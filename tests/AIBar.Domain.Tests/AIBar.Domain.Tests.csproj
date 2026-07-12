@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AIBar.Domain\AIBar.Domain.csproj" />
+    <ProjectReference Include="..\..\src\AIBar.Application\AIBar.Application.csproj" />
   </ItemGroup>
 
 </Project>

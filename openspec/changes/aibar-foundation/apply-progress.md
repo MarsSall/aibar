@@ -2,7 +2,7 @@
 
 ## Status
 
-**Slice 1 complete.** The prior SDK blocker is resolved: .NET SDK `8.0.408` is installed alongside `6.0.424`. Only the approved Solution Skeleton and Pure Contracts work unit was implemented. No Slice 2+ implementation, credentials, HTTP, SQLite, scanner, tray behavior, polished UI, commit, push, branch, or PR was created.
+**Slice 1 complete. Slice 2 blocked before implementation by its enforced 400-line budget gate.** The prior SDK blocker is resolved: .NET SDK `8.0.408` is installed alongside `6.0.424`. Only the approved Solution Skeleton and Pure Contracts work unit was implemented. Slice 2 was assessed on `feature/aibar-foundation-slice-2`; no Slice 2+ production code, fixtures, tests, credentials, HTTP, SQLite, scanner, tray behavior, polished UI, commit, push, branch, or PR was created.
 
 ## Preserved blocker history
 
@@ -14,8 +14,31 @@ The previous apply attempt was blocked before implementation because only .NET S
 - Native status: authoritative OpenSpec status, `applyState: ready`, `nextRecommended: apply`, no blocked reasons
 - Action context: `repo-local`; workspace root and allowed edit root are `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`
 - Delivery: `auto-chain` / `feature-branch-chain`
-- PR boundary: Slice 1 only; Slice 2+ remain out of scope
-- Strict TDD configuration: false; Slice 1's explicit test-first requirement was followed.
+- Prior PR boundary: Slice 1 only; current attempted boundary: Slice 2 only (blocked at preflight; Slice 3+ remain out of scope)
+- Strict TDD configuration: false; Slice 1's explicit test-first requirement was followed. Slice 2 explicitly requires RED → GREEN → TRIANGULATE → REFACTOR, but no cycle began because the budget gate stopped work before code/test edits.
+
+## Slice 2 budget preflight (2026-07-12)
+
+Structured status was supplied by the parent and consumed before editing: authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, `5/52` complete, repo-local action context rooted at `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`, with no blockers. The approved delivery path is `auto-chain` / `feature-branch-chain`, and the assigned boundary is Slice 2 only.
+
+Slice 2 cannot be implemented as its six required checkboxes under the `<=400` authored-line limit. The smallest credible forecast is **~620 authored lines**, excluding generated build output:
+
+| Concern | Forecast |
+|---|---:|
+| Root resolver, minimum-field JSON reader, request-scoped credential object, feature policy, safe error/redaction boundary | 160 |
+| Allowlisted `HttpClient` adapter, timeout/cancellation/redirect/retry policy, response DTO mapping | 210 |
+| Synthetic HTTP/auth fixtures and contract tests (including RED/TRIANGULATE cases) | 230 |
+| Project/test wiring and unsupported-integration disclosure | 20 |
+| **Total** | **620** |
+
+No partial Slice 2 work was started, no test was run, and no Slice 2 checkbox was changed. This preserves the reviewed Slice 1 baseline and prevents an unreviewable security-sensitive diff. Actual Slice 2 implementation authored lines: **0**; this progress-only record changed 29 lines (26 additions, 3 deletions).
+
+**Concrete split proposal:**
+
+1. **Slice 2A — credential boundary and disablement** (~350 authored lines): root resolver; minimum-field read-only credential reader; request-scoped credential lifetime; centralized safe error/redaction; feature-default-disabled policy and unsupported-endpoint disclosure; synthetic auth/redaction tests.
+2. **Slice 2B — private HTTP quota adapter** (~390 authored lines): HTTPS allowlist, redirects disabled, timeout/cancellation/retry classification; version-neutral `/wham/usage` and optional-detail mapping; synthetic status/redirect/schema/retry contract tests.
+
+Each proposed unit remains within the budget and retains synthetic-only fixtures. Slice 2B depends on 2A; neither introduces real credentials or live endpoints.
 
 ## Completed tasks and checkbox evidence
 
@@ -135,3 +158,72 @@ The exact unchecked persisted task lines are:
 - [ ] Preserve no credentials or user content in test evidence, logs, artifacts, screenshots, or release bundles.
 
 All remaining lines are Slice 2–8 or cross-slice gates and are intentionally not part of this apply batch.
+
+## Slice 2A applied (2026-07-12)
+
+Slice 2A is complete on `feature/aibar-foundation-slice-2`. The preserved 620-line Slice 2 gate and approved 2A/2B split above remain the governing delivery decision. This work unit implements the credential/policy boundary only; it adds no `HttpClient`, endpoints, DTOs, retries, redirects, or live integration.
+
+### Completed tasks and persisted checkbox evidence
+
+All seven Slice 2A task lines are visibly marked `- [x]` in `openspec/changes/aibar-foundation/tasks.md` after focused synthetic and full-suite evidence:
+
+- supported `%CODEX_HOME%`/current-user `.codex` root selection;
+- read-only minimum-field `access_token` plus optional `account_id` reader using `FileShare.ReadWrite | FileShare.Delete`;
+- disposable request credential that clears token/account references on disposal;
+- central safe redaction for bearer, token/secret, account ID, and path values;
+- disabled-by-default private-integration policy with private/undocumented/unsupported disclosure; and
+- synthetic tests for roots, malformed/missing/extra fields, lifetime, defaults, disclosure, redaction, and replacement/share-read behavior.
+
+### TDD Cycle Evidence
+
+| Stage | Evidence | Result |
+|---|---|---|
+| RED | Added `CredentialBoundaryTests` and Application reference; ran focused test command before implementation | Failed as expected: `AIBar.Application` and `ICredentialFileReader` did not exist (`CS0234`, `CS0246`). |
+| GREEN | Added the minimum credential boundary, reader, policy, disclosure, and redactor; reran focused tests | Initially exposed platform-sensitive root separator expectation; corrected the synthetic assertion to `Path.Combine`; passed 9/9. |
+| TRIANGULATE | Focused tests cover missing/malformed/blank fields, extra refresh-token field, replacement/share-read, disabled default, and seeded secret/account/path redaction | Passed 9/9; all inputs are in-memory synthetic strings. |
+| REFACTOR | Kept parsing in one `JsonDocument` minimum-field path and redaction in one primitive; fixed the pre-existing WPF `Application` namespace ambiguity caused by the new application namespace | Full build and suite pass with 0 warnings/errors; no HTTP or persistence references added. |
+
+### Verification evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter FullyQualifiedName~CredentialBoundaryTests --logger "console;verbosity=minimal"
+RED: failed as expected (CS0234/CS0246).
+GREEN/TRIANGULATE: Passed: 9, Failed: 0, Skipped: 0, Total: 9.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 15, Failed: 0, Skipped: 0, Total: 15.
+```
+
+LSP diagnostics were requested but no LSP tool is available in this executor session; the successful compiler build is the available static diagnostic evidence. `git diff --check` passed. Source inspection found no `HttpClient`, `System.Net.Http`, `backend-api`, or `wham` references in Slice 2A paths.
+
+### Files changed in Slice 2A
+
+- `src/AIBar.Application/CredentialBoundary.cs`
+- `tests/AIBar.Domain.Tests/CredentialBoundaryTests.cs`
+- `tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj`
+- `src/AIBar.Desktop/App.xaml.cs` (one-line namespace disambiguation required for the full solution build)
+- `openspec/changes/aibar-foundation/tasks.md`
+- `openspec/changes/aibar-foundation/apply-progress.md`
+
+### Workload / boundary / deviations
+
+Current feature-branch-chain boundary: **Slice 2A only**; prior dependency: Slice 1; follow-up: Slice 2B. Slice 2A adds **171 source/test lines**, plus two one-line project/host corrections, before SDD metadata; it is below the 400-line authored budget. No commit, push, PR, review transaction, real Codex access, credential, or network call occurred.
+
+Deviation: the reader is an infrastructure-neutral `ICredentialFileReader` port backed by a read-only file implementation; the existing `ICodexCredentialSource` remains unchanged so Slice 2B can compose the request boundary without introducing HTTP now. The required build fix qualifies the WPF base type as `System.Windows.Application` because `AIBar.Application` now exists.
+
+### Remaining tasks
+
+The following exact Slice 2B lines remain unchecked and are outside this work unit:
+
+- [ ] Implement the feature-gated `IQuotaProvider` with `HttpClient`, HTTPS allowlisting for only `https://chatgpt.com/backend-api`, redirects disabled, request-scoped authorization, cancellation, bounded connect/request timeouts, and conservative retry behavior honoring `Retry-After`.
+- [ ] Implement version-neutral DTO mapping for `/wham/usage` and optional `/wham/rate-limit-reset-credits`, validating required percentages/reset timestamps and preserving optional-detail failure without invalidating the primary quota result.
+- [ ] Classify 401/403/429/5xx, transport/timeout, redirect, malformed/missing-field, and unavailable outcomes into safe error codes and summaries; never expose raw bodies, headers, credentials, URLs/query secrets, or sensitive account identifiers.
+- [ ] **RED:** add synthetic HTTP/auth contract fixtures and tests for valid/version-variant/missing-field responses, status classes, redirect rejection, timeout/cancellation, retry limits, `Retry-After`, optional-detail failure, and secret-free errors.
+- [ ] **GREEN:** implement the allowlisted adapter, version-neutral mapping, failure classification, and bounded retry behavior against the synthetic handler/fixtures only.
+- [ ] **TRIANGULATE:** verify no cross-origin redirect can carry authorization, no retry occurs for 401/403/malformed payloads, one transient retry is bounded, and optional failure preserves primary windows.
+- [ ] **REFACTOR:** isolate endpoint details behind `IQuotaProvider`, reuse Slice 2A redaction/lifetime boundaries, and keep live private-endpoint tests opt-in and outside ordinary CI.
+
+Slice 3–8 and cross-slice gates remain unchecked exactly as listed in the persisted tasks artifact above.
