@@ -1,0 +1,7 @@
+# Build and local tooling output
+[Bb]in/
+[Oo]bj/
+.codegraph/
+
+# Local Pi runtime state
+.atl/
