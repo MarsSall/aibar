@@ -13,8 +13,11 @@ public sealed class HostRuntimeTests
         var tray = new FakeTray();
         var popover = new FakePopover();
         var taskbar = new FakeRecreationEvents();
-        await using var host = new TrayHostRuntime(instance, tray, popover, taskbar, _ => Task.CompletedTask, new ProbeResource(), () => { });
-        host.Start();
+        var refreshes = 0;
+        var command = new ManualRefreshCommand(_ => { refreshes++; return ValueTask.CompletedTask; }, () => true);
+        await using var host = new TrayHostRuntime(instance, tray, popover, taskbar, _ => Task.CompletedTask, new ProbeResource(), () => { }, command);
+        host.Start(); Assert.True(tray.RefreshAvailable); tray.Refresh();
+        Assert.Equal(1, refreshes);
 
         tray.Click(); tray.Click();
         Assert.Equal(1, popover.Shows); Assert.Equal(1, popover.Hides);
@@ -43,6 +46,7 @@ public sealed class HostRuntimeTests
             cancellationObserved = token.IsCancellationRequested; resource.Events.Add("cancel"); return Task.CompletedTask;
         }, resource, () => exited++);
 
+        Assert.False(tray.RefreshAvailable); tray.Refresh();
         tray.Exit(); tray.Exit();
         instance.Dispose();
         await host.ExitAsync();
@@ -78,9 +82,10 @@ public sealed class HostRuntimeTests
 
     private sealed class FakeTray : ITrayRuntime
     {
-        public event Action? Toggled; public event Action? ExitRequested; public event Action? Recreated;
-        public int Shows { get; private set; } public int Disposals { get; private set; }
-        public void Show() => Shows++; public void Hide() { } public void Click() => Toggled?.Invoke(); public void Exit() => ExitRequested?.Invoke(); public void Recreate() => Recreated?.Invoke();
+        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? Recreated;
+        public int Shows { get; private set; } public int Disposals { get; private set; } public bool RefreshAvailable { get; private set; }
+        public void SetRefreshAvailable(bool available) => RefreshAvailable = available;
+        public void Show() => Shows++; public void Hide() { } public void Click() => Toggled?.Invoke(); public void Exit() => ExitRequested?.Invoke(); public void Refresh() { if (RefreshAvailable) RefreshRequested?.Invoke(); } public void Recreate() => Recreated?.Invoke();
         public ValueTask DisposeAsync() { Disposals++; return ValueTask.CompletedTask; }
     }
 

@@ -558,3 +558,57 @@ No quota view-models, quota/analytics/cost disclosures, visual tokens/cards/acce
 - `RELIABILITY-002`: process-exit failures now fault `ExitAsync`; retry reuses the completed cleanup and invokes only process exit again, preserving cancellation → persistence → tray → process-exit order.
 - Focused tests: 3/3 passed. Full suite: 64/64 passed. Build: 0 warnings/errors. `git diff --check`: passed with line-ending warnings only.
 - LSP diagnostics were requested but unavailable because no LSP tool is injected in this executor session; compiler diagnostics are clean.
+
+## Slice 4B applied (2026-07-13)
+
+**Status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, no blocked reasons; repo-local workspace/allowed edit root is `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`. Delivery is `auto-chain` / `feature-branch-chain`; boundary: **4B only**, based on approved 4A.2 commit `c280bb6`. Strict TDD is false; focused test-first evidence was retained. No action-context warnings.
+
+### Completed tasks / persisted checkbox evidence
+
+All four Slice 4B RED/GREEN/TRIANGULATE/REFACTOR lines are visibly `- [x]` in `tasks.md`. `QuotaPresentationMapper` returns immutable presentation records for current, stale, loading, unavailable, authentication, permission, malformed, network, and service states. It preserves known stale/loading values without marking them current, leaves unavailable percentages null, derives independent service-reset countdowns from an injected clock, and exposes source/timestamp/freshness plus fixed distinct disclosures for private service quota, local analytics, and estimated cost. `ManualRefreshCommand` is platform-light and deterministic; the existing tray host accepts it as an optional refresh boundary and the Windows tray exposes a Refresh command. No XAML, visual tokens/cards, accessibility styling, analytics scanning, pricing, or Slice 5+ scope was added.
+
+### RED → GREEN → TRIANGULATE → REFACTOR evidence
+
+| Stage | Evidence | Result |
+|---|---|---|
+| RED | Added `QuotaPresentationTests`, then ran its focused filter before mapper/command types existed. | Failed as expected: `CS0246` for `QuotaPresentationMapper` and `ManualRefreshCommand`. |
+| GREEN | Added immutable mapping, injected-clock countdowns, disclosure records, and refresh command. | Focused presentation tests passed 8/8. |
+| TRIANGULATE | Added stale/error overlay and elapsed-reset cases; exercised all safe error classes, loading, unavailable, independent windows, command disabled state, and tray refresh routing. | Focused presentation/host tests passed 12/12. |
+| REFACTOR | Centralized state labels/error mapping/disclosures; retained no dispatcher dependency in pure mapping or command tests. | Full suite/build passed with zero warnings/errors. |
+
+### Verification / workload / deviations
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~QuotaPresentationTests"
+RED: failed as expected (CS0246); GREEN: Passed 8/8.
+
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~QuotaPresentationTests|FullyQualifiedName~HostRuntimeTests"
+Passed: 12, Failed: 0.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 73, Failed: 0.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+git diff --check
+Passed (Git emitted only LF-to-CRLF warnings).
+```
+
+LSP diagnostics are not injected in this executor session; the zero-warning compiler build is the available static diagnostic evidence. Files: `src/AIBar.Desktop/QuotaPresentation.cs`, `src/AIBar.Desktop/HostRuntime.cs`, `tests/AIBar.Domain.Tests/QuotaPresentationTests.cs`, `tests/AIBar.Domain.Tests/HostRuntimeTests.cs`, plus persisted tasks/progress. Complete diff from `c280bb6`, including tracked, untracked, and OpenSpec evidence, is rechecked below the 400-line cap. No design deviation, staging, commit, push, PR, review transaction, branch action, credential/network/user-data access, or out-of-repository write occurred.
+
+### Bounded reliability correction
+
+- `RELIABILITY-001`: tray refresh availability now follows whether the host received a functional command; null composition leaves Refresh unexposed.
+- `RELIABILITY-002`: manual refresh owns an atomic running state, rejects overlap, and restores/notifies executability after success, failure, or cancellation.
+- `RELIABILITY-003`: a retained snapshot with a refresh failure preserves data/timestamp but is labeled `Stale`, never `Current`.
+- Focused deterministic correction tests passed 14/14; full suite passed 75/75 and build completed with zero warnings/errors.
+
+### Remaining work
+
+Slice 4C remains the next boundary; its exact unchecked lines are:
+
+- [ ] **RED:** add rendering/interaction checks for semantic token roles, quota-card hierarchy, typography/spacing/contrast, keyboard navigation, visible focus, accessible names, reduced motion, high contrast, and DPI scaling; establish representative W10/W11 evidence expectations.
+- [ ] **GREEN:** build the custom semantic WPF token system and compact quota cards using Windows-native typography, spacing, contrast, keyboard/focus/accessibility behavior, reduced-motion and high-contrast support, and DPI scaling.
+- [ ] **TRIANGULATE:** validate representative Windows 10/11 scale factors, keyboard/focus paths, screen-reader names, reduced-motion/high-contrast behavior, and that visual evidence does not replace lifecycle/accessibility checks.
+- [ ] **REFACTOR:** consolidate semantic resources, remove hard-coded presentation roles, preserve readable Windows fallbacks, and rerun representative interaction/accessibility checks and build diagnostics.

@@ -11,6 +11,8 @@ public interface ITrayRuntime : IAsyncDisposable
 {
     event Action? Toggled;
     event Action? ExitRequested;
+    event Action? RefreshRequested;
+    void SetRefreshAvailable(bool available);
     void Show();
     void Hide();
 }
@@ -36,16 +38,18 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private readonly Func<CancellationToken, Task> _awaitCancelledWork;
     private readonly IAsyncDisposable _persistence;
     private readonly Action _exitProcess;
+    private readonly IManualRefreshCommand? _refreshCommand;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly DispatcherTimer _activationTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private Task? _cleanupTask;
     private Task? _exitTask;
     private bool _disposed;
 
-    public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess)
+    public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess, IManualRefreshCommand? refreshCommand = null)
     {
-        _instance = instance; _tray = tray; _popover = popover; _taskbar = taskbar; _awaitCancelledWork = awaitCancelledWork; _persistence = persistence; _exitProcess = exitProcess;
-        _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += ShowPopover;
+        _instance = instance; _tray = tray; _popover = popover; _taskbar = taskbar; _awaitCancelledWork = awaitCancelledWork; _persistence = persistence; _exitProcess = exitProcess; _refreshCommand = refreshCommand;
+        _tray.SetRefreshAvailable(refreshCommand is not null);
+        _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _tray.RefreshRequested += OnRefreshRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += ShowPopover;
         _activationTimer.Tick += DispatchPendingActivation;
     }
 
@@ -98,10 +102,15 @@ public sealed class TrayHostRuntime : IAsyncDisposable
         if (!_disposed) RunSafely(() => { _tray.Hide(); _tray.Show(); });
     }
     private void OnExitRequested() => _ = ExitSafelyAsync();
+    private void OnRefreshRequested() => _ = RefreshSafelyAsync();
+    private async Task RefreshSafelyAsync()
+    {
+        if (_refreshCommand?.CanExecute == true) try { await _refreshCommand.ExecuteAsync(_shutdown.Token); } catch (Exception) { }
+    }
     private async Task ExitSafelyAsync() { try { await ExitAsync(); } catch (Exception) { } }
     private void Detach()
     {
-        _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= ShowPopover;
+        _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _tray.RefreshRequested -= OnRefreshRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= ShowPopover;
     }
     private static void RunSafely(Action action) { try { action(); } catch (Exception) { } }
     public ValueTask DisposeAsync() => new(ExitAsync());
@@ -110,14 +119,22 @@ public sealed class TrayHostRuntime : IAsyncDisposable
 public sealed class WindowsTrayRuntime : ITrayRuntime
 {
     private readonly Forms.NotifyIcon _icon = new() { Icon = SystemIcons.Application, Text = "AIBar", Visible = false };
+    private readonly Forms.ContextMenuStrip _menu = new();
+    private readonly Forms.ToolStripMenuItem _refresh = new("Refresh");
     public WindowsTrayRuntime()
     {
-        var menu = new Forms.ContextMenuStrip(); var exit = new Forms.ToolStripMenuItem("Exit AIBar");
-        exit.Click += (_, _) => ExitRequested?.Invoke(); menu.Items.Add(exit); _icon.ContextMenuStrip = menu;
+        var exit = new Forms.ToolStripMenuItem("Exit AIBar");
+        _refresh.Click += (_, _) => RefreshRequested?.Invoke(); exit.Click += (_, _) => ExitRequested?.Invoke(); _menu.Items.Add(exit); _icon.ContextMenuStrip = _menu;
         _icon.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) Toggled?.Invoke(); };
     }
     public event Action? Toggled;
     public event Action? ExitRequested;
+    public event Action? RefreshRequested;
+    public void SetRefreshAvailable(bool available)
+    {
+        if (available && !_menu.Items.Contains(_refresh)) _menu.Items.Insert(0, _refresh);
+        else if (!available) _menu.Items.Remove(_refresh);
+    }
     public void Show() => _icon.Visible = true;
     public void Hide() => _icon.Visible = false;
     public ValueTask DisposeAsync() { _icon.Dispose(); return ValueTask.CompletedTask; }
