@@ -463,3 +463,45 @@ No Slice 3C task remains unchecked. Slice 4 and later work remain out of scope; 
 - [ ] Implement the single-process WPF host, named-mutex single-instance activation, tray recreation handling, taskbar/DPI-aware borderless popover positioning, deactivation behavior, and explicit Exit command that cancels work and closes persistence.
 
 The remaining unchecked Slice 4–8 and cross-slice-gate lines remain unchanged in `tasks.md`; verification is the next phase only after the entire change's remaining tasks are complete.
+
+## Slice 4 planning gate (2026-07-13)
+
+Planning-only status: Slice 4 implementation/test/project lines remain **0**. The approved split and current next action are recorded in the final `Slice 4A split approval` note below; no duplicate workload history is repeated here.
+
+## Slice 4A split approval (2026-07-13)
+
+**Approved decision recorded; implementation not started.** Replace the unchecked ~465-line 4A unit with two independently testable/revertible units: **4A.1** (~315 including evidence) for WPF host primitives, named-mutex single-instance activation/secondary-activation handoff, pure taskbar/DPI-aware placement, and deterministic tests; and **4A.2** (~260) for the live tray bridge, taskbar recreation, popover show/hide/deactivation, orderly explicit Exit, and focused Windows smoke tests using 4A.1. Neither unit includes 4B/4C presentation scope.
+
+**Approved chain and next action:** `1b9cca5 → 4A.1 → 4A.2 → 4B → 4C → 5`. Apply 4A.1 only after task review. All new task checkboxes remain unchecked. No implementation, XAML, project, test, screenshot, build, stage, commit, branch, push, or review action was performed. The complete planning diff from `1b9cca5` still requires `git diff --stat`/`git diff --check` verification by an execution environment with Git command access; no such command tool is available in this phase.
+
+## Slice 4A.1 applied (2026-07-13)
+
+**Status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`; repo-local edit root; no blockers. Boundary: **4A.1 only** in the approved `auto-chain` / `feature-branch-chain` path. Strict TDD is false; test-first evidence is retained.
+
+### Completed tasks / evidence
+
+The four 4A.1 RED/GREEN/TRIANGULATE/REFACTOR lines are visibly `- [x]` in `tasks.md`. `SingleInstanceHost` owns a named mutex and uses a named auto-reset activation event: secondaries signal, while the primary drains one pending activation per dispatch. `PopoverPlacement` is pure and consumes monitor/work-area rectangles and DPI scale; it clamps size/position to the work area. No tray runtime/recreation, deactivation/show-hide behavior, Exit orchestration, presentation state, cards, or disclosures was added.
+
+| Cycle | Evidence | Result |
+|---|---|---|
+| RED | `HostPrimitivesTests` compiled before the primitives existed | Failed as expected with `CS0246`. |
+| GREEN | Minimal host/placement primitives | Focused tests passed 4/4. |
+| TRIANGULATE | Same-process takeover with another handle alive, bounded real child-process election/handoff, abandoned-owner recovery, every NaN/±Infinity field, invalid dimensions/DPI, and overflow | Focused tests passed 7/7. |
+| REFACTOR | Kept WPF/platform code in Desktop and policies pure | Full build/tests passed. |
+
+### Verification / workload
+
+Correction focused command `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~HostPrimitivesTests"` passed 7/7, including a timeout-bounded `dotnet test --no-build` child process that is terminated and awaited for abandoned-owner evidence. Full-suite/build/diff checks are recorded from the final correction validation. LSP diagnostics remain unavailable in this executor session; the compiler build is the available static diagnostic evidence.
+
+Files: `src/AIBar.Desktop/HostPrimitives.cs`, `tests/AIBar.Domain.Tests/HostPrimitivesTests.cs`, `tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj`, plus persisted tasks/progress. No design deviation. The pre-existing planning diff was 69 lines; the post-implementation complete authored count is recorded after final validation and remains within 400. No stage, commit, push, branch, PR, or review transaction occurred.
+
+**Remaining:** all 4A.2, 4B, 4C, Slice 5+, and cross-slice lines remain unchecked; next boundary is 4A.2 only.
+
+Exact next unchecked Slice 4 lines:
+
+- [ ] **RED:** add focused Windows smoke tests for tray creation/toggle, secondary activation handoff, Explorer/taskbar recreation, popover focus/deactivation, and Exit cancellation/persistence disposal ordering.
+- [ ] **GREEN:** implement the tray runtime bridge, recreation handling, borderless popover show/hide and deactivation behavior, and explicit Exit orchestration that cancels work, closes persistence, and exits orderly.
+- [ ] **TRIANGULATE:** exercise taskbar recreation, repeated toggles, owned-dialog deactivation, shutdown races, cancellation/close ordering, and activation handoff through the 4A.1 contract on a representative Windows environment.
+- [ ] **REFACTOR:** isolate runtime Win32/WPF adapters, make tray recreation and shutdown idempotent, keep coordinator/persistence calls at the host boundary, and rerun focused smoke tests plus diagnostics.
+
+The 4B and 4C task lines remain unchecked as persisted in `tasks.md`; they are intentionally deferred with Slice 5+ and cross-slice gates. Final complete authored diff from `1b9cca5`: **282** lines (tracked `git diff --numstat 1b9cca5 --`: 118 additions + 38 deletions = 156; two unstaged new source/test files: 126 additions). This is within the 400-line limit.

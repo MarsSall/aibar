@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Estimated changed lines | 11 reviewable units; Slice 2A ~350, Slice 2B ~390, 3A ~330, 3B ~375, 3C ~230; all units below 400 authored lines |
+| Estimated changed lines | 15 reviewable units; Slice 2A ~350, Slice 2B ~390, 3A ~330, 3B ~375, 3C ~230, 4A.1 ~315, 4A.2 ~260, 4B ~385, 4C ~390; all units below 400 authored lines |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | PR 1 → PR 2A → PR 2B → PR 3A → PR 3B → PR 3C → PR 4 → PR 5 → PR 6 → PR 7 → PR 8 |
+| Suggested split | PR 1 → PR 2A → PR 2B → PR 3A → PR 3B → PR 3C → PR 4A.1 → PR 4A.2 → PR 4B → PR 4C → PR 5 → PR 6 → PR 7 → PR 8 |
 | Delivery strategy | auto-chain |
 | Chain strategy | feature-branch-chain |
 
@@ -87,18 +87,55 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Acceptance evidence:** lifecycle/degradation race report, fake-clock state traces, cancellation/clear-data evidence, and affected build/test output. **Rollback boundary:** remove the lifecycle adapter and hardening changes, retaining the stable 3B coordinator and 3A schema/store.
 
-**Slice 3 chain:** `2B → 3A → 3B → 3C → 4`. Each unit remains under the 400-line authored review budget and must be applied/reviewed independently before advancing.
+**Slice 3 chain:** `2B → 3A → 3B → 3C → 4A.1`. Each unit remains under the 400-line authored review budget and must be applied/reviewed independently before advancing.
 
-### Slice 4 — Native tray, popover, and quota presentation
+### Slice 4A.1 — WPF host primitives, single-instance activation, and pure placement (~315 including evidence)
 
-- [ ] Implement the single-process WPF host, named-mutex single-instance activation, tray recreation handling, taskbar/DPI-aware borderless popover positioning, deactivation behavior, and explicit Exit command that cancels work and closes persistence.
-- [ ] Implement immutable view models/state rendering for current, stale, loading, unavailable, authentication, permission, malformed, network, and service states; never show a fabricated percentage or stale data as current.
-- [ ] Build the custom semantic WPF design tokens and compact CodexBar-inspired quota cards using Windows-native typography, spacing, contrast, keyboard navigation, visible focus, accessible names, reduced-motion behavior, high-contrast support, and DPI scaling.
-- [ ] Show independent 5-hour/weekly percentages, service reset countdowns, source/timestamp/freshness disclosure, manual refresh, local-analytics separation, estimated-cost separation, and private-endpoint disclosure.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test view-model state mapping and coordinator/UI command behavior; add focused Windows smoke checks for tray toggling, popover focus, single-instance activation, taskbar recreation, and representative DPI.
-- [ ] Capture representative Windows 10/11 visual evidence; treat accessibility and lifecycle checks as acceptance evidence, not screenshot similarity alone.
+**Dependency:** Slice 3C complete at `1b9cca5`. **Scope boundary:** testable WPF host primitives, named-mutex single-instance activation/secondary-activation handoff contract, pure taskbar/DPI-aware popover placement model, and focused deterministic tests. Explicitly excludes live tray runtime/recreation, popover deactivation behavior, and Exit orchestration. **Rollback/review boundary:** revert only 4A.1 to restore the Slice 3C baseline; review and apply as one independently testable unit before 4A.2.
 
-**Acceptance evidence:** view-model tests, Windows smoke results, accessibility checklist, and W10/W11 screenshots at representative scale factors. Rollback is removal of presentation while preserving application services.
+- [x] **RED:** add deterministic tests for named-mutex ownership, secondary-launch activation handoff, idempotent activation handling, taskbar work-area placement, monitor edges, and DPI scaling; keep tests independent of a live tray icon or process shutdown.
+- [x] **GREEN:** implement the minimal WPF host primitives, named-mutex single-instance contract, secondary-activation handoff, and pure placement model using taskbar work area and DPI inputs; do not wire live tray runtime, recreation, deactivation, or Exit.
+- [x] **TRIANGULATE:** exercise duplicate launches, repeated handoff signals, malformed/edge placement inputs, taskbar/display/DPI changes represented as pure inputs, and deterministic activation/placement traces.
+- [x] **REFACTOR:** isolate Win32/WPF boundary code from pure activation and placement policies, make ownership/handoff disposal idempotent, and verify focused deterministic tests and diagnostics without adding runtime orchestration.
+
+**Acceptance evidence:** deterministic activation-contract and placement test report, synthetic monitor/taskbar/DPI matrix, host primitive dependency inspection, and build diagnostics. Forecast is ~315 lines including evidence and remains below 400. No tray runtime, recreation, deactivation, or Exit smoke evidence belongs here.
+
+### Slice 4A.2 — Tray runtime, recreation, popover lifecycle, and orderly Exit (~260 including evidence)
+
+**Dependency:** Slice 4A.1 complete and reviewed. **Scope boundary:** actual tray runtime bridge, taskbar/Explorer recreation, popover show/hide/deactivation behavior, and orderly explicit Exit that cancels work and closes persistence, using 4A.1 primitives. No quota view-model mapping, quota-card styling, analytics disclosures, or visual token system. **Rollback/review boundary:** revert only 4A.2 to retain the reviewed 4A.1 primitives and restore a non-runtime host boundary; review and apply independently before 4B.
+
+- [ ] **RED:** add focused Windows smoke tests for tray creation/toggle, secondary activation handoff, Explorer/taskbar recreation, popover focus/deactivation, and Exit cancellation/persistence disposal ordering.
+- [ ] **GREEN:** implement the tray runtime bridge, recreation handling, borderless popover show/hide and deactivation behavior, and explicit Exit orchestration that cancels work, closes persistence, and exits orderly.
+- [ ] **TRIANGULATE:** exercise taskbar recreation, repeated toggles, owned-dialog deactivation, shutdown races, cancellation/close ordering, and activation handoff through the 4A.1 contract on a representative Windows environment.
+- [ ] **REFACTOR:** isolate runtime Win32/WPF adapters, make tray recreation and shutdown idempotent, keep coordinator/persistence calls at the host boundary, and rerun focused smoke tests plus diagnostics.
+
+**Acceptance evidence:** focused Windows smoke log for tray, activation, recreation, popover lifecycle, and Exit; cancellation/persistence-close ordering evidence; and build diagnostics. Forecast is ~260 lines including evidence and remains below 400.
+
+### Slice 4B — Immutable presentation state, commands, and disclosures (~385 authored lines)
+
+**Dependency:** Slice 4A.2 complete. **Scope boundary:** immutable view-model/state mapping, commands, quota/analytics/cost semantics, and behavior tests; no host lifecycle changes or semantic visual token/card styling. **Rollback:** remove 4B to retain the 4A.1/4A.2 host boundary and revert only presentation-state behavior.
+
+- [ ] **RED:** add deterministic view-model and command tests for current, stale, loading, unavailable, authentication, permission, malformed, network, and service states; prove no fabricated percentage or stale value is shown as current; cover refresh command behavior.
+- [ ] **GREEN:** implement immutable state mapping and commands for independent 5-hour/weekly percentages, service reset countdowns, manual refresh, source/timestamp/freshness, explicit private-endpoint disclosure, and visually/conceptually separate local analytics and estimated cost data.
+- [ ] **TRIANGULATE:** exercise state transitions, missing windows, stale/error overlays, loading/concurrent refresh commands, reset time basis, and snapshots proving service quota, local analytics, and estimated cost remain distinct.
+- [ ] **REFACTOR:** centralize mapping/label semantics, remove mutable presentation leakage and duplicated disclosure text, preserve dispatcher-independent tests, and run the focused behavior suite and build diagnostics.
+
+**Acceptance evidence:** deterministic state/command test report for every listed state, snapshots proving no fabricated current percentage, source/timestamp/freshness and disclosure evidence, and build output. Independently reviewable/testable/revertible; apply/review only after 4A.2 and before 4C.
+
+### Slice 4C — Semantic WPF tokens, quota cards, and accessibility evidence (~390 authored lines)
+
+**Dependency:** Slice 4B complete. **Scope boundary:** semantic WPF design tokens, compact CodexBar-inspired quota cards, typography/spacing/contrast, keyboard/focus/accessibility/reduced-motion/high-contrast/DPI behavior, and representative evidence; no new host lifecycle or state/business rules. **Rollback:** remove 4C styling/evidence while preserving 4B state contracts and 4A lifecycle.
+
+- [ ] **RED:** add rendering/interaction checks for semantic token roles, quota-card hierarchy, typography/spacing/contrast, keyboard navigation, visible focus, accessible names, reduced motion, high contrast, and DPI scaling; establish representative W10/W11 evidence expectations.
+- [ ] **GREEN:** build the custom semantic WPF token system and compact quota cards using Windows-native typography, spacing, contrast, keyboard/focus/accessibility behavior, reduced-motion and high-contrast support, and DPI scaling.
+- [ ] **TRIANGULATE:** validate representative Windows 10/11 scale factors, keyboard/focus paths, screen-reader names, reduced-motion/high-contrast behavior, and that visual evidence does not replace lifecycle/accessibility checks.
+- [ ] **REFACTOR:** consolidate semantic resources, remove hard-coded presentation roles, preserve readable Windows fallbacks, and rerun representative interaction/accessibility checks and build diagnostics.
+
+**Acceptance evidence:** automatable token/card checks where available, accessibility and lifecycle checklist, focused interaction smoke results, and representative Windows 10/11 screenshots at scale factors. Independently reviewable/testable/revertible; apply/review only after 4B.
+
+**Slice 4 requirement mapping:** original host primitives and named-mutex activation → 4A.1; original pure taskbar/DPI placement → 4A.1; original tray runtime/recreation, popover deactivation, and explicit Exit orchestration → 4A.2; original host/tray smoke obligation → 4A.2; original immutable-state task → 4B; original semantic-token/card task → 4C; original quota windows/countdowns/source/timestamp/freshness/manual refresh/analytics-cost separation/private disclosure task → 4B; original W10/W11 visual/accessibility evidence obligation → 4C. Every current 4A obligation appears exactly once across 4A.1 or 4A.2, and 4B/4C product scope is unchanged.
+
+**Slice 4 chain:** `1b9cca5 → 4A.1 → 4A.2 → 4B → 4C → 5`. Each unit is independently testable and revertible and remains at or below 400 authored lines. Do not include scanner, pricing, packaging, or later-slice work.
 
 ### Slice 5 — Incremental scanner and checkpointing
 

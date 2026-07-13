@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\AIBar.Domain\AIBar.Domain.csproj" />
     <ProjectReference Include="..\..\src\AIBar.Application\AIBar.Application.csproj" />
+    <ProjectReference Include="..\..\src\AIBar.Desktop\AIBar.Desktop.csproj" />
   </ItemGroup>
 
 </Project>
