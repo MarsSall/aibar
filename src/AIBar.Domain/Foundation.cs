@@ -70,6 +70,8 @@ public sealed record QuotaFailure(QuotaErrorKind Kind, string SafeCode);
 public sealed record CredentialResult(string? AccessToken, string? AccountId, QuotaFailure? Failure);
 public sealed record QuotaProviderResult(QuotaSnapshot? Snapshot, QuotaFailure? Failure, decimal? ResetCredits = null, QuotaFailure? OptionalFailure = null);
 public sealed record UsageScanResult(IReadOnlyList<DailyUsage> Usage, ScanCoverage Coverage);
+public enum RefreshTrigger { Poll, PopoverOpened, Resume, Manual }
+public sealed record QuotaRefreshState(QuotaSnapshot? Snapshot, FreshnessState Freshness, bool IsLoading, QuotaFailure? Failure, QuotaFailure? OptionalFailure);
 
 public sealed class FreshnessPolicy(TimeSpan threshold)
 {

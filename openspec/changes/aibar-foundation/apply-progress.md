@@ -369,3 +369,51 @@ Remaining Slice 3 work is exactly:
 - [ ] **GREEN:** implement `QuotaRefreshCoordinator` using the 3A store and 2B provider: publish cached state first, gate one asynchronous refresh task, coalesce poll/popover-open/resume/manual triggers, let manual refresh bypass freshness but not concurrency, schedule conservatively, preserve the prior snapshot/timestamp on failure, overlay classified errors, and publish explicit stale/unavailable states without fabricating percentages.
 - [ ] **RED:** add deterministic tests for sleep/resume, system clock forward/backward changes, resume freshness re-evaluation, stale-to-current/unavailable transitions, prior timestamp preservation, optional-detail degradation, and clear-data/cancellation races using the existing coordinator contracts.
 - [ ] **GREEN:** add the lifecycle boundary that forwards sleep/resume and clock-change notifications to coordinator re-evaluation; harden stale/unavailable transitions, retain original successful timestamps on failures, preserve primary data when optional details fail, and prevent cancelled/cleared work from republishing.
+
+## Slice 3B applied (2026-07-13)
+
+**Structured status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, no blocked reasons; workspace and allowed edit root are `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`. Delivery is `auto-chain` / `feature-branch-chain`; the boundary is **Slice 3B only**, based on approved Slice 3A commit `73919f3`. Strict TDD is false, so Standard Mode applied with focused behavior tests. No action-context warnings.
+
+### Completed tasks and persisted checkbox evidence
+
+The four Slice 3B task lines (RED, GREEN, TRIANGULATE, REFACTOR) are visibly marked `- [x]` in `openspec/changes/aibar-foundation/tasks.md`. `QuotaRefreshCoordinator` publishes the persisted cache first, exposes immutable test-observable state, coalesces in-flight triggers, allows manual freshness bypass without bypassing the concurrency gate, avoids fresh ordinary polls, saves successful normalized snapshots, retains the prior timestamp on failure, exposes stale/unavailable/error/optional-degradation state, and suppresses late publication after clear/cancellation. It contains no UI, dispatcher, tray, lifecycle adapter, or thread-affinity dependency.
+
+### Focused behavior evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter FullyQualifiedName~QuotaRefreshCoordinatorTests --logger "console;verbosity=minimal"
+RED: failed as expected: CS0246 (QuotaRefreshCoordinator absent).
+GREEN/TRIANGULATE: Passed: 8, Failed: 0, Skipped: 0, Total: 8.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 48, Failed: 0, Skipped: 0, Total: 48.
+
+git diff --check
+Passed.
+```
+
+LSP diagnostics were requested before command execution, but no LSP diagnostic tool is injected in this executor session. The zero-warning compiler build is the available static diagnostic evidence.
+
+### Files / workload / deviations
+
+- `src/AIBar.Domain/Foundation.cs` — immutable refresh trigger/state contracts.
+- `src/AIBar.Application/QuotaRefreshCoordinator.cs` — application-only cache/refresh state machine.
+- `tests/AIBar.Domain.Tests/QuotaRefreshCoordinatorTests.cs` — deterministic fake clock/provider/store behavior tests.
+- `openspec/changes/aibar-foundation/tasks.md` — completed Slice 3B checkboxes.
+- `openspec/changes/aibar-foundation/apply-progress.md` — this cumulative Slice 3B record.
+
+Authored implementation/test lines: **215** (106 coordinator + 107 tests + 2 domain contracts). The Slice 3B implementation/test change is below the 400-line budget; OpenSpec evidence is separately required delivery metadata. No design deviation: lifecycle re-evaluation remains intentionally deferred to Slice 3C. No commit, stage, push, PR, review transaction, Judgment Day, branch creation, credential, network call, or UI work occurred.
+
+### Remaining work
+
+Slice 3B has no unchecked tasks. Slice 3C remains the next bounded work unit:
+
+- [ ] **RED:** add deterministic tests for sleep/resume, system clock forward/backward changes, resume freshness re-evaluation, stale-to-current/unavailable transitions, prior timestamp preservation, optional-detail degradation, and clear-data/cancellation races using the existing coordinator contracts.
+- [ ] **GREEN:** add the lifecycle boundary that forwards sleep/resume and clock-change notifications to coordinator re-evaluation; harden stale/unavailable transitions, retain original successful timestamps on failures, preserve primary data when optional details fail, and prevent cancelled/cleared work from republishing.
+- [ ] **TRIANGULATE:** inject reordered lifecycle events, duplicate notifications, clock jumps, cancellation at each publication boundary, provider failure during resume, and store-unavailable conditions; verify deterministic state traces and no overlapping refreshes.
+- [ ] **REFACTOR:** make event subscriptions/disposal idempotent, centralize degradation rules, remove duplicated transition handling, and run the affected suite plus static/build diagnostics without adding UI coupling.
+
+Slice 4 and later UI/wiring work remain out of scope.
