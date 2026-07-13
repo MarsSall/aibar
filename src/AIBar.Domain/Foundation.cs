@@ -1,7 +1,7 @@
 namespace AIBar.Domain;
 
 public enum FreshnessState { Current, Stale, Unavailable }
-public enum QuotaErrorKind { Authentication, Permission, MalformedResponse, Network, Service, Unavailable }
+public enum QuotaErrorKind { Authentication, Permission, MalformedResponse, Network, Service, Unavailable, Redirect }
 public enum ScanCoverageState { Complete, Partial, Unavailable }
 public enum PricingResultState { Available, UnsupportedModel }
 
@@ -66,7 +66,7 @@ public sealed record DailyUsage
 public sealed record PricingResult(decimal? EstimatedCost, string CatalogVersion, DateOnly CatalogDate, PricingResultState State);
 public sealed record QuotaFailure(QuotaErrorKind Kind, string SafeCode);
 public sealed record CredentialResult(string? AccessToken, string? AccountId, QuotaFailure? Failure);
-public sealed record QuotaProviderResult(QuotaSnapshot? Snapshot, QuotaFailure? Failure);
+public sealed record QuotaProviderResult(QuotaSnapshot? Snapshot, QuotaFailure? Failure, decimal? ResetCredits = null, QuotaFailure? OptionalFailure = null);
 public sealed record UsageScanResult(IReadOnlyList<DailyUsage> Usage, ScanCoverage Coverage);
 
 public sealed class FreshnessPolicy(TimeSpan threshold)

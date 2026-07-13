@@ -227,3 +227,56 @@ The following exact Slice 2B lines remain unchecked and are outside this work un
 - [ ] **REFACTOR:** isolate endpoint details behind `IQuotaProvider`, reuse Slice 2A redaction/lifetime boundaries, and keep live private-endpoint tests opt-in and outside ordinary CI.
 
 Slice 3–8 and cross-slice gates remain unchecked exactly as listed in the persisted tasks artifact above.
+
+## Slice 2B applied (2026-07-12)
+
+Slice 2B is complete on `feature/aibar-foundation-slice-2b`, based on approved Slice 2A commit `e72da52`. This work unit is synthetic-only: no live endpoint, credential, Codex file, account, cache, coordinator, or Slice 3+ behavior was used or added.
+
+**Structured status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, 12/60 tasks complete before this unit, no blocked reasons; `actionContext: repo-local` with allowed root `C:\\Users\\mjsal\\Desarrollos IA\\Modificacion de Terminales\\aibar`. Delivery was resolved as `auto-chain` / `feature-branch-chain`; current PR boundary is Slice 2B only. No action-context warnings.
+
+### Completed tasks and persisted checkbox evidence
+
+The seven Slice 2B task lines are visibly marked `- [x]` in `openspec/changes/aibar-foundation/tasks.md`: feature-gated `HttpClient` provider; exact HTTPS base origin; disabled redirects; per-request bearer/account headers scoped to a disposable Slice 2A credential; 5-second connect and 10-second request bounds; cancellation; one transient retry with capped `Retry-After`; primary `/wham/usage` plus optional reset-credit mapping; validated 0–100 percentages and timestamps; safe status/transport/timeout/redirect/malformed/disabled failures; and optional-detail degradation.
+
+### TDD Cycle Evidence
+
+| Stage | Evidence | Result |
+|---|---|---|
+| RED | Added synthetic `QuotaHttpProviderTests`; focused test run before the provider existed | Failed as expected: `CS0246` (`QuotaHttpProvider` absent). |
+| GREEN | Added the minimal provider and domain result fields; focused tests | Passed 7/7. |
+| TRIANGULATE | Variant fields, missing/invalid percentages, redirect, 401/403/400, 429 + `Retry-After`, cancellation, transport/timeout, retry bound, and optional 503 cases | Passed 7/7; primary snapshot survives optional failure. |
+| REFACTOR | Kept endpoint strings private to the adapter, only safe fixed error codes, and reused `RequestCredential` disposal | Full build/suite pass with no warnings/errors. |
+
+### Verification evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter FullyQualifiedName~QuotaHttpProviderTests --logger "console;verbosity=minimal"
+Passed: 7, Failed: 0, Skipped: 0, Total: 7.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 31, Failed: 0, Skipped: 0, Total: 31.
+
+git diff --check
+Passed.
+```
+
+LSP diagnostics are unavailable in this executor session; the zero-warning compiler build is the available static diagnostic evidence.
+
+### Files changed / workload / deviations
+
+- `src/AIBar.Application/QuotaHttpProvider.cs`
+- `src/AIBar.Domain/Foundation.cs`
+- `tests/AIBar.Domain.Tests/QuotaHttpProviderTests.cs`
+- `openspec/changes/aibar-foundation/tasks.md`
+- `openspec/changes/aibar-foundation/apply-progress.md`
+
+Slice 2B authored implementation/test lines are 166 (`91` adapter + `71` tests + four domain change lines), plus this task/progress evidence; the current work unit remains below the 400-line limit. Feature-branch-chain boundary: Slice 2B only; dependency: Slice 2A; follow-up: Slice 3. No commit, push, PR, review transaction, or Judgment Day action occurred. No design deviation: optional credits are exposed only through the adapter result because cache/coordinator work is deferred to Slice 3.
+
+### Remaining tasks
+
+Slice 3–8 and cross-slice gates remain unchecked. The next exact unchecked line is:
+
+- [ ] Implement `QuotaRefreshCoordinator` with cache-first publication, one in-flight refresh task, trigger coalescing, manual-refresh freshness bypass, conservative polling, cancellation, sleep/resume and clock-change re-evaluation.
