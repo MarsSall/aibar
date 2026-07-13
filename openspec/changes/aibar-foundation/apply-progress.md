@@ -505,3 +505,56 @@ Exact next unchecked Slice 4 lines:
 - [ ] **REFACTOR:** isolate runtime Win32/WPF adapters, make tray recreation and shutdown idempotent, keep coordinator/persistence calls at the host boundary, and rerun focused smoke tests plus diagnostics.
 
 The 4B and 4C task lines remain unchecked as persisted in `tasks.md`; they are intentionally deferred with Slice 5+ and cross-slice gates. Final complete authored diff from `1b9cca5`: **282** lines (tracked `git diff --numstat 1b9cca5 --`: 118 additions + 38 deletions = 156; two unstaged new source/test files: 126 additions). This is within the 400-line limit.
+
+## Slice 4A.2 applied (2026-07-13)
+
+**Status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`; repo-local allowed root; no blockers. Delivery is `auto-chain` / `feature-branch-chain`; boundary: **4A.2 only**, based on approved 4A.1 commit `5e13ef5`. Strict TDD is false; focused test-first evidence was retained. No action-context warnings.
+
+### Completed tasks / persisted checkbox evidence
+
+The four 4A.2 RED/GREEN/TRIANGULATE/REFACTOR task lines are visibly `- [x]` in `tasks.md`. `TrayHostRuntime` composes the approved `SingleInstanceHost` with an actual WinForms `NotifyIcon`, WPF borderless popover adapter, and `TaskbarCreated` Win32 monitor. It toggles/show-hides the popover, preserves an owned dialog on deactivation, recreates the tray icon after Explorer/taskbar recreation, and blocks late activation after Exit. Exit is idempotent: it cancels active work, awaits cancellation, disposes injected persistence before the tray resource, and requests process shutdown. Event/fire-and-forget boundaries swallow exceptions.
+
+### RED → GREEN → TRIANGULATE → REFACTOR evidence
+
+| Stage | Evidence | Result |
+|---|---|---|
+| RED | Added `HostRuntimeTests`, then ran the focused filter before runtime contracts existed. | Failed as expected with `CS0246` for `ITrayRuntime`, `IPopoverRuntime`, and taskbar recreation contracts. |
+| GREEN | Added minimal runtime adapters and lifecycle orchestration. | Focused tests passed 2/2. |
+| TRIANGULATE | Covered repeated toggle, owned-dialog deactivation, taskbar recreation, secondary activation handoff, repeated Exit, cancellation-before-disposal, and late activation suppression. | Focused tests passed 2/2. |
+| REFACTOR | Kept Win32/WPF/WinForms inside Desktop; host shutdown depends only on injected lifecycle resources. | Full build/tests passed with 0 warnings/errors. |
+
+### Verification / smoke evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~HostRuntimeTests"
+Passed: 2, Failed: 0.
+
+dotnet test AIBar.sln --no-restore
+Passed: 63, Failed: 0.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+git diff --check
+Passed.
+
+Bounded Windows smoke: launched Debug AIBar.Desktop.exe, observed it remained running for two seconds, then forcibly stopped it.
+```
+
+The bounded smoke proves the composed Windows host launches; it does not automate Explorer restart, owned-dialog focus, or orderly Exit interaction. Those behaviors have deterministic adapter tests; manual Windows 10/11 matrix evidence remains a later compatibility obligation.
+
+### Files / workload / remaining work
+
+- `src/AIBar.Desktop/HostRuntime.cs` — tray, WPF popover, Explorer/taskbar monitor, and orderly shutdown boundary.
+- `src/AIBar.Desktop/App.xaml`, `App.xaml.cs`, `AIBar.Desktop.csproj` — live host composition and Windows Forms support.
+- `tests/AIBar.Domain.Tests/HostRuntimeTests.cs` — deterministic runtime/lifecycle tests.
+- `openspec/changes/aibar-foundation/tasks.md` and this cumulative progress record.
+
+No quota view-models, quota/analytics/cost disclosures, visual tokens/cards/accessibility visuals, scanner, packaging, or Slice 5+ scope was added. LSP diagnostics are unavailable in this executor session; the zero-warning compiler build is the available static diagnostic evidence. No commit, stage, push, PR, branch, review transaction, credential, network, or user-data access occurred. The next remaining boundary is Slice 4B, followed by 4C; all of their persisted task lines remain unchecked.
+
+## Bounded reliability correction (2026-07-13)
+
+- `RELIABILITY-001`: the live runtime now starts one UI-dispatcher timer that drains secondary activation signals automatically and stops/unsubscribes before shutdown; the focused test pumps the dispatcher and observes activation without manual dispatch.
+- `RELIABILITY-002`: process-exit failures now fault `ExitAsync`; retry reuses the completed cleanup and invokes only process exit again, preserving cancellation → persistence → tray → process-exit order.
+- Focused tests: 3/3 passed. Full suite: 64/64 passed. Build: 0 warnings/errors. `git diff --check`: passed with line-ending warnings only.
+- LSP diagnostics were requested but unavailable because no LSP tool is injected in this executor session; compiler diagnostics are clean.
