@@ -40,6 +40,26 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable
         }
     }
 
+    public ValueTask ReevaluateAsync(RefreshTrigger trigger, CancellationToken cancellationToken)
+    {
+        QuotaRefreshState? changedState = null;
+        Action<QuotaRefreshState>? handler = null;
+        lock (_gate)
+        {
+            ThrowIfDisposed();
+            var freshness = _freshness.Evaluate(State.Snapshot, _clock.UtcNow);
+            if (freshness != State.Freshness)
+            {
+                changedState = State = State with { Freshness = freshness };
+                handler = StateChanged;
+            }
+        }
+        if (changedState is not null) handler?.Invoke(changedState);
+        return trigger == RefreshTrigger.Sleep
+            ? ValueTask.CompletedTask
+            : RefreshAsync(trigger, cancellationToken);
+    }
+
     public ValueTask RefreshAsync(RefreshTrigger trigger, CancellationToken cancellationToken)
     {
         Task active;

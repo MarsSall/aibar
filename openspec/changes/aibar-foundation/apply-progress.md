@@ -417,3 +417,49 @@ Slice 3B has no unchecked tasks. Slice 3C remains the next bounded work unit:
 - [ ] **REFACTOR:** make event subscriptions/disposal idempotent, centralize degradation rules, remove duplicated transition handling, and run the affected suite plus static/build diagnostics without adding UI coupling.
 
 Slice 4 and later UI/wiring work remain out of scope.
+
+## Slice 3C applied (2026-07-13)
+
+**Structured status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, `verify: blocked`, and no blocked reasons. The allowed repository edit root is `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`; no action-context warnings apply. Delivery is `feature-branch-chain`; this boundary is **Slice 3C only**, based on approved Slice 3B commit `cac832e`. Strict TDD is false, so Standard Mode applied with focused deterministic behavior tests.
+
+### Completed tasks and persisted checkbox evidence
+
+The four Slice 3C task lines (RED, GREEN, TRIANGULATE, REFACTOR) are visibly marked `- [x]` in the persisted tasks artifact. The application-only lifecycle adapter subscribes idempotently to sleep, resume, and clock-change events, forwards them to coordinator freshness re-evaluation, and unsubscribes on disposal. Re-evaluation republishes only a changed freshness state; sleep never starts a request, while resume/clock-change joins the existing coordinator request gate. Existing generation/cancellation safeguards continue to prevent clear/cancelled work from publishing late data.
+
+### Focused behavior evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~QuotaRefreshCoordinatorTests"
+RED: failed as expected with CS0246 because IQuotaRefreshLifecycleEvents did not yet exist.
+GREEN/TRIANGULATE/correction: Passed: 14, Failed: 0, Skipped: 0, Total: 14.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+dotnet test AIBar.sln --no-restore
+Passed: 54, Failed: 0, Skipped: 0, Total: 54.
+
+git diff --check
+Passed (only Git LF-to-CRLF conversion warnings were emitted).
+```
+
+LSP diagnostics were requested before validation commands, but no LSP diagnostic tool is injected in this executor session. The zero-warning compiler build is the available static diagnostic evidence. Tests cover suspended/resumed/clock-change forwarding, forward and backward clock changes, duplicate resume/clock notifications coalescing to one provider call, stale-to-current transition, resume failure with original timestamp preservation, optional-detail degradation, store-save degradation, and clear/dispose late-publication suppression.
+
+### Files / workload / deviations
+
+- `src/AIBar.Application/QuotaRefreshLifecycleAdapter.cs` — lifecycle event boundary and idempotent disposal.
+- `src/AIBar.Application/QuotaRefreshCoordinator.cs` — explicit lifecycle freshness re-evaluation.
+- `src/AIBar.Domain/Foundation.cs` — lifecycle refresh trigger values.
+- `tests/AIBar.Domain.Tests/QuotaRefreshCoordinatorTests.cs` — deterministic lifecycle/degradation race tests.
+- `openspec/changes/aibar-foundation/tasks.md` — completed Slice 3C checkboxes.
+- `openspec/changes/aibar-foundation/apply-progress.md` — this cumulative record.
+
+Authored implementation/test changes are **241 lines** (238 additions, 3 deletions, including the new adapter); the bounded reliability correction is **95 lines** relative to the frozen review tree, within its 114-line budget and the 400-line Slice 3C limit. OpenSpec task/progress metadata is required delivery evidence. No UI/tray work, Slice 4+, commit, stage, push, PR, branch creation, review transaction, Judgment Day, network call, credential access, or writes outside the repository occurred. No design deviation: the boundary remains application-only and does not reference WPF, tray, or dispatcher APIs.
+
+### Remaining work
+
+No Slice 3C task remains unchecked. Slice 4 and later work remain out of scope; the next exact unchecked persisted line is:
+
+- [ ] Implement the single-process WPF host, named-mutex single-instance activation, tray recreation handling, taskbar/DPI-aware borderless popover positioning, deactivation behavior, and explicit Exit command that cancels work and closes persistence.
+
+The remaining unchecked Slice 4–8 and cross-slice-gate lines remain unchanged in `tasks.md`; verification is the next phase only after the entire change's remaining tasks are complete.
