@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Estimated changed lines | 9 reviewable slices; Slice 2A ~350 and Slice 2B ~390 authored lines, all slices below 400; generated fixtures/goldens remain in snapshot identity but excluded from authored estimates |
+| Estimated changed lines | 11 reviewable units; Slice 2A ~350, Slice 2B ~390, 3A ~330, 3B ~375, 3C ~230; all units below 400 authored lines |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | PR 1 → PR 2A → PR 2B → PR 3 → PR 4 → PR 5 → PR 6 → PR 7 → PR 8 |
+| Suggested split | PR 1 → PR 2A → PR 2B → PR 3A → PR 3B → PR 3C → PR 4 → PR 5 → PR 6 → PR 7 → PR 8 |
 | Delivery strategy | auto-chain |
 | Chain strategy | feature-branch-chain |
 
@@ -54,15 +54,40 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Acceptance evidence:** synthetic adapter contract/fixture test report, redirect/timeout/retry evidence, version-neutral mapping matrix, and redaction assertions. Start state is the completed Slice 2A boundary; finish state is a disabled-by-default, independently testable adapter contract with no cache/coordinator. Rollback removes or disables Slice 2B while preserving Slice 2A and local analytics contracts. Independently reviewable/revertible; requires focused `review-risk`.
 
-### Slice 3 — Refresh coordination and quota cache
+### Slice 3A — SQLite quota snapshot store (~330 authored lines)
 
-- [ ] Implement `QuotaRefreshCoordinator` with cache-first publication, one in-flight refresh task, trigger coalescing, manual-refresh freshness bypass, conservative polling, cancellation, sleep/resume and clock-change re-evaluation.
-- [ ] Implement SQLite schema/migration and `IQuotaSnapshotStore` for normalized quota fields and retrieval metadata only; atomically commit successful primary snapshots and never store credentials or raw responses.
-- [ ] Preserve the prior snapshot and original timestamp on failure, overlay the classified error, and transition to explicit stale/unavailable states after the documented freshness threshold; optional-detail failures must not erase primary data.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** add coordinator/store tests for startup cache rendering, concurrent triggers, manual bypass, stale-on-failure, atomic save/load, cancellation races, clear-data publication, and optional-detail degradation.
-- [ ] Verify migration, foreign keys, WAL configuration, and crash-before-commit behavior using persistence integration tests.
+**Dependency:** Slice 2B complete. **Scope boundary:** persistence only; no refresh coordinator, polling, tray, or UI. **Independent reviewability:** review the store, migration, privacy boundary, and integration tests as one revertible unit.
 
-**Acceptance evidence:** coordinator and persistence test report plus database inspection proving only normalized cache data exists. Rollback is a schema-compatible removal of the cache feature; no destructive downgrade or Codex-file mutation.
+- [x] **RED:** add persistence integration tests against a temporary database for first-open schema creation/migration, normalized `quota_snapshot` round-trip, empty load, FK enforcement, WAL mode, atomic clear, and inspection proving credentials/raw HTTP bodies are not represented; add a crash-before-commit test harness that fails before commit and asserts the prior row remains intact.
+- [x] **GREEN:** wire the SQLite dependency/project boundary; implement schema versioning/migration and `IQuotaSnapshotStore` with normalized primary/optional quota fields, retrieval metadata, schema-adapter version, and timestamps only; configure foreign keys and WAL; implement transactional atomic load/save/clear with no credential or raw-response persistence.
+- [x] **TRIANGULATE:** exercise migration from the prior schema, rollback on injected write failure/crash-before-commit, repeated save/load, optional-detail absence, malformed/unsupported persisted data handling, and database-content assertions for seeded secrets, headers, paths, and response bodies.
+- [x] **REFACTOR:** isolate SQL/mapping behind the store port, keep domain/application contracts infrastructure-neutral, document migration compatibility and non-destructive downgrade behavior, and verify deterministic disposal/locking behavior.
+
+**Acceptance evidence:** focused RED/GREEN/TRIANGULATE/REFACTOR report; migration/FK/WAL inspection; atomicity and crash-before-commit evidence; normalized-schema/privacy inspection; `dotnet build` and relevant tests. **Rollback boundary:** remove or disable the 3A store and revert only its schema-compatible migration/project/test changes; preserve Slice 2B and never delete Codex-owned data.
+
+### Slice 3B — Refresh coordinator state machine (~375 authored lines)
+
+**Dependency:** Slice 3A complete. **Scope boundary:** coordinator and deterministic fakes only; no tray/popover or Windows lifecycle event wiring. **Independent reviewability:** provider/store/coordinator tests establish a complete application-service boundary and can be reverted without changing presentation.
+
+- [ ] **RED:** add fake-clock/provider/store tests for cache-first startup publication, one in-flight refresh, concurrent trigger coalescing, manual freshness bypass, conservative polling eligibility, failure overlays, original timestamp preservation, stale/unavailable threshold transitions, optional-detail degradation, cancellation, and clear-data publication suppression.
+- [ ] **GREEN:** implement `QuotaRefreshCoordinator` using the 3A store and 2B provider: publish cached state first, gate one asynchronous refresh task, coalesce poll/popover-open/resume/manual triggers, let manual refresh bypass freshness but not concurrency, schedule conservatively, preserve the prior snapshot/timestamp on failure, overlay classified errors, and publish explicit stale/unavailable states without fabricating percentages.
+- [ ] **TRIANGULATE:** use deterministic provider gates and fake time to prove no duplicate provider calls, no early polling, manual refresh behavior, cancellation before publication, clear-data races, primary snapshot retention when optional detail fails, and state transitions across the freshness threshold.
+- [ ] **REFACTOR:** separate policy/state transition logic from orchestration and scheduling, make publication immutable and test-observable, keep cancellation/disposal idempotent, and verify no UI/thread-affinity dependency enters the application service.
+
+**Acceptance evidence:** deterministic coordinator test report covering every trigger/state race, cache-first trace, timestamp-preservation assertions, and full build/tests for affected projects. **Rollback boundary:** revert coordinator and its tests/scheduling changes while leaving the 3A database store loadable and Slice 2B unchanged.
+
+### Slice 3C — Lifecycle and degradation hardening (~230 authored lines)
+
+**Dependency:** Slice 3B complete. **Scope boundary:** lifecycle event adapter and hardening tests only; no Slice 4 visual/presentation work. **Independent reviewability:** event-to-coordinator commands and degradation races are testable with fake time and cancellation gates.
+
+- [ ] **RED:** add deterministic tests for sleep/resume, system clock forward/backward changes, resume freshness re-evaluation, stale-to-current/unavailable transitions, prior timestamp preservation, optional-detail degradation, and clear-data/cancellation races using the existing coordinator contracts.
+- [ ] **GREEN:** add the lifecycle boundary that forwards sleep/resume and clock-change notifications to coordinator re-evaluation; harden stale/unavailable transitions, retain original successful timestamps on failures, preserve primary data when optional details fail, and prevent cancelled/cleared work from republishing.
+- [ ] **TRIANGULATE:** inject reordered lifecycle events, duplicate notifications, clock jumps, cancellation at each publication boundary, provider failure during resume, and store-unavailable conditions; verify deterministic state traces and no overlapping refreshes.
+- [ ] **REFACTOR:** make event subscriptions/disposal idempotent, centralize degradation rules, remove duplicated transition handling, and run the affected suite plus static/build diagnostics without adding UI coupling.
+
+**Acceptance evidence:** lifecycle/degradation race report, fake-clock state traces, cancellation/clear-data evidence, and affected build/test output. **Rollback boundary:** remove the lifecycle adapter and hardening changes, retaining the stable 3B coordinator and 3A schema/store.
+
+**Slice 3 chain:** `2B → 3A → 3B → 3C → 4`. Each unit remains under the 400-line authored review budget and must be applied/reviewed independently before advancing.
 
 ### Slice 4 — Native tray, popover, and quota presentation
 

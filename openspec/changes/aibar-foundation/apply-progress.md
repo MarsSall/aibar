@@ -280,3 +280,92 @@ Slice 2B authored implementation/test lines are 166 (`91` adapter + `71` tests +
 Slice 3–8 and cross-slice gates remain unchecked. The next exact unchecked line is:
 
 - [ ] Implement `QuotaRefreshCoordinator` with cache-first publication, one in-flight refresh task, trigger coalescing, manual-refresh freshness bypass, conservative polling, cancellation, sleep/resume and clock-change re-evaluation.
+
+## Slice 3 budget gate (2026-07-12)
+
+**Blocked before any Slice 3 code, test, project, or task-artifact edit.** Parent-provided structured status was consumed: authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, `19/60` complete, no blocked reasons; action context is `repo-local` with workspace/allowed root `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`. Delivery is resolved as `auto-chain` / `feature-branch-chain`; this requested work unit is Slice 3 only, with parent Slice 2B commit `9351927`. No action-context warning applies.
+
+The required Slice 3 scope cannot credibly fit the enforced **<=400 authored changed-line** budget when code, focused tests, project wiring, and this required OpenSpec evidence are counted. No production code or RED test was started, so strict TDD evidence has no cycle for this blocked gate.
+
+| Required concern | Credible forecast (lines) |
+|---|---:|
+| Coordinator state, cache-first publication, trigger coalescing, manual bypass, polling, cancellation, clock/lifecycle handling | 160 |
+| SQLite connection/schema migration, normalized snapshot mapping, atomic save/load/clear and privacy boundary | 150 |
+| Coordinator fake-clock/provider/store tests: startup cache, coalescing, bypass, stale/failure, cancellation, optional degradation | 175 |
+| SQLite integration tests: migration, FK/WAL, atomicity, crash-before-commit and normalized-data inspection | 145 |
+| Domain/project wiring and task/progress evidence | 35 |
+| **Total** | **665** |
+
+Actual Slice 3 authored implementation/test/project lines: **0**. This append-only audit evidence changes 29 lines in `apply-progress.md`; no persisted task checkbox changed.
+
+### Required dependency-ordered split
+
+1. **Slice 3A — quota snapshot SQLite store** (~330 lines including tests and OpenSpec evidence): add the SQLite package/project wiring; schema versioning/migration; `quota_snapshot` normalized fields only; foreign-key/WAL setup; atomic load/save/clear; synthetic persistence integration tests for migration, normalized-data inspection, atomic rollback/crash-before-commit, and no credentials/raw bodies. Depends on Slice 2B; no coordinator.
+2. **Slice 3B — refresh coordinator state machine** (~375 lines including tests and OpenSpec evidence): cache-first publication using the 3A store; single in-flight provider operation; trigger coalescing; manual freshness bypass; conservative scheduling; failure/stale/unavailable state overlay preserving original timestamp; optional-detail degradation; cancellation/clear-data publication; fake-clock/provider/store tests. Depends on 3A; no tray/UI.
+3. **Slice 3C — lifecycle re-evaluation hardening** (~230 lines including tests and OpenSpec evidence): sleep/resume and clock-change event boundary wired to coordinator reevaluation, deterministic fake-time lifecycle/cancellation race tests, plus focused full-suite/build diagnostics evidence. Depends on 3B; no Slice 4 presentation.
+
+Each slice is independently reviewable and stays within the 400-line budget without removing required persistence or deterministic test behavior. Feature-branch-chain order: `9351927` → **3A** → **3B** → **3C** → Slice 4. 📍 Current blocked boundary: Slice 3 (must be replaced by 3A/3B/3C before implementation).
+
+### Verification and remaining work
+
+No test, build, or LSP command was run because the pre-edit budget gate stopped implementation. No design deviation occurred. Slice 3's five persisted `- [ ]` lines remain unchecked; the next recommended action is to approve the proposed Slice 3A/3B/3C delivery boundary and apply Slice 3A only.
+
+## Slice 3A applied (2026-07-12)
+
+**Structured status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, no blocked reasons. `actionContext` is `repo-local`, with workspace and allowed root `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`; no action-context warnings. Delivery is `auto-chain` / `feature-branch-chain`; parent dependency is Slice 2B commit `9351927`; current boundary is **Slice 3A only**. No coordinator, polling, lifecycle, tray, UI, or Slice 3B/3C work was added.
+
+### Completed tasks and checkbox evidence
+
+The four Slice 3A task lines (RED, GREEN, TRIANGULATE, REFACTOR) are visibly marked `- [x]` in the persisted `openspec/changes/aibar-foundation/tasks.md` artifact. The store uses a temporary synthetic database per test, opens SQLite with foreign keys and WAL, keeps one normalized snapshot row with primary/weekly values, optional reset-credit column, retrieval timestamp, and schema-adapter version, and supports transactional save/load/clear. It persists no credentials, raw HTTP bodies, headers, or source paths.
+
+### TDD Cycle Evidence
+
+| Stage | Evidence | Result |
+|---|---|---|
+| RED | Added `SqliteQuotaSnapshotStoreTests` and the SQLite project dependency, then ran the focused test command before the store existed. | Failed as expected: `CS0246` for missing `SqliteQuotaSnapshotStore`. |
+| GREEN | Implemented the smallest store, normalized schema, v1→v2 migration, transactional operations, WAL/foreign-key setup, and disposal lock. | Focused suite passed 4/4. |
+| TRIANGULATE | Added repeated save/load, absent optional detail, malformed row, future-schema/no-downgrade, migration, and injected pre-commit failure cases. | Focused suite passed 5/5; failed save retained the prior row. |
+| REFACTOR | Centralized schema SQL and connection initialization; disabled pooling so temporary WAL databases deterministically release locks for cleanup. | Full solution build/test passed with 0 warnings/errors. |
+
+### Verification evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~SqliteQuotaSnapshotStoreTests --logger "console;verbosity=minimal"
+RED: failed as expected (CS0246).
+
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter FullyQualifiedName~SqliteQuotaSnapshotStoreTests --logger "console;verbosity=minimal"
+GREEN: Passed: 4, Failed: 0, Skipped: 0, Total: 4.
+TRIANGULATE: Passed: 5, Failed: 0, Skipped: 0, Total: 5.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 38, Failed: 0, Skipped: 0, Total: 38.
+
+git diff --check
+Passed.
+```
+
+No LSP diagnostic tool is injected in this executor session; the zero-warning compiler build is the available static diagnostic evidence.
+
+### Files changed / migration / rollback
+
+- `src/AIBar.Application/AIBar.Application.csproj` — `Microsoft.Data.Sqlite` 8.0.8 boundary.
+- `src/AIBar.Application/SqliteQuotaSnapshotStore.cs` — serialized/disposable SQLite store, schema v2, v1 migration, future-version rejection, atomic save/clear.
+- `src/AIBar.Domain/Foundation.cs` — adds `IQuotaSnapshotStore.ClearAsync`.
+- `tests/AIBar.Domain.Tests/SqliteQuotaSnapshotStoreTests.cs` — temporary synthetic integration tests only.
+- `openspec/changes/aibar-foundation/tasks.md` and this cumulative progress record.
+
+The v1→v2 migration preserves the existing normalized row; a database newer than v2 is rejected before mutation, so downgrade is non-destructive. Rollback removes only the 3A dependency/store/tests and leaves existing data untouched; no Codex-owned file is accessed or deleted. The injected pre-commit failure throws before transaction commit, and the test proves the previous committed row survives.
+
+### Workload / remaining tasks
+
+Current feature-branch-chain PR boundary: **Slice 3A** (`9351927` → 3A → 3B → 3C → Slice 4). This work unit adds 178 implementation/test/project lines before the 3A task/progress evidence. The complete current work-tree diff from `9351927`, including inherited Slice-3 split metadata and this 3A OpenSpec evidence, is 336 changed lines (314 additions, 22 deletions), below the 400-line authored budget. No commit, push, PR, or review transaction occurred.
+
+Remaining Slice 3 work is exactly:
+
+- [ ] **RED:** add fake-clock/provider/store tests for cache-first startup publication, one in-flight refresh, concurrent trigger coalescing, manual freshness bypass, conservative polling eligibility, failure overlays, original timestamp preservation, stale/unavailable threshold transitions, optional-detail degradation, cancellation, and clear-data publication suppression.
+- [ ] **GREEN:** implement `QuotaRefreshCoordinator` using the 3A store and 2B provider: publish cached state first, gate one asynchronous refresh task, coalesce poll/popover-open/resume/manual triggers, let manual refresh bypass freshness but not concurrency, schedule conservatively, preserve the prior snapshot/timestamp on failure, overlay classified errors, and publish explicit stale/unavailable states without fabricating percentages.
+- [ ] **RED:** add deterministic tests for sleep/resume, system clock forward/backward changes, resume freshness re-evaluation, stale-to-current/unavailable transitions, prior timestamp preservation, optional-detail degradation, and clear-data/cancellation races using the existing coordinator contracts.
+- [ ] **GREEN:** add the lifecycle boundary that forwards sleep/resume and clock-change notifications to coordinator re-evaluation; harden stale/unavailable transitions, retain original successful timestamps on failures, preserve primary data when optional details fail, and prevent cancelled/cleared work from republishing.

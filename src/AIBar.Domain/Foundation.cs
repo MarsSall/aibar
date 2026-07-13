@@ -17,16 +17,18 @@ public sealed record QuotaWindow(decimal PercentageUsed, DateTimeOffset ResetAt)
 
 public sealed record QuotaSnapshot
 {
-    public QuotaSnapshot(QuotaWindow primary, QuotaWindow weekly, DateTimeOffset retrievedAt)
+    public QuotaSnapshot(QuotaWindow primary, QuotaWindow weekly, DateTimeOffset retrievedAt, decimal? resetCredits = null)
     {
         Primary = primary;
         Weekly = weekly;
         RetrievedAt = retrievedAt;
+        ResetCredits = resetCredits;
     }
 
     public QuotaWindow Primary { get; }
     public QuotaWindow Weekly { get; }
     public DateTimeOffset RetrievedAt { get; }
+    public decimal? ResetCredits { get; }
 }
 
 public sealed record ScanCoverage
@@ -102,6 +104,7 @@ public interface IQuotaSnapshotStore
 {
     ValueTask<QuotaSnapshot?> LoadAsync(CancellationToken cancellationToken);
     ValueTask SaveAsync(QuotaSnapshot snapshot, CancellationToken cancellationToken);
+    ValueTask ClearAsync(CancellationToken cancellationToken);
 }
 public interface IUsageScanner { ValueTask<UsageScanResult> ScanAsync(CancellationToken cancellationToken); }
 public interface IAnalyticsStore { ValueTask SaveAsync(IReadOnlyList<DailyUsage> usage, CancellationToken cancellationToken); }
