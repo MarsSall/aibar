@@ -3,6 +3,8 @@ using Microsoft.Data.Sqlite;
 
 namespace AIBar.Application;
 
+public sealed record SourceContributionStatus(bool RebuildRequired);
+
 public sealed class SqliteDailyModelUsageStore : IAsyncDisposable
 {
     private readonly string _connectionString;
@@ -19,6 +21,9 @@ public sealed class SqliteDailyModelUsageStore : IAsyncDisposable
         await using var connection = await OpenAsync(cancellationToken);
         await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
         await SaveAsync(connection, transaction, usage, cancellationToken);
+        await using var migration = connection.CreateCommand(); migration.Transaction = transaction;
+        migration.CommandText = "UPDATE daily_model_usage_migration SET rebuild_required=1 WHERE EXISTS(SELECT 1 FROM daily_model_usage);";
+        await migration.ExecuteNonQueryAsync(cancellationToken);
         _beforeCommit?.Invoke();
         await transaction.CommitAsync(cancellationToken);
     }
@@ -32,7 +37,10 @@ public sealed class SqliteDailyModelUsageStore : IAsyncDisposable
         return await reader.ReadAsync(cancellationToken) ? new(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetString(4), reader.GetInt64(5), reader.GetInt64(6), reader.GetInt64(7)) : null;
     }
 
-    public async ValueTask SaveWithCheckpointAsync(IReadOnlyList<DailyUsage> usage, string sourceFingerprint, SessionCheckpoint? expectedCheckpoint, SessionCheckpoint checkpoint, CancellationToken cancellationToken)
+    public ValueTask SaveWithCheckpointAsync(IReadOnlyList<DailyUsage> usage, string sourceFingerprint, SessionCheckpoint? expectedCheckpoint, SessionCheckpoint checkpoint, CancellationToken cancellationToken) =>
+        SaveWithCheckpointAsync(usage, sourceFingerprint, expectedCheckpoint, checkpoint, "legacy", cancellationToken);
+
+    public async ValueTask SaveWithCheckpointAsync(IReadOnlyList<DailyUsage> usage, string sourceFingerprint, SessionCheckpoint? expectedCheckpoint, SessionCheckpoint checkpoint, string policyVersion, CancellationToken cancellationToken)
     {
         await using var connection = await OpenAsync(cancellationToken);
         await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
@@ -48,8 +56,32 @@ public sealed class SqliteDailyModelUsageStore : IAsyncDisposable
         if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
             throw new InvalidOperationException("The analytics checkpoint changed during the scan.");
         await SaveAsync(connection, transaction, usage, cancellationToken);
+        await SaveContributionsAsync(connection, transaction, usage, sourceFingerprint, policyVersion, cancellationToken);
         _beforeCommit?.Invoke();
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async ValueTask<IReadOnlyList<DailyUsage>> LoadContributionAsync(string sourceFingerprint, CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenAsync(cancellationToken); await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT local_day, time_zone_id, observed_offset_minutes, model, input_tokens, cached_input_tokens, output_tokens FROM source_daily_model_usage WHERE source_fingerprint=$fingerprint ORDER BY local_day, time_zone_id, observed_offset_minutes, model;";
+        command.Parameters.AddWithValue("$fingerprint", sourceFingerprint);
+        return await ReadUsageAsync(command, cancellationToken);
+    }
+
+    public async ValueTask<string?> LoadContributionPolicyAsync(string sourceFingerprint, CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenAsync(cancellationToken); await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT policy_version FROM source_contribution_state WHERE source_fingerprint=$fingerprint;";
+        command.Parameters.AddWithValue("$fingerprint", sourceFingerprint);
+        return await command.ExecuteScalarAsync(cancellationToken) as string;
+    }
+
+    public async ValueTask<SourceContributionStatus> GetContributionStatusAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenAsync(cancellationToken); await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT rebuild_required OR (EXISTS(SELECT 1 FROM daily_model_usage) AND NOT EXISTS(SELECT 1 FROM source_contribution_state)) OR EXISTS(SELECT 1 FROM source_contribution_state WHERE policy_version IN ('', 'legacy')) FROM daily_model_usage_migration LIMIT 1;";
+        return new(Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken)) != 0);
     }
 
     private static async ValueTask SaveAsync(SqliteConnection connection, SqliteTransaction transaction, IReadOnlyList<DailyUsage> usage, CancellationToken cancellationToken)
@@ -66,10 +98,31 @@ public sealed class SqliteDailyModelUsageStore : IAsyncDisposable
         }
     }
 
+    private static async ValueTask SaveContributionsAsync(SqliteConnection connection, SqliteTransaction transaction, IReadOnlyList<DailyUsage> usage, string fingerprint, string policyVersion, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(policyVersion)) throw new ArgumentException("A policy version is required.", nameof(policyVersion));
+        await using var state = connection.CreateCommand(); state.Transaction = transaction;
+        state.CommandText = "INSERT INTO source_contribution_state (source_fingerprint, policy_version) VALUES ($fingerprint, $policy) ON CONFLICT(source_fingerprint) DO UPDATE SET policy_version=excluded.policy_version WHERE policy_version=excluded.policy_version;";
+        state.Parameters.AddWithValue("$fingerprint", fingerprint); state.Parameters.AddWithValue("$policy", policyVersion);
+        if (await state.ExecuteNonQueryAsync(cancellationToken) == 0) throw new InvalidOperationException("The analytics policy changed and requires a rebuild.");
+        await using var command = connection.CreateCommand(); command.Transaction = transaction;
+        command.CommandText = "INSERT INTO source_daily_model_usage (source_fingerprint, local_day, time_zone_id, observed_offset_minutes, model, input_tokens, cached_input_tokens, output_tokens) VALUES ($fingerprint, $day, $zone, $offset, $model, $input, $cached, $output) ON CONFLICT(source_fingerprint, local_day, time_zone_id, observed_offset_minutes, model) DO UPDATE SET input_tokens=input_tokens + excluded.input_tokens, cached_input_tokens=cached_input_tokens + excluded.cached_input_tokens, output_tokens=output_tokens + excluded.output_tokens WHERE input_tokens <= 9223372036854775807 - excluded.input_tokens AND cached_input_tokens <= 9223372036854775807 - excluded.cached_input_tokens AND output_tokens <= 9223372036854775807 - excluded.output_tokens;";
+        foreach (var item in usage)
+        {
+            command.Parameters.Clear(); command.Parameters.AddWithValue("$fingerprint", fingerprint); command.Parameters.AddWithValue("$day", item.LocalDay.ToString("O")); command.Parameters.AddWithValue("$zone", item.TimeZoneId); command.Parameters.AddWithValue("$offset", (long)item.ObservedOffset.TotalMinutes); command.Parameters.AddWithValue("$model", string.IsNullOrWhiteSpace(item.Model) ? AnalyticsPolicy.UnknownModel : item.Model); command.Parameters.AddWithValue("$input", item.Tokens.Input); command.Parameters.AddWithValue("$cached", item.Tokens.CachedInput); command.Parameters.AddWithValue("$output", item.Tokens.Output);
+            if (await command.ExecuteNonQueryAsync(cancellationToken) == 0) throw new OverflowException("Source contribution token totals exceed Int64 capacity.");
+        }
+    }
+
     public async ValueTask<IReadOnlyList<DailyUsage>> LoadAsync(CancellationToken cancellationToken)
     {
         await using var connection = await OpenAsync(cancellationToken); await using var command = connection.CreateCommand();
         command.CommandText = "SELECT local_day, time_zone_id, observed_offset_minutes, model, input_tokens, cached_input_tokens, output_tokens FROM daily_model_usage ORDER BY local_day, time_zone_id, observed_offset_minutes, model;";
+        return await ReadUsageAsync(command, cancellationToken);
+    }
+
+    private static async ValueTask<IReadOnlyList<DailyUsage>> ReadUsageAsync(SqliteCommand command, CancellationToken cancellationToken)
+    {
         await using var reader = await command.ExecuteReaderAsync(cancellationToken); var usage = new List<DailyUsage>();
         while (await reader.ReadAsync(cancellationToken))
             usage.Add(new(DateOnly.Parse(reader.GetString(0)), reader.GetString(1), TimeSpan.FromMinutes(reader.GetInt64(2)), reader.GetString(3), new(reader.GetInt64(4), reader.GetInt64(5), reader.GetInt64(6))));
@@ -87,9 +140,9 @@ public sealed class SqliteDailyModelUsageStore : IAsyncDisposable
             command.CommandText = "PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; CREATE TABLE IF NOT EXISTS daily_model_usage_schema (version INTEGER NOT NULL); INSERT INTO daily_model_usage_schema SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM daily_model_usage_schema);";
             await command.ExecuteNonQueryAsync(cancellationToken);
             command.CommandText = "SELECT MAX(version) FROM daily_model_usage_schema;";
-            if (Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken)) > 1)
+            if (Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken)) > 2)
                 throw new NotSupportedException("The daily model usage schema is newer than this application supports.");
-            command.CommandText = "CREATE TABLE IF NOT EXISTS daily_model_usage (local_day TEXT NOT NULL, time_zone_id TEXT NOT NULL, observed_offset_minutes INTEGER NOT NULL, model TEXT NOT NULL, input_tokens INTEGER NOT NULL CHECK (input_tokens >= 0), cached_input_tokens INTEGER NOT NULL CHECK (cached_input_tokens >= 0), output_tokens INTEGER NOT NULL CHECK (output_tokens >= 0), PRIMARY KEY (local_day, time_zone_id, observed_offset_minutes, model)); CREATE TABLE IF NOT EXISTS file_checkpoint (source_fingerprint TEXT PRIMARY KEY, identity INTEGER NOT NULL, length INTEGER NOT NULL, last_write_utc_ticks INTEGER NOT NULL, offset INTEGER NOT NULL, parser_version TEXT NOT NULL, cumulative_input_tokens INTEGER NOT NULL, cumulative_cached_input_tokens INTEGER NOT NULL, cumulative_output_tokens INTEGER NOT NULL);";
+            command.CommandText = "CREATE TABLE IF NOT EXISTS daily_model_usage (local_day TEXT NOT NULL, time_zone_id TEXT NOT NULL, observed_offset_minutes INTEGER NOT NULL, model TEXT NOT NULL, input_tokens INTEGER NOT NULL CHECK (input_tokens >= 0), cached_input_tokens INTEGER NOT NULL CHECK (cached_input_tokens >= 0), output_tokens INTEGER NOT NULL CHECK (output_tokens >= 0), PRIMARY KEY (local_day, time_zone_id, observed_offset_minutes, model)); CREATE TABLE IF NOT EXISTS file_checkpoint (source_fingerprint TEXT PRIMARY KEY, identity INTEGER NOT NULL, length INTEGER NOT NULL, last_write_utc_ticks INTEGER NOT NULL, offset INTEGER NOT NULL, parser_version TEXT NOT NULL, cumulative_input_tokens INTEGER NOT NULL, cumulative_cached_input_tokens INTEGER NOT NULL, cumulative_output_tokens INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS source_contribution_state (source_fingerprint TEXT PRIMARY KEY, policy_version TEXT NOT NULL); CREATE TABLE IF NOT EXISTS source_daily_model_usage (source_fingerprint TEXT NOT NULL, local_day TEXT NOT NULL, time_zone_id TEXT NOT NULL, observed_offset_minutes INTEGER NOT NULL, model TEXT NOT NULL, input_tokens INTEGER NOT NULL CHECK (input_tokens >= 0), cached_input_tokens INTEGER NOT NULL CHECK (cached_input_tokens >= 0), output_tokens INTEGER NOT NULL CHECK (output_tokens >= 0), PRIMARY KEY (source_fingerprint, local_day, time_zone_id, observed_offset_minutes, model)); CREATE TABLE IF NOT EXISTS daily_model_usage_migration (rebuild_required INTEGER NOT NULL); INSERT INTO daily_model_usage_migration SELECT EXISTS(SELECT 1 FROM daily_model_usage) WHERE NOT EXISTS(SELECT 1 FROM daily_model_usage_migration); INSERT INTO daily_model_usage_schema SELECT 2 WHERE (SELECT MAX(version) FROM daily_model_usage_schema) = 1;";
             await command.ExecuteNonQueryAsync(cancellationToken); return connection;
         }
         catch { await connection.DisposeAsync(); throw; }

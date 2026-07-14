@@ -1,5 +1,29 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 6C2A replanned after terminal review escalation (2026-07-14)
+
+**Status:** The prior 6C2A candidate is discarded and must not be marked complete. Review `review-f9dc7720376bf064` is terminal ESCALATED/superseded; successor `review-6c2a-source-attribution` is terminal INVALIDATED at `sha256:804a1585b1d6ec7c8fdee81a6462fab1dac7bc288865c3c92f0c85b3dd56a0ed`. No review is active or reused.
+
+The candidate was escalated because policy-less migration cannot deterministically identify historical ownership, and global multi-source aggregates lose unrelated source contributions during replacement. The four candidate implementation/test files were restored to the 6C1B baseline at `8fe89ec`; only this progress artifact and `tasks.md` are intentionally revised.
+
+New chain: `8fe89ec → 6C2A.1 source-attributed durable contributions/migration → 6C2A.2 atomic multi-source rebuild/policy transition → 6C2B Clear AIBar Data → 6D`. 6C2A.1 must establish independent source ownership before 6C2A.2 can rebuild safely; 6C2B remains downstream.
+
+## Superseded candidate record
+
+**Status:** INVALIDATED/discarded; the former completion claims below are historical evidence only and no longer represent repository state.
+
+No implementation, migration, checkbox completion, test, build, stage, commit, push, PR, or review operation was performed during replanning. The 6C1A preparation API and 6C1B expected-checkpoint CAS remain the preserved baseline and are prerequisites for the new chain.
+
+| Work Unit Evidence | Result |
+|---|---|
+| Focused test | Not run; planning only. |
+| Full test | Not run; planning only. |
+| Build | Not run; planning only. |
+| Runtime harness | N/A — no implementation or runtime boundary exists in planning. |
+| Rollback boundary | Revert only the deliberate planning artifacts; restored implementation paths remain at 6C1B baseline. |
+
+**Files:** only `openspec/changes/aibar-foundation/tasks.md` and `apply-progress.md` were deliberately revised; the four invalid implementation/test paths were restored and are not part of the plan.
+
 ## Status
 
 **Slice 1 complete. Slice 2 blocked before implementation by its enforced 400-line budget gate.** The prior SDK blocker is resolved: .NET SDK `8.0.408` is installed alongside `6.0.424`. Only the approved Solution Skeleton and Pure Contracts work unit was implemented. Slice 2 was assessed on `feature/aibar-foundation-slice-2`; no Slice 2+ production code, fixtures, tests, credentials, HTTP, SQLite, scanner, tray behavior, polished UI, commit, push, branch, or PR was created.
@@ -1161,3 +1185,23 @@ Both Slice 6C1B checkboxes are visibly `- [x]` in `tasks.md`. `file_checkpoint` 
 **Deviation:** None — implementation follows the 6C1A non-mutating preparation contract and keeps policy-rebuild persistence and Clear Data deferred to 6C2.
 
 **Remaining:** Slice 6C2, Slice 6D, and later tasks remain unchecked and out of scope. Next chain boundary: `a0188df → 6C1B → 6C2`; current slice is 📍 **6C1B**.
+
+## Slice 6C2A.1 applied (2026-07-14)
+
+**Status consumed:** `applyState: ready`, `nextRecommended: apply`, no blocked reasons; repo-local OpenSpec edits only. Delivery is `force-chained` / `feature-branch-chain`; this child boundary is **6C2A.1 only**, based on `8fe89ec`. Standard mode applied; no review authority was started or reused.
+
+All three 6C2A.1 checkboxes are visibly `- [x]` in `tasks.md`. Schema v2 adds path-free `source_contribution_state` policy provenance and source-keyed daily contribution rows. The 6C1B CAS remains first in the same transaction; global aggregates, contribution rows, source policy, and checkpoint all roll back together. V1 global aggregates are retained read-only and report rebuild-required rather than inventing historical ownership; future schemas fail closed. A policy mismatch also fails before commit.
+
+| Work Unit Evidence | Result |
+|---|---|
+| Focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --nologo --filter "FullyQualifiedName~Source_attribution\|FullyQualifiedName~AnalyticsScanCoordinatorTests\|FullyQualifiedName~SqliteDailyModelUsageStoreTests" --logger "console;verbosity=minimal"` — exit 0; 13 passed, 0 failed, 0 skipped. |
+| Full test | `dotnet test AIBar.sln --nologo` — exit 0; 130 passed, 0 failed, 0 skipped. |
+| Build | `dotnet build AIBar.sln --nologo` — exit 0; 0 warnings, 0 errors. |
+| Runtime harness | N/A — synthetic SQLite migration/scanner boundary has no UI or live source; focused tests use temporary JSONL and SQLite. |
+| Rollback boundary | Revert `AnalyticsPolicy.cs`, `AnalyticsScanCoordinator.cs`, `SqliteDailyModelUsageStore.cs`, the two focused test files, and this 6C2A.1 metadata; 6C1B checkpoint/CAS behavior and Codex-owned files remain untouched. |
+
+**Files:** `src/AIBar.Domain/AnalyticsPolicy.cs`, `src/AIBar.Application/{AnalyticsScanCoordinator,SqliteDailyModelUsageStore}.cs`, `tests/AIBar.Domain.Tests/{AnalyticsScanCoordinatorTests,SqliteDailyModelUsageStoreTests}.cs`, `tasks.md`, and this progress record. No prompt/response bodies, paths, Clear Data, multi-source rebuild orchestration, pricing, UI, Git, PR, or review lifecycle action was added.
+
+**Workload:** complete authored diff including pre-existing replanning artifacts is **157 additions + 16 deletions = 173 lines**, below the 400-line limit. `git diff --check` passed (LF/CRLF notices only). No design deviation.
+
+**Remaining:** 6C2A.2 is the next dependency-bound child slice; 6C2B, 6D, and later work remain unchecked and out of scope.

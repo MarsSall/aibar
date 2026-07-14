@@ -24,7 +24,7 @@ public sealed class AnalyticsScanCoordinator(SessionJsonlScanner scanner, Sqlite
             return observation;
         });
         var usage = policy.Aggregate(observations).Usage;
-        await store.SaveWithCheckpointAsync(usage, fingerprint, prior, prepared.ProposedCheckpoint, cancellationToken);
+        await store.SaveWithCheckpointAsync(usage, fingerprint, prior, prepared.ProposedCheckpoint, policy.PolicyVersion, cancellationToken);
         return new(usage, prepared.WarningCodes, prepared.RebuildRequired);
     }
 

@@ -78,7 +78,7 @@ public sealed class SqliteDailyModelUsageStoreTests : IDisposable
         await using (var connection = Open())
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = "CREATE TABLE daily_model_usage_schema (version INTEGER NOT NULL); INSERT INTO daily_model_usage_schema VALUES (2);";
+            command.CommandText = "CREATE TABLE daily_model_usage_schema (version INTEGER NOT NULL); INSERT INTO daily_model_usage_schema VALUES (3);";
             await command.ExecuteNonQueryAsync();
         }
 
@@ -87,7 +87,7 @@ public sealed class SqliteDailyModelUsageStoreTests : IDisposable
 
         await using var verify = Open();
         Assert.Equal(0L, await Scalar(verify, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'daily_model_usage';"));
-        Assert.Equal(2L, await Scalar(verify, "SELECT version FROM daily_model_usage_schema;"));
+        Assert.Equal(3L, await Scalar(verify, "SELECT version FROM daily_model_usage_schema;"));
     }
 
     [Fact]

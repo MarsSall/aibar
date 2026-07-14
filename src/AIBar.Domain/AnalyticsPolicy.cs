@@ -8,6 +8,7 @@ public enum AnalyticsRebuildDecision { None, RebuildRequired }
 
 public sealed class TimeZoneLocalDayPolicy(TimeZoneInfo timeZone, string policyVersion)
 {
+    public string PolicyVersion => policyVersion;
     public LocalDayAssignment Assign(DateTimeOffset eventUtc)
     {
         var utc = eventUtc.ToUniversalTime();
@@ -21,6 +22,7 @@ public sealed record AnalyticsAggregation(IReadOnlyList<DailyUsage> Usage, IRead
 public sealed class AnalyticsPolicy(TimeZoneLocalDayPolicy localDayPolicy)
 {
     public const string UnknownModel = "Unknown";
+    public string PolicyVersion => localDayPolicy.PolicyVersion;
 
     public AnalyticsAggregation Aggregate(IEnumerable<TokenObservation> observations)
     {

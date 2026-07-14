@@ -17,6 +17,7 @@ public sealed class AnalyticsScanCoordinatorTests : IDisposable
             var coordinator = Coordinator(failing);
             await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.ScanAsync(_jsonl, default).AsTask());
             Assert.Null(await failing.LoadCheckpointAsync(coordinator.SourceFingerprint(_jsonl), default));
+            Assert.Empty(await failing.LoadContributionAsync(coordinator.SourceFingerprint(_jsonl), default));
         }
 
         await using var stable = new SqliteDailyModelUsageStore(_database);
@@ -77,6 +78,29 @@ public sealed class AnalyticsScanCoordinatorTests : IDisposable
         Assert.Empty(result.Usage);
         Assert.Equal(new TokenTotals(2, 3, 4), Assert.Single(await store.LoadAsync(default)).Tokens);
         Assert.Equal(prior, await store.LoadCheckpointAsync(fingerprint, default));
+    }
+
+    [Fact]
+    public async Task Source_attribution_is_independent_and_legacy_aggregates_require_rebuild()
+    {
+        await using var store = new SqliteDailyModelUsageStore(_database);
+        await store.SaveAsync([new(new DateOnly(2030, 1, 1), "UTC", TimeSpan.Zero, "gpt-5", new(1, 0, 0)), new(new DateOnly(2030, 1, 1), "UTC", TimeSpan.Zero, "gpt-4", new(0, 1, 0))], default);
+        Assert.True((await store.GetContributionStatusAsync(default)).RebuildRequired);
+
+        var first = Path.Combine(Path.GetTempPath(), $"aibar-source-{Guid.NewGuid():N}.jsonl");
+        try
+        {
+            await File.WriteAllTextAsync(_jsonl, Line(2, 0, 0) + "\n");
+            await File.WriteAllTextAsync(first, Line(0, 3, 0) + "\n");
+            var coordinator = Coordinator(store);
+            await coordinator.ScanAsync(_jsonl, default);
+            await coordinator.ScanAsync(first, default);
+            Assert.True((await store.GetContributionStatusAsync(default)).RebuildRequired);
+            Assert.Equal(new TokenTotals(2, 0, 0), Assert.Single(await store.LoadContributionAsync(coordinator.SourceFingerprint(_jsonl), default)).Tokens);
+            Assert.Equal(new TokenTotals(0, 3, 0), Assert.Single(await store.LoadContributionAsync(coordinator.SourceFingerprint(first), default)).Tokens);
+            Assert.Equal("v1", await store.LoadContributionPolicyAsync(coordinator.SourceFingerprint(_jsonl), default));
+        }
+        finally { if (File.Exists(first)) File.Delete(first); }
     }
 
     private static AnalyticsScanCoordinator Coordinator(SqliteDailyModelUsageStore store, string parserVersion = "v1") => new(

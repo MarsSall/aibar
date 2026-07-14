@@ -4,11 +4,11 @@
 
 | Field | Value |
 |-------|-------|
-| Estimated changed lines | 15 reviewable units; Slice 2A ~350, Slice 2B ~390, 3A ~330, 3B ~375, 3C ~230, 4A.1 ~315, 4A.2 ~260, 4B ~385, 4C ~390; all units below 400 authored lines |
+| Estimated changed lines | 6C2A.1 ~260; 6C2A.2 ~300; 6C2B ~260; each independently below 400 |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | PR 1 → PR 2A → PR 2B → PR 3A → PR 3B → PR 3C → PR 4A.1 → PR 4A.2 → PR 4B → PR 4C → PR 5 → PR 6 → PR 7 → PR 8 |
-| Delivery strategy | auto-chain |
+| Suggested split | Existing chain → 6C1A → 6C1B → 6C2A.1 → 6C2A.2 → 6C2B → 6D → 7 |
+| Delivery strategy | force-chained |
 | Chain strategy | feature-branch-chain |
 
 Decision needed before apply: No
@@ -168,7 +168,7 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 ### Slice 6 — Daily aggregation, model attribution, and clear-data isolation
 
-**Chained sequence:** `5C → 6A → 6B → 6C1 → 6C2 → 6D → 7`. Each unit is independently testable/revertible and must remain at or below 400 authored changed lines. Requirements below preserve the original Slice 6 scope exactly; do not advance a later unit early.
+**Chained sequence:** `5C → 6A → 6B → 6C1A → 6C1B → 6C2A → 6C2B → 6D → 7`. Each unit is independently testable/revertible and must remain at or below 400 authored changed lines. 6C2A preserves 6C1A preparation and 6C1B durable CAS/atomic handoff; 6C2B follows 6C2A because it rebuilds the state model established there.
 
 #### Slice 6A — Analytics policy kernel (~330 lines including evidence)
 
@@ -204,17 +204,39 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 - [x] Wire supported scanner token/model/timestamp handoff through 6A to 6B, advancing the exact proposed checkpoint only in the same successful aggregate transaction.
 - [x] **RED → GREEN → TRIANGULATE → REFACTOR:** test unchanged/appended handoff, cancellation/failure-before-commit retry reproducibility, and partial-scan retention without prompt/response persistence.
 
-#### Slice 6C2 — Timezone-policy rebuild persistence and Clear Data isolation (~350 lines including evidence)
+#### Slice 6C2A.1 — Source-attributed durable contributions and migration (~260 lines including evidence)
 
-**Dependency:** 6C1 complete. **Scope boundary:** persist the explicit timezone-policy version/rebuild decision and isolate Clear AIBar Data; no pricing, UI, or unrelated diagnostics work.
+**Dependency:** 6C1B complete; 6C1A preparation and 6C1B durable CAS/atomic handoff are immutable prerequisites. **Scope boundary:** source-attributed contribution schema, migration, and durable read/write ports; no rebuild orchestration, Clear Data, pricing, UI, or unrelated diagnostics.
 
-- [ ] Persist timezone-policy version/provenance; on mismatch require explicit replacement/rebuild rather than silently moving historical daily totals.
-- [ ] Implement Clear AIBar Data to cancel work, remove only AIBar-owned cache/database/log/settings data, recreate empty state, and prove Codex-owned source files are byte-for-byte unchanged.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test policy-version replacement/rebuild and clear-data isolation with synthetic before/after source hashes.
+- [x] **RED:** test independent per-source contribution reads, migration of multi-source legacy aggregates, policy-less legacy detection, and preservation of 6C1B checkpoint/CAS semantics.
+- [x] **GREEN:** add source-attributed durable contribution rows and explicit migration/status APIs; retain legacy data read-only or require safe rebuild when attribution is impossible.
+- [x] **TRIANGULATE/REFACTOR:** prove append/unchanged idempotence, source isolation, cancellation/failure-before-commit retryability, policy provenance, and no prompt/response persistence.
+
+**Review Workload Forecast — 6C2A.1:** ~260 authored additions+deletions; risk Medium; focused command `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~SourceAttributed`; runtime harness N/A (synthetic SQLite migration; no UI/live source); rollback removes contribution schema/port/tests while preserving 6C1B.
+
+#### Slice 6C2A.2 — Atomic multi-source rebuild and policy transition (~300 lines including evidence)
+
+**Dependency:** 6C2A.1 complete and reviewed. **Scope boundary:** coordinator-owned atomic multi-source rebuild/policy transition using attributed contributions; no Clear Data, pricing, UI, or unrelated diagnostics.
+
+- [ ] **RED:** test source replacement/shrink/parser invalidation, policy mismatch, legacy policy-less databases, cancellation, failure-before-commit, and retry; assert unrelated sources remain unchanged.
+- [ ] **GREEN:** implement one transaction that rebuilds selected sources, preserves unrelated contribution/checkpoint state, updates policy provenance, and fails closed when legacy attribution is unsafe.
+- [ ] **TRIANGULATE/REFACTOR:** prove multi-source atomicity, deterministic retry, concurrent CAS rejection, partial-scan retention, and no prompt/response persistence.
+
+**Review Workload Forecast — 6C2A.2:** ~300 authored additions+deletions; risk Medium; focused command `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~MultiSourceRebuild`; runtime harness N/A (synthetic coordinator/SQLite boundary; no live Codex access); rollback removes rebuild orchestration/tests while preserving 6C2A.1.
+
+#### Slice 6C2B — Clear AIBar Data cancellation and strict isolation (~260 lines including evidence)
+
+**Dependency:** 6C2A.2 complete and reviewed. **Scope boundary:** Clear AIBar Data only; no rebuild or policy implementation.
+
+- [ ] **RED:** test cancellation boundaries, empty-state recreation, and byte-for-byte Codex hashes before/after clear.
+- [ ] **GREEN:** cancel work, suppress late commits, remove only AIBar-owned state, and recreate a valid empty state.
+- [ ] **TRIANGULATE/REFACTOR:** test repeated clear, races, locked/source-changing files, failure recovery, and post-clear rescan readiness.
+
+**Review Workload Forecast — 6C2B:** ~260 authored additions+deletions; risk Low; focused command `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~ClearAiBarData`; runtime harness N/A (synthetic isolation); rollback removes clear orchestration/tests while preserving 6C2A.2.
 
 #### Slice 6D — Aggregation integration hardening (~300 lines including evidence)
 
-**Dependency:** 6C2 complete. **Scope boundary:** synthetic end-to-end aggregation correctness and resilience only; no Slice 7 pricing/trends/UI work.
+**Dependency:** 6C2A and 6C2B complete and reviewed. **Scope boundary:** synthetic end-to-end aggregation correctness and resilience only; no Slice 7 pricing/trends/UI work.
 
 - [ ] Verify transactional aggregate/checkpoint atomicity, crash recovery, partial scan retention, and repricing without token mutation across the completed Slice 6 boundary.
 - [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** run synthetic integration/property coverage for model ranking, `Unknown`, reset/decrease, midnight/DST, rebuild, and retention behavior.
