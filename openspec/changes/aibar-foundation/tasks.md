@@ -168,14 +168,49 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 ### Slice 6 — Daily aggregation, model attribution, and clear-data isolation
 
-- [ ] Implement transactional `daily_model_usage` aggregation for input, cached-input, and output totals using `max(0, current - previous)` per component and the exact documented ranking formula `total tokens = input + cached input + output`.
-- [ ] Implement explicit `Unknown` attribution for missing/untrusted model evidence; never infer a named model or rank by cost.
-- [ ] Implement Windows local-timezone/day normalization with timezone ID, observed offset, DST behavior, UTC-derived provenance, and explicit rebuild/version behavior when the policy changes.
-- [ ] Add SQLite migrations and transactional tests for checkpoint/aggregate atomicity, crash recovery, repricing without token mutation, and aggregate retention.
-- [ ] Implement Clear AIBar Data to cancel work, remove only AIBar-owned cache/database/log/settings data, recreate empty state, and prove Codex-owned source files are byte-for-byte unchanged.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test model ranking, `Unknown`, midnight/DST boundaries, reset/decrease handling, clear-data isolation, and partial scan retention.
+**Chained sequence:** `5C → 6A → 6B → 6C1 → 6C2 → 6D → 7`. Each unit is independently testable/revertible and must remain at or below 400 authored changed lines. Requirements below preserve the original Slice 6 scope exactly; do not advance a later unit early.
 
-**Acceptance evidence:** aggregation/property/persistence/privacy test reports and before/after hashes of Codex fixtures. Rollback is a schema-compatible disablement of derived analytics; source files are never deleted.
+#### Slice 6A — Analytics policy kernel (~330 lines including evidence)
+
+**Scope boundary:** pure domain policy only; no SQLite schema/migration, scanner wiring, checkpoint advancement, rebuild persistence, Clear Data, pricing, UI, or network access.
+
+- [x] Implement pure component-wise cumulative deltas as `max(0, current - previous)` independently for input, cached-input, and output; aggregate only token facts with the exact ranking formula `input + cached input + output`.
+- [x] Implement explicit `Unknown` attribution for absent/untrusted model evidence; never infer a named model or rank by cost; resolve equal token totals deterministically.
+- [x] Implement injectable Windows local-day/timezone policy with event UTC provenance, Windows timezone ID, observed offset, deterministic DST conversion, and an explicit policy-version mismatch decision that requires rebuild rather than silently moving history.
+- [x] **RED → GREEN → TRIANGULATE → REFACTOR:** add pure tests for resets/decreases, `Unknown`, token-only ranking/ties, midnight/DST boundaries, UTC/timezone/offset provenance, and policy-version rebuild behavior.
+
+**Acceptance evidence:** pure policy test report and documented no-persistence/no-scanner boundary. **Rollback:** remove the policy kernel/tests only; no user data exists or is changed.
+
+#### Slice 6B — Daily-model SQLite schema and atomic store (~360 lines including evidence)
+
+**Dependency:** 6A complete. **Scope boundary:** `daily_model_usage` schema/migration and transactional token-fact persistence only; no scanner wiring, checkpoint advancement, rebuild orchestration, Clear Data, or pricing.
+
+- [ ] Add SQLite migration and transactional `daily_model_usage` storage for local day, timezone ID/offset provenance, model, and input/cached-input/output totals, preserving 6A token facts.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test aggregate/checkpoint transaction seams, crash recovery, aggregate retention, and repricing without token mutation using synthetic data.
+
+#### Slice 6C1 — Scanner aggregation handoff and partial retention (~300 lines including evidence)
+
+**Dependency:** 6B complete. **Scope boundary:** connect existing scanner outputs to the 6A policy and 6B transaction; no policy rebuild persistence or Clear Data.
+
+- [ ] Wire supported scanner token/model/timestamp handoff through 6A to 6B, advancing checkpoints only in the same successful aggregate transaction.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test unchanged/appended handoff, cancellation-before-commit, and partial-scan retention without prompt/response persistence.
+
+#### Slice 6C2 — Timezone-policy rebuild persistence and Clear Data isolation (~350 lines including evidence)
+
+**Dependency:** 6C1 complete. **Scope boundary:** persist the explicit timezone-policy version/rebuild decision and isolate Clear AIBar Data; no pricing, UI, or unrelated diagnostics work.
+
+- [ ] Persist timezone-policy version/provenance; on mismatch require explicit replacement/rebuild rather than silently moving historical daily totals.
+- [ ] Implement Clear AIBar Data to cancel work, remove only AIBar-owned cache/database/log/settings data, recreate empty state, and prove Codex-owned source files are byte-for-byte unchanged.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test policy-version replacement/rebuild and clear-data isolation with synthetic before/after source hashes.
+
+#### Slice 6D — Aggregation integration hardening (~300 lines including evidence)
+
+**Dependency:** 6C2 complete. **Scope boundary:** synthetic end-to-end aggregation correctness and resilience only; no Slice 7 pricing/trends/UI work.
+
+- [ ] Verify transactional aggregate/checkpoint atomicity, crash recovery, partial scan retention, and repricing without token mutation across the completed Slice 6 boundary.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** run synthetic integration/property coverage for model ranking, `Unknown`, reset/decrease, midnight/DST, rebuild, and retention behavior.
+
+**Acceptance evidence:** aggregation/property/persistence/privacy reports and synthetic before/after Codex-fixture hashes. Rollback is schema-compatible disablement of derived analytics; source files are never deleted.
 
 ### Slice 7 — Pricing, trends, pace, burn, and ETA
 

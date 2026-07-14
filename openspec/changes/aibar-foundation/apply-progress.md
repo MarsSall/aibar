@@ -911,3 +911,53 @@ The single correction transaction for `review-60b9b949769a5e75` resolves RELIABI
 RED focused tests failed in all three frozen behaviors: raw secret/path present in `fingerprint`, empty reopened handoff, and stale first-cancellation timestamp. GREEN focused tests passed 8/8; privacy inspection passed 1/1; full build passed with 0 warnings/errors; full suite passed 104/104; `git diff --check` passed with line-ending notices only. No Slice 6 behavior or task state changed.
 
 Rollback boundary: revert only `ScanRunProvenance.cs`, its focused tests, and this evidence paragraph; prior Slice 5C behavior and all Codex-owned data remain untouched.
+
+## Slice 6A applied (2026-07-14)
+
+**Structured status consumed:** authoritative OpenSpec status for `aibar-foundation`: `applyState: ready`, `nextRecommended: apply`, and no blocked reasons. `actionContext` is repo-local; workspace and only allowed edit root are `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`. Delivery is `auto-chain` / `feature-branch-chain`; this independently revertible boundary is **Slice 6A only**, based on approved Slice 5C parent `ed5c353`. No action-context warnings.
+
+### Completed tasks and persisted checkbox evidence
+
+The four Slice 6A lines are visibly marked `- [x]` in `tasks.md`. The pure domain kernel computes per-component non-negative cumulative deltas, assigns absent/untrusted models to `Unknown`, ranks models only by `input + cached input + output` with ordinal deterministic ties, and records UTC timestamp, Windows timezone ID, observed offset, local day, and policy version. A policy-version mismatch returns `RebuildRequired`; it never moves persisted history. SQLite, scanner/checkpoint wiring, rebuild persistence, Clear Data, pricing, UI, and network access remain deferred.
+
+### TDD Cycle Evidence
+
+| Task | Test file | Layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 6A policy kernel | `tests/AIBar.Domain.Tests/AnalyticsPolicyTests.cs` | Unit | `FoundationContractsTests`: 6/6 | Missing policy types: expected `CS0246` | 5/5 passed | Added DST offset-separation case; 6/6 passed | No behavior change required; focused suite remained green |
+
+### Verification evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~FoundationContractsTests"
+Passed: 6, Failed: 0, Total: 6.
+
+RED: AnalyticsPolicyTests before production implementation
+Failed as expected: CS0246 (AnalyticsRebuildDecision absent).
+
+Focused GREEN/TRIANGULATE:
+Passed: 6, Failed: 0, Total: 6.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 110, Failed: 0, Skipped: 0, Total: 110.
+
+git diff --check ed5c353 --
+Passed.
+```
+
+No LSP tool is available in this executor session; the zero-warning compiler build is the available static diagnostic evidence. The diff and source boundary contain no Codex file reads, credentials, prompts/responses, network calls, SQLite, or scanner wiring.
+
+### Files / workload / remaining
+
+- `src/AIBar.Domain/AnalyticsPolicy.cs`
+- `tests/AIBar.Domain.Tests/AnalyticsPolicyTests.cs`
+- `openspec/changes/aibar-foundation/tasks.md`
+- `openspec/changes/aibar-foundation/apply-progress.md`
+
+No design deviation. The 6A rollback boundary is exactly the policy/test/task/progress changes above; it changes no persisted data. The feature-branch-chain follow-up is 6B only. The exact unchecked next 6B task lines are:
+
+- [ ] Add SQLite migration and transactional `daily_model_usage` storage for local day, timezone ID/offset provenance, model, and input/cached-input/output totals, preserving 6A token facts.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test aggregate/checkpoint transaction seams, crash recovery, aggregate retention, and repricing without token mutation using synthetic data.
