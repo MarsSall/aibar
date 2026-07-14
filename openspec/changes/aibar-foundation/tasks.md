@@ -160,9 +160,9 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Dependency:** Slice 5B complete. **Scope boundary:** `scan_run` provenance/status, discovered/read/skipped/deferred counts, warning/cancellation/partial coverage persistence, and synthetic evidence; no aggregation/UI.
 
-- [ ] Implement `scan_run` provenance/status including discovered/read/skipped/deferred counts, safe warnings, cancellation, and partial coverage.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** add synthetic tests for scan coverage counts, cancellation, idempotence, and non-negative delta handoff boundaries.
-- [ ] Verify fixture data contains no real credentials, paths, prompt text, or response text, and that cancellation before commit leaves aggregates/checkpoints unchanged.
+- [x] Implement SQLite-backed `scan_run` provenance/status including discovered/read/skipped/deferred counts, safe warnings, durable cancellation, and partial coverage.
+- [x] **RED → GREEN → TRIANGULATE → REFACTOR:** add synthetic tests for scan coverage counts, cancellation, idempotence, and non-negative delta handoff boundaries.
+- [x] Verify fixture data contains no real credentials, paths, prompt text, or response text, and that cancellation before commit leaves aggregates/checkpoints unchanged.
 
 **Slice 5 chain:** `4C → 5A → 5B → 5C → 6`. Each unit is independently testable/revertible and remains below the 400-line authored review budget.
 

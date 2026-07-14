@@ -785,3 +785,129 @@ Delivery remains `auto-chain` / `feature-branch-chain`, PR boundary Slice 5B rem
 ### Bounded review correction evidence
 
 Safety net passed 6/6. RED failed three cases: numeric timestamp/model threw, and an unchanged incomplete tail lost its warning. Minimal value-kind guards plus the truthful unchanged-tail fast path passed 8/8; a following valid record survives malformed input and repeated scans preserve checkpoint semantics. Full suite passed 96/96; build passed with 0 warnings/errors; diff/LF checks passed and LSP was unavailable. No review approval or authority mutation is claimed.
+
+## Slice 5C applied (2026-07-14)
+
+**Structured status consumed:** authoritative OpenSpec status: `artifactStore: openspec`, `applyState: ready`, `nextRecommended: apply`, `54/81` complete, no blocked reasons. `actionContext` is repo-local; the authoritative workspace and allowed edit root are `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`. Delivery is `auto-chain` / `feature-branch-chain`; this independent child boundary is **Slice 5C only** on `feature/aibar-foundation-slice-5c`, based on `2441cd6`. No action-context warnings apply.
+
+### Completed tasks and persisted checkbox evidence
+
+The three Slice 5C task lines are visibly marked `- [x]` in `openspec/changes/aibar-foundation/tasks.md`:
+
+- `ScanRunRecorder` persists immutable scan-run provenance with discovered/read/skipped/deferred counts, safe warning codes, partial/complete coverage, non-negative token handoff, and deterministic idempotence through `IScanRunStore`.
+- Synthetic focused tests cover counts and partial coverage, cancellation before commit, idempotent replay, non-negative handoff boundaries, and warning-code filtering.
+- Fixture/privacy inspection passed: the Slice 5C fixture uses only synthetic model/file labels and token counts; it contains no credential, prompt, response, or real filesystem-path material. Cancellation before commit raises before a scan-run/handoff write and retains the prior committed state.
+
+### TDD Cycle Evidence
+
+| Stage | Evidence | Result |
+|---|---|---|
+| RED | Preserved the interrupted untracked `ScanRunProvenanceTests.cs` and ran the focused test before implementation. | Failed as expected with `CS0246`: `InMemoryScanRunStore` and `ScanRunRecorder` did not exist. |
+| GREEN | Added minimal application-only scan-run store/recorder and reran the focused suite. | Initial run exposed cancellation occurring after the idempotence lookup; moving the cancellation boundary before lookup made 3/3 pass. |
+| TRIANGULATE | Added an unrecognized-warning case alongside counts, cancellation, idempotence, partial coverage, and non-negative handoff cases. | Focused suite passed 4/4. |
+| REFACTOR | Centralized deterministic fingerprinting, safe-warning filtering, coverage determination, and one pre-commit cancellation boundary. | Full suite/build passed; no aggregation, UI, SQLite, or source-file mutation was introduced. |
+
+### Verification evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~ScanRunProvenanceTests" --logger "console;verbosity=minimal"
+RED: failed as expected (CS0246).
+GREEN: Passed: 3, Failed: 0, Skipped: 0, Total: 3.
+TRIANGULATE/REFACTOR: Passed: 4, Failed: 0, Skipped: 0, Total: 4.
+
+fixture privacy grep (credential/prompt/response/path patterns)
+Passed: no matches.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 100, Failed: 0, Skipped: 0, Total: 100.
+
+git diff --check
+Passed (Git emitted only LF-to-CRLF working-copy notices).
+```
+
+### Files changed / workload / rollback
+
+- `src/AIBar.Application/ScanRunProvenance.cs`
+- `tests/AIBar.Domain.Tests/ScanRunProvenanceTests.cs` (preserved and completed interrupted RED work)
+- `openspec/changes/aibar-foundation/tasks.md`
+- `openspec/changes/aibar-foundation/apply-progress.md`
+
+Authored implementation/test change is **194 lines** (117 production + 77 synthetic tests) before OpenSpec evidence, below the hard 400-line budget. The Slice 5C PR boundary starts at `2441cd6`, ends with scan-run provenance/status only, depends on Slice 5B, and is followed by Slice 6. Rollback removes only the recorder/store and its synthetic tests; it does not modify Codex-owned files, checkpoints, aggregates, UI, or later analytics. No design deviation, commit, stage, push, PR, review transaction, or Slice 6/aggregation work occurred.
+
+### Remaining tasks
+
+Slice 5C is complete. The next exact unchecked task is outside this boundary:
+
+- [ ] Implement transactional `daily_model_usage` aggregation for input, cached-input, and output totals using `max(0, current - previous)` per component and the exact documented ranking formula `total tokens = input + cached input + output`.
+
+## Slice 5C corrective rerun (2026-07-14)
+
+**Status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, repo-local action context, no blockers. Delivery is `auto-chain` / `feature-branch-chain`; this is the single focused corrective rerun of the **Slice 5C-only** boundary from HEAD `2441cd6`. Strict TDD was active by executor context despite `openspec/config.yaml` declaring false. No action-context warnings. The canonical spec was read at `openspec/changes/aibar-foundation/specs/aibar-foundation/spec.md`; the canonical design was read at `openspec/changes/aibar-foundation/design.md`.
+
+### Corrected implementation and persisted task evidence
+
+The persisted Slice 5C task explicitly now says **SQLite-backed** `scan_run` and remains visibly checked. `SqliteScanRunStore` uses the existing `Microsoft.Data.Sqlite` dependency and creates the logical `scan_run` table in the application database with fingerprint, timestamps, discovered/read/skipped/deferred counts, safe warning codes, cancellation, and coverage state. It opens with foreign keys and WAL. Completed scans are idempotent by fingerprint across a reopened store; `LoadLastAsync` returns durable last-scan status.
+
+Cancellation before the normal commit now records a separate durable cancelled scan status with partial coverage, `session_cancelled`, and an empty handoff before rethrowing `OperationCanceledException`. The normal scan commit is not performed in that path, preserving the Slice 5C boundary's no-aggregate/no-checkpoint-mutation guarantee. `WasCancelled` is no longer dead or always false. The correct application file is `src/AIBar.Application/ScanRunProvenance.cs` (not an Infrastructure path).
+
+### TDD Cycle Evidence
+
+| Stage | Evidence | Result |
+|---|---|---|
+| RED | Added durable reopen/idempotence and persisted-cancellation tests before a SQLite store existed; ran focused tests. | Failed as expected with `CS0246`: `SqliteScanRunStore` did not exist. |
+| GREEN | Added the minimum SQLite-backed store/table and cancellation-status persistence, reusing the existing SQLite package. | Focused tests initially exposed cancellation being bypassed by the completed-run idempotence lookup; ordering was corrected so cancellation is observed and recorded first. |
+| TRIANGULATE | Added persisted-row idempotence assertion (`COUNT(*) = 1`), reopen/load assertions, and cancellation status assertions including empty handoff and partial coverage. | Focused suite passed 6/6. |
+| REFACTOR | Kept provenance mapping, warning validation, normal idempotence, and cancellation status in the existing application boundary; no aggregation, checkpoints, UI, or Codex file behavior was added. | Full build/suite and diff/privacy checks passed. |
+
+### Verification evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~ScanRunProvenanceTests" --logger "console;verbosity=minimal"
+RED: failed as expected (CS0246 SqliteScanRunStore missing).
+GREEN/TRIANGULATE: Passed: 6, Failed: 0, Skipped: 0, Total: 6.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 102, Failed: 0, Skipped: 0, Total: 102.
+
+git diff --check; untracked no-index diff checks
+Passed (only Git LF-to-CRLF working-copy notices).
+
+Privacy grep over Slice 5C source/tests for bearer/access-token/prompt/response/path patterns
+Passed: no matches.
+```
+
+### Files, workload, deviation, and rollback
+
+Exact Slice 5C implementation/test paths from HEAD `2441cd6`:
+
+- `src/AIBar.Application/ScanRunProvenance.cs`
+- `tests/AIBar.Domain.Tests/ScanRunProvenanceTests.cs`
+
+Required SDD metadata paths:
+
+- `openspec/changes/aibar-foundation/tasks.md`
+- `openspec/changes/aibar-foundation/apply-progress.md`
+
+Implementation plus test authored lines from HEAD are **203** (`wc -l` across the two untracked Slice 5C paths), within the `<=400` limit. Parent gate diagnostics identified dynamic SQL composition in the shared load helper; it was replaced with two constant parameterized query texts. Post-fix LSP/Semgrep diagnostics reported zero findings, focused tests passed 6/6, the full suite passed 102/102, the build completed with zero warnings/errors, and `git diff --check` passed. No design deviation remains: the scan-run status is now durable in SQLite as required. Rollback removes only the scan-run recorder/store and its synthetic tests; it leaves the prior SQLite quota store, scanner, Codex-owned files, checkpoints, aggregates, UI, and Slice 6 untouched. No commit, stage, push, PR, or review transaction was started.
+
+### Remaining tasks / PR boundary
+
+Current PR boundary: **Slice 5C only** (`2441cd6` → Slice 5C → Slice 6). Prior dependency: Slice 5B. The next exact unchecked line, intentionally out of scope, is:
+
+- [ ] Implement transactional `daily_model_usage` aggregation for input, cached-input, and output totals using `max(0, current - previous)` per component and the exact documented ranking formula `total tokens = input + cached input + output`.
+
+Other Slice 6+ and cross-slice tasks remain unchecked. Do not advance this apply rerun to Slice 6.
+
+## Slice 5C bounded reliability correction (2026-07-14)
+
+The single correction transaction for `review-60b9b949769a5e75` resolves RELIABILITY-001/002/003 only. Persisted scan identity is now a SHA-256 digest of canonical inputs, so raw warning paths/secrets are not stored. SQLite atomically persists/reloads handoff JSON, including idempotent replay after reopen. Cancelled rows use deterministic upsert to advance their row order, preserving the freshest repeated cancellation as last-scan status after reopen.
+
+RED focused tests failed in all three frozen behaviors: raw secret/path present in `fingerprint`, empty reopened handoff, and stale first-cancellation timestamp. GREEN focused tests passed 8/8; privacy inspection passed 1/1; full build passed with 0 warnings/errors; full suite passed 104/104; `git diff --check` passed with line-ending notices only. No Slice 6 behavior or task state changed.
+
+Rollback boundary: revert only `ScanRunProvenance.cs`, its focused tests, and this evidence paragraph; prior Slice 5C behavior and all Codex-owned data remain untouched.
