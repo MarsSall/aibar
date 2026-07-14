@@ -218,9 +218,9 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Dependency:** 6C2A.1 complete and reviewed. **Scope boundary:** coordinator-owned atomic multi-source rebuild/policy transition using attributed contributions; no Clear Data, pricing, UI, or unrelated diagnostics.
 
-- [ ] **RED:** test source replacement/shrink/parser invalidation, policy mismatch, legacy policy-less databases, cancellation, failure-before-commit, and retry; assert unrelated sources remain unchanged.
-- [ ] **GREEN:** implement one transaction that rebuilds selected sources, preserves unrelated contribution/checkpoint state, updates policy provenance, and fails closed when legacy attribution is unsafe.
-- [ ] **TRIANGULATE/REFACTOR:** prove multi-source atomicity, deterministic retry, concurrent CAS rejection, partial-scan retention, and no prompt/response persistence.
+- [x] **RED:** test source replacement/shrink/parser invalidation, policy mismatch, legacy policy-less databases, cancellation, failure-before-commit, and retry; assert unrelated sources remain unchanged.
+- [x] **GREEN:** implement one transaction that rebuilds selected sources, requires an exact durable checkpoint set while clearing migration debt (or an explicit checkpoint-free legacy rescan), preserves unrelated contribution/checkpoint state, updates policy provenance, and fails closed when legacy attribution is unsafe.
+- [x] **TRIANGULATE/REFACTOR:** prove multi-source atomicity, deterministic retry, concurrent CAS rejection, partial-scan retention, and no prompt/response persistence.
 
 **Review Workload Forecast — 6C2A.2:** ~300 authored additions+deletions; risk Medium; focused command `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~MultiSourceRebuild`; runtime harness N/A (synthetic coordinator/SQLite boundary; no live Codex access); rollback removes rebuild orchestration/tests while preserving 6C2A.1.
 

@@ -1,5 +1,24 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 6C2A.2 applied (2026-07-14)
+
+**Status:** Standard mode; `applyState: ready`, OpenSpec/repo-local, force-chained `feature-branch-chain`. Review lineage `review-878ecbaeb79af763` authorized one bounded correction; no review authority or Git lifecycle action was started.
+
+Completed only the three Slice 6C2A.2 tasks and the authorized correction. Before cleanup or debt clearing, `ReplaceSourcesAsync` now requires the exact requested fingerprint set to match the durable checkpoint universe; contribution-state cardinality is not authoritative, so partially attributed legacy A/B accepts a complete A/B rescan, while checkpoint-free legacy aggregates retain their explicit full-rescan path. Atomic CAS, replacement, aggregate recomputation, policy transition, rollback, retry, and unrelated-source retention remain unchanged.
+
+| Work Unit Evidence | Result |
+|---|---|
+| Focused test | Exact two regression filter — passed 2/2; coordinator/store filter — passed 18/18; failed 0, skipped 0. |
+| Related scanner/coordinator/store/policy tests | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~SessionJsonlScannerTests|FullyQualifiedName~AnalyticsScanCoordinatorTests|FullyQualifiedName~SqliteDailyModelUsageStoreTests|FullyQualifiedName~AnalyticsPolicyTests" --nologo` — passed 39/39, failed 0. |
+| Full test | `dotnet test AIBar.sln --nologo` — passed 135/135, failed 0, skipped 0. |
+| Build | `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors; `git diff --check` passed. |
+| Runtime harness | N/A — synthetic coordinator/SQLite transaction boundary only; no live Codex/UI runtime belongs to this slice. |
+| Rollback boundary | Revert `AnalyticsScanCoordinator.cs`, `SqliteDailyModelUsageStore.cs`, these coordinator tests, and the 6C2A.2 task/progress evidence; 6C2A.1 schema/contribution rows and 6C1B normal scan CAS remain. |
+
+**Files:** `src/AIBar.Application/AnalyticsScanCoordinator.cs`, `src/AIBar.Application/SqliteDailyModelUsageStore.cs`, `tests/AIBar.Domain.Tests/AnalyticsScanCoordinatorTests.cs`, `openspec/changes/aibar-foundation/tasks.md`, `openspec/changes/aibar-foundation/apply-progress.md`.
+
+**Authored count:** the authorized correction is 66 additions+deletions across the frozen paths, within its hard 70-line limit; the underlying Slice 6C2A.2 remains below 400. **Deviation:** none. **Next:** Slice 6C2B only after review; downstream scope remains unchanged.
+
 ## Slice 6C2A replanned after terminal review escalation (2026-07-14)
 
 **Status:** The prior 6C2A candidate is discarded and must not be marked complete. Review `review-f9dc7720376bf064` is terminal ESCALATED/superseded; successor `review-6c2a-source-attribution` is terminal INVALIDATED at `sha256:804a1585b1d6ec7c8fdee81a6462fab1dac7bc288865c3c92f0c85b3dd56a0ed`. No review is active or reused.

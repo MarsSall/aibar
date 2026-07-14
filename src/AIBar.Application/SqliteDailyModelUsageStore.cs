@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 namespace AIBar.Application;
 
 public sealed record SourceContributionStatus(bool RebuildRequired);
+public sealed record SourceReplacement(string Fingerprint, SessionCheckpoint? ExpectedCheckpoint, SessionCheckpoint Checkpoint, IReadOnlyList<DailyUsage> Usage);
 
 public sealed class SqliteDailyModelUsageStore : IAsyncDisposable
 {
@@ -84,6 +85,29 @@ public sealed class SqliteDailyModelUsageStore : IAsyncDisposable
         return new(Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken)) != 0);
     }
 
+    public async ValueTask ReplaceSourcesAsync(IReadOnlyList<SourceReplacement> sources, string policyVersion, bool fullRebuild, CancellationToken cancellationToken)
+    {
+        if (sources.Count == 0 || sources.Select(source => source.Fingerprint).Distinct(StringComparer.Ordinal).Count() != sources.Count) throw new ArgumentException("Sources must be unique and non-empty.", nameof(sources));
+        await using var connection = await OpenAsync(cancellationToken); await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        await using var status = connection.CreateCommand(); status.Transaction = transaction;
+        status.CommandText = "SELECT rebuild_required OR (EXISTS(SELECT 1 FROM daily_model_usage) AND NOT EXISTS(SELECT 1 FROM source_contribution_state)) OR EXISTS(SELECT 1 FROM source_contribution_state WHERE policy_version IN ('', 'legacy')) FROM daily_model_usage_migration LIMIT 1;";
+        var required = Convert.ToInt64(await status.ExecuteScalarAsync(cancellationToken)) != 0;
+        if (required && !fullRebuild) throw new InvalidOperationException("A full source rescan is required before replacing legacy analytics.");
+        status.CommandText = $"SELECT COUNT(*) = 0 OR (COUNT(*) = $count AND NOT EXISTS(SELECT 1 FROM file_checkpoint WHERE source_fingerprint NOT IN ({string.Join(',', sources.Select((_, index) => "$source" + index))}))) FROM file_checkpoint;";
+        status.Parameters.AddWithValue("$count", sources.Count); foreach (var (source, index) in sources.Select((source, index) => (source, index))) status.Parameters.AddWithValue("$source" + index, source.Fingerprint);
+        var completeCheckpointSet = Convert.ToInt64(await status.ExecuteScalarAsync(cancellationToken)) != 0;
+        if ((fullRebuild && !completeCheckpointSet) || (!fullRebuild && await HasOtherPolicyAsync(connection, transaction, sources, policyVersion, cancellationToken))) throw new InvalidOperationException("All sources affected by the analytics policy must be rebuilt together.");
+        foreach (var source in sources)
+        {
+            await SaveCheckpointAsync(connection, transaction, source.Fingerprint, source.ExpectedCheckpoint, source.Checkpoint, cancellationToken);
+            await using var delete = connection.CreateCommand(); delete.Transaction = transaction; delete.CommandText = "DELETE FROM source_daily_model_usage WHERE source_fingerprint=$fingerprint; DELETE FROM source_contribution_state WHERE source_fingerprint=$fingerprint;"; delete.Parameters.AddWithValue("$fingerprint", source.Fingerprint); await delete.ExecuteNonQueryAsync(cancellationToken);
+            await SaveContributionsAsync(connection, transaction, source.Usage, source.Fingerprint, policyVersion, cancellationToken);
+        }
+        await using var aggregate = connection.CreateCommand(); aggregate.Transaction = transaction;
+        aggregate.CommandText = "DELETE FROM daily_model_usage; INSERT INTO daily_model_usage SELECT local_day, time_zone_id, observed_offset_minutes, model, SUM(input_tokens), SUM(cached_input_tokens), SUM(output_tokens) FROM source_daily_model_usage GROUP BY local_day, time_zone_id, observed_offset_minutes, model; UPDATE daily_model_usage_migration SET rebuild_required=0;";
+        await aggregate.ExecuteNonQueryAsync(cancellationToken); _beforeCommit?.Invoke(); await transaction.CommitAsync(cancellationToken);
+    }
+
     private static async ValueTask SaveAsync(SqliteConnection connection, SqliteTransaction transaction, IReadOnlyList<DailyUsage> usage, CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand(); command.Transaction = transaction;
@@ -96,6 +120,23 @@ public sealed class SqliteDailyModelUsageStore : IAsyncDisposable
             if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
                 throw new OverflowException("Daily model usage token totals exceed Int64 capacity.");
         }
+    }
+
+    private static async ValueTask<bool> HasOtherPolicyAsync(SqliteConnection connection, SqliteTransaction transaction, IReadOnlyList<SourceReplacement> sources, string policyVersion, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand(); command.Transaction = transaction;
+        command.CommandText = $"SELECT EXISTS(SELECT 1 FROM source_contribution_state WHERE policy_version <> $policy AND source_fingerprint NOT IN ({string.Join(',', sources.Select((_, index) => "$source" + index))}));";
+        command.Parameters.AddWithValue("$policy", policyVersion); foreach (var (source, index) in sources.Select((source, index) => (source, index))) command.Parameters.AddWithValue("$source" + index, source.Fingerprint);
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken)) != 0;
+    }
+
+    private static async ValueTask SaveCheckpointAsync(SqliteConnection connection, SqliteTransaction transaction, string fingerprint, SessionCheckpoint? expectedCheckpoint, SessionCheckpoint checkpoint, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand(); command.Transaction = transaction;
+        command.CommandText = expectedCheckpoint is null ? "INSERT INTO file_checkpoint (source_fingerprint, identity, length, last_write_utc_ticks, offset, parser_version, cumulative_input_tokens, cumulative_cached_input_tokens, cumulative_output_tokens) VALUES ($fingerprint, $identity, $length, $mtime, $offset, $parser, $input, $cached, $output) ON CONFLICT(source_fingerprint) DO NOTHING;" : "UPDATE file_checkpoint SET identity=$identity, length=$length, last_write_utc_ticks=$mtime, offset=$offset, parser_version=$parser, cumulative_input_tokens=$input, cumulative_cached_input_tokens=$cached, cumulative_output_tokens=$output WHERE source_fingerprint=$fingerprint AND identity=$expectedIdentity AND length=$expectedLength AND last_write_utc_ticks=$expectedMtime AND offset=$expectedOffset AND parser_version=$expectedParser AND cumulative_input_tokens=$expectedInput AND cumulative_cached_input_tokens=$expectedCached AND cumulative_output_tokens=$expectedOutput;";
+        command.Parameters.AddWithValue("$fingerprint", fingerprint); command.Parameters.AddWithValue("$identity", checkpoint.Identity); command.Parameters.AddWithValue("$length", checkpoint.Length); command.Parameters.AddWithValue("$mtime", checkpoint.LastWriteUtcTicks); command.Parameters.AddWithValue("$offset", checkpoint.Offset); command.Parameters.AddWithValue("$parser", checkpoint.ParserVersion); command.Parameters.AddWithValue("$input", checkpoint.CumulativeInputTokens); command.Parameters.AddWithValue("$cached", checkpoint.CumulativeCachedInputTokens); command.Parameters.AddWithValue("$output", checkpoint.CumulativeOutputTokens);
+        if (expectedCheckpoint is not null) { command.Parameters.AddWithValue("$expectedIdentity", expectedCheckpoint.Identity); command.Parameters.AddWithValue("$expectedLength", expectedCheckpoint.Length); command.Parameters.AddWithValue("$expectedMtime", expectedCheckpoint.LastWriteUtcTicks); command.Parameters.AddWithValue("$expectedOffset", expectedCheckpoint.Offset); command.Parameters.AddWithValue("$expectedParser", expectedCheckpoint.ParserVersion); command.Parameters.AddWithValue("$expectedInput", expectedCheckpoint.CumulativeInputTokens); command.Parameters.AddWithValue("$expectedCached", expectedCheckpoint.CumulativeCachedInputTokens); command.Parameters.AddWithValue("$expectedOutput", expectedCheckpoint.CumulativeOutputTokens); }
+        if (await command.ExecuteNonQueryAsync(cancellationToken) != 1) throw new InvalidOperationException("The analytics checkpoint changed during the scan.");
     }
 
     private static async ValueTask SaveContributionsAsync(SqliteConnection connection, SqliteTransaction transaction, IReadOnlyList<DailyUsage> usage, string fingerprint, string policyVersion, CancellationToken cancellationToken)
