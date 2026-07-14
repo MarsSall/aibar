@@ -715,3 +715,73 @@ The checked Slice 5A task is reconciled: a minimal injected `ISessionFileSystem`
 | Slice 5A remediation | Focused 4/4 passed before changes | New tests failed `CS0246`: `ISessionFileSystem` absent | 7/7 after minimal seam/handling | Added cancellation case; 8/8 | Blank-line-only cleanup; 8/8 |
 
 Observed evidence only: baseline 4/4; RED compiler failure above; final focused 8/8. Full suite passed 87/87; build passed 0 warnings/errors; `git diff --check 3d7fc39` and LF-only check of all four allowed paths passed (only Git autocrlf advisories). Final four-path recount: 94 tracked additions + 6 deletions + 276 untracked additions = **376**, within the 400 cap. Rollback removes only the four listed Slice 5A paths; no commit, stage, push, PR, review, or authority action occurred.
+
+## Slice 5B applied (2026-07-14)
+
+**Status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, no blockers; repo-local allowed root. Boundary: **Slice 5B only**, based on `bcd0931`; delivery is `auto-chain` / `feature-branch-chain`. No action-context warnings.
+
+### Completed tasks / files
+
+The three Slice 5B task lines are visibly `- [x]` in `tasks.md`. Added `SessionJsonlScanner` and synthetic tests. It reads JSONL by byte offset, compares creation-time identity/length/mtime plus parser version, rebuilds from zero on invalidation, defers an incomplete tail, emits safe warning codes, and commits a checkpoint only after stable parsing and cancellation checks. Parsed records retain only timestamp, trusted model or `Unknown`, and token counters; raw JSON and prompt/response fields are discarded. No aggregation, SQLite, UI, scan-run provenance, or Codex access was added.
+
+### TDD Cycle Evidence
+
+| Stage | Evidence | Result |
+|---|---|---|
+| RED | Added `SessionJsonlScannerTests`; focused test before scanner types existed. | Failed as expected: `CS0246` for scanner/checkpoint types. |
+| GREEN | Added byte-offset parser and in-memory transactional checkpoint boundary. | Focused 3/3 passed. |
+| TRIANGULATE | Covered unchanged, append, incomplete tail, malformed line, replacement, shrink, parser version, and pre-commit cancellation. | Focused 3/3 passed. |
+| REFACTOR | Centralized checkpoint validation, safe warnings, and minimal-field parsing. | Full suite/build passed. |
+
+### Verification / workload
+
+```text
+dotnet test ... --filter FullyQualifiedName~SessionJsonlScannerTests
+Passed: 3, Failed: 0, Total: 3.
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 91, Failed: 0, Total: 91.
+dotnet build AIBar.sln --no-restore
+0 warnings, 0 errors.
+git diff --check
+Passed.
+```
+
+PR boundary is Slice 5B only. No design deviations, commit, push, PR, review, or Slice 5C+ work. Remaining Slice 5C lines are unchecked.
+
+## Slice 5B remediation applied (2026-07-14)
+
+Corrected the failed preflight: the canonical required specification is `openspec/changes/aibar-foundation/specs/aibar-foundation/spec.md`. Removed only the erroneous `Slice 5B remediation preflight blocked` section; all preceding Slice 5B evidence is retained. This corrective boundary changes only the scanner, its synthetic tests, and this cumulative evidence record.
+
+### Remediation completed
+
+- Validates negative, beyond-recorded/current, and non-line-boundary checkpoint offsets before the unchanged fast path; invalid offsets rebuild from zero.
+- Captures immutable pre-read identity/length/mtime metadata and compares post-read state against it. A deterministic pre-commit mutation seam returns path-free `session_file_changed` and does not commit a checkpoint.
+- Retains only timestamp, trusted model or `Unknown`, and independently non-negative input/cached-input/output counters. Synthetic fixtures contain no prompt/response text, credentials, or user paths.
+- Proves identity-only checkpoint mismatch, incomplete-tail complete-boundary checkpointing, and cancellation leaves an existing checkpoint unchanged.
+
+### TDD Cycle Evidence
+
+| Task | Test file | Layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| Slice 5B remediation | `tests/AIBar.Domain.Tests/SessionJsonlScannerTests.cs` | filesystem-focused unit | focused baseline: 3/3 passed | 2 failures: corrupt offsets and mutation during read | 5/5 passed after minimal scanner fix | 6/6 passed with identity-only mismatch, extraction/clamping/`Unknown`, incomplete tail, and existing-checkpoint cancellation | immutable `FileSnapshot` and centralized offset-boundary predicate; 6/6 passed |
+
+### Verification evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~SessionJsonlScannerTests" --logger "console;verbosity=minimal"
+Safety net: 3/3 passed. RED: 2 failed, 3 passed. GREEN: 5/5 passed. TRIANGULATE/REFACTOR: 6/6 passed.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 94, Failed: 0, Skipped: 0, Total: 94.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+```
+
+### Workload / scope / remaining
+
+Delivery remains `auto-chain` / `feature-branch-chain`, PR boundary Slice 5B remediation only. No aggregation, UI, SQLite, scan-run provenance, Slice 5C+, stage, commit, push, PR, review, or Judgment Day action occurred. No design deviation. Slice 5B's three persisted task lines remain visibly checked; Slice 5C and later remain unchecked.
+
+### Bounded review correction evidence
+
+Safety net passed 6/6. RED failed three cases: numeric timestamp/model threw, and an unchanged incomplete tail lost its warning. Minimal value-kind guards plus the truthful unchanged-tail fast path passed 8/8; a following valid record survives malformed input and repeated scans preserve checkpoint semantics. Full suite passed 96/96; build passed with 0 warnings/errors; diff/LF checks passed and LSP was unavailable. No review approval or authority mutation is claimed.

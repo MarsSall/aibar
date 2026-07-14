@@ -152,9 +152,9 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Dependency:** Slice 5A complete. **Scope boundary:** validated checkpoint offsets, file identity/size/mtime comparison, append/replacement/shrink/parser-version invalidation, incomplete-tail deferral, and transactional checkpoint updates; no aggregation/UI.
 
-- [ ] Implement streaming JSONL parsing from validated checkpoints with append handling, incomplete-tail deferral, parser-semantics invalidation, replacement/rebuild, and transactional checkpoint updates.
-- [ ] Parse only timestamps, trustworthy model evidence, and token counters; skip/defer malformed or changing records with scan coverage warnings and never retain prompt/response bodies.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** add synthetic tests for unchanged rescans, appended events, malformed/truncated files, replaced/shrunk files, parser-version invalidation, and cancellation before checkpoint commit.
+- [x] Implement streaming JSONL parsing from validated checkpoints with append handling, incomplete-tail deferral, parser-semantics invalidation, replacement/rebuild, and transactional checkpoint updates.
+- [x] Parse only timestamps, trustworthy model evidence, and token counters; skip/defer malformed or changing records with scan coverage warnings and never retain prompt/response bodies.
+- [x] **RED → GREEN → TRIANGULATE → REFACTOR:** add synthetic tests for unchanged rescans, appended events, malformed/truncated files, replaced/shrunk files, parser-version invalidation, and cancellation before checkpoint commit.
 
 ### Slice 5C — Scan provenance and coverage status
 
