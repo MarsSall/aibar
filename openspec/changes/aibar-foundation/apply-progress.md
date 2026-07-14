@@ -1,5 +1,22 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 6D applied (2026-07-14)
+
+**Status:** Standard TDD mode (`strict_tdd: false`); OpenSpec/repo-local `applyState: ready`; force-chained `feature-branch-chain`. This child work unit starts at `512488a` and covers synthetic aggregation integration hardening only. No production code, live Codex source, AppData, Git lifecycle, PR, or review action was used.
+
+| Evidence | Exact result |
+|---|---|
+| RED | Added the persistence-inspection test before production changes. Its first run exposed a test-only pooled read-only SQLite handle that prevented deterministic temporary-root cleanup; disabling pooling in the inspection connection fixed the harness without changing production behavior. |
+| GREEN | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~Slice6AggregationIntegrationTests --nologo` — passed 4/4, failed 0, skipped 0. |
+| TRIANGULATE / aggregation-property-persistence report | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter 'FullyQualifiedName~Slice6AggregationIntegrationTests|FullyQualifiedName~AnalyticsScanCoordinatorTests|FullyQualifiedName~SqliteDailyModelUsageStoreTests|FullyQualifiedName~AnalyticsPolicyTests' --nologo` — passed 31/31, failed 0, skipped 0. The single-quoted plain-pipe filter is PowerShell-safe and was executed exactly as shown. Covers checkpoint/aggregate rollback and crash retry, partial-tail retention, CAS/rebuild/unrelated-source retention, repricing token-fact retention, ranking, `Unknown`, component resets/decreases, local midnight, and DST provenance. |
+| REFACTOR | Kept only one synthetic fixture builder, coordinator factory, SHA-256 helper, and temporary-root disposal in the integration test; no production abstraction changed. |
+| Full regression / build | `dotnet test AIBar.sln --nologo` — passed 146/146, failed 0, skipped 0; `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors; `git diff --check` — passed (only LF-to-CRLF warnings). |
+| Runtime harness | N/A — the real boundary is the synthetic SQLite/filesystem scanner harness; no live Codex/AppData or UI boundary belongs to this slice. |
+| Privacy report | The synthetic JSONL deliberately includes unique prompt, response, access-token, and raw-path sentinels. The scanner reads the JSONL only to extract its allowed fields; after the actual scan/persistence path, the test enumerates every AIBar SQLite table and asserts all sentinels plus the actual raw source path are absent. It also proves the durable SHA-256 source fingerprint, checkpoint, contribution row, and `7/8/9` token facts remain usable. The fixture SHA-256 is unchanged before/after scan; no real Codex file is used. |
+| Rollback boundary | Remove `Slice6AggregationIntegrationTests.cs` and this Slice 6D OpenSpec evidence/checkmarks; completed Slice 6 production aggregation, checkpoint, contribution, and clear-data behavior remains intact. |
+
+**Changed paths:** `tests/AIBar.Domain.Tests/Slice6AggregationIntegrationTests.cs`, `openspec/changes/aibar-foundation/tasks.md`, and this cumulative progress file. **Authored count:** 170 additions + 2 deletions = 172 lines, below the hard 400-line budget (including the untracked test and OpenSpec evidence). **Acceptance:** synthetic before/after fixture hash proof and raw-persistence inspection are asserted in the focused test; aggregation/property/privacy evidence is recorded above. **Deviation:** no production change — a test-only SQLite read connection disables pooling for deterministic temporary-fixture cleanup. No pricing catalog, trends, pace, burn, ETA, UI, or production logic was added. **Next dependency:** Slice 7 after this 6D child slice is independently reviewed.
+
 ## Slice 6C2B applied (2026-07-14)
 
 **Status:** Standard mode; OpenSpec/repo-local, `applyState: ready`, force-chained `feature-branch-chain`. This child work unit starts at `7d2f025` and ends at Clear AIBar Data only; no Git, PR, or review lifecycle action was performed.

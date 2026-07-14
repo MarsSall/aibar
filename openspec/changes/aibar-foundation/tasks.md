@@ -238,8 +238,8 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Dependency:** 6C2A and 6C2B complete and reviewed. **Scope boundary:** synthetic end-to-end aggregation correctness and resilience only; no Slice 7 pricing/trends/UI work.
 
-- [ ] Verify transactional aggregate/checkpoint atomicity, crash recovery, partial scan retention, and repricing without token mutation across the completed Slice 6 boundary.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** run synthetic integration/property coverage for model ranking, `Unknown`, reset/decrease, midnight/DST, rebuild, and retention behavior.
+- [x] Verify transactional aggregate/checkpoint atomicity, crash recovery, partial scan retention, and repricing without token mutation across the completed Slice 6 boundary.
+- [x] **RED → GREEN → TRIANGULATE → REFACTOR:** run synthetic integration/property coverage for model ranking, `Unknown`, reset/decrease, midnight/DST, rebuild, and retention behavior.
 
 **Acceptance evidence:** aggregation/property/persistence/privacy reports and synthetic before/after Codex-fixture hashes. Rollback is schema-compatible disablement of derived analytics; source files are never deleted.
 
