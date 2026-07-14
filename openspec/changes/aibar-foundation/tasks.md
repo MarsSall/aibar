@@ -188,12 +188,21 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 - [x] Add SQLite migration and transactional `daily_model_usage` storage for local day, timezone ID/offset provenance, model, and input/cached-input/output totals, preserving 6A token facts.
 - [x] **RED → GREEN → TRIANGULATE → REFACTOR:** test aggregate/checkpoint transaction seams, crash recovery, aggregate retention, and repricing without token mutation using synthetic data.
 
-#### Slice 6C1 — Scanner aggregation handoff and partial retention (~300 lines including evidence)
+#### Slice 6C1A — Two-phase scanner and proposed checkpoint contract (~190 lines including evidence)
 
-**Dependency:** 6B complete. **Scope boundary:** connect existing scanner outputs to the 6A policy and 6B transaction; no policy rebuild persistence or Clear Data.
+**Dependency:** 6B complete. **Scope boundary:** scanner preparation only; no SQLite schema/checkpoint persistence, `AnalyticsScanCoordinator`, aggregate commit, retry transaction, policy rebuild persistence, or Clear Data.
 
-- [ ] Wire supported scanner token/model/timestamp handoff through 6A to 6B, advancing checkpoints only in the same successful aggregate transaction.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test unchanged/appended handoff, cancellation-before-commit, and partial-scan retention without prompt/response persistence.
+- [x] Add a preparation API that reads/parses from a caller-supplied durable prior checkpoint and returns records, warnings, rebuild status, and an uncommitted proposed checkpoint without mutating `SessionCheckpointStore` or durable state.
+- [x] Keep the proposed checkpoint path-free and limited to file identity, observed length/mtime, safe complete-line byte offset, parser version, and cumulative input/cached-input/output counters; rebuild on identity/parser/shrink/inconsistent-offset changes.
+- [x] Preserve Slice 5B public `ScanAsync` compatibility by implementing it through preparation and its existing in-memory commit path.
+- [x] **RED → GREEN → TRIANGULATE → REFACTOR:** test preparation non-mutation/retry reproducibility, unchanged/append behavior, incomplete-tail deferral, rebuild triggers, and legacy scanner compatibility without prompt/response persistence.
+
+#### Slice 6C1B — Coordinator-owned atomic commit and retry proof (~250 lines including evidence)
+
+**Dependency:** 6C1A complete. **Scope boundary:** durable checkpoint load/schema/write, coordinator-owned aggregate/checkpoint transaction, and real scanner-path retry evidence; no policy rebuild persistence or Clear Data.
+
+- [ ] Wire supported scanner token/model/timestamp handoff through 6A to 6B, advancing the exact proposed checkpoint only in the same successful aggregate transaction.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test unchanged/appended handoff, cancellation/failure-before-commit retry reproducibility, and partial-scan retention without prompt/response persistence.
 
 #### Slice 6C2 — Timezone-policy rebuild persistence and Clear Data isolation (~350 lines including evidence)
 

@@ -1014,3 +1014,128 @@ No design deviation. PR boundary: **Slice 6B only** (`d0ca0e3 → 6B → 6C1`); 
 
 - [ ] Wire supported scanner token/model/timestamp handoff through 6A to 6B, advancing checkpoints only in the same successful aggregate transaction.
 - [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test unchanged/appended handoff, cancellation-before-commit, and partial-scan retention without prompt/response persistence.
+
+## Slice 6C1 applied (2026-07-14)
+
+**Structured status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, no blockers; `actionContext` is `repo-local` with workspace and only allowed root `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`. Delivery is approved `auto-chain` / `feature-branch-chain`; this boundary is **Slice 6C1 only**, from stable parent `052ede7`. Strict TDD was active by parent instruction; no action-context warning applied.
+
+### Completed tasks and persisted checkbox evidence
+
+Both Slice 6C1 tasks are visibly `- [x]` in `tasks.md`. `AnalyticsScanCoordinator` consumes the existing scanner's supported timestamp/model/token records, applies the 6A local-day/Unknown/component-wise policy, and asks the 6B SQLite store to merge aggregates and advance a minimum path-free `file_checkpoint` (opaque fingerprint, monotonic sequence, parser version, last token facts) in one transaction. Cancellation or an injected pre-commit failure rolls back both changes. Partial scanner results retain valid supported records, preserve only safe `session_*` warning codes in the returned coverage, and persist no raw paths, prompts, responses, project/session names, or arbitrary warnings.
+
+### TDD Cycle Evidence
+
+| Stage | Evidence | Result |
+|---|---|---|
+| RED | Added `AnalyticsScanCoordinatorTests` and ran its focused test before coordinator/checkpoint types existed. | Failed as expected: `CS0246` for `DurableFileCheckpoint`. |
+| GREEN | Added the coordinator plus the aggregate/checkpoint SQLite transaction. | Focused tests passed 3/3. |
+| TRIANGULATE | Added pre-commit-failure rollback coverage; exercised unchanged, appended/reopen, cancellation, malformed/incomplete-tail partial retention, and schema privacy. | Focused tests passed 4/4. |
+| REFACTOR | Kept transaction ownership in `SqliteDailyModelUsageStore`, checkpoint data minimum and path-free, and warning handling outside durable checkpoint state. | Focused legacy scanner/store tests, full build, and full suite passed. |
+
+### Verification evidence
+
+```text
+dotnet test ... --filter "FullyQualifiedName~AnalyticsScanCoordinatorTests"
+RED: failed as expected (CS0246); GREEN: 3/3; TRIANGULATE: 4/4 passed.
+
+dotnet test ... --filter "FullyQualifiedName~SessionJsonlScannerTests|FullyQualifiedName~SqliteDailyModelUsageStoreTests"
+Passed: 14, Failed: 0.
+
+dotnet build AIBar.sln --no-restore
+Passed: 0 warnings, 0 errors.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 123, Failed: 0, Skipped: 0.
+
+git diff --check 052ede7 --
+Passed (only LF-to-CRLF notices).
+```
+
+No LSP tool is available in this executor session; the zero-warning compiler build is the available static diagnostic evidence. Privacy inspection found prompt/response strings only in the synthetic test fixture/assertion, never in production persistence schema or data. No design deviation.
+
+### Files, workload, and rollback
+
+- `src/AIBar.Application/AnalyticsScanCoordinator.cs`
+- `src/AIBar.Application/SqliteDailyModelUsageStore.cs`
+- `tests/AIBar.Domain.Tests/AnalyticsScanCoordinatorTests.cs`
+- `openspec/changes/aibar-foundation/tasks.md`
+- `openspec/changes/aibar-foundation/apply-progress.md`
+
+PR boundary: **Slice 6C1 only** (`052ede7 → 6C1 → 6C2`). Rollback removes the coordinator, `file_checkpoint` schema/transaction additions, focused tests, and this 6C1 metadata; it leaves prior daily aggregates and all Codex-owned files untouched. No staging, commit, push, PR, branch, review transaction, Clear Data, rebuild persistence, pricing, UI, or 6C2+ work occurred.
+
+### Remaining tasks
+
+- [ ] Persist timezone-policy version/provenance; on mismatch require explicit replacement/rebuild rather than silently moving historical daily totals.
+- [ ] Implement Clear AIBar Data to cancel work, remove only AIBar-owned cache/database/log/settings data, recreate empty state, and prove Codex-owned source files are byte-for-byte unchanged.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test policy-version replacement/rebuild and clear-data isolation with synthetic before/after source hashes.
+
+## Slice 6C1 corrective gate rerun — blocked by review budget (2026-07-14)
+
+**Structured status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, no blocked reasons; `actionContext` is `repo-local` and the workspace/only allowed edit root is `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`. Delivery is `auto-chain` / `feature-branch-chain`; the assigned boundary remains **Slice 6C1 only** from `052ede7`. Strict TDD was required by parent instruction. No action-context warning applies.
+
+The focused parent gate correctly rejected the prior implementation: `SessionJsonlScanner.ScanAsync` advanced its private checkpoint before SQLite aggregate/checkpoint commit, and the coordinator accepted hand-built checkpoint data. Its cancellation/failure tests bypassed the scanner. Therefore neither Slice 6C1 task is complete; both persisted checkboxes were restored to `- [ ]` immediately. The invalid coordinator, its tests, and the related store checkpoint changes were removed, returning production code to `052ede7` behavior.
+
+### Budget decision: split required before implementation
+
+The remaining budget is approximately **200 authored additions + deletions** from `052ede7`. A truthful, readable repair requires at least:
+
+| Required concern | Conservative forecast |
+|---|---:|
+| Scanner prepare result and uncommitted checkpoint identity/length/mtime/safe-offset/parser/cumulative-token state; preserve legacy `ScanAsync` | 85 |
+| SQLite checkpoint schema/load/atomic write extension | 55 |
+| Coordinator durable-checkpoint → scanner-prepare → one-transaction integration | 45 |
+| Real scanner cancellation/failure/retry, unchanged/appended/reopen, and incomplete-tail/privacy tests | 115 |
+| **Total** | **300** |
+
+Compressing these boundaries would weaken checkpoint identity, hide retry behavior, or make tests hand-fabricate state again. No RED/GREEN cycle was started in this corrective rerun because the workload gate stops before edits. Earlier claimed 6C1 TDD/verification evidence is superseded and must not be used.
+
+### Required 6C1 split proposal
+
+- **6C1A — two-phase scanner and durable checkpoint contract** (~190): add `PrepareAsync` returning parsed records plus an uncommitted proposed checkpoint with file identity, length, mtime, safe byte offset, parser version, and cumulative tokens; retain legacy `ScanAsync` by committing only through its existing in-memory compatibility path. Add scanner-only RED/GREEN/TRIANGULATE tests for unchanged, append, reopen, and incomplete tails.
+- **6C1B — coordinator-owned atomic commit and retry proof** (~250): persist/load the exact proposed checkpoint, have the coordinator load durable state then prepare from it, and atomically merge usage plus checkpoint. Add real scanner-path cancellation/failure/retry and schema-privacy tests proving a retry reproduces records and commits once.
+
+**PR boundary:** no 6C1 implementation is complete. Current invalid work was removed; no stage, commit, push, PR, review, branch action, 6C2, Clear Data, rebuild persistence, pricing, or UI work occurred. **Rollback boundary:** none beyond removing this planning/progress record; production code remains at `052ede7` for Slice 6C1.
+
+### Remaining tasks
+
+- [ ] Wire supported scanner token/model/timestamp handoff through 6A to 6B, advancing checkpoints only in the same successful aggregate transaction.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test unchanged/appended handoff, cancellation-before-commit, and partial-scan retention without prompt/response persistence.
+
+### Corrective-rerun verification evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~SessionJsonlScannerTests|FullyQualifiedName~SqliteDailyModelUsageStoreTests" --logger "console;verbosity=minimal"
+Passed: 14, Failed: 0, Skipped: 0, Total: 14.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 119, Failed: 0, Skipped: 0, Total: 119.
+
+git diff --check 052ede7 --
+Passed (only LF-to-CRLF notices).
+```
+
+No LSP service is available in this executor session; the zero-warning compiler build is the available static evidence. The final complete diff from `052ede7` is **104 additions + 0 deletions = 104 authored lines**, all cumulative apply-progress metadata. No production or test code remains for Slice 6C1, and the persisted tasks artifact retains both 6C1 tasks as unchecked.
+
+## Slice 6C1A applied (2026-07-14)
+
+**Status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, no blockers; `actionContext: repo-local` and the allowed workspace root is `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`. Delivery is approved `auto-chain` / `feature-branch-chain`; boundary: **6C1A only** from `052ede7`. Strict TDD was active by parent instruction.
+
+### Completed tasks and evidence
+
+The four 6C1A lines are visibly `- [x]` in `tasks.md`; both 6C1B lines remain unchecked. `PrepareAsync` accepts a caller checkpoint and returns records/warnings/rebuild status with a path-free, uncommitted `SessionCheckpoint` proposal (identity, length/mtime, safe offset, parser version, and cumulative token counters). It does not access `SessionCheckpointStore`. `ScanAsync` now prepares then uses only its legacy in-memory commit path. No SQLite, coordinator, aggregate transaction, retry persistence, 6C1B, or 6C2 work was added.
+
+| TDD stage | Evidence | Result |
+|---|---|---|
+| RED | New preparation contract test before API implementation | Failed as expected: `CS1061` (`PrepareAsync` absent). |
+| GREEN | Minimal prepare/propose and compatibility-commit implementation | Focused scanner tests: 9/9 passed. |
+| TRIANGULATE | Existing scanner cases plus new same-prior append/retry test cover unchanged, append, incomplete tail, offset/identity rebuild, cancellation, and no store mutation | Focused scanner tests: 9/9 passed. |
+| REFACTOR | Kept checkpoint state path-free and commit ownership in `ScanAsync` | Full build/suite passed. |
+
+### Verification / workload / rollback
+
+`dotnet build AIBar.sln --no-restore`: 0 warnings, 0 errors. `dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"`: 120 passed. `git diff --check 052ede7 --` passed (LF/CRLF notices only). LSP is unavailable; the zero-warning compiler build is the static diagnostic evidence. Current authored total from `052ede7`: **248 lines** (201 additions + 47 deletions), below the 400-line limit. Rollback removes the scanner preparation API/test and this 6C1A metadata only; no durable checkpoint or Codex-owned file changes exist.
+
+**Remaining:** 6C1B's exact unchecked lines are the scanner-to-6A/6B atomic handoff and its cancellation/failure retry proof. PR boundary: `052ede7 → 6C1A → 6C1B → 6C2`; current slice is 📍 **6C1A**. No stage, commit, push, PR, branch, review, or 6C1B/6C2 work occurred.

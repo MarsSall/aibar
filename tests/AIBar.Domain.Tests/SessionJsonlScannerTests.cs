@@ -38,6 +38,39 @@ public sealed class SessionJsonlScannerTests : IDisposable
         Assert.Equal("trusted", Assert.Single(result.Records).Model);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("not-json\n")]
+    public async Task Rebuild_without_a_valid_complete_record_resets_prior_cumulative_counters(string content)
+    {
+        await File.WriteAllTextAsync(_path, content);
+        var info = new FileInfo(_path);
+        var prior = new SessionCheckpoint(info.CreationTimeUtc.Ticks + 1, info.Length, info.LastWriteTimeUtc.Ticks, 0, "v1", 10, 20, 30);
+
+        var result = await new SessionJsonlScanner(new SessionCheckpointStore(), "v1").PrepareAsync(_path, prior, default);
+
+        Assert.True(result.RebuildRequired);
+        Assert.Empty(result.Records);
+        Assert.NotNull(result.ProposedCheckpoint);
+        Assert.Equal((0L, 0L, 0L), (result.ProposedCheckpoint.CumulativeInputTokens, result.ProposedCheckpoint.CumulativeCachedInputTokens, result.ProposedCheckpoint.CumulativeOutputTokens));
+    }
+
+    [Fact]
+    public async Task Non_rebuild_incomplete_append_preserves_prior_cumulative_counters()
+    {
+        await File.WriteAllTextAsync(_path, Line("first", 1, 2, 3) + "\n");
+        var scanner = new SessionJsonlScanner(new SessionCheckpointStore(), "v1");
+        var prior = (await scanner.PrepareAsync(_path, null, default)).ProposedCheckpoint!;
+        await File.AppendAllTextAsync(_path, Line("tail", 4, 5, 6));
+
+        var result = await scanner.PrepareAsync(_path, prior, default);
+
+        Assert.False(result.RebuildRequired);
+        Assert.Empty(result.Records);
+        Assert.Contains("session_incomplete_tail", result.WarningCodes);
+        Assert.Equal((1L, 2L, 3L), (result.ProposedCheckpoint!.CumulativeInputTokens, result.ProposedCheckpoint.CumulativeCachedInputTokens, result.ProposedCheckpoint.CumulativeOutputTokens));
+    }
+
     [Fact]
     public async Task Extracts_only_minimal_fields_clamps_counters_and_maps_untrusted_models_to_unknown()
     {
@@ -128,6 +161,28 @@ public sealed class SessionJsonlScannerTests : IDisposable
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => scanner.ScanAsync(_path, cancellation.Token).AsTask());
         Assert.Equal(checkpoint, await store.LoadAsync(_path, default));
+    }
+
+    [Fact]
+    public async Task Preparation_is_uncommitted_path_free_and_reproducible_from_the_same_prior_checkpoint()
+    {
+        await File.WriteAllTextAsync(_path, Line("first", 1, 2, 3) + "\n");
+        var store = new SessionCheckpointStore();
+        var scanner = new SessionJsonlScanner(store, "v1");
+        var initial = await scanner.PrepareAsync(_path, null, default);
+        var prior = initial.ProposedCheckpoint!;
+        await File.AppendAllTextAsync(_path, Line("next", 4, 5, 6) + "\n");
+
+        var first = await scanner.PrepareAsync(_path, prior, default);
+        var retry = await scanner.PrepareAsync(_path, prior, default);
+
+        Assert.Null(await store.LoadAsync(_path, default));
+        Assert.Equal(first.Records, retry.Records);
+        Assert.Equal(first.WarningCodes, retry.WarningCodes);
+        Assert.Equal(first.ProposedCheckpoint, retry.ProposedCheckpoint);
+        Assert.Equal("next", Assert.Single(first.Records).Model);
+        Assert.Equal((4L, 5L, 6L), (first.ProposedCheckpoint!.CumulativeInputTokens, first.ProposedCheckpoint.CumulativeCachedInputTokens, first.ProposedCheckpoint.CumulativeOutputTokens));
+        Assert.Equal(["CumulativeCachedInputTokens", "CumulativeInputTokens", "CumulativeOutputTokens", "Identity", "LastWriteUtcTicks", "Length", "Offset", "ParserVersion"], typeof(SessionCheckpoint).GetProperties().Select(property => property.Name).OrderBy(name => name).ToArray());
     }
 
     private static string Line(string model, long input, long cached, long output) =>
