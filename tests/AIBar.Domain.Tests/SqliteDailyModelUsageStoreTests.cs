@@ -104,6 +104,34 @@ public sealed class SqliteDailyModelUsageStoreTests : IDisposable
         Assert.Equal(new TokenTotals(long.MaxValue, long.MaxValue, long.MaxValue), Assert.Single(await reopened.LoadAsync(default)).Tokens);
     }
 
+    [Fact]
+    public async Task Atomic_checkpoint_commit_rolls_back_aggregates_when_cancelled_before_commit()
+    {
+        using var cancellation = new CancellationTokenSource();
+        await using var store = new SqliteDailyModelUsageStore(_path, cancellation.Cancel);
+        var checkpoint = new SessionCheckpoint(1, 10, 20, 10, "v1", 2, 3, 4);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => store.SaveWithCheckpointAsync([Usage("gpt-5", 2, 3, 4)], "source", null, checkpoint, cancellation.Token).AsTask());
+
+        Assert.Empty(await store.LoadAsync(default));
+        Assert.Null(await store.LoadCheckpointAsync("source", default));
+    }
+
+    [Fact]
+    public async Task Stale_expected_checkpoint_cannot_persist_duplicate_usage_or_checkpoint()
+    {
+        await using var store = new SqliteDailyModelUsageStore(_path);
+        var prior = new SessionCheckpoint(1, 10, 20, 10, "v1", 1, 0, 0);
+        var next = prior with { Length = 20, Offset = 20, CumulativeInputTokens = 3 };
+        await store.SaveWithCheckpointAsync([], "source", null, prior, default);
+        await store.SaveWithCheckpointAsync([Usage("gpt-5", 2, 0, 0)], "source", prior, next, default);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.SaveWithCheckpointAsync([Usage("gpt-5", 2, 0, 0)], "source", prior, next, default).AsTask());
+
+        Assert.Equal(new TokenTotals(2, 0, 0), Assert.Single(await store.LoadAsync(default)).Tokens);
+        Assert.Equal(next, await store.LoadCheckpointAsync("source", default));
+    }
+
     public void Dispose() { if (File.Exists(_path)) File.Delete(_path); }
     private SqliteConnection Open() { var connection = new SqliteConnection($"Data Source={_path};Pooling=False"); connection.Open(); return connection; }
     private static async Task<object?> Scalar(SqliteConnection connection, string sql) { await using var command = connection.CreateCommand(); command.CommandText = sql; return await command.ExecuteScalarAsync(); }

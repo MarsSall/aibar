@@ -1139,3 +1139,25 @@ The four 6C1A lines are visibly `- [x]` in `tasks.md`; both 6C1B lines remain un
 `dotnet build AIBar.sln --no-restore`: 0 warnings, 0 errors. `dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"`: 120 passed. `git diff --check 052ede7 --` passed (LF/CRLF notices only). LSP is unavailable; the zero-warning compiler build is the static diagnostic evidence. Current authored total from `052ede7`: **248 lines** (201 additions + 47 deletions), below the 400-line limit. Rollback removes the scanner preparation API/test and this 6C1A metadata only; no durable checkpoint or Codex-owned file changes exist.
 
 **Remaining:** 6C1B's exact unchecked lines are the scanner-to-6A/6B atomic handoff and its cancellation/failure retry proof. PR boundary: `052ede7 → 6C1A → 6C1B → 6C2`; current slice is 📍 **6C1A**. No stage, commit, push, PR, branch, review, or 6C1B/6C2 work occurred.
+
+## Slice 6C1B applied (2026-07-14)
+
+**Status consumed:** `applyState: ready`, `nextRecommended: apply`, no blocked reasons; repo-local edits only. Strict TDD is false, so Standard Mode was used with behavior-first tests. Delivery is `force-chained` / `feature-branch-chain`; this autonomous child boundary is **6C1B only**, from clean parent `feature/aibar-foundation-slice-6c1a` at `a0188df`.
+
+### Completed tasks and evidence
+
+Both Slice 6C1B checkboxes are visibly `- [x]` in `tasks.md`. `file_checkpoint` is durable SQLite state keyed by an application-local SHA-256 source fingerprint and holds only the 6C1A path-free checkpoint fields. `AnalyticsScanCoordinator` loads that checkpoint, invokes `PrepareAsync`, routes records through the 6A `AnalyticsPolicy`, and persists aggregate deltas plus the exact proposed checkpoint in one SQLite transaction. It neither changes legacy `ScanAsync` nor persists paths, prompt/response data, or session names.
+
+| Evidence | Result |
+|---|---|
+| Focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~AnalyticsScanCoordinatorTests\|FullyQualifiedName~SqliteDailyModelUsageStoreTests" --logger "console;verbosity=minimal"` — exit 0; 10 passed, 0 failed. It exercises actual JSONL scanner preparation followed by injected store failure/cancellation and retry, append-once behavior, incomplete-tail partial retention, and aggregate/checkpoint rollback. |
+| Runtime harness | N/A — this is a framework-independent SQLite/scanner integration boundary; the focused tests execute the real temporary-file JSONL + SQLite path without a desktop runtime. |
+| Rollback boundary | Revert `AnalyticsScanCoordinator.cs`, the `file_checkpoint` methods/schema in `SqliteDailyModelUsageStore.cs`, their focused tests, and this metadata. Existing daily aggregates and all Codex-owned source files remain untouched. |
+
+### Verification / workload
+
+`dotnet test AIBar.sln --nologo`: exit 0, 127 passed, 0 failed. `dotnet build AIBar.sln --nologo`: exit 0, 0 warnings, 0 errors. `git diff --check`: exit 0 (only Git LF/CRLF notices). The complete 6C1B authored diff is 172 additions plus deletions, below 400; no stage, commit, push, PR, or review lifecycle operation was performed.
+
+**Deviation:** None — implementation follows the 6C1A non-mutating preparation contract and keeps policy-rebuild persistence and Clear Data deferred to 6C2.
+
+**Remaining:** Slice 6C2, Slice 6D, and later tasks remain unchecked and out of scope. Next chain boundary: `a0188df → 6C1B → 6C2`; current slice is 📍 **6C1B**.

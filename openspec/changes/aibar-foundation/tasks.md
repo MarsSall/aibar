@@ -201,8 +201,8 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Dependency:** 6C1A complete. **Scope boundary:** durable checkpoint load/schema/write, coordinator-owned aggregate/checkpoint transaction, and real scanner-path retry evidence; no policy rebuild persistence or Clear Data.
 
-- [ ] Wire supported scanner token/model/timestamp handoff through 6A to 6B, advancing the exact proposed checkpoint only in the same successful aggregate transaction.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test unchanged/appended handoff, cancellation/failure-before-commit retry reproducibility, and partial-scan retention without prompt/response persistence.
+- [x] Wire supported scanner token/model/timestamp handoff through 6A to 6B, advancing the exact proposed checkpoint only in the same successful aggregate transaction.
+- [x] **RED → GREEN → TRIANGULATE → REFACTOR:** test unchanged/appended handoff, cancellation/failure-before-commit retry reproducibility, and partial-scan retention without prompt/response persistence.
 
 #### Slice 6C2 — Timezone-policy rebuild persistence and Clear Data isolation (~350 lines including evidence)
 
