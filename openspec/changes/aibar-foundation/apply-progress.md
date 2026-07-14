@@ -612,3 +612,36 @@ Slice 4C remains the next boundary; its exact unchecked lines are:
 - [ ] **GREEN:** build the custom semantic WPF token system and compact quota cards using Windows-native typography, spacing, contrast, keyboard/focus/accessibility behavior, reduced-motion and high-contrast support, and DPI scaling.
 - [ ] **TRIANGULATE:** validate representative Windows 10/11 scale factors, keyboard/focus paths, screen-reader names, reduced-motion/high-contrast behavior, and that visual evidence does not replace lifecycle/accessibility checks.
 - [ ] **REFACTOR:** consolidate semantic resources, remove hard-coded presentation roles, preserve readable Windows fallbacks, and rerun representative interaction/accessibility checks and build diagnostics.
+
+## Slice 4C escalated-review remediation (2026-07-13)
+
+**Status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, no blockers; repo-local action context rooted at the allowed workspace. Delivery remains `auto-chain` / `feature-branch-chain`; this expanded remediation remains **Slice 4C only**, based on `0b0289e`. Terminal lineage `review-976c8d0610470e0e` was not reused; the normalized committable candidate uses fresh lineage `review-4487567db2eeb73c`. Strict TDD is false; focused RED/GREEN/TRIANGULATE/REFACTOR evidence is retained.
+
+### Remediation completed
+
+- `RELIABILITY-001`: disabled policy collapses Refresh; enabled composition is functional. Startup contains composition, tray-start, initialization, and disposal failures, reporting safe evidence while retaining honest unavailable state.
+- `RELIABILITY-002`: the STA test proves Button invocation, running disablement, completion/re-enable, and coordinator failure reporting through the production host path.
+- `RELIABILITY-003`: the STA WPF test creates `UIElementAutomationPeer`s for both `GroupBox` cards and asserts their peer names.
+- High-contrast card overrides now use dynamic `SystemColors` brush keys rather than fixed high-contrast colors. No animation was introduced.
+
+### Evidence and workload
+
+| Stage | Evidence | Result |
+|---|---|---|
+| RED | Added the runtime presentation-host test before the host/composition types existed. | Failed as expected with missing presentation/coordinator types. |
+| GREEN | Added host, runtime DataContext, coordinator/manual-refresh composition, and command binding. | Focused visual suite passed. |
+| TRIANGULATE | Gated provider, enabled/disabled composition, and automation peers cover running state and card names. | Focused visual suite passed. |
+| REFACTOR | Removed duplicate 4C evidence; presentation remains a dispatcher-only adapter. | Full suite/build passed. |
+
+Commands: focused `QuotaVisualDesignTests` passed **4/4**; `dotnet build AIBar.sln --no-restore` passed with **0 warnings / 0 errors**; `dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"` passed **79/79**; `git diff --check 0b0289e` passed (only LF-to-CRLF warnings). Parent LSP diagnostics are clean. The complete diff is **400 changed lines** from `0b0289e`, at the hard cap.
+
+No Slice 5+ code or tasks changed. The four persisted Slice 4C checkboxes remain visibly checked and are satisfied by runtime composition, functional refresh, UI Automation, and focused/full verification. Windows 10/11 physical/VM, screen-reader, and live high-contrast desktop evidence remain unavailable and are not claimed.
+
+Remaining exact Slice 5 lines:
+
+- [ ] Implement supported initial Codex `sessions` and `archived_sessions` discovery only, with bounded background batches and cancellation.
+- [ ] Implement streaming JSONL parsing from validated checkpoints, file identity/size/mtime comparison, append handling, incomplete-tail deferral, parser-semantics invalidation, replacement/rebuild, and transactional checkpoint updates.
+- [ ] Parse only timestamps, trustworthy model evidence, and token counters; skip/defer malformed or changing records with scan coverage warnings and never retain prompt/response bodies.
+- [ ] Implement `scan_run` provenance/status including discovered/read/skipped/deferred counts, warnings, cancellation, and partial coverage.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** add synthetic golden/property tests for unchanged rescans, appended events, malformed/truncated files, replaced/shrunk files, cumulative resets, cancellation, parser-version invalidation, idempotence, and non-negative deltas.
+- [ ] Verify fixture data contains no real credentials, paths, prompt text, or response text, and that cancellation before commit leaves aggregates/checkpoints unchanged.

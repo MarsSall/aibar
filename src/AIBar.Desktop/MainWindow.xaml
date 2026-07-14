@@ -1,12 +1,43 @@
-﻿<Window x:Class="AIBar.Desktop.MainWindow"
+<Window x:Class="AIBar.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:AIBar.Desktop"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        xmlns:automation="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        Title="AIBar quota" Width="420" SizeToContent="Height"
+        FontFamily="{DynamicResource AppFont}" FontSize="14"
+        Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextBrush}"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="16">
+            <TextBlock Text="Quota" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,8" />
+            <TextBlock Text="{Binding FreshnessLabel}" Foreground="{DynamicResource MutedTextBrush}" />
 
-    </Grid>
+            <GroupBox automation:AutomationProperties.Name="5-hour quota card" Margin="0,16,0,0">
+                <Border Style="{StaticResource QuotaCardStyle}">
+                    <Grid Margin="16">
+                        <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Primary.Label}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="{Binding Primary.PercentageUsed, StringFormat={}{0:0}%}" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="1" Style="{StaticResource QuotaCardSecondaryTextStyle}" Margin="0,8,0,0"><Run Text="Reset " /><Run Text="{Binding Primary.ResetCountdown}" /></TextBlock>
+                    </Grid>
+                </Border>
+            </GroupBox>
+
+            <GroupBox automation:AutomationProperties.Name="Weekly quota card" Margin="0,8,0,0">
+                <Border Style="{StaticResource QuotaCardStyle}">
+                    <Grid Margin="16">
+                        <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Weekly.Label}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="{Binding Weekly.PercentageUsed, StringFormat={}{0:0}%}" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="1" Style="{StaticResource QuotaCardSecondaryTextStyle}" Margin="0,8,0,0"><Run Text="Reset " /><Run Text="{Binding Weekly.ResetCountdown}" /></TextBlock>
+                    </Grid>
+                </Border>
+            </GroupBox>
+
+            <TextBlock Text="{Binding PrivateEndpointDisclosure}" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,16,0,8" />
+            <Button Content="Refresh" Command="{Binding RefreshCommand}" Visibility="{Binding IsRefreshAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" automation:AutomationProperties.Name="Refresh quota" IsTabStop="True" HorizontalAlignment="Left" />
+        </StackPanel>
+    </ScrollViewer>
 </Window>
