@@ -228,9 +228,9 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Dependency:** 6C2A.2 complete and reviewed. **Scope boundary:** Clear AIBar Data only; no rebuild or policy implementation.
 
-- [ ] **RED:** test cancellation boundaries, empty-state recreation, and byte-for-byte Codex hashes before/after clear.
-- [ ] **GREEN:** cancel work, suppress late commits, remove only AIBar-owned state, and recreate a valid empty state.
-- [ ] **TRIANGULATE/REFACTOR:** test repeated clear, races, locked/source-changing files, failure recovery, and post-clear rescan readiness.
+- [x] **RED:** test cancellation boundaries, empty-state recreation, and byte-for-byte Codex hashes before/after clear.
+- [x] **GREEN:** cancel work, suppress late commits, remove only AIBar-owned state, and recreate a valid empty state.
+- [x] **TRIANGULATE/REFACTOR:** test repeated clear, races, locked/source-changing files, failure recovery, and post-clear rescan readiness.
 
 **Review Workload Forecast — 6C2B:** ~260 authored additions+deletions; risk Low; focused command `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~ClearAiBarData`; runtime harness N/A (synthetic isolation); rollback removes clear orchestration/tests while preserving 6C2A.2.
 

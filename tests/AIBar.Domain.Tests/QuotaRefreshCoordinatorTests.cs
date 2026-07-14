@@ -74,8 +74,8 @@ public sealed class QuotaRefreshCoordinatorTests
         await coordinator.InitializeAsync(default);
         var refresh = coordinator.RefreshAsync(RefreshTrigger.Manual, default).AsTask();
 
-        await coordinator.ClearAsync(default);
-        gate.SetResult(new(Snapshot(Now.AddHours(1)), null));
+        var clear = coordinator.ClearAsync(default).AsTask();
+        Assert.False(clear.IsCompleted); gate.SetResult(new(Snapshot(Now.AddHours(1)), null)); await clear;
         await refresh;
 
         Assert.Null(coordinator.State.Snapshot);
@@ -127,9 +127,10 @@ public async Task Detached_refresh_cannot_clear_new_active_refresh()
         var oldGate = new TaskCompletionSource<QuotaProviderResult>(); var newGate = new TaskCompletionSource<QuotaProviderResult>();
         var provider = new SequencedProvider(oldGate.Task, newGate.Task);
         await using var coordinator = Create(new FakeStore(null), provider);
-        var old = coordinator.RefreshAsync(RefreshTrigger.Manual, default).AsTask(); await coordinator.ClearAsync(default);
+        var old = coordinator.RefreshAsync(RefreshTrigger.Manual, default).AsTask(); var clear = coordinator.ClearAsync(default).AsTask();
+        Assert.False(clear.IsCompleted); oldGate.SetResult(new(Snapshot(Now), null)); await clear;
         var current = coordinator.RefreshAsync(RefreshTrigger.Manual, default).AsTask();
-        oldGate.SetResult(new(Snapshot(Now), null)); await old;
+        await old;
         Assert.Same(current, coordinator.RefreshAsync(RefreshTrigger.Manual, default).AsTask()); Assert.Equal(2, provider.Calls);
         newGate.SetResult(new(Snapshot(Now), null)); await current;
 }
@@ -264,11 +265,11 @@ var adapter = new QuotaRefreshLifecycleAdapter(events, coordinator);
 
 events.RaiseResume();
 await WaitUntilAsync(() => provider.Calls == 1);
-await coordinator.ClearAsync(default);
-await adapter.DisposeAsync();
-events.RaiseResume();
-gate.SetResult(new(Snapshot(Now), null));
-await Task.Delay(20);
+ var clear = coordinator.ClearAsync(default).AsTask();
+ Assert.False(clear.IsCompleted); gate.SetResult(new(Snapshot(Now), null)); await clear;
+ await adapter.DisposeAsync();
+ events.RaiseResume();
+ await Task.Delay(20);
 
 Assert.Null(coordinator.State.Snapshot);
 Assert.Equal(FreshnessState.Unavailable, coordinator.State.Freshness);

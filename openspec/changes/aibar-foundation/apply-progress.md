@@ -1,5 +1,26 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 6C2B applied (2026-07-14)
+
+**Status:** Standard mode; OpenSpec/repo-local, `applyState: ready`, force-chained `feature-branch-chain`. This child work unit starts at `7d2f025` and ends at Clear AIBar Data only; no Git, PR, or review lifecycle action was performed.
+
+`ClearAiBarDataService` serializes clear requests, cancels and awaits registered AIBar-owned work, rejects ambiguous/traversing/non-allowlisted paths and reparse points, then deletes only `cache`, `logs`, `aibar.db`, `aibar.db-wal`, `aibar.db-shm`, and `settings.json` under its explicit application-data root. It never recurses over the root or a Codex path. A successful return means the allowlisted targets were removed and the injected empty-state factory completed; deletion is intentionally non-atomic. A deletion/recreation failure returns an error without claiming success; a later clear is retryable. `QuotaRefreshCoordinator` now quiesces its active refresh, waits for it, generation-suppresses late publication, and resumes only after clear completion.
+
+| Work Unit Evidence | Result |
+|---|---|
+| Focused clear/cancellation tests | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~ClearAiBarData --nologo` — passed 7/7, failed 0, skipped 0; includes a Windows `FileShare.None` lock failure, no-outside-write assertion, and retry after release. |
+| Related persistence/coordinator tests | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~QuotaRefreshCoordinatorTests|FullyQualifiedName~AnalyticsScanCoordinatorTests|FullyQualifiedName~SqliteDailyModelUsageStoreTests" --nologo` — passed 32/32, failed 0, skipped 0. |
+| Full test | `dotnet test AIBar.sln --nologo` — passed 142/142, failed 0, skipped 0. |
+| Build | `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors. |
+| Runtime harness | N/A — isolated synthetic filesystem/cancellation boundary only; no live Codex source, AppData, native command, or UI runtime belongs to this slice. |
+| Rollback boundary | Revert `ClearAiBarDataService.cs`, the quiesce change/tests in `QuotaRefreshCoordinator*`, and these 6C2B artifacts; 6C2A persistence/rebuild behavior remains intact. |
+
+**Source hash proof:** the synthetic Codex source `session.jsonl` SHA-256 was `81B154E2705A9347DDED445B9E48399EA1C81128B1818CD2083D6FAFEDC2BB7E` before clear and exactly the same after; the clear test uses separate temporary AIBar/Codex roots.
+
+**Files:** `src/AIBar.Application/ClearAiBarDataService.cs`, `src/AIBar.Application/QuotaRefreshCoordinator.cs`, `tests/AIBar.Domain.Tests/ClearAiBarDataTests.cs`, `tests/AIBar.Domain.Tests/QuotaRefreshCoordinatorTests.cs`, `openspec/changes/aibar-foundation/{tasks,apply-progress}.md`.
+
+**Corrective evidence:** a locked allowlisted database fails closed, leaves the separate Codex fixture unchanged, and clears successfully only after the Windows lock releases. A successful clear initializes an empty SQLite database and then accepts the next synthetic `AnalyticsScanCoordinator` rescan. **Authored count:** under the 400 additions+deletions budget (code/tests/OpenSpec only; generated test diagnostics excluded). **Deviation:** no atomic filesystem-deletion claim; observable success requires deletion plus recreation. **Next:** Slice 6D only after this child slice is reviewed.
+
 ## Slice 6C2A.2 applied (2026-07-14)
 
 **Status:** Standard mode; `applyState: ready`, OpenSpec/repo-local, force-chained `feature-branch-chain`. Review lineage `review-878ecbaeb79af763` authorized one bounded correction; no review authority or Git lifecycle action was started.

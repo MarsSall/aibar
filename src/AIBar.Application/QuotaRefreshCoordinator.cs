@@ -2,7 +2,7 @@ using AIBar.Domain;
 
 namespace AIBar.Application;
 
-public sealed class QuotaRefreshCoordinator : IAsyncDisposable
+public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
 {
     private readonly IQuotaSnapshotStore _store;
     private readonly IQuotaProvider _provider;
@@ -15,6 +15,7 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable
     private DateTimeOffset _lastAttempt = DateTimeOffset.MinValue;
     private long _generation;
     private bool _disposed;
+    private bool _paused;
 
     public QuotaRefreshCoordinator(IQuotaSnapshotStore store, IQuotaProvider provider, IClock clock, FreshnessPolicy freshness, TimeSpan minimumPollInterval)
     {
@@ -66,6 +67,7 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable
         lock (_gate)
         {
             ThrowIfDisposed();
+            if (_paused) return ValueTask.CompletedTask;
             if (_active is not null && !_active.IsCompleted) active = _active;
             else
             {
@@ -80,19 +82,24 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable
 
     public async ValueTask ClearAsync(CancellationToken cancellationToken)
     {
-        CancellationTokenSource cancelled;
+        await CancelAndWaitAsync(cancellationToken);
+        try { await _store.ClearAsync(cancellationToken); Publish(new(null, FreshnessState.Unavailable, false, null, null)); }
+        finally { ResumeAfterClear(); }
+    }
+
+    public async ValueTask CancelAndWaitAsync(CancellationToken cancellationToken)
+    {
+        CancellationTokenSource cancelled; Task? active;
         lock (_gate)
         {
-            ThrowIfDisposed();
-            _generation++;
-            cancelled = _lifetime;
-            _lifetime = new();
-            _active = null;
+            ThrowIfDisposed(); _generation++; _paused = true; cancelled = _lifetime; _lifetime = new(); active = _active; _active = null;
         }
-        cancelled.Cancel(); cancelled.Dispose();
-        try { await _store.ClearAsync(cancellationToken); }
-        finally { Publish(new(null, FreshnessState.Unavailable, false, null, null)); }
+        cancelled.Cancel();
+        try { if (active is not null) await active.WaitAsync(cancellationToken); }
+        finally { cancelled.Dispose(); }
     }
+
+    public void ResumeAfterClear() { lock (_gate) if (!_disposed) _paused = false; }
 
     private bool Eligible(RefreshTrigger trigger) => trigger == RefreshTrigger.Manual ||
         _freshness.Evaluate(State.Snapshot, _clock.UtcNow) != FreshnessState.Current &&
