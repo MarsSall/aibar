@@ -645,3 +645,73 @@ Remaining exact Slice 5 lines:
 - [ ] Implement `scan_run` provenance/status including discovered/read/skipped/deferred counts, warnings, cancellation, and partial coverage.
 - [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** add synthetic golden/property tests for unchanged rescans, appended events, malformed/truncated files, replaced/shrunk files, cumulative resets, cancellation, parser-version invalidation, idempotence, and non-negative deltas.
 - [ ] Verify fixture data contains no real credentials, paths, prompt text, or response text, and that cancellation before commit leaves aggregates/checkpoints unchanged.
+
+## Slice 5A applied (2026-07-14)
+
+**Structured status consumed:** authoritative OpenSpec status supplied by the parent: `applyState: ready`, `nextRecommended: apply`, no blocked reasons; `actionContext: repo-local` with the current AIBar repository as workspace and allowed edit root. Delivery is `feature-branch-chain`; PR boundary is **Slice 5A only**, based on clean base `3d7fc39`. The parent explicitly required RED → GREEN → TRIANGULATE → REFACTOR despite `openspec/config.yaml` declaring `strict_tdd: false`; this work followed that test-first cycle. No action-context warnings.
+
+### Completed tasks and persisted checkbox evidence
+
+Slice 5 was split in the persisted task artifact into 5A discovery/bounded enumeration, 5B streaming/checkpoint semantics, and 5C provenance/coverage status. Only the four Slice 5A RED/GREEN/TRIANGULATE/REFACTOR checkboxes are visibly `- [x]`; all 5B/5C lines remain unchecked.
+
+`SessionFileDiscovery` reuses `CodexRootResolver`, inspects only `<root>/sessions` and `<root>/archived_sessions`, discovers `.jsonl` in synthetic date-partitioned, flat, and recursive legacy layouts, orders paths deterministically, and emits configured positive-size batches. It checks cancellation before traversal and between directories/files/batches, rejects reparse points and paths outside the resolved root, and returns only path-free coverage codes/counts for missing, unreadable, changing, and reparse conditions. It never opens JSONL files or implements parsing, identity/mtime, offsets, checkpoints, SQLite, aggregation, UI, real Codex access, multiple roots/accounts, or WSL.
+
+### TDD cycle evidence
+
+| Cycle | Evidence | Result |
+|---|---|---|
+| RED | Added synthetic `SessionFileDiscoveryTests` before the discovery types existed; ran the focused test filter. | Failed as expected: `CS0246` for missing `SessionFileBatch`. |
+| GREEN | Added the minimum resolver-based discovery boundary, bounded batches, cancellation checks, containment, reparse rejection, and safe coverage codes. | Focused tests passed 4/4. |
+| TRIANGULATE | Covered date/flat/recursive layouts, unsupported files, deterministic batching, positive-size validation, pre-traversal and between-batch cancellation, missing root, reparse skipping, and path-free warnings. | Focused tests passed 4/4. |
+| REFACTOR | Centralized containment/reparse and safe warning-code handling; no content-reading or persistence dependency was introduced. | Full suite and build passed with 0 warnings/errors. |
+
+### Verification evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~SessionFileDiscoveryTests" --logger "console;verbosity=minimal"
+RED: failed as expected (CS0246); GREEN/TRIANGULATE: Passed: 4, Failed: 0, Skipped: 0, Total: 4.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 83, Failed: 0, Skipped: 0, Total: 83.
+
+dotnet build AIBar.sln --no-restore
+Build succeeded: 0 warnings, 0 errors.
+
+git diff --check 3d7fc39
+Passed.
+
+LF-only check for Slice 5A source/test/tasks artifacts
+Passed.
+```
+
+### Files changed / workload / rollback
+
+- `src/AIBar.Application/SessionFileDiscovery.cs`
+- `tests/AIBar.Domain.Tests/SessionFileDiscoveryTests.cs`
+- `openspec/changes/aibar-foundation/tasks.md`
+- `openspec/changes/aibar-foundation/apply-progress.md`
+
+Feature-branch-chain boundary: **Slice 5A only**. The semantic implementation/test diff is recorded after final reconciliation and remains below the 400-line cap. No commit, push, PR, review/lens/lineage action, Desktop composition, or write outside the repository occurred. Rollback removes only `SessionFileDiscovery` and its synthetic tests; it never modifies Codex-owned files and does not affect later scanner or persistence work.
+
+### Remaining Slice 5 work
+
+- [ ] Implement streaming JSONL parsing from validated checkpoints with append handling, incomplete-tail deferral, parser-semantics invalidation, replacement/rebuild, and transactional checkpoint updates.
+- [ ] Parse only timestamps, trustworthy model evidence, and token counters; skip/defer malformed or changing records with scan coverage warnings and never retain prompt/response bodies.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** add synthetic tests for unchanged rescans, appended events, malformed/truncated files, replaced/shrunk files, parser-version invalidation, and cancellation before checkpoint commit.
+- [ ] Implement `scan_run` provenance/status including discovered/read/skipped/deferred counts, safe warnings, cancellation, and partial coverage.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** add synthetic tests for scan coverage counts, cancellation, idempotence, and non-negative delta handoff boundaries.
+- [ ] Verify fixture data contains no real credentials, paths, prompt text, or response text, and that cancellation before commit leaves aggregates/checkpoints unchanged.
+
+## Slice 5A verification-remediation (2026-07-14)
+
+**Status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, no blockers; repo-local root is the sole allowed edit root. Boundary remains **Slice 5A** from `3d7fc39`; strict TDD was explicitly active.
+
+The checked Slice 5A task is reconciled: a minimal injected `ISessionFileSystem` seam deterministically exercises missing `sessions`/`archived_sessions`, enumeration unreadability, changing-entry attributes, root attribute failure, and cancellation. All warning codes are path-free; missing/race conditions increment `FilesSkipped`; cancellation propagates. No OS-permission-dependent test, JSONL read, parser, SQLite, Desktop, or fifth path was added.
+
+### TDD Cycle Evidence
+
+| Task | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|
+| Slice 5A remediation | Focused 4/4 passed before changes | New tests failed `CS0246`: `ISessionFileSystem` absent | 7/7 after minimal seam/handling | Added cancellation case; 8/8 | Blank-line-only cleanup; 8/8 |
+
+Observed evidence only: baseline 4/4; RED compiler failure above; final focused 8/8. Full suite passed 87/87; build passed 0 warnings/errors; `git diff --check 3d7fc39` and LF-only check of all four allowed paths passed (only Git autocrlf advisories). Final four-path recount: 94 tracked additions + 6 deletions + 276 untracked additions = **376**, within the 400 cap. Rollback removes only the four listed Slice 5A paths; no commit, stage, push, PR, review, or authority action occurred.

@@ -137,16 +137,34 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Slice 4 chain:** `1b9cca5 → 4A.1 → 4A.2 → 4B → 4C → 5`. Each unit is independently testable and revertible and remains at or below 400 authored lines. Do not include scanner, pricing, packaging, or later-slice work.
 
-### Slice 5 — Incremental scanner and checkpointing
+### Slice 5A — Discovery and bounded enumeration
 
-- [ ] Implement supported initial Codex `sessions` and `archived_sessions` discovery only, with bounded background batches and cancellation.
-- [ ] Implement streaming JSONL parsing from validated checkpoints, file identity/size/mtime comparison, append handling, incomplete-tail deferral, parser-semantics invalidation, replacement/rebuild, and transactional checkpoint updates.
+**Dependency:** Slice 4C complete. **Scope boundary:** reuse `CodexRootResolver` to inspect only the configured root's `sessions` and `archived_sessions` directories, discover synthetic `.jsonl` in date-partitioned, flat, and recursive legacy layouts, and return deterministic positive-size bounded batches. No JSON content reads, checkpoints, identity/mtime, parsing, SQLite, aggregation, UI, or real Codex access.
+
+- [x] **RED:** add synthetic temporary-directory and injected-filesystem tests for resolved-root discovery, supported-layout batching, cancellation, containment/reparse safety, and path-free missing/unreadable/changing/attribute-failure coverage codes.
+- [x] **GREEN:** implement only the `CodexRootResolver`-based bounded discovery/enumeration boundary for `sessions` and `archived_sessions`; do not read JSONL contents or add persistence.
+- [x] **TRIANGULATE:** exercise mixed supported/unsupported files, nested legacy directories, deterministic ordering, cancellation, and reparse/symlink escape rejection using synthetic fixtures only.
+- [x] **REFACTOR:** centralize containment and safe warning-code handling, preserve cancellation checks between directories/files/batches, and rerun focused/full/build/diff/LF/line-count checks.
+
+**Acceptance evidence:** synthetic discovery test report with safe path-free warning codes and bounded batch matrix. **Rollback boundary:** remove the discovery boundary and tests without touching Codex-owned files or later scanner/persistence work. Independently reviewable/revertible; requires focused `review-reliability`.
+
+### Slice 5B — Streaming parse and checkpoint semantics
+
+**Dependency:** Slice 5A complete. **Scope boundary:** validated checkpoint offsets, file identity/size/mtime comparison, append/replacement/shrink/parser-version invalidation, incomplete-tail deferral, and transactional checkpoint updates; no aggregation/UI.
+
+- [ ] Implement streaming JSONL parsing from validated checkpoints with append handling, incomplete-tail deferral, parser-semantics invalidation, replacement/rebuild, and transactional checkpoint updates.
 - [ ] Parse only timestamps, trustworthy model evidence, and token counters; skip/defer malformed or changing records with scan coverage warnings and never retain prompt/response bodies.
-- [ ] Implement `scan_run` provenance/status including discovered/read/skipped/deferred counts, warnings, cancellation, and partial coverage.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** add synthetic golden/property tests for unchanged rescans, appended events, malformed/truncated files, replaced/shrunk files, cumulative resets, cancellation, parser-version invalidation, idempotence, and non-negative deltas.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** add synthetic tests for unchanged rescans, appended events, malformed/truncated files, replaced/shrunk files, parser-version invalidation, and cancellation before checkpoint commit.
+
+### Slice 5C — Scan provenance and coverage status
+
+**Dependency:** Slice 5B complete. **Scope boundary:** `scan_run` provenance/status, discovered/read/skipped/deferred counts, warning/cancellation/partial coverage persistence, and synthetic evidence; no aggregation/UI.
+
+- [ ] Implement `scan_run` provenance/status including discovered/read/skipped/deferred counts, safe warnings, cancellation, and partial coverage.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** add synthetic tests for scan coverage counts, cancellation, idempotence, and non-negative delta handoff boundaries.
 - [ ] Verify fixture data contains no real credentials, paths, prompt text, or response text, and that cancellation before commit leaves aggregates/checkpoints unchanged.
 
-**Acceptance evidence:** scanner golden/property and persistence test reports with coverage warnings. Rollback is disabling scanning; existing committed aggregates remain readable. Requires focused `review-reliability`.
+**Slice 5 chain:** `4C → 5A → 5B → 5C → 6`. Each unit is independently testable/revertible and remains below the 400-line authored review budget.
 
 ### Slice 6 — Daily aggregation, model attribution, and clear-data isolation
 
