@@ -185,8 +185,8 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Dependency:** 6A complete. **Scope boundary:** `daily_model_usage` schema/migration and transactional token-fact persistence only; no scanner wiring, checkpoint advancement, rebuild orchestration, Clear Data, or pricing.
 
-- [ ] Add SQLite migration and transactional `daily_model_usage` storage for local day, timezone ID/offset provenance, model, and input/cached-input/output totals, preserving 6A token facts.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test aggregate/checkpoint transaction seams, crash recovery, aggregate retention, and repricing without token mutation using synthetic data.
+- [x] Add SQLite migration and transactional `daily_model_usage` storage for local day, timezone ID/offset provenance, model, and input/cached-input/output totals, preserving 6A token facts.
+- [x] **RED → GREEN → TRIANGULATE → REFACTOR:** test aggregate/checkpoint transaction seams, crash recovery, aggregate retention, and repricing without token mutation using synthetic data.
 
 #### Slice 6C1 — Scanner aggregation handoff and partial retention (~300 lines including evidence)
 

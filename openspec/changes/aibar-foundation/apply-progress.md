@@ -961,3 +961,56 @@ No design deviation. The 6A rollback boundary is exactly the policy/test/task/pr
 
 - [ ] Add SQLite migration and transactional `daily_model_usage` storage for local day, timezone ID/offset provenance, model, and input/cached-input/output totals, preserving 6A token facts.
 - [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test aggregate/checkpoint transaction seams, crash recovery, aggregate retention, and repricing without token mutation using synthetic data.
+
+## Slice 6B applied (2026-07-14)
+
+**Structured status consumed:** authoritative OpenSpec `applyState: ready`, `nextRecommended: apply`, no blockers; `actionContext` is `repo-local` and the workspace/only allowed root is `C:\Users\mjsal\Desarrollos IA\Modificacion de Terminales\aibar`. Delivery is approved `auto-chain` / `feature-branch-chain`. This boundary is **Slice 6B only**, from stable Slice 6A parent `d0ca0e3`; no action-context warnings.
+
+### Completed tasks and persisted checkbox evidence
+
+Both Slice 6B lines are visibly `- [x]` in `tasks.md`. `SqliteDailyModelUsageStore` creates only `daily_model_usage` and its local schema marker alongside pre-existing application tables. Its transaction atomically merges rows keyed by local day, Windows timezone ID, observed offset minutes, and explicit model (`Unknown` for blank input), retaining only non-negative input/cached-input/output token facts. It stores no prices, costs, catalog values, credentials, payloads, prompts/responses, source paths, session/project names, scanner wiring, or checkpoints.
+
+The injected seam runs after aggregate upserts and before commit. A seam failure rolls back every aggregate update in that transaction. This is **not** checkpoint atomicity: aggregate/checkpoint coupling remains strictly deferred to Slice 6C1.
+
+### TDD Cycle Evidence
+
+| Stage | Evidence | Result |
+|---|---|---|
+| RED | Added synthetic `SqliteDailyModelUsageStoreTests` before the store existed; ran focused tests. | Failed as expected: `CS0246` for missing `SqliteDailyModelUsageStore`. |
+| GREEN | Added minimal SQLite migration/open, transactional merge, reopen/load mapping, and injected pre-commit seam. | Focused tests passed 3/3. |
+| TRIANGULATE | Added coexistence migration test against an existing `quota_snapshot` table and `user_version = 2`. | Focused tests passed 4/4; existing row remained intact. |
+| REFACTOR | Kept schema ownership local to `daily_model_usage`; no scanner/checkpoint or pricing contract was added. | Focused/full suite and zero-warning build passed. |
+
+### Verification evidence
+
+```text
+dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --no-restore --filter "FullyQualifiedName~SqliteDailyModelUsageStoreTests" --logger "console;verbosity=minimal"
+RED: failed as expected (CS0246).
+GREEN: Passed: 3, Failed: 0, Skipped: 0, Total: 3.
+TRIANGULATE: Passed: 4, Failed: 0, Skipped: 0, Total: 4.
+
+dotnet build AIBar.sln --no-restore
+Passed: 0 warnings, 0 errors.
+
+dotnet test AIBar.sln --no-restore --logger "console;verbosity=minimal"
+Passed: 117, Failed: 0, Skipped: 0, Total: 117.
+
+git diff --check d0ca0e3 -- plus no-index checks for both untracked Slice 6B paths
+Passed; only Git LF-to-CRLF notices.
+```
+
+No LSP tool is available in this executor session; the zero-warning compiler build is the available static diagnostic evidence. Production-store privacy inspection found no price/cost, credential, bearer, prompt/response, checkpoint, or session persistence concerns. Tests use only synthetic temporary databases/data.
+
+### Files / workload / rollback
+
+- `src/AIBar.Application/SqliteDailyModelUsageStore.cs`
+- `tests/AIBar.Domain.Tests/SqliteDailyModelUsageStoreTests.cs`
+- `openspec/changes/aibar-foundation/tasks.md`
+- `openspec/changes/aibar-foundation/apply-progress.md`
+
+No design deviation. PR boundary: **Slice 6B only** (`d0ca0e3 → 6B → 6C1`); no stage, commit, push, PR, branch, review, scanner wiring, checkpoint mutation, Clear Data, pricing/catalog, UI, or 6C1+ work occurred. Rollback removes only the daily-model store/test and this Slice 6B task/progress evidence; existing database tables and all Codex-owned files remain untouched.
+
+### Remaining tasks
+
+- [ ] Wire supported scanner token/model/timestamp handoff through 6A to 6B, advancing checkpoints only in the same successful aggregate transaction.
+- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test unchanged/appended handoff, cancellation-before-commit, and partial-scan retention without prompt/response persistence.
