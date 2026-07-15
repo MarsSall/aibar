@@ -3,7 +3,6 @@ namespace AIBar.Domain;
 public enum FreshnessState { Current, Stale, Unavailable }
 public enum QuotaErrorKind { Authentication, Permission, MalformedResponse, Network, Service, Unavailable, Redirect }
 public enum ScanCoverageState { Complete, Partial, Unavailable }
-public enum PricingResultState { Available, UnsupportedModel }
 
 public sealed record TokenTotals(long Input, long CachedInput, long Output)
 {
@@ -65,7 +64,6 @@ public sealed record DailyUsage
     public TokenTotals Tokens { get; }
 }
 
-public sealed record PricingResult(decimal? EstimatedCost, string CatalogVersion, DateOnly CatalogDate, PricingResultState State);
 public sealed record QuotaFailure(QuotaErrorKind Kind, string SafeCode);
 public sealed record CredentialResult(string? AccessToken, string? AccountId, QuotaFailure? Failure);
 public sealed record QuotaProviderResult(QuotaSnapshot? Snapshot, QuotaFailure? Failure, decimal? ResetCredits = null, QuotaFailure? OptionalFailure = null);
@@ -110,7 +108,13 @@ public interface IQuotaSnapshotStore
 }
 public interface IUsageScanner { ValueTask<UsageScanResult> ScanAsync(CancellationToken cancellationToken); }
 public interface IAnalyticsStore { ValueTask SaveAsync(IReadOnlyList<DailyUsage> usage, CancellationToken cancellationToken); }
-public interface IPricingCatalog { PricingResult Price(DailyUsage usage); }
+public interface IPricingCatalog
+{
+    string Version { get; }
+    DateOnly EffectiveDate { get; }
+    IReadOnlyDictionary<string, ComponentRates> Rates { get; }
+    bool TryGetRates(string model, out ComponentRates rates);
+}
 public interface IStartupRegistration
 {
     ValueTask<bool> IsEnabledAsync(CancellationToken cancellationToken);

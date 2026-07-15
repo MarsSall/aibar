@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Estimated changed lines | 6C2A.1 ~260; 6C2A.2 ~300; 6C2B ~260; each independently below 400 |
+| Estimated changed lines | Existing chain through 6D; Slice 7A ~260, 7B ~300, 7C ~340; each independently below 400 |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | Existing chain → 6C1A → 6C1B → 6C2A.1 → 6C2A.2 → 6C2B → 6D → 7 |
+| Suggested split | Existing chain → 6C1A → 6C1B → 6C2A.1 → 6C2A.2 → 6C2B → 6D → 7A → 7B → 7C |
 | Delivery strategy | force-chained |
 | Chain strategy | feature-branch-chain |
 
@@ -245,14 +245,40 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 ### Slice 7 — Pricing, trends, pace, burn, and ETA
 
-- [ ] Add a checked-in, versioned immutable pricing catalog with version/date provenance, component-specific rates, unsupported-model results, and no fallback rate for `Unknown`.
-- [ ] Implement estimated-cost calculation and UI labels/warnings for estimate status, unknown models, repricing, discounts, routing, contracts, and non-authoritative billing assumptions; never use billed-cost/invoice/credit language.
-- [ ] Implement named daily trend windows (initial 7 complete local days and day-over-day comparison) and simple linear quota exhaustion from observed current-window usage, remaining service quota, reset time, and valid positive rate only.
-- [ ] Return insufficient/unavailable for stale quota, invalid reset, zero/negative rate, insufficient observations, or unsupported forecasting; never reconstruct hourly history or emit probabilistic predictions.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** test pricing provenance/warnings, model totals, trend windows, time basis, ETA insufficiency, and linear estimate labeling.
-- [ ] Verify UI/source labels distinguish service quota, locally derived analytics, and estimated cost in view-model snapshots.
+**Chained sequence:** `6D → 7A → 7B → 7C → 8`. Each child targets its immediate predecessor branch, remains independently useful, and forecasts ≤400 authored additions+deletions.
 
-**Acceptance evidence:** domain/UI tests and sample output showing formula, window, rate basis, provenance, and warnings. Rollback is removal of derived metrics without changing token facts or quota behavior.
+#### Slice 7A — Immutable pricing catalog and estimated-cost domain policy (~260 lines)
+
+**Dependency:** 6D complete. **Scope:** checked-in immutable version/date catalog, component rates, unsupported-model results, estimate calculation and provenance/warnings; no trends, ETA, UI wiring, or token-fact mutation. **Non-goals:** billed cost, invoices, credits, fallback pricing, repricing of stored facts.
+
+- [x] **RED:** `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~Pricing` for supported components, catalog provenance, `Unknown`/unsupported models, and warnings for repricing, discounts, routing, contracts.
+- [x] **GREEN:** implement catalog and estimated-cost policy with explicit estimated/unavailable results and no `Unknown` fallback.
+- [x] **TRIANGULATE:** prove component totals remain factual, rates are immutable/versioned, and unsupported prerequisites never produce a number.
+- [x] **REFACTOR:** isolate catalog access and centralize non-authoritative warning/source semantics.
+
+**Evidence/runtime:** domain test report and catalog inspection; runtime N/A (pure policy). **Rollback:** remove 7A catalog/policy/tests; preserve 6D token facts and quota.
+
+#### Slice 7B — Named trend windows and linear ETA policy (~300 lines)
+
+**Dependency:** 7A complete. **Scope:** seven complete local-day window, day-over-day comparison, observed current-window rate, remaining service quota/reset, and linear exhaustion ETA. **Non-goals:** UI integration, hourly reconstruction, probabilistic/history forecasting.
+
+- [ ] **RED:** `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~DerivedMetrics` for window names/time basis, insufficient observations, stale quota, invalid reset, zero/negative rate, and unsupported forecasting.
+- [ ] **GREEN:** implement named trends and simple estimated ETA only for valid positive observed rate and service inputs.
+- [ ] **TRIANGULATE:** prove no hourly reconstruction/prediction language and preserve quota/token facts when estimates are unavailable.
+- [ ] **REFACTOR:** separate trend and ETA policies with deterministic clock/time-basis outputs.
+
+**Evidence/runtime:** focused domain report with acceptance matrix; runtime N/A (pure derived policy). **Rollback:** remove 7B policies/tests while retaining 7A pricing.
+
+#### Slice 7C — View-model source labels and warnings (~340 lines)
+
+**Dependency:** 7B complete. **Scope:** presentation mapping for estimated cost, named trends, ETA, warnings, and source labels separating service quota, locally derived analytics, and estimated cost. **Non-goals:** new domain rules, host lifecycle, quota behavior, Slice 8 work.
+
+- [ ] **RED:** `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~ViewModel` for source-label separation, estimate/unavailable states, warning copy, and non-authoritative language.
+- [ ] **GREEN:** wire existing view-model contracts without fabricating values or relabeling derived data as service data.
+- [ ] **TRIANGULATE:** snapshot stale/unknown/unsupported/insufficient cases and verify factual token/quota aggregates remain unchanged.
+- [ ] **REFACTOR:** centralize display labels and remove duplicated warning/source mapping.
+
+**Evidence/runtime:** view-model snapshot report; runtime N/A (presentation mapping has no live harness). **Rollback:** revert 7C mapping/tests, leaving 7A/7B domain policies usable.
 
 ### Slice 8 — Startup, diagnostics, packaging, privacy, and compatibility hardening
 

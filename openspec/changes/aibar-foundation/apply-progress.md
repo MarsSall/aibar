@@ -1,5 +1,22 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 7A applied (2026-07-14)
+
+**Status:** Standard TDD mode (`strict_tdd: false`); authoritative OpenSpec `applyState: ready`; force-chained `feature-branch-chain`. This child work unit starts from committed Slice 6D (`2f0af30`) with the intentional Slice 7 task decomposition preserved, and covers immutable pricing catalog and pure estimated-cost policy only. No token persistence, trend/window/ETA policy, view-model/UI, billing authority, Git lifecycle, PR, or review action was used.
+
+| Evidence | Exact result |
+|---|---|
+| RED | Added `PricingPolicyTests` before the production policy. `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~Pricing --nologo` failed as expected with missing `PricingPolicy`, `CheckedInPricingCatalog`, result-state, and warning contracts (`CS0246`/`CS0103`). |
+| GREEN / focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~Pricing --nologo` — passed 9/9, failed 0, skipped 0. |
+| TRIANGULATE / token-fact regression | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter 'FullyQualifiedName~Pricing|FullyQualifiedName~SqliteDailyModelUsageStoreTests|FullyQualifiedName~Slice6AggregationIntegrationTests' --nologo` — passed 21/21, failed 0, skipped 0. It proves pricing keeps supplied component facts unchanged, and existing SQLite/Slice 6 regressions prove repricing never changes persisted token facts. |
+| REFACTOR | `CheckedInPricingCatalog` now implements the design-named `IPricingCatalog`; obsolete placeholder `PricingResult`/`PricingResultState` and duplicate `IComponentPricingCatalog` are removed. One policy owns provenance and read-only warning semantics. No persistence or presentation contract changed. |
+| Catalog inspection / provenance | `CheckedInPricingCatalog.Current` is checked-in immutable code data: version `2026-07-14`, effective date `2026-07-14`, and `gpt-5` input/cached-input/output rates of `1.25`/`0.125`/`10.00` per million tokens. Component-only one-million-token cases fail if rates are swapped. A copied `readonly record struct` rate can change only locally; re-fetch proves the stored rate/provenance unchanged, and the exposed read-only dictionary rejects added keys. `Unknown` and unlisted models have no lookup/fallback. |
+| Full regression / build | `dotnet test AIBar.sln --nologo` — passed 155/155, failed 0, skipped 0; `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors; `git diff --check` — passed with no whitespace errors (Git emitted only LF-to-CRLF conversion warnings for modified tracked files). |
+| Runtime harness | N/A — this is a pure Domain pricing-policy boundary; no live service, persistence, filesystem, or UI runtime exists in scope. |
+| Rollback boundary | Remove `src/AIBar.Domain/PricingPolicy.cs`, restore the prior placeholder-only pricing declarations in `src/AIBar.Domain/Foundation.cs`, remove `tests/AIBar.Domain.Tests/PricingPolicyTests.cs`, and revert these Slice 7A task/progress updates. Slice 6D token facts, persistence, quota, and all later Slice 7B/7C work remain untouched. |
+
+**Behavior:** component-specific rates calculate only an explicitly estimated result. Empty facts return `Unavailable`; `Unknown` and unlisted models return `Incomplete` with no monetary number. Every result retains original `DailyUsage` token facts and catalog version/date; estimates carry repricing, discount, routing, contract-term, and non-authoritative warnings through a read-only collection. **Changed paths:** `src/AIBar.Domain/Foundation.cs`, `src/AIBar.Domain/PricingPolicy.cs`, `tests/AIBar.Domain.Tests/PricingPolicyTests.cs`, `openspec/changes/aibar-foundation/tasks.md`, and this file. **Authored count:** 240 additions + 12 deletions = 252 from `2f0af30`, including the pre-existing task decomposition and untracked files. **Deviation:** none — the checked-in immutable code catalog is the small design-consistent catalog representation. **Next dependency:** Slice 7B only after 7A review.
+
 ## Slice 6D applied (2026-07-14)
 
 **Status:** Standard TDD mode (`strict_tdd: false`); OpenSpec/repo-local `applyState: ready`; force-chained `feature-branch-chain`. This child work unit starts at `512488a` and covers synthetic aggregation integration hardening only. No production code, live Codex source, AppData, Git lifecycle, PR, or review action was used.
