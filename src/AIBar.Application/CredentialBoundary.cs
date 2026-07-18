@@ -64,7 +64,8 @@ public sealed class RequestCredential(string accessToken, string? accountId) : I
 
 public sealed class PrivateIntegrationPolicy(bool enabled = false)
 {
-    public bool IsEnabled { get; } = enabled;
+    public bool IsEnabled { get; private set; } = enabled;
+    public void Disable() => IsEnabled = false;
     public string Disclosure => "Quota integration is private, undocumented, and unsupported; it is disabled by default.";
 }
 

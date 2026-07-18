@@ -51,19 +51,26 @@ public partial class App : System.Windows.Application
         var policy = new PrivateIntegrationPolicy();
         var coordinator = new QuotaRefreshCoordinator(store, new QuotaHttpProvider(policy, _ => ValueTask.FromResult<RequestCredential?>(null)), new SystemClock(), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
         var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new SystemClock()), policy.IsEnabled, ReportFault);
-        return new(presentation, policy.IsEnabled ? presentation.RefreshCommand : null, new QuotaRuntimeResource(presentation, coordinator, store), () => presentation.InitializeAsync(default).AsTask(), presentation.ReportUnavailable);
+        var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
+        var clear = new ClearAiBarDataService(dataDirectory, [coordinator], CreateEmptyStateFactory(coordinator));
+        return new(presentation, policy.IsEnabled ? presentation.RefreshCommand : null, new NativeSettingsCommands(startup, clear, policy), new QuotaRuntimeResource(presentation, coordinator, store), () => presentation.InitializeAsync(default).AsTask(), presentation.ReportUnavailable);
     }
+    internal static Func<CancellationToken, ValueTask> CreateEmptyStateFactory(QuotaRefreshCoordinator coordinator) => coordinator.ClearAsync;
     private void StartTray(StartupComposition composition)
     {
         var window = new MainWindow { DataContext = composition.Presentation, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
         _taskbar = new TaskbarRecreationMonitor(window);
         _runtime = new TrayHostRuntime(_instance!, new WindowsTrayRuntime(), new WpfPopoverRuntime(window), _taskbar,
-            _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand);
+            _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable);
         _runtime.Start();
     }
     private static void ReportFault(Exception exception) => Trace.TraceError("AIBar unavailable: {0}", exception.GetType().Name);
-    internal sealed record StartupComposition(object Presentation, IManualRefreshCommand? RefreshCommand, IAsyncDisposable Resource, Func<Task> Initialize, Action ReportUnavailable)
-    { internal static StartupComposition Unavailable => new(new UnavailableQuotaPresentation(), null, new EmptyAsyncResource(), () => Task.CompletedTask, () => { }); }
+    internal sealed record StartupComposition(object Presentation, IManualRefreshCommand? RefreshCommand, NativeSettingsCommands? Settings, IAsyncDisposable Resource, Func<Task> Initialize, Action ReportUnavailable)
+    {
+        internal StartupComposition(object presentation, IManualRefreshCommand? refreshCommand, IAsyncDisposable resource, Func<Task> initialize, Action reportUnavailable)
+            : this(presentation, refreshCommand, null, resource, initialize, reportUnavailable) { }
+        internal static StartupComposition Unavailable => new(new UnavailableQuotaPresentation(), null, null, new EmptyAsyncResource(), () => Task.CompletedTask, () => { });
+    }
 
     private sealed class SystemClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.UtcNow; }
     private sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, QuotaRefreshCoordinator coordinator, IAsyncDisposable store) : IAsyncDisposable

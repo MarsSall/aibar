@@ -4,11 +4,11 @@
 
 | Field | Value |
 |-------|-------|
-| Estimated changed lines | Existing chain through 6D; Slice 7A ~260, 7B ~300, 7C ~340; each independently below 400 |
+| Estimated changed lines | Existing chain through 6D; Slice 7A ~260, 7B ~300, 7C ~340; Slice 8A is 481 actual under its maintainer-approved `size:exception`; 8B ~360, 8C ~300, 8D ~340, 8E ~280 and each remains independently below 400 |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | Existing chain → 6C1A → 6C1B → 6C2A.1 → 6C2A.2 → 6C2B → 6D → 7A → 7B → 7C |
-| Delivery strategy | force-chained |
+| Suggested split | Existing chain → 6C1A → 6C1B → 6C2A.1 → 6C2A.2 → 6C2B → 6D → 7A → 7B → 7C → 8A → 8B → 8C → 8D → 8E |
+| Delivery strategy | auto-chain |
 | Chain strategy | feature-branch-chain |
 
 Decision needed before apply: No
@@ -280,17 +280,54 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Evidence/runtime:** view-model snapshot report; runtime N/A (presentation mapping has no live harness). **Rollback:** revert 7C mapping/tests, leaving 7A/7B domain policies usable.
 
-### Slice 8 — Startup, diagnostics, packaging, privacy, and compatibility hardening
+### Slice 8A — Per-user startup and native settings (~260 lines)
 
-- [ ] Implement per-user startup registration abstraction: packaged startup-task path where available and unpackaged HKCU Run entry with quoted executable and `--startup`; read back effective state after mutation, never elevate or write machine-wide state.
-- [ ] Add native commands/settings for startup toggle, Clear AIBar Data, safe diagnostic export, and private-integration disablement; keep telemetry and remote crash reporting off by default.
-- [ ] Implement central redaction before every diagnostic sink/export for bearer headers, secret fields, sensitive IDs, URLs/query strings, paths, raw bodies, auth files, JSONL lines, database rows, and exception values; bound local log size/age.
-- [ ] Add privacy tests that recursively inspect AIBar-owned persistence, logs, diagnostics, exports, and UI/error snapshots for seeded prompt/response text, bearer values, sensitive IDs, and source paths.
-- [ ] Add deterministic x64 Windows 10/11 packaging, SBOM, signed per-user MSIX path when signing is available, unpackaged self-contained development/recovery artifact, and upgrade/migration/uninstall/user-data retention checks.
-- [ ] **RED → GREEN → TRIANGULATE → REFACTOR:** add packaging smoke tests for clean install, upgrade, startup launch, single instance, uninstall, and data retention/removal; perform W10/W11 manual/VM checks for tray recreation, DPI, taskbar placement, sleep/resume, popover focus, and concrete unsupported behavior.
-- [ ] Complete policy/legal review, dependency and source-provenance/MIT-notice review, private-endpoint compatibility validation, and remote-free kill-switch verification before enabling distribution builds.
+**Dependency/base:** 7C branch; chain PR #1 targets `feature/aibar-foundation-slice-7c-viewmodel`. **Scope:** startup abstraction, settings commands, Clear AIBar Data and private-integration/telemetry policy wiring. **Non-goals:** diagnostics sinks, packaging, policy sign-off.
 
-**Acceptance evidence:** packaging artifacts/checksums/SBOM, install-upgrade-uninstall report, W10/W11 matrix, privacy inspection report, policy/legal sign-off, and rollback procedure. Requires focused `review-resilience` plus release risk review.
+**Delivery decision:** `size:exception` for Slice 8A only, explicitly maintainer-approved in session 2026-07-18. Slices 8B–8E remain `auto-chain` with the <=400 authored-line budget; this exception grants no broader scope or budget waiver.
+
+- [x] **RED:** test packaged-task vs HKCU Run selection, quoted path/`--startup`, read-back, denial, no elevation/machine writes, toggle, clear-data isolation, and disabled private/telemetry/crash defaults.
+- [x] **GREEN:** implement `IStartupRegistration`, native settings/commands, effective-state read-back, and policy defaults.
+- [x] **TRIANGULATE:** exercise missing task API, malformed Run value, repeated toggles, locked data, and kill-switch preserving local analytics.
+- [x] **REFACTOR:** keep OS adapters isolated and disposal/idempotence explicit. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Startup|FullyQualifiedName~ClearAiBarData|FullyQualifiedName~Policy"`. Runtime: Windows 10/11 per-user toggle scenario. Rollback: remove startup/settings adapters and tests only.
+
+### Slice 8B — Redaction, bounded diagnostics, and privacy inspection (~360 lines)
+
+**Dependency/base:** 8A branch; PR #2 targets 8A. **Scope:** central redaction, local bounded logs, safe export and recursive privacy tests. **Non-goals:** installers and VM matrix.
+
+- [ ] **RED:** seed bearer headers, secret fields, sensitive IDs, URLs/query strings, paths, raw bodies, auth files, JSONL, database rows, exception values, prompt/response text; recursively assert absence in persistence/logs/diagnostics/exports/UI/error snapshots.
+- [ ] **GREEN:** route every sink/export through one redactor, bound log size/age, exclude DB/Codex files, and require explicit export action.
+- [ ] **TRIANGULATE:** test nested/escaped/case variants, thrown exceptions, repeated rotation, partial export, and clear-data races.
+- [ ] **REFACTOR:** remove bypasses and document safe event fields. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Privacy|FullyQualifiedName~Redact|FullyQualifiedName~Diagnostic"`. Runtime: export a seeded fixture and inspect the archive. Rollback: remove diagnostics/redaction/export and privacy tests; retain 8A settings.
+
+### Slice 8C — Deterministic x64 packaging and provenance (~300 lines)
+
+**Dependency/base:** 8B branch; PR #3 targets 8B. **Scope:** deterministic x64 W10/11 publish, SBOM, signed per-user MSIX when credentials exist, unpackaged self-contained recovery artifact, dependency/source provenance and MIT notices. **Non-goals:** install lifecycle and policy approval.
+
+- [ ] **RED:** assert reproducible artifact identity, x64 target, SBOM completeness, signing-available/unavailable paths, self-contained recovery output, and provenance notice presence.
+- [ ] **GREEN:** add packaging scripts/configuration and deterministic artifact generation without embedding secrets or user data.
+- [ ] **TRIANGULATE:** rebuild twice, inspect manifests/dependencies/notices, and verify unsigned fallback is explicit.
+- [ ] **REFACTOR:** isolate signing inputs and publish metadata. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~Packaging`. Runtime: two clean publish runs and artifact diff. Rollback: remove packaging scripts/artifacts; preserve application behavior.
+
+### Slice 8D — Install, upgrade, launch, uninstall, and retention smoke (~340 lines)
+
+**Dependency/base:** 8C branch; PR #4 targets 8C. **Scope:** packaging/runtime smoke harness for clean install, migration/upgrade, startup launch, single instance, uninstall and retention/removal. **Non-goals:** manual DPI matrix and legal gates.
+
+- [ ] **RED:** add smoke tests for clean install, upgrade migration, `--startup`, single-instance activation, uninstall, retained/removed user data, and Codex-file hashes.
+- [ ] **GREEN:** wire the install lifecycle harness and migration-safe upgrade/uninstall behavior.
+- [ ] **TRIANGULATE:** rerun with existing DB, locked files, failed migration, disabled integration, and explicit data-removal selection.
+- [ ] **REFACTOR:** make setup/cleanup idempotent and evidence path-free. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSmoke|FullyQualifiedName~Lifecycle"`. Runtime: clean Windows sandbox install → launch → upgrade → uninstall. Rollback: remove smoke harness/lifecycle changes; retain publish outputs from 8C.
+
+### Slice 8E — Windows matrix and release gates (~280 lines)
+
+**Dependency/base:** 8D branch; PR #5 targets 8D. **Scope:** W10/W11 manual/VM matrix, private compatibility validation, policy/legal review, remote-free kill-switch and release evidence. **Non-goals:** new product behavior; Slice 7B tiny-positive-rate ETA warning remains deferred.
+
+- [ ] **RED:** record failing matrix/gate checks for tray recreation, DPI, taskbar placement, sleep/resume, popover focus, unsupported behavior, policy/legal, dependency/license, provenance, private endpoint compatibility, and kill-switch.
+- [ ] **GREEN:** execute and document the matrix and sign-off gates; make unsupported behavior visible and distribution disabled until all pass.
+- [ ] **TRIANGULATE:** repeat on representative W10/W11 VMs and with private integration disabled; verify local analytics remain usable and no remote sink exists.
+- [ ] **REFACTOR:** consolidate release checklist and rollback procedure. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Windows|FullyQualifiedName~ReleaseGate"`. Runtime: W10/W11 VM smoke matrix. Rollback: remove gate evidence/configuration and ship disabled; preserve 8D lifecycle.
+
+**Slice 8 chain:** `7C → 8A → 8B → 8C → 8D → 8E`; 8A is autonomous at 481 authored lines solely under its maintainer-approved Slice-8A-only `size:exception`; 8B–8E remain autonomous, `auto-chain`, and ≤400 authored lines with behavior, tests, docs, and config together.
 
 ## Cross-Slice Completion Gates
 

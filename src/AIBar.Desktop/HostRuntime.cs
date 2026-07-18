@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using AIBar.Application;
 using Forms = System.Windows.Forms;
 
 namespace AIBar.Desktop;
@@ -12,7 +13,12 @@ public interface ITrayRuntime : IAsyncDisposable
     event Action? Toggled;
     event Action? ExitRequested;
     event Action? RefreshRequested;
+    event Action? StartupToggleRequested;
+    event Action? ClearAiBarDataRequested;
+    event Action? PrivateIntegrationDisableRequested;
     void SetRefreshAvailable(bool available);
+    void SetSettingsAvailable(bool available);
+    void SetStartupEnabled(bool enabled);
     void Show();
     void Hide();
 }
@@ -39,21 +45,25 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private readonly IAsyncDisposable _persistence;
     private readonly Action _exitProcess;
     private readonly IManualRefreshCommand? _refreshCommand;
+    private readonly NativeSettingsCommands? _settings;
+    private readonly Action? _reportSettingsFailure;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly DispatcherTimer _activationTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private Task? _cleanupTask;
     private Task? _exitTask;
     private bool _disposed;
 
-    public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess, IManualRefreshCommand? refreshCommand = null)
+    public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess, IManualRefreshCommand? refreshCommand = null, NativeSettingsCommands? settings = null, Action? reportSettingsFailure = null)
     {
-        _instance = instance; _tray = tray; _popover = popover; _taskbar = taskbar; _awaitCancelledWork = awaitCancelledWork; _persistence = persistence; _exitProcess = exitProcess; _refreshCommand = refreshCommand;
+        _instance = instance; _tray = tray; _popover = popover; _taskbar = taskbar; _awaitCancelledWork = awaitCancelledWork; _persistence = persistence; _exitProcess = exitProcess; _refreshCommand = refreshCommand; _settings = settings; _reportSettingsFailure = reportSettingsFailure;
         _tray.SetRefreshAvailable(refreshCommand is not null);
-        _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _tray.RefreshRequested += OnRefreshRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += ShowPopover;
+        _tray.SetSettingsAvailable(settings is not null);
+        _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _tray.RefreshRequested += OnRefreshRequested; _tray.StartupToggleRequested += OnStartupToggleRequested; _tray.ClearAiBarDataRequested += OnClearAiBarDataRequested; _tray.PrivateIntegrationDisableRequested += OnPrivateIntegrationDisableRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += ShowPopover;
         _activationTimer.Tick += DispatchPendingActivation;
     }
 
     public void Start() { if (_disposed) return; RunSafely(_tray.Show); _activationTimer.Start(); }
+    public bool? StartupEnabled { get; private set; }
     public Task ExitAsync()
     {
         lock (_shutdown)
@@ -103,14 +113,29 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     }
     private void OnExitRequested() => _ = ExitSafelyAsync();
     private void OnRefreshRequested() => _ = RefreshSafelyAsync();
+    private void OnStartupToggleRequested() => _ = ToggleStartupSafelyAsync();
+    private void OnClearAiBarDataRequested() => _ = ClearAiBarDataSafelyAsync();
+    private void OnPrivateIntegrationDisableRequested() => _ = SettingsSafelyAsync(settings => settings.DisablePrivateIntegrationAsync(_shutdown.Token));
     private async Task RefreshSafelyAsync()
     {
         if (_refreshCommand?.CanExecute == true) try { await _refreshCommand.ExecuteAsync(_shutdown.Token); } catch (Exception) { }
     }
+    private async Task SettingsSafelyAsync(Func<NativeSettingsCommands, ValueTask> operation)
+    {
+        if (_settings is not null) try { await operation(_settings); } catch (Exception) { }
+    }
+    private async Task ClearAiBarDataSafelyAsync()
+    {
+        if (_settings is not null) try { await _settings.ClearAiBarDataAsync(_shutdown.Token); } catch (Exception) { _reportSettingsFailure?.Invoke(); }
+    }
+    private async Task ToggleStartupSafelyAsync()
+    {
+        if (_settings is not null) try { StartupEnabled = await _settings.ToggleStartupAsync(_shutdown.Token); _tray.SetStartupEnabled(StartupEnabled.Value); } catch (Exception) { }
+    }
     private async Task ExitSafelyAsync() { try { await ExitAsync(); } catch (Exception) { } }
     private void Detach()
     {
-        _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _tray.RefreshRequested -= OnRefreshRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= ShowPopover;
+        _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _tray.RefreshRequested -= OnRefreshRequested; _tray.StartupToggleRequested -= OnStartupToggleRequested; _tray.ClearAiBarDataRequested -= OnClearAiBarDataRequested; _tray.PrivateIntegrationDisableRequested -= OnPrivateIntegrationDisableRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= ShowPopover;
     }
     private static void RunSafely(Action action) { try { action(); } catch (Exception) { } }
     public ValueTask DisposeAsync() => new(ExitAsync());
@@ -121,20 +146,32 @@ public sealed class WindowsTrayRuntime : ITrayRuntime
     private readonly Forms.NotifyIcon _icon = new() { Icon = SystemIcons.Application, Text = "AIBar", Visible = false };
     private readonly Forms.ContextMenuStrip _menu = new();
     private readonly Forms.ToolStripMenuItem _refresh = new("Refresh");
+    private readonly Forms.ToolStripMenuItem _startup = new("Start with Windows");
+    private readonly Forms.ToolStripMenuItem _clear = new("Clear AIBar Data");
+    private readonly Forms.ToolStripMenuItem _disablePrivate = new("Disable Private Quota Integration");
     public WindowsTrayRuntime()
     {
         var exit = new Forms.ToolStripMenuItem("Exit AIBar");
-        _refresh.Click += (_, _) => RefreshRequested?.Invoke(); exit.Click += (_, _) => ExitRequested?.Invoke(); _menu.Items.Add(exit); _icon.ContextMenuStrip = _menu;
+        _refresh.Click += (_, _) => RefreshRequested?.Invoke(); _startup.Click += (_, _) => StartupToggleRequested?.Invoke(); _clear.Click += (_, _) => ClearAiBarDataRequested?.Invoke(); _disablePrivate.Click += (_, _) => PrivateIntegrationDisableRequested?.Invoke(); exit.Click += (_, _) => ExitRequested?.Invoke(); _menu.Items.Add(exit); _icon.ContextMenuStrip = _menu;
         _icon.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) Toggled?.Invoke(); };
     }
     public event Action? Toggled;
     public event Action? ExitRequested;
     public event Action? RefreshRequested;
+    public event Action? StartupToggleRequested;
+    public event Action? ClearAiBarDataRequested;
+    public event Action? PrivateIntegrationDisableRequested;
     public void SetRefreshAvailable(bool available)
     {
         if (available && !_menu.Items.Contains(_refresh)) _menu.Items.Insert(0, _refresh);
         else if (!available) _menu.Items.Remove(_refresh);
     }
+    public void SetSettingsAvailable(bool available)
+    {
+        if (available && !_menu.Items.Contains(_startup)) { _menu.Items.Insert(0, _disablePrivate); _menu.Items.Insert(0, _clear); _menu.Items.Insert(0, _startup); }
+        else if (!available) { _menu.Items.Remove(_startup); _menu.Items.Remove(_clear); _menu.Items.Remove(_disablePrivate); }
+    }
+    public void SetStartupEnabled(bool enabled) => _startup.Checked = enabled;
     public void Show() => _icon.Visible = true;
     public void Hide() => _icon.Visible = false;
     public ValueTask DisposeAsync() { _icon.Dispose(); return ValueTask.CompletedTask; }

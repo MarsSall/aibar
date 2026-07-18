@@ -1,5 +1,33 @@
 # Apply Progress — AIBar Foundation
 
+## Ordinary-review correction `review-slice-8a-standalone-20260718` (2026-07-18)
+
+**Authority / scope:** post-forecast revision `sha256:328819136f5b1748aca3412d8d55808641cf888c9b13039d0e1bfa1f0f5849bd`; only frozen severe IDs `R3-001`, `R4-001`, `R4-002`, and `R2-001` were corrected. INFO warnings and planning/tasks remain unchanged.
+**Frozen-ID proof:** `R3-001`/`R4-001` now read both effective startup backends, migrate stale fallback state when packaged startup becomes available, and disable packaged plus HKCU state; `R4-002` stages validated owned targets through reversible sibling moves, rolls back an earlier prepared target when a later file is locked, and publishes host failure through the existing unavailable-state seam; `R2-001` replaces the production no-op with `QuotaRefreshCoordinator.ClearAsync`, publishing null/unavailable coordinator and presentation state.
+**Verification:** focused quoted-filter startup/Clear Data/host tests passed 25/25; direct synthetic/temp-root safety harness passed 15/15; full solution passed 186/186; build succeeded with 0 warnings and 0 errors; `git diff --check` passed.
+**Runtime safety:** all correction tests use fakes, synthetic reflection, and temporary roots; no real registry, startup task, elevation, machine-wide state, AppData, or Codex-owned source was read or mutated.
+**Rollback:** revert only this correction in `StartupSettings.cs`, `ClearAiBarDataService.cs`, `App.xaml.cs`, `HostRuntime.cs`, `StartupSettingsTests.cs`, `HostRuntimeTests.cs`, and this evidence block; the frozen reviewed candidate remains the rollback state.
+**Exact correction receipt relative to the frozen candidate: 139 additions + 12 deletions = 151 authored lines, below the 160 forecast and 200 hard budget.**
+
+## Slice 8A applied (2026-07-18)
+
+**Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `feature-branch-chain` with a **Slice 8A-only `size:exception`**, explicitly maintainer-approved in session 2026-07-18. Slices 8B–8E remain `auto-chain` and <=400. This child starts at Slice 7C parent `66dbfbac94256b9d259247076c1517688ad5e75b` and is limited to per-user startup/settings and Clear AIBar Data command wiring.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | Added `StartupSettingsTests` first. The required focused command failed before production code with missing `IStartupTaskRegistration`, `ICurrentUserRunStore`, and `IAiBarDataClearCommand` (`CS0246`). |
+| GREEN / focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Startup|FullyQualifiedName~ClearAiBarData|FullyQualifiedName~Policy"` — passed 41/41, failed 0, skipped 0. |
+| TRIANGULATE / safe runtime harness | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~StartupSettingsTests|FullyQualifiedName~Native_settings_events"` — passed 11/11, failed 0, skipped 0. Injected packaged-task/current-user-run fakes prove package-unavailable fallback, exact HKCU path and quoted command, malformed values, denial, true→false read-back, `quota.db` clear isolation, kill-switch/local-analytics preservation, direct host startup/clear events, and synthetic reflection Completed/Error/Canceled/unexpected states. No real registry/startup task/user data was touched. Live Windows toggle verification is deferred to Slice 8D's isolated install harness. |
+| REFACTOR | The runtime detects and invokes the OS packaged startup-task API only when it is present and task resolution succeeds; otherwise it falls back to the isolated HKCU adapter. Reflection polling accepts only `Started`/`Completed` and fails closed immediately for `Error`, `Canceled`, missing, or unexpected states. Host state and the checked native menu update only from effective post-mutation read-back. `ClearAiBarDataService` owns `quota.db` and sidecars. |
+| Full regression / build | `dotnet test AIBar.sln --nologo` — passed 182/182, failed 0, skipped 0. `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors. `git diff --check` — passed (LF-to-CRLF advisories only). |
+| Rollback boundary | Revert `src/AIBar.Application/{StartupSettings.cs,AssemblyInfo.cs,ClearAiBarDataService.cs,CredentialBoundary.cs}`, `src/AIBar.Desktop/{App.xaml.cs,HostRuntime.cs}`, `tests/AIBar.Domain.Tests/{StartupSettingsTests.cs,HostRuntimeTests.cs}`, and `openspec/changes/aibar-foundation/{tasks.md,apply-progress.md}`. This includes the Slice 8A `PrivateIntegrationPolicy` mutation. Existing Clear AIBar Data, quota, analytics, and Slice 7C presentation behavior remain. |
+
+**Behavior:** unpackaged startup writes only `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` with a quoted executable and `--startup`; the production adapter never elevates or writes machine-wide state. A packaged process resolves the Windows startup-task API/task at runtime and uses it only when that task is available; otherwise the HKCU adapter is selected. Every mutation reads the effective state back into the host/menu. The native private-integration command only disables the default-off policy and local analytics remains enabled. Clear Data includes live `quota.db`/WAL/SHM and fails closed if a locked owned file cannot be removed. **Deviation:** live mutable startup verification was intentionally deferred because this apply batch must not persist real user startup state.
+
+**Size exception rationale:** maintainer explicitly approved `size:exception` for Slice 8A in session 2026-07-18 after truthful production/runtime corrections exceeded the original budget. The exception applies only to this unit; 8B–8E remain auto-chained and <=400.
+
+**Exact Slice 8A authored changed-line receipt from `66dbfbac94256b9d259247076c1517688ad5e75b`: 455 additions + 26 deletions = 481 total, including the authorized Slice 8 planning diff. This exceeds 400 solely under the Slice 8A-only maintainer-approved `size:exception`.**
+
 ## Slice 7C applied (2026-07-18)
 
 **Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `auto-chain` / `feature-branch-chain`. This child work unit starts from Slice 7B commit `42729af` and covers view-model mapping only. No domain policy, quota behavior, host lifecycle, runtime integration, or Slice 8 work changed.

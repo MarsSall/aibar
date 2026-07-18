@@ -1,15 +1,15 @@
 namespace AIBar.Application;
 
-/// <summary>Coordinates a non-atomic, allowlisted clear. A successful return means every owned target was removed and the supplied empty-state factory completed.</summary>
+/// <summary>Coordinates an allowlisted clear. A successful return means every owned target was removed and the supplied empty-state factory completed.</summary>
 public interface IAiBarClearWork
 {
     ValueTask CancelAndWaitAsync(CancellationToken cancellationToken);
     void ResumeAfterClear();
 }
 
-public sealed class ClearAiBarDataService
+public sealed class ClearAiBarDataService : IAiBarDataClearCommand
 {
-    private static readonly string[] DefaultOwnedPaths = ["cache", "logs", "aibar.db", "aibar.db-wal", "aibar.db-shm", "settings.json"];
+    private static readonly string[] DefaultOwnedPaths = ["cache", "logs", "aibar.db", "aibar.db-wal", "aibar.db-shm", "quota.db", "quota.db-wal", "quota.db-shm", "settings.json"];
     private readonly string _root;
     private readonly IReadOnlyList<IAiBarClearWork> _work;
     private readonly Func<CancellationToken, ValueTask> _recreateEmptyState;
@@ -34,7 +34,33 @@ public sealed class ClearAiBarDataService
         {
             foreach (var item in _work) await item.CancelAndWaitAsync(cancellationToken);
             VerifySafeRoot();
-            foreach (var relative in _ownedPaths) DeleteOwnedTarget(Path.Combine(_root, relative));
+            var staged = new List<(string Original, string Temporary)>();
+            try
+            {
+                foreach (var relative in _ownedPaths)
+                {
+                    var original = Path.Combine(_root, relative);
+                    if (!File.Exists(original) && !Directory.Exists(original)) continue;
+                    ValidateOwnedTarget(original);
+                    var temporary = $"{original}.aibar-clear-{Guid.NewGuid():N}";
+                    if (File.Exists(original)) File.Move(original, temporary); else Directory.Move(original, temporary);
+                    staged.Add((original, temporary));
+                }
+            }
+            catch (Exception failure)
+            {
+                try
+                {
+                    for (var index = staged.Count - 1; index >= 0; index--)
+                    {
+                        var (original, temporary) = staged[index];
+                        if (File.Exists(temporary)) File.Move(temporary, original); else if (Directory.Exists(temporary)) Directory.Move(temporary, original);
+                    }
+                }
+                catch (Exception rollbackFailure) { throw new AggregateException(failure, rollbackFailure); }
+                throw;
+            }
+            foreach (var (_, temporary) in staged) DeleteOwnedTarget(temporary);
             Directory.CreateDirectory(_root);
             await _recreateEmptyState(cancellationToken);
         }
@@ -70,6 +96,13 @@ public sealed class ClearAiBarDataService
             if (Directory.Exists(child)) DeleteOwnedTarget(child); else File.Delete(child);
         }
         Directory.Delete(path);
+    }
+
+    private static void ValidateOwnedTarget(string path)
+    {
+        RejectReparsePoint(path);
+        if (File.Exists(path)) { using var probe = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None); return; }
+        foreach (var child in Directory.EnumerateFileSystemEntries(path)) ValidateOwnedTarget(child);
     }
 
     private static void RejectReparsePoint(string path)
