@@ -1279,3 +1279,21 @@ All three 6C2A.1 checkboxes are visibly `- [x]` in `tasks.md`. Schema v2 adds pa
 **Workload:** complete authored diff including pre-existing replanning artifacts is **157 additions + 16 deletions = 173 lines**, below the 400-line limit. `git diff --check` passed (LF/CRLF notices only). No design deviation.
 
 **Remaining:** 6C2A.2 is the next dependency-bound child slice; 6C2B, 6D, and later work remain unchecked and out of scope.
+
+## Slice 7B strict-TDD recovery applied (2026-07-14)
+
+**Status:** Harness Strict TDD mode is active. This corrected Slice 7B record replaces the earlier incomplete phase evidence after an authorized discard/reconstruction from clean `41b1ded`; it covers only pure named trends and linear primary-window ETA. No UI, hourly reconstruction, probabilistic/history forecasting, Slice 7C/8, persistence, or Git/review lifecycle action was used.
+
+### TDD Cycle Evidence
+
+| Stage | Chronological evidence |
+|---|---|
+| Safety net | On clean base before any Slice 7B file: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --nologo` — passed 155/155, failed 0, skipped 0. |
+| RED | Added one behavior-first seven-complete-local-day trend test while production types were absent; `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~DerivedMetrics --nologo` failed as expected (`CS0246` `NamedTrendPolicy`; `CS0103` `DerivedMetricState`). |
+| GREEN | Added the minimum `NamedTrendPolicy`/trend result contracts only; same focused command passed 1/1. |
+| TRIANGULATE | Added insufficient-history, positive/zero/negative rate, stale/invalid/mismatched reset, unsupported single-observation, source-fact preservation, and estimate-label tests. Before ETA production code, the focused command failed as expected (`CS0246` `LinearExhaustionEtaPolicy`/`QuotaUsageObservation`); after adding ETA policy it passed 8/8. Related `DerivedMetrics|Pricing|AnalyticsPolicyTests` passed 26/26. |
+| REFACTOR | Extracted current-service-window validation while retaining separate trend/ETA policies and deterministic clock/local-time inputs. A concurrent related test invocation had a transient Windows file lock (`CS2012`), so it is not evidence; sequential reruns passed focused 8/8 and related 26/26. |
+
+**Behavior:** trends require all seven immediately preceding complete local calendar days, excluding today's partial day. ETA is labeled only `simple linear estimate`, requires a fresh primary snapshot, future reset, matching-reset observations, and a positive observed percentage-per-hour rate; unavailable/unsupported results preserve quota and observation facts. No token or quota fact is mutated.
+
+**Verification:** full `dotnet test AIBar.sln --nologo` passed 163/163; `dotnet build AIBar.sln --nologo` succeeded with 0 warnings/0 errors; `git diff --check` passed. Runtime N/A: pure Domain policy. **Checkboxes:** all four Slice 7B lines are `- [x]`. **Files:** `src/AIBar.Domain/DerivedMetricsPolicy.cs`, `tests/AIBar.Domain.Tests/DerivedMetricsTests.cs`, `openspec/changes/aibar-foundation/{tasks,apply-progress}.md`. **Boundary/deviation:** Slice 7B only; corrected TDD chronology. **Rollback:** remove policy/test and revert Slice 7B artifacts, retaining 7A pricing. **Next:** independent review, then Slice 7C.

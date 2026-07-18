@@ -262,10 +262,10 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Dependency:** 7A complete. **Scope:** seven complete local-day window, day-over-day comparison, observed current-window rate, remaining service quota/reset, and linear exhaustion ETA. **Non-goals:** UI integration, hourly reconstruction, probabilistic/history forecasting.
 
-- [ ] **RED:** `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~DerivedMetrics` for window names/time basis, insufficient observations, stale quota, invalid reset, zero/negative rate, and unsupported forecasting.
-- [ ] **GREEN:** implement named trends and simple estimated ETA only for valid positive observed rate and service inputs.
-- [ ] **TRIANGULATE:** prove no hourly reconstruction/prediction language and preserve quota/token facts when estimates are unavailable.
-- [ ] **REFACTOR:** separate trend and ETA policies with deterministic clock/time-basis outputs.
+- [x] **RED:** `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~DerivedMetrics` for window names/time basis, insufficient observations, stale quota, invalid reset, zero/negative rate, and unsupported forecasting.
+- [x] **GREEN:** implement named trends and simple estimated ETA only for valid positive observed rate and service inputs.
+- [x] **TRIANGULATE:** prove no hourly reconstruction/prediction language and preserve quota/token facts when estimates are unavailable.
+- [x] **REFACTOR:** separate trend and ETA policies with deterministic clock/time-basis outputs.
 
 **Evidence/runtime:** focused domain report with acceptance matrix; runtime N/A (pure derived policy). **Rollback:** remove 7B policies/tests while retaining 7A pricing.
 
