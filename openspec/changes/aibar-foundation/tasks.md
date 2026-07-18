@@ -273,10 +273,10 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Dependency:** 7B complete. **Scope:** presentation mapping for estimated cost, named trends, ETA, warnings, and source labels separating service quota, locally derived analytics, and estimated cost. **Non-goals:** new domain rules, host lifecycle, quota behavior, Slice 8 work.
 
-- [ ] **RED:** `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~ViewModel` for source-label separation, estimate/unavailable states, warning copy, and non-authoritative language.
-- [ ] **GREEN:** wire existing view-model contracts without fabricating values or relabeling derived data as service data.
-- [ ] **TRIANGULATE:** snapshot stale/unknown/unsupported/insufficient cases and verify factual token/quota aggregates remain unchanged.
-- [ ] **REFACTOR:** centralize display labels and remove duplicated warning/source mapping.
+- [x] **RED:** `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~ViewModel` for source-label separation, estimate/unavailable states, warning copy, and non-authoritative language.
+- [x] **GREEN:** wire existing view-model contracts without fabricating values or relabeling derived data as service data.
+- [x] **TRIANGULATE:** snapshot stale/unknown/unsupported/insufficient cases and verify factual token/quota aggregates remain unchanged.
+- [x] **REFACTOR:** centralize display labels and remove duplicated warning/source mapping.
 
 **Evidence/runtime:** view-model snapshot report; runtime N/A (presentation mapping has no live harness). **Rollback:** revert 7C mapping/tests, leaving 7A/7B domain policies usable.
 

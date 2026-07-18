@@ -33,9 +33,9 @@ public sealed class QuotaPresentationMapper(IClock clock)
             freshness,
             ErrorLabel(state.Failure),
             snapshot?.RetrievedAt,
-            "Private service-reported quota",
-            "Locally derived analytics",
-            "Estimated cost; not billed cost.",
+            ViewModelDisplayLabels.ServiceQuota,
+            ViewModelDisplayLabels.LocallyDerivedAnalytics,
+            ViewModelDisplayLabels.EstimatedCost,
             "Quota access uses a private, undocumented, unsupported endpoint.");
     }
 

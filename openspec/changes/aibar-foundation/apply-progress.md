@@ -1,5 +1,32 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 7C applied (2026-07-18)
+
+**Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `auto-chain` / `feature-branch-chain`. This child work unit starts from Slice 7B commit `42729af` and covers view-model mapping only. No domain policy, quota behavior, host lifecycle, runtime integration, or Slice 8 work changed.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | Added `ViewModelPresentationTests` first. `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~ViewModel` failed as expected with missing `DerivedMetricsPresentationMapper` and `ViewModelDisplayLabels` (`CS0246`/`CS0103`). |
+| GREEN / focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~ViewModel` — passed 4/4, failed 0, skipped 0. |
+| TRIANGULATE / full relevant suite | `dotnet test AIBar.sln --nologo` — passed 171/171, failed 0, skipped 0. Snapshots cover stale quota, unknown/unsupported price states, unsupported ETA, and insufficient trend data; equality assertions prove token facts, service quota, and observations are unchanged. |
+| REFACTOR | `ViewModelDisplayLabels` and one warning-copy table centralize source/non-authoritative wording. Mapping returns original factual collections and values; it never derives a replacement quota, token total, or cost. |
+| Build / diagnostics | `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors. `git diff --check` — passed; only Git LF-to-CRLF advisory warnings occurred. |
+| Runtime harness | N/A — this is a pure immutable presentation-mapping boundary with no new live host, service, filesystem, or UI runtime path. |
+| Rollback boundary | Revert `src/AIBar.Desktop/DerivedMetricsPresentation.cs`, `src/AIBar.Desktop/QuotaPresentation.cs`, `tests/AIBar.Domain.Tests/ViewModelPresentationTests.cs`, and these Slice 7C task/progress edits. Slice 7A pricing and Slice 7B trend/ETA policies remain usable. |
+
+**Behavior:** service quota, locally derived trend facts, estimated cost, and ETA estimates each retain an explicit source label. Missing costs remain `null`/unavailable; unknown or unsupported prices receive readable warnings plus non-billing language. No ETA output is called a prediction. **Deviation:** none. **Next dependency:** Slice 8 only after this Slice 7C child is reviewed.
+
+### Gatekeeper authorized corrective retries (2026-07-18)
+
+`QuotaPresentationMapper` consumes the shared source labels, and `MapCost` now consumes `WarningCopy[PricingWarning.NonAuthoritative]` rather than repeating its literal; display text and warning-list behavior are unchanged.
+
+| Verification | Exact result |
+|---|---|
+| Focused ViewModel | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~ViewModel` — passed 4/4, failed 0, skipped 0. |
+| Full solution / build / diff | `dotnet test AIBar.sln --nologo` — passed 171/171, failed 0, skipped 0; `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors; `git diff --check` — passed (LF-to-CRLF advisories only). |
+
+**Exact Slice 7C authored changed-line receipt from `42729af3c603b42868d7492071a41d6b21e0e13d`: 124 additions + 7 deletions = 131 total, below the 400-line limit.**
+
 ## Slice 7A applied (2026-07-14)
 
 **Status:** Standard TDD mode (`strict_tdd: false`); authoritative OpenSpec `applyState: ready`; force-chained `feature-branch-chain`. This child work unit starts from committed Slice 6D (`2f0af30`) with the intentional Slice 7 task decomposition preserved, and covers immutable pricing catalog and pure estimated-cost policy only. No token persistence, trend/window/ETA policy, view-model/UI, billing authority, Git lifecycle, PR, or review action was used.
