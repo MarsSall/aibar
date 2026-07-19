@@ -1,5 +1,26 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 8B.1 applied (2026-07-19)
+
+**Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `auto-chain` / `feature-branch-chain`. This PR #3 work unit starts at reviewed Slice 8B.0 (`c03fa7f62757994e5457711634b1a1e970706334`) and implements only the private one-shot gesture, structured in-memory sinks, and tray/UI adapter. No export, filesystem/network I/O, raw-text parser, installer, or `SafeRedactor` change was introduced.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | Added `DiagnosticCommandTests` before implementation. The required focused command failed as expected with missing `DiagnosticMemorySinks`, `DiagnosticCommand`, and `IDiagnosticClock` (`CS0246`). |
+| GREEN / focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~DiagnosticCommand" --nologo` — passed 7/7, failed 0, skipped 0. |
+| TRIANGULATE | Covers one-shot/replayed and cancelled gestures; forged/default zero-token rejection before and after trusted gesture; safe category preview/confirm/unavailable-empty behavior; App/Quota routing; malformed structured-event rejection; same-category oldest-entry count eviction plus byte/age retention; immutable snapshots; concurrent emit/clear races; and clear behavior. |
+| Runtime harness | The focused `Synthetic_tray_runtime_proves_safe_preview_confirm_and_no_file_or_network_operation` scenario invokes the internal trusted tray adapter, previews `Quota`, confirms its structured event, then confirms empty `Application` as unavailable. The command source has no filesystem, network, parser, or export reference: `findstr /I /N /R "System\\.IO System\\.Net HttpClient File\\. Directory\\. JsonDocument JsonSerializer Deserialize Export" "src\\AIBar.Application\\DiagnosticCommand.cs" "src\\AIBar.Desktop\\DiagnosticTrayAdapter.cs"` — no matches. |
+| Full regression / build | `dotnet test AIBar.sln --nologo` — passed 202/202, failed 0, skipped 0. `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors. `git diff --check` — passed. |
+| Rollback boundary | Remove `src/AIBar.Application/DiagnosticCommand.cs`, `src/AIBar.Desktop/DiagnosticTrayAdapter.cs`, the Application friend-assembly line, `tests/AIBar.Domain.Tests/DiagnosticCommandTests.cs`, and these Slice 8B.1 task/progress edits. Slice 8B.0 remains intact. |
+
+**Corrective retry:** `Confirm` rejects null/default previews and the zero inactive-token sentinel before attempting atomic token consumption. A forged `DiagnosticPreview(true, [Quota], 0)` is unavailable on repeated attempts before a trusted gesture; a default/null preview is unavailable; a real `BeginTrustedGesture` token still authorizes exactly once. A deterministic single-Quota-sink test records three timestamped events with a count bound of two and proves only timestamps 00:00:01 and 00:00:02 remain.
+
+**Behavior:** `DiagnosticMemorySinks` accepts a `StructuredDiagnosticEvent` only when the existing strict serializer accepts it, routes it to separate Application/Quota in-memory lists, and keeps only immutable serialized snapshots under count, size, and age limits. `DiagnosticCommand` grants one internal trusted token at a time; confirm/cancel atomically consumes it, so replay cannot expose snapshots. `DiagnosticTrayAdapter` is the sole Desktop bridge and cannot access sinks. Export remains unavailable because no export command/path exists. **Deviation:** none. **Next dependency:** Slice 8B.2 after Slice 8B.1 review.
+
+**Changed paths:** `src/AIBar.Application/{AssemblyInfo.cs,DiagnosticCommand.cs}`, `src/AIBar.Desktop/DiagnosticTrayAdapter.cs`, `tests/AIBar.Domain.Tests/DiagnosticCommandTests.cs`, and `openspec/changes/aibar-foundation/{tasks.md,apply-progress.md}`.
+
+**Authored count:** 285 additions + 4 deletions = 289 total across the exact six-path scope, below the 400-line work-unit limit (111 lines remain; the directed correction consumed 37 of its 148-line allowance).
+
 ## Slice 8B.0 applied (2026-07-19)
 
 **Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `auto-chain` / `feature-branch-chain`. This PR #2 work unit starts from the reviewed Slice 8A base and is limited to a pure Application structured diagnostic contract. No UI, sink, filesystem/network export, arbitrary-text parser, or `SafeRedactor` change was introduced.

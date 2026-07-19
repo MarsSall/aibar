@@ -304,10 +304,10 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Dependency/base:** reviewed 8B.0; PR #3 targets `feature/aibar-foundation-slice-8b0-redactor` from `feature/aibar-foundation-slice-8b1-diagnostic-command`. **Scope:** private one-shot trusted UI gesture, category preview, central App/Quota in-memory sinks, bounded retention; export unavailable. **Non-goals:** file/network I/O, raw text parsing, installers.
 
-- [ ] **RED:** test gesture authorization/one-shot expiry, tray/UI category preview-confirm-unavailable behavior, sink routing, bounded count/size/age, concurrency, clear-data, and absence of export/file/network paths.
-- [ ] **GREEN:** wire only structured 8B.0 events through central App/Quota sinks and enforce private gesture plus bounded memory.
-- [ ] **TRIANGULATE:** exercise repeated/replayed gestures, concurrent emission, cancellation, clear races, and malformed event rejection.
-- [ ] **REFACTOR:** isolate tray/UI adapter from Application sinks and preserve immutable snapshots. Focused PowerShell-safe filter: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~DiagnosticCommand"`. Runtime: synthetic tray/gesture scenario — invoke trusted gesture, preview a safe category, confirm, verify unavailable/empty state, and prove no file or network operation occurs. Rollback: remove command/sinks/UI tests; retain 8B.0.
+- [x] **RED:** test gesture authorization/one-shot expiry, tray/UI category preview-confirm-unavailable behavior, sink routing, bounded count/size/age, concurrency, clear-data, and absence of export/file/network paths.
+- [x] **GREEN:** wire only structured 8B.0 events through central App/Quota sinks and enforce private gesture plus bounded memory.
+- [x] **TRIANGULATE:** exercise repeated/replayed gestures, concurrent emission, cancellation, clear races, and malformed event rejection.
+- [x] **REFACTOR:** isolate tray/UI adapter from Application sinks and preserve immutable snapshots. Focused PowerShell-safe filter: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~DiagnosticCommand"`. Runtime: synthetic tray/gesture scenario — invoke trusted gesture, preview a safe category, confirm, verify unavailable/empty state, and prove no file or network operation occurs. Rollback: remove command/sinks/UI tests; retain 8B.0.
 
 ### Slice 8B.2 — Atomic export hardening (~360 lines)
 
