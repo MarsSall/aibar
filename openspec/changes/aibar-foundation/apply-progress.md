@@ -1,5 +1,22 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 8B.0 applied (2026-07-19)
+
+**Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `auto-chain` / `feature-branch-chain`. This PR #2 work unit starts from the reviewed Slice 8A base and is limited to a pure Application structured diagnostic contract. No UI, sink, filesystem/network export, arbitrary-text parser, or `SafeRedactor` change was introduced.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | Added `StructuredDiagnosticTests` before production code. The required focused command failed as expected with missing `DiagnosticFieldEntry`, `DiagnosticErrorKind`, and `StructuredDiagnosticEvent` (`CS0246`). |
+| GREEN / focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~StructuredDiagnostic"` — passed 9/9, failed 0, skipped 0. |
+| TRIANGULATE | The focused table/property tests cover unknown category/code/error enums, unknown keys/value kinds, duplicate/nested-style invalid entries, null fields, numeric and count limits, casing/escaping hostile content, repeated fallback, deterministic ordering, and reflection proof that the public serializer accepts no string parameter or raw string-bearing event field. Each invalid candidate returns exactly `[REDACTED]`; valid output contains only fixed enum names and scalar values. |
+| Full regression / build | `dotnet test AIBar.sln --nologo` — passed 195/195, failed 0, skipped 0. `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors. |
+| Runtime harness | N/A — this work unit is a pure in-memory Application contract with no runtime host, UI, sink, filesystem, or network boundary. |
+| Rollback boundary | Remove `src/AIBar.Application/StructuredDiagnostics.cs`, `tests/AIBar.Domain.Tests/StructuredDiagnosticTests.cs`, and these Slice 8B.0 task/progress edits. Slice 8A startup/settings and the existing credential `SafeRedactor` remain unchanged. |
+
+**Behavior:** `StructuredDiagnosticEvent` carries only allowlisted enums plus bounded numeric/boolean fields. Serialization is deterministic and field-order stable. Unknown category/code/time basis, missing fields, invalid keys/types/ranges, duplicates, or more than eight fields fail closed to the complete `[REDACTED]` fallback. Unknown error kinds become the fixed `unavailable` error kind. The boundary does not accept, parse, retain, or emit arbitrary strings, raw payloads, exception values, identifiers, paths, authorization content, URLs/query strings, or bodies.
+
+**Changed paths:** `src/AIBar.Application/StructuredDiagnostics.cs`, `tests/AIBar.Domain.Tests/StructuredDiagnosticTests.cs`, `openspec/changes/aibar-foundation/tasks.md`, and `openspec/changes/aibar-foundation/apply-progress.md`. **Deviation:** none. **Next dependency:** Slice 8B.1 after Slice 8B.0 review.
+
 ## Ordinary-review correction `review-slice-8a-standalone-20260718` (2026-07-18)
 
 **Authority / scope:** post-forecast revision `sha256:328819136f5b1748aca3412d8d55808641cf888c9b13039d0e1bfa1f0f5849bd`; only frozen severe IDs `R3-001`, `R4-001`, `R4-002`, and `R2-001` were corrected. INFO warnings and planning/tasks remain unchanged.

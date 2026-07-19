@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Estimated changed lines | Existing chain through 6D; Slice 7A ~260, 7B ~300, 7C ~340; Slice 8A is 481 actual under its maintainer-approved `size:exception`; 8B ~360, 8C ~300, 8D ~340, 8E ~280 and each remains independently below 400 |
+| Estimated changed lines | Existing chain through 6D; Slice 7A ~260, 7B ~300, 7C ~340; Slice 8A is 481 actual under its maintainer-approved `size:exception`; 8B.0 ~280, 8B.1 ~300, 8B.2 ~360, 8C ~300, 8D ~340, 8E ~280 and each non-exception child remains below 400 |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | Existing chain → 6C1A → 6C1B → 6C2A.1 → 6C2A.2 → 6C2B → 6D → 7A → 7B → 7C → 8A → 8B → 8C → 8D → 8E |
+| Suggested split | Existing chain → 6C1A → 6C1B → 6C2A.1 → 6C2A.2 → 6C2B → 6D → 7A → 7B → 7C → 8A → 8B.0 → 8B.1 → 8B.2 → 8C → 8D → 8E |
 | Delivery strategy | auto-chain |
 | Chain strategy | feature-branch-chain |
 
@@ -291,18 +291,36 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 - [x] **TRIANGULATE:** exercise missing task API, malformed Run value, repeated toggles, locked data, and kill-switch preserving local analytics.
 - [x] **REFACTOR:** keep OS adapters isolated and disposal/idempotence explicit. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Startup|FullyQualifiedName~ClearAiBarData|FullyQualifiedName~Policy"`. Runtime: Windows 10/11 per-user toggle scenario. Rollback: remove startup/settings adapters and tests only.
 
-### Slice 8B — Redaction, bounded diagnostics, and privacy inspection (~360 lines)
+### Slice 8B.0 — Structured diagnostic event boundary (~280 lines)
 
-**Dependency/base:** 8A branch; PR #2 targets 8A. **Scope:** central redaction, local bounded logs, safe export and recursive privacy tests. **Non-goals:** installers and VM matrix.
+**Dependency/base:** starts from exact reviewed base `feature/aibar-foundation-slice-8a-startup-settings`; current child branch is `feature/aibar-foundation-slice-8b0-redactor`; PR #2 targets the 8A base. **Scope:** pure Application typed event/category/code/time-basis contract; strict allowlist, deterministic serialization, idempotence, and bounded fields/events. **Non-goals:** UI, sinks, file/network export, arbitrary-text parsing, and changing credential `SafeRedactor`.
 
-- [ ] **RED:** seed bearer headers, secret fields, sensitive IDs, URLs/query strings, paths, raw bodies, auth files, JSONL, database rows, exception values, prompt/response text; recursively assert absence in persistence/logs/diagnostics/exports/UI/error snapshots.
-- [ ] **GREEN:** route every sink/export through one redactor, bound log size/age, exclude DB/Codex files, and require explicit export action.
-- [ ] **TRIANGULATE:** test nested/escaped/case variants, thrown exceptions, repeated rotation, partial export, and clear-data races.
-- [ ] **REFACTOR:** remove bypasses and document safe event fields. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Privacy|FullyQualifiedName~Redact|FullyQualifiedName~Diagnostic"`. Runtime: export a seeded fixture and inspect the archive. Rollback: remove diagnostics/redaction/export and privacy tests; retain 8A settings.
+- [x] **RED:** add pure property/table tests for rejected keys/types, nested objects/collections, exceptions, IDs/paths/auth/content, raw fallback, full `[REDACTED]`, deterministic output, limits, and proof that arbitrary strings are never parsed or stored.
+- [x] **GREEN:** implement typed safe enums/numbers/booleans, category/error-kind fallback, strict fail-closed allowlist, bounded event/field serialization, and no raw payload storage; keep `SafeRedactor` at its credential boundary.
+- [x] **TRIANGULATE:** run adversarial casing/escaping/null/oversize/repeated-redaction cases and inspect serialized output for user content, URLs/query, paths, bodies, prompts/responses, IDs, and exception values.
+- [x] **REFACTOR:** centralize contracts/serialization and document the non-parsing boundary. Focused PowerShell-safe filter: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~StructuredDiagnostic"`. Runtime: N/A (pure contract). Rollback: remove Application contract/tests only; retain 8A.
+
+### Slice 8B.1 — Gesture-bound command and central in-memory sinks (~300 lines)
+
+**Dependency/base:** reviewed 8B.0; PR #3 targets `feature/aibar-foundation-slice-8b0-redactor` from `feature/aibar-foundation-slice-8b1-diagnostic-command`. **Scope:** private one-shot trusted UI gesture, category preview, central App/Quota in-memory sinks, bounded retention; export unavailable. **Non-goals:** file/network I/O, raw text parsing, installers.
+
+- [ ] **RED:** test gesture authorization/one-shot expiry, tray/UI category preview-confirm-unavailable behavior, sink routing, bounded count/size/age, concurrency, clear-data, and absence of export/file/network paths.
+- [ ] **GREEN:** wire only structured 8B.0 events through central App/Quota sinks and enforce private gesture plus bounded memory.
+- [ ] **TRIANGULATE:** exercise repeated/replayed gestures, concurrent emission, cancellation, clear races, and malformed event rejection.
+- [ ] **REFACTOR:** isolate tray/UI adapter from Application sinks and preserve immutable snapshots. Focused PowerShell-safe filter: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~DiagnosticCommand"`. Runtime: synthetic tray/gesture scenario — invoke trusted gesture, preview a safe category, confirm, verify unavailable/empty state, and prove no file or network operation occurs. Rollback: remove command/sinks/UI tests; retain 8B.0.
+
+### Slice 8B.2 — Atomic export hardening (~360 lines)
+
+**Dependency/base:** reviewed 8B.1; PR #4 targets `feature/aibar-foundation-slice-8b1-diagnostic-command` from `feature/aibar-foundation-slice-8b2-diagnostics-hardening`. **Scope:** filesystem export of serialized structured events only, UTF-8 retention, atomic publish, containment/reparse protection, allowlist, cancellation/race proof. **Non-goals:** arbitrary parser, remote export, installers.
+
+- [ ] **RED:** test containment/reparse/allowlist rejection, cancellation and races, partial-write failure, UTF-8 retention, atomic publish, bounded output, and seeded adversarial content proving only structured serialization is exported.
+- [ ] **GREEN:** implement atomic staged export with safe-root verification, reparse rejection, cancellation checks, allowlisted destination, and serialized-event-only output.
+- [ ] **TRIANGULATE:** exercise locked targets, replacement races, repeated/idempotent export, failure cleanup, and path/URL/ID/exception/content redaction proofs.
+- [ ] **REFACTOR:** centralize filesystem safety and evidence path-free. Focused PowerShell-safe filter: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~DiagnosticExport"`. Runtime: synthetic Windows sandbox export scenario; no live user data. Rollback: remove exporter/tests; retain 8B.1 sinks.
 
 ### Slice 8C — Deterministic x64 packaging and provenance (~300 lines)
 
-**Dependency/base:** 8B branch; PR #3 targets 8B. **Scope:** deterministic x64 W10/11 publish, SBOM, signed per-user MSIX when credentials exist, unpackaged self-contained recovery artifact, dependency/source provenance and MIT notices. **Non-goals:** install lifecycle and policy approval.
+**Dependency/base:** reviewed 8B.2; PR #5 targets `feature/aibar-foundation-slice-8b2-diagnostics-hardening`. **Scope:** deterministic x64 W10/11 publish, SBOM, signed per-user MSIX when credentials exist, unpackaged self-contained recovery artifact, dependency/source provenance and MIT notices. **Non-goals:** install lifecycle and policy approval.
 
 - [ ] **RED:** assert reproducible artifact identity, x64 target, SBOM completeness, signing-available/unavailable paths, self-contained recovery output, and provenance notice presence.
 - [ ] **GREEN:** add packaging scripts/configuration and deterministic artifact generation without embedding secrets or user data.
@@ -311,7 +329,7 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 ### Slice 8D — Install, upgrade, launch, uninstall, and retention smoke (~340 lines)
 
-**Dependency/base:** 8C branch; PR #4 targets 8C. **Scope:** packaging/runtime smoke harness for clean install, migration/upgrade, startup launch, single instance, uninstall and retention/removal. **Non-goals:** manual DPI matrix and legal gates.
+**Dependency/base:** 8C branch; PR #6 targets 8C. **Scope:** packaging/runtime smoke harness for clean install, migration/upgrade, startup launch, single instance, uninstall and retention/removal. **Non-goals:** manual DPI matrix and legal gates.
 
 - [ ] **RED:** add smoke tests for clean install, upgrade migration, `--startup`, single-instance activation, uninstall, retained/removed user data, and Codex-file hashes.
 - [ ] **GREEN:** wire the install lifecycle harness and migration-safe upgrade/uninstall behavior.
@@ -320,19 +338,20 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 ### Slice 8E — Windows matrix and release gates (~280 lines)
 
-**Dependency/base:** 8D branch; PR #5 targets 8D. **Scope:** W10/W11 manual/VM matrix, private compatibility validation, policy/legal review, remote-free kill-switch and release evidence. **Non-goals:** new product behavior; Slice 7B tiny-positive-rate ETA warning remains deferred.
+**Dependency/base:** 8D branch; PR #7 targets 8D. **Scope:** W10/W11 manual/VM matrix, private compatibility validation, policy/legal review, remote-free kill-switch and release evidence. **Non-goals:** new product behavior; Slice 7B tiny-positive-rate ETA warning remains deferred.
 
 - [ ] **RED:** record failing matrix/gate checks for tray recreation, DPI, taskbar placement, sleep/resume, popover focus, unsupported behavior, policy/legal, dependency/license, provenance, private endpoint compatibility, and kill-switch.
 - [ ] **GREEN:** execute and document the matrix and sign-off gates; make unsupported behavior visible and distribution disabled until all pass.
 - [ ] **TRIANGULATE:** repeat on representative W10/W11 VMs and with private integration disabled; verify local analytics remain usable and no remote sink exists.
 - [ ] **REFACTOR:** consolidate release checklist and rollback procedure. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Windows|FullyQualifiedName~ReleaseGate"`. Runtime: W10/W11 VM smoke matrix. Rollback: remove gate evidence/configuration and ship disabled; preserve 8D lifecycle.
 
-**Slice 8 chain:** `7C → 8A → 8B → 8C → 8D → 8E`; 8A is autonomous at 481 authored lines solely under its maintainer-approved Slice-8A-only `size:exception`; 8B–8E remain autonomous, `auto-chain`, and ≤400 authored lines with behavior, tests, docs, and config together.
+**Slice 8 chain:** `7C → 8A → 8B.0 → 8B.1 → 8B.2 → 8C → 8D → 8E`; 8A is autonomous at 481 authored lines solely under its maintainer-approved Slice-8A-only `size:exception`; 8B.0/8B.1/8B.2 and 8C–8E remain autonomous, `auto-chain`, feature-branch-chain children at ≤400 authored lines with behavior and tests together. 8C depends on reviewed 8B.2.
 
 ## Cross-Slice Completion Gates
 
+- [ ] Keep authored changes at or below 400 lines for every slice except the explicitly recorded, maintainer-approved Slice 8A-only `size:exception`; no future slice inherits, extends, or receives that exception.
 - [ ] Run the full test suite, static analysis, dependency/license checks, and `dotnet publish` for the supported Windows target.
 - [ ] Confirm all MVP non-goals remain unsupported and no code path reads multiple roots/accounts, WSL, browser cookies, passwords, prompt/response bodies, or authoritative billing data.
 - [ ] Confirm generated fixtures and screenshots are synthetic/approved and remain bound to the reviewed behavior.
-- [ ] Confirm each implementation slice remains independently revertible and its authored change count is at or below 400 lines before opening or advancing its chained PR.
+- [ ] Confirm each implementation slice remains independently revertible before opening or advancing its chained PR, and enforce the line-budget rule above with only the recorded Slice 8A exception.
 - [ ] Preserve no credentials or user content in test evidence, logs, artifacts, screenshots, or release bundles.
