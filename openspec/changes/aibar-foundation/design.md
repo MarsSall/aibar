@@ -4,6 +4,16 @@
 
 Build AIBar as a **single-process, Windows-native .NET 8 desktop application using WPF**, with a thin tray/popover shell and framework-independent application/domain services. Use `HttpClient` for the private quota adapter, `System.Text.Json` streaming for Codex JSONL, and SQLite for AIBar-owned cache, checkpoints, daily aggregates, and settings.
 
+### Corrective decision: defer diagnostic filesystem export
+
+**Slice 8B.2 is retired from the current delivery chain. Diagnostic filesystem export remains explicitly unavailable and disabled.** The reviewed Slice 8B.1 behavior—gesture-bound category preview, bounded structured in-memory sinks, and an unavailable export result—is the approved diagnostics boundary for packaging.
+
+Repeated review of the uncommitted Slice 8B.2 candidate identified an unresolved Windows filesystem security boundary. The candidate validates root and target path strings before calling path-based staging and replacement APIs. An attacker or concurrent actor can substitute a root or ancestor junction after validation and before a later path resolution. Rechecking attributes narrows but does not close this TOCTOU window because each check and mutation resolves the namespace again. The in-process semaphore is also keyed by normalized path string rather than stable filesystem identity, so aliases or a substituted directory identity are not the same serialization boundary.
+
+Passing 208/208 tests demonstrates the candidate's tested serialization, cancellation, sharing, and replacement behavior; it does **not** prove namespace identity across the check/write/publish sequence. The review therefore blocks acceptance of 8B.2 without weakening privacy and without treating the tests as requirement approval. The native review record is additionally non-terminal and defective for this candidate: it remains `reviewing`, contains no lens result or finding, and classified a filesystem-security change as medium reliability work. It is evidence of no approval, not a receipt.
+
+The foundation specification does not require diagnostic export. It requires local-first privacy, safe diagnostics, and explicit unsupported states. Packaging can therefore proceed from the last approved Slice 8B.1 while export stays unavailable. Slice 8C is rechained from the reviewed `feature/aibar-foundation-slice-8b1-diagnostic-command` base; it must not include, compile, advertise, enable, or test the retired exporter candidate.
+
 Native Windows lifecycle and integration take precedence over pixel-perfect macOS imitation. The visual target is nevertheless a polished, modern, CodexBar-inspired experience: preserve the reference application's compact information hierarchy, clarity, spacing, status visualization, and perceived quality while expressing them through Windows typography, interaction, accessibility, and window behavior.
 
 This is a Windows-only utility whose highest-risk work is credential access, private HTTP integration, incremental file processing, and lifecycle behavior—not cross-platform UI. WPF has the mature tray/window ecosystem and direct Windows integration identified by the feasibility investigation, supports Windows 10 and 11 without a Windows App SDK deployment dependency, and keeps the trusted implementation in one managed runtime.
@@ -143,6 +153,8 @@ MVP trends use named daily windows only (initially a 7-complete-local-day averag
 
 Target x64 Windows 10 and 11 initially; add arm64 only as a separately verified package. Publish a signed, per-user MSIX package when signing/distribution is available, with a documented unpackaged self-contained build for development and recovery. CI produces deterministic release artifacts and a software bill of materials; release notes disclose the private integration and its disablement risk.
 
+Packaging is independent of diagnostic filesystem export. Slice 8C starts from the approved 8B.1 base and must preserve the explicit export-unavailable state in packaged and unpackaged artifacts. Manifests, release notes, UI copy, support documentation, and smoke tests must not claim or imply export support. Deferring export does not relax redaction, bounded retention, clear-data isolation, telemetry-off defaults, or the prohibition on remote diagnostic sinks.
+
 Use a per-user startup registration abstraction. Packaged builds use the supported MSIX startup-task mechanism where available; unpackaged builds use a per-user `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry with quoted executable path and a `--startup` argument. Never require elevation, scheduled tasks, services, or machine-wide registration. The UI always reads back effective state after mutation.
 
 Automated packaging smoke tests cover clean install, upgrade with database migration, startup toggle, launch-at-login argument, single-instance activation, uninstall, and user-data retention/removal expectations. Windows 10 and 11 manual/VM checks cover tray recreation, DPI, taskbar placement, sleep/resume, and popover focus. Concrete unsupported behavior is displayed and documented rather than hidden.
@@ -151,7 +163,9 @@ Automated packaging smoke tests cover clean install, upgrade with database migra
 
 Telemetry is off and no remote crash reporter is included in MVP. Local structured diagnostics use event IDs, coarse durations/counts, adapter/parser versions, HTTP status class, and safe error codes. A central redactor runs before every sink and is tested against bearer headers, JSON secret fields, account identifiers, URLs/query strings, and source paths. Raw HTTP bodies, auth files, JSONL lines, prompts/responses, database rows, and exception objects containing those values are never logged.
 
-Logs are local, size/age bounded, and disabled or minimal by default. An optional diagnostic export requires explicit user action, previews included categories, applies redaction again, and excludes the SQLite database and Codex files. Clear AIBar Data cancels work, closes persistence, deletes AIBar cache/database/logs/settings as selected, recreates empty state, and never traverses or deletes the Codex root.
+Logs are local, size/age bounded, and disabled or minimal by default. Diagnostic category preview may use the bounded structured in-memory sinks, but filesystem export is unavailable and disabled; no local export file or remote diagnostic sink is created. Clear AIBar Data cancels work, closes persistence, deletes AIBar cache/database/logs/settings as selected, recreates empty state, and never traverses or deletes the Codex root.
+
+Reintroducing export requires a separate native-handle slice and a new security review. That slice must keep a trusted Windows directory handle open across validation, staging, flush, publication, and cleanup; reject reparse traversal while opening the root and children; create and rename children relative to the verified root handle rather than re-resolving absolute path strings; bind synchronization to stable volume/file identity; verify the destination identity and replacement semantics through handles; and fail closed when the filesystem cannot provide the required guarantees. A managed path-only `DirectoryInfo`/`File.GetAttributes`/`File.Move` sequence is not an acceptable substitute. Required Windows tests include root and ancestor junction substitution at every publication gate, alias paths to the same directory identity, destination substitution, cancellation, cleanup, sharing contention, and proof that no write can escape the held root. This work is a later capability, not part of Slice 8C or the current MVP critical path.
 
 ## Testing strategy
 
@@ -163,7 +177,7 @@ Tests follow boundaries rather than UI screenshots alone:
 - **Persistence integration tests:** transactional checkpoint/aggregate atomicity, migration, crash-before-commit recovery, clear-data isolation, and repricing without token mutation.
 - **Coordinator tests with fakes:** cache-first startup, trigger coalescing, manual bypass, stale-on-failure, sleep/resume, and cancellation races.
 - **WPF/Windows tests:** view-model state rendering plus focused Windows VM smoke tests for tray, popover, DPI, Explorer restart, startup, and single instance on Windows 10/11.
-- **Privacy tests:** recursively inspect AIBar-owned database, logs, diagnostic exports, and UI/error snapshots for seeded prompt text, bearer values, sensitive IDs, and source paths.
+- **Privacy tests:** recursively inspect AIBar-owned database, logs, and UI/error snapshots for seeded prompt text, bearer values, sensitive IDs, and source paths; assert that export remains unavailable and creates no diagnostic file or network path.
 
 Live private-endpoint tests are opt-in, never run in ordinary CI, require an explicitly provisioned disposable account/session, redact evidence, and cannot become the sole acceptance proof because the endpoint is unsupported.
 
@@ -178,7 +192,9 @@ Each slice is independently testable and MUST be forecast below the 400 authored
 5. **Scanner discovery and checkpoints** — supported roots/layouts, streaming offsets, invalidation, cancellation, and coverage, without analytics UI. Reliability review.
 6. **Daily aggregation and model attribution** — component deltas, timezone policy, transactional daily/model rows, `Unknown`, ranking formula, and clear-data protection.
 7. **Pricing and derived metrics** — versioned catalog, incomplete estimates, trends, pace/burn/ETA, and strict source labels.
-8. **Startup, packaging, privacy, and compatibility hardening** — effective startup toggle, diagnostics/export, installers, migration/upgrade checks, Windows 10/11 matrix. Resilience review.
+8. **Startup, packaging, privacy, and compatibility hardening** — effective startup toggle, structured in-memory diagnostics with export unavailable, installers, migration/upgrade checks, and the Windows 10/11 matrix. Resilience review.
+
+The active Slice 8 delivery chain is `8B.1 → 8C → 8D → 8E`; 8B.2 is not on its critical path. A future diagnostic export is a separately proposed native-handle slice after the current chain, with its own requirements, threat model, strict Windows runtime evidence, and security-focused review. It must not inherit the retired candidate's completion claims or review lineage.
 
 No slice may copy investigated source without a provenance and MIT-notice decision. Generated fixture volume is kept separate from authored-logic forecasts while remaining part of behavioral review identity.
 
@@ -186,10 +202,23 @@ No slice may copy investigated source without a provenance and MIT-notice decisi
 
 1. Developer-only builds with synthetic fixtures and the private adapter disabled by default.
 2. Opt-in internal build after credential/redaction review and live compatibility validation; show unsupported-endpoint disclosure.
-3. Signed limited release only after policy/legal approval, dependency/SBOM review, Windows 10/11 packaging evidence, privacy inspection, and a tested remote-free kill switch/build policy for disabling private quota access.
-4. Broader release only after observing schema/failure behavior without collecting user content or secrets.
+3. Signed limited release only after policy/legal approval, dependency/SBOM review, Windows 10/11 packaging evidence, privacy inspection, a tested remote-free kill switch/build policy for disabling private quota access, and evidence that diagnostic export is unavailable and absent from release artifacts.
+4. Broader release only after observing schema/failure behavior without collecting user content or secrets. Diagnostic export remains a disclosed non-goal until the separate native-handle slice is approved.
 
 Rollback is an application downgrade plus schema-compatible database handling; destructive database downgrade is not automatic. If private access becomes prohibited or incompatible, ship/configure it disabled while preserving local analytics and explicit quota-unavailable behavior.
+
+### Retired 8B.2 candidate removal boundary
+
+The next corrective tasks/apply phase must return the worktree to the reviewed 8B.1 behavior before starting 8C:
+
+- delete only `src/AIBar.Application/DiagnosticExport.cs` and `tests/AIBar.Domain.Tests/DiagnosticExportTests.cs` from the uncommitted candidate;
+- revert only the Slice 8B.2 deltas in `openspec/changes/aibar-foundation/tasks.md` and `openspec/changes/aibar-foundation/apply-progress.md`, replacing completion/advance claims with truthful retirement evidence while preserving all 8B.1 and earlier history;
+- preserve the 8B.0 structured event boundary and 8B.1 command, preview, in-memory sinks, bounded retention, clear-data behavior, and explicit unavailable state unchanged;
+- verify no project, package, manifest, UI adapter, dependency, generated artifact, or test references `DiagnosticExport`, creates `diagnostics.jsonl`, or exposes a filesystem/network export path;
+- treat the prior 208/208 result as historical candidate evidence only and rerun the approved 8B.1 baseline suite after removal; and
+- do not manually delete or rewrite `.git/gentle-ai` authority records. The non-terminal/defective review binding is audit evidence and requires native lifecycle handling outside SDD design/apply scope; it grants no approval and must not be reused to authorize 8C.
+
+This removal boundary deletes no user data, Codex-owned data, or approved diagnostic sink behavior. No code removal is performed by this design phase.
 
 ## Design constraints carried forward
 

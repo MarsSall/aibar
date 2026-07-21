@@ -7,7 +7,7 @@
 | Estimated changed lines | Existing chain through 6D; Slice 7A ~260, 7B ~300, 7C ~340; Slice 8A is 481 actual under its maintainer-approved `size:exception`; 8B.0 ~280, 8B.1 ~300, 8B.2 ~360, 8C ~300, 8D ~340, 8E ~280 and each non-exception child remains below 400 |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | Existing chain → 6C1A → 6C1B → 6C2A.1 → 6C2A.2 → 6C2B → 6D → 7A → 7B → 7C → 8A → 8B.0 → 8B.1 → 8B.2 → 8C → 8D → 8E |
+| Suggested split | Existing chain → 6C1A → 6C1B → 6C2A.1 → 6C2A.2 → 6C2B → 6D → 7A → 7B → 7C → 8A → 8B.0 → 8B.1 → 8C → 8D → 8E |
 | Delivery strategy | auto-chain |
 | Chain strategy | feature-branch-chain |
 
@@ -309,18 +309,23 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 - [x] **TRIANGULATE:** exercise repeated/replayed gestures, concurrent emission, cancellation, clear races, and malformed event rejection.
 - [x] **REFACTOR:** isolate tray/UI adapter from Application sinks and preserve immutable snapshots. Focused PowerShell-safe filter: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~DiagnosticCommand"`. Runtime: synthetic tray/gesture scenario — invoke trusted gesture, preview a safe category, confirm, verify unavailable/empty state, and prove no file or network operation occurs. Rollback: remove command/sinks/UI tests; retain 8B.0.
 
-### Slice 8B.2 — Atomic export hardening (~360 lines)
+### Retired Slice 8B.2 — Diagnostic filesystem export (not active)
 
-**Dependency/base:** reviewed 8B.1; PR #4 targets `feature/aibar-foundation-slice-8b1-diagnostic-command` from `feature/aibar-foundation-slice-8b2-diagnostics-hardening`. **Scope:** filesystem export of serialized structured events only, UTF-8 retention, atomic publish, containment/reparse protection, allowlist, cancellation/race proof. **Non-goals:** arbitrary parser, remote export, installers.
+**Status:** retired from the active chain. Diagnostic filesystem export remains unavailable and disabled. The prior 8B.2 implementation/tests are uncommitted candidate evidence only; the prior 208/208 result is historical and does not establish approval. Preserve the earlier 8B.0/8B.1 history and do not reuse the non-terminal review binding.
 
-- [ ] **RED:** test containment/reparse/allowlist rejection, cancellation and races, partial-write failure, UTF-8 retention, atomic publish, bounded output, and seeded adversarial content proving only structured serialization is exported.
-- [ ] **GREEN:** implement atomic staged export with safe-root verification, reparse rejection, cancellation checks, allowlisted destination, and serialized-event-only output.
-- [ ] **TRIANGULATE:** exercise locked targets, replacement races, repeated/idempotent export, failure cleanup, and path/URL/ID/exception/content redaction proofs.
-- [ ] **REFACTOR:** centralize filesystem safety and evidence path-free. Focused PowerShell-safe filter: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~DiagnosticExport"`. Runtime: synthetic Windows sandbox export scenario; no live user data. Rollback: remove exporter/tests; retain 8B.1 sinks.
+**Future Apply removal work unit (must run before Slice 8C; stop after verification):**
+
+- [x] Delete only `src/AIBar.Application/DiagnosticExport.cs` and `tests/AIBar.Domain.Tests/DiagnosticExportTests.cs`; do not delete or alter approved 8B.0/8B.1 behavior. <!-- sdd-owner: implementation -->
+- [x] Correct only the Slice 8B.2 progress evidence in `openspec/changes/aibar-foundation/apply-progress.md`, replacing false completion/advance claims with truthful retirement evidence while preserving all earlier history. <!-- sdd-owner: implementation -->
+- [x] Verify no project, package, manifest, UI adapter, dependency, generated artifact, or test reference to `DiagnosticExport`, no `diagnostics.jsonl` creation remains, and no filesystem or network export path is advertised or enabled. <!-- sdd-owner: implementation -->
+- [x] Rerun the clean reviewed 8B.1 baseline suite/build/diff/status and record that the gesture-bound preview, bounded in-memory sinks, clear-data behavior, and explicit unavailable state remain unchanged. <!-- sdd-owner: implementation -->
+- [ ] Do not touch `.git/gentle-ai` authority records; stop before Slice 8C Apply and leave lifecycle/staging/commit/push/PR/publication to their owning phases. <!-- sdd-owner: parent -->
+
+**Completion gate:** only the reviewed 8B.1 behavior may be the base for 8C; export must be absent or explicitly unsupported in source, tests, packaging, and artifacts.
 
 ### Slice 8C — Deterministic x64 packaging and provenance (~300 lines)
 
-**Dependency/base:** reviewed 8B.2; PR #5 targets `feature/aibar-foundation-slice-8b2-diagnostics-hardening`. **Scope:** deterministic x64 W10/11 publish, SBOM, signed per-user MSIX when credentials exist, unpackaged self-contained recovery artifact, dependency/source provenance and MIT notices. **Non-goals:** install lifecycle and policy approval.
+**Dependency/base:** reviewed 8B.1 after the retired 8B.2 removal work unit; PR #4 targets `feature/aibar-foundation-slice-8b1-diagnostic-command`. **Scope:** deterministic x64 W10/11 publish, SBOM, signed per-user MSIX when credentials exist, unpackaged self-contained recovery artifact, dependency/source provenance and MIT notices. **Non-goals:** install lifecycle and policy approval. Packaging must prove diagnostic filesystem export is absent and unsupported.
 
 - [ ] **RED:** assert reproducible artifact identity, x64 target, SBOM completeness, signing-available/unavailable paths, self-contained recovery output, and provenance notice presence.
 - [ ] **GREEN:** add packaging scripts/configuration and deterministic artifact generation without embedding secrets or user data.
@@ -329,7 +334,7 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 ### Slice 8D — Install, upgrade, launch, uninstall, and retention smoke (~340 lines)
 
-**Dependency/base:** 8C branch; PR #6 targets 8C. **Scope:** packaging/runtime smoke harness for clean install, migration/upgrade, startup launch, single instance, uninstall and retention/removal. **Non-goals:** manual DPI matrix and legal gates.
+**Dependency/base:** 8C branch, including its export-absence proof; PR #5 targets 8C. **Scope:** packaging/runtime smoke harness for clean install, migration/upgrade, startup launch, single instance, uninstall and retention/removal. **Non-goals:** manual DPI matrix and legal gates. Smoke coverage must preserve explicit export-unavailable behavior and prove no export artifact is installed or created.
 
 - [ ] **RED:** add smoke tests for clean install, upgrade migration, `--startup`, single-instance activation, uninstall, retained/removed user data, and Codex-file hashes.
 - [ ] **GREEN:** wire the install lifecycle harness and migration-safe upgrade/uninstall behavior.
@@ -338,14 +343,14 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 ### Slice 8E — Windows matrix and release gates (~280 lines)
 
-**Dependency/base:** 8D branch; PR #7 targets 8D. **Scope:** W10/W11 manual/VM matrix, private compatibility validation, policy/legal review, remote-free kill-switch and release evidence. **Non-goals:** new product behavior; Slice 7B tiny-positive-rate ETA warning remains deferred.
+**Dependency/base:** 8D branch, including packaging and smoke proof that export is absent/unsupported; PR #6 targets 8D. **Scope:** W10/W11 manual/VM matrix, private compatibility validation, policy/legal review, remote-free kill-switch and release evidence. **Non-goals:** new product behavior; Slice 7B tiny-positive-rate ETA warning remains deferred. Release evidence must continue to prove no diagnostic export path or artifact exists.
 
 - [ ] **RED:** record failing matrix/gate checks for tray recreation, DPI, taskbar placement, sleep/resume, popover focus, unsupported behavior, policy/legal, dependency/license, provenance, private endpoint compatibility, and kill-switch.
 - [ ] **GREEN:** execute and document the matrix and sign-off gates; make unsupported behavior visible and distribution disabled until all pass.
 - [ ] **TRIANGULATE:** repeat on representative W10/W11 VMs and with private integration disabled; verify local analytics remain usable and no remote sink exists.
 - [ ] **REFACTOR:** consolidate release checklist and rollback procedure. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Windows|FullyQualifiedName~ReleaseGate"`. Runtime: W10/W11 VM smoke matrix. Rollback: remove gate evidence/configuration and ship disabled; preserve 8D lifecycle.
 
-**Slice 8 chain:** `7C → 8A → 8B.0 → 8B.1 → 8B.2 → 8C → 8D → 8E`; 8A is autonomous at 481 authored lines solely under its maintainer-approved Slice-8A-only `size:exception`; 8B.0/8B.1/8B.2 and 8C–8E remain autonomous, `auto-chain`, feature-branch-chain children at ≤400 authored lines with behavior and tests together. 8C depends on reviewed 8B.2.
+**Slice 8 chain:** `7C → 8A → 8B.0 → 8B.1 → 8C → 8D → 8E`; 8B.2 is retired and not an active dependency. The removal work unit is separate, bounded, and must complete before 8C Apply. 8A is autonomous at 481 authored lines solely under its maintainer-approved Slice-8A-only `size:exception`; 8B.0/8B.1 and 8C–8E remain autonomous, `auto-chain`, feature-branch-chain children at ≤400 authored lines with behavior and tests together. 8C must prove export is absent/unsupported.
 
 ## Cross-Slice Completion Gates
 

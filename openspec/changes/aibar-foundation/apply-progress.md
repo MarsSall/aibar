@@ -1,5 +1,24 @@
 # Apply Progress — AIBar Foundation
 
+## Retired Slice 8B.2 removal verified (2026-07-21)
+
+**Status:** strict TDD is active by parent instruction; authoritative OpenSpec status consumed before work: `applyState: ready`, `nextRecommended: apply`, repo-local workspace/allowed edit root, and `auto-chain` / `feature-branch-chain`. This approved removal work unit stops before Slice 8C.
+
+**Retirement outcome:** Deleted only the uncommitted candidate files `src/AIBar.Application/DiagnosticExport.cs` and `tests/AIBar.Domain.Tests/DiagnosticExportTests.cs`. The former 208/208 candidate result and filesystem-export claims are superseded historical evidence, not completion or approval. The corrective design is unchanged.
+
+| TDD Cycle Evidence | Exact result |
+|---|---|
+| RED | No new production behavior was written: this is deletion of an unapproved production/test candidate. Absence checks are the removal contract. |
+| GREEN | Removed both candidate files; 2/2 required paths are absent. |
+| TRIANGULATE | Source/test inspection found 0 `DiagnosticExport` or `diagnostics.jsonl` references; project/package/manifest/generated-artifact inspection found 0. The approved command and tray adapter contain 0 filesystem/network/export markers. |
+| REFACTOR | No production refactor. SHA-256 before/after comparison confirms the approved command, tray adapter, clear-data service, and their tests are byte-identical. |
+
+**Verification:** proactive diagnostics via `dotnet test AIBar.sln --nologo` passed **202/202** (0 failed, 0 skipped); `dotnet build AIBar.sln --nologo` succeeded with **0 warnings, 0 errors**. `git diff --check` passed and `git diff --cached --quiet` confirmed a clean index. No project, package, manifest, UI adapter, dependency, generated artifact, or test reference remains; no `diagnostics.jsonl` creation exists; no enabled or advertised filesystem/network diagnostic export path exists.
+
+**Persisted task evidence:** the four implementation-owned retired-8B.2 removal tasks are visibly marked `- [x]` in `tasks.md`. The parent-owned lifecycle task and Slice 8C+ tasks remain unchecked.
+
+**Files changed:** deleted `src/AIBar.Application/DiagnosticExport.cs`; deleted `tests/AIBar.Domain.Tests/DiagnosticExportTests.cs`; updated only the retired Slice 8B.2 progress section and its four approved implementation checkboxes. **Deviation:** none. **Workload / PR boundary:** retired 8B.2 removal only; no staging, commit, review, push, PR, publication, or Slice 8C work. **Next:** parent-owned post-apply review/verification routing; do not start Slice 8C from this work unit.
+
 ## Slice 8B.1 applied (2026-07-19)
 
 **Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `auto-chain` / `feature-branch-chain`. This PR #3 work unit starts at reviewed Slice 8B.0 (`c03fa7f62757994e5457711634b1a1e970706334`) and implements only the private one-shot gesture, structured in-memory sinks, and tray/UI adapter. No export, filesystem/network I/O, raw-text parser, installer, or `SafeRedactor` change was introduced.
