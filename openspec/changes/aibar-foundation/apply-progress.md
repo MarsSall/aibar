@@ -6,6 +6,14 @@
 
 Prior generated outputs and runtime evidence MUST NOT be reused as implementation inputs, acceptance evidence, completion authority, or review authority. The working candidate still exists; this planning correction does not claim that any candidate file or output has been discarded, quarantined, restored, or cleaned. MakeAppx/SignTool execution remains B2-owned.
 
+## Slice 8C2B1 generation 8 preflight (2026-07-23)
+
+**Status:** blocked before implementation. Native generation 8 (`slice-8c2b1-fresh`) started from `cd9cea4` with a 400-line hard limit. The committed B1 contract requires complete redistributed license/notice text, canonical evidence documents, a real publish/reconciliation harness, and adversarial coverage; these additions cannot fit within the remaining authored budget without omitting required behavior or evidence. No production code, tests, generated evidence, candidate-root output, MakeAppx, SignTool, staging, commit, or review lifecycle action was performed.
+
+**Evidence:** runtime status before any execution reported active generation 8, begin revision `sha256:b8b371a6bc356a7d5e911cfceab64802b01a1355aa2ca7aecef1d164db3602e8`, and `changed_lines: 0`. Current committed scope contains only the 64-line recovery publisher, 87-line 8C2A planner tests, and no B1 packaging evidence files; the eight B1 checkboxes remain unchecked. This record is the terminal preflight artifact for the fresh candidate and does not reuse generations 3–7 or their outputs, totals, tests, or receipts.
+
+**Required resolution:** split B1 into additional independently reviewed work units, or explicitly revise the B1 contract and planning base; a size exception is forbidden by the active task. **Rollback boundary:** remove only this preflight record; reviewed 8C2A and all B1 source/evidence paths remain unchanged.
+
 ## Slice 8C2B1 applied (2026-07-23)
 
 **Authority/base:** `f0d15b1`; Standard mode (`strict_tdd: false`); `auto-chain` / `feature-branch-chain`, PR #6 only. This supersedes the failed combined-candidate claims without deleting their history below. It retains the reviewed 8C2A manifest/capability planner and removes all unreviewed MakeAppx/SignTool execution or runtime-gate behavior.
