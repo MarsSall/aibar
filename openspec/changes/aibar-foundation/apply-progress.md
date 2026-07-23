@@ -8,6 +8,19 @@
 
 **Active chain:** reviewed 8C2A → B1a1 (PR #6) → B1a2 (PR #7) → B1b (PR #8) → B2 (PR #9) → 8D (PR #10) → 8E (PR #11), feature-branch-chain, each child <=400 authored additions+deletions, no exception. B1b depends on reviewed B1a2; B2 depends on reviewed B1b; 8D depends on reviewed B2.
 
+## Slice 8C2B1a1 generation 17 checked-fixture evidence (2026-07-23)
+
+**Status:** passed pure-model scope only. Maintainer-authorized, versioned minimal real-format fixtures supply restore assets, emitted deps, publish inventory, recovery inventory, and source/publish bytes. They are not live-runtime evidence: B1a2 later validates live acquisition/integration.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused GraphProjection test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingDistribution&FullyQualifiedName~GraphProjection" --no-restore -m:1` — passed 1/1, failed 0, skipped 0. Mutations cover graph edge/reachability, omission/extra/duplicate/case collision/owner ambiguity/test leakage, recovery mismatch, source bytes, artifact hash, and length. |
+| Full suite / build | The initial generation-16 full-suite run reported one host-mutex test failure; no exact error text is retained here. Its immediate rerun of `dotnet test AIBar.sln --nologo --no-restore -m:1` passed 215/215. `dotnet build AIBar.sln --nologo --no-restore -m:1` — 0 warnings, 0 errors. |
+| Runtime harness | N/A: B1a1 consumes checked fixtures only and launches no restore/publish process. B1a2 exclusively proves live acquisition and integration. |
+| Rollback boundary | Revert only B1a1 graph-mode script/tests/`Fixtures/PackagingGraph`, `packaging/{sbom.cdx.json,compliance-manifest.json}`, these four checkboxes, and this evidence; 8C2A remains. |
+
+**Generation 17 provenance correction:** preserves focused 1/1, the host-mutex initial full-suite failure disclosure, successful 215/215 rerun, and build result. The native generation-17 finish ledger is terminal-revision authority after finish. No additional claim is made.
+
 ## Historical non-authoritative Slice 8C2B1a generation 9 candidate (2026-07-23)
 
 **Authority/base:** `28a2f46` split plan; Standard mode; `auto-chain` / `feature-branch-chain`, PR #6 only. The real `Release/win-x64` self-contained harness selected the matching restore and published RID graphs and emitted canonical CycloneDX 1.5 nested file evidence without legal/provenance promotion, MakeAppx, or SignTool.

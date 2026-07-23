@@ -1,0 +1,1 @@
+{"version":3,"targets":{"net8.0-windows7.0/win-x64":{"AIBar.Desktop/1.0.0":{"dependencies":{"Newtonsoft.Json":"13.0.3","Runtime.Pack":"8.0.0"}},"Newtonsoft.Json/13.0.3":{"dependencies":{}},"Runtime.Pack/8.0.0":{"dependencies":{"System.Runtime":"8.0.0"}},"System.Runtime/8.0.0":{"dependencies":{}}}}}

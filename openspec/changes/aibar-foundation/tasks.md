@@ -17,7 +17,7 @@ Chain strategy: feature-branch-chain
 400-line budget risk: High
 Literal-plan tier: exceptional — chained-PR path, runtime gate, and per-child rollback evidence
 Size-scope: active Slice 8C2 section only
-Active-section word count: 1178
+Active-section word count: 1179
 Full-artifact word count: 6947
 
 Each slice below is a candidate commit/PR with its tests and directly related documentation. Do not merge slices together if the authored forecast exceeds 400 lines. Generated fixtures may be separated operationally, but remain bound to the behavior they verify.
@@ -361,12 +361,12 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 #### Slice 8C2B1a1 — Pure graph projection, reconciliation, and CycloneDX model (~300–370 lines)
 
-**Start:** reviewed 8C2A plus selective restoration of implementation/test bytes to HEAD `28a2f46`; PR #6 base is the reviewed 8C2A branch. **End:** reviewed pure deterministic model ready for B1a2. **Allowed paths:** `scripts/Publish-Deterministic.ps1`, `tests/AIBar.Domain.Tests/PackagingDistributionTests.cs`, `packaging/{sbom.cdx.json,compliance-manifest.json}`. No subprocess, legal/provenance promotion, MakeAppx, or signing.
+**Start:** reviewed 8C2A plus selective restoration of implementation/test bytes to HEAD `28a2f46`; PR #6 base is the reviewed 8C2A branch. **End:** reviewed pure deterministic model ready for B1a2. **Allowed paths:** `scripts/Publish-Deterministic.ps1`, `tests/AIBar.Domain.Tests/PackagingDistributionTests.cs`, `tests/AIBar.Domain.Tests/Fixtures/PackagingGraph/**`, `packaging/{sbom.cdx.json,compliance-manifest.json}`. No subprocess, legal/provenance promotion, MakeAppx, or signing.
 
-- [ ] **RED:** consume real-format `project.assets.json`, `.deps.json`, publish inventory, and 8C1 `recovery-inventory.json`; mutate each authoritative input to require exact edges/reachability and fail bidirectional omission/extra/duplicate/case collision/ambiguity/test leakage/artifact-byte/hash/length mismatches. <!-- sdd-owner: implementation -->
-- [ ] **GREEN:** implement deterministic graph projection with authoritative direct/transitive/runtime/native/resource/first-party ownership, exact dependency edges/reachability, no heuristic or fallback owner, and nested CycloneDX file components with recomputed artifact-byte SHA-256/length. <!-- sdd-owner: implementation -->
-- [ ] **TRIANGULATE:** reconcile checked real-format snapshots and approved synthetic inputs under reordered enumeration and spaces/non-ASCII names; require canonical ordinal JSON plus terminal LF and byte-identical output while every authoritative-input mutation fails closed. <!-- sdd-owner: implementation -->
-- [ ] **GATE:** focused `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingDistribution&FullyQualifiedName~GraphProjection"`; runtime harness N/A because B1a1 is a pure consumer and B1a2 proves live acquisition. Rollback reverts only B1a1 script/model, fixtures/tests, and SBOM/manifest outputs, preserving 8C2A. <!-- sdd-owner: implementation -->
+- [x] **RED:** consume real-format `project.assets.json`, `.deps.json`, publish inventory, and 8C1 `recovery-inventory.json`; mutate each authoritative input to require exact edges/reachability and fail bidirectional omission/extra/duplicate/case collision/ambiguity/test leakage/artifact-byte/hash/length mismatches. <!-- sdd-owner: implementation -->
+- [x] **GREEN:** implement deterministic graph projection with authoritative direct/transitive/runtime/native/resource/first-party ownership, exact dependency edges/reachability, no heuristic or fallback owner, and nested CycloneDX file components with recomputed artifact-byte SHA-256/length. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE:** reconcile checked real-format snapshots and approved synthetic inputs under reordered enumeration and spaces/non-ASCII names; require canonical ordinal JSON plus terminal LF and byte-identical output while every authoritative-input mutation fails closed. <!-- sdd-owner: implementation -->
+- [x] **GATE:** focused `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingDistribution&FullyQualifiedName~GraphProjection"`; runtime harness N/A because B1a1 is a pure consumer and B1a2 proves live acquisition. Rollback reverts only B1a1 script/model, fixtures/tests, and SBOM/manifest outputs, preserving 8C2A. <!-- sdd-owner: implementation -->
 
 #### Slice 8C2B1a2 — Safe restore/publish runner and live two-root harness (~330–390 lines)
 
