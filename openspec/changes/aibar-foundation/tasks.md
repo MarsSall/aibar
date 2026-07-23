@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Estimated changed lines | Existing chain through 6D; Slice 7A ~260, 7B ~300, 7C ~340; Slice 8A is 481 actual under its maintainer-approved `size:exception`; 8B.0 ~280, 8B.1 ~300, 8B.2 ~360, 8C ~300, 8D ~340, 8E ~280 and each non-exception child remains below 400 |
+| Estimated changed lines | 8C1 ~280–340; 8C2 ~330–360 before any mandatory 8C2A/8C2B split; existing chain is unchanged |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | Existing chain → 6C1A → 6C1B → 6C2A.1 → 6C2A.2 → 6C2B → 6D → 7A → 7B → 7C → 8A → 8B.0 → 8B.1 → 8C → 8D → 8E |
+| Suggested split | Existing chain → 8B.1 → 8C1 → 8C2 → 8D → 8E; split 8C2 into 8C2A → 8C2B before Apply if forecast exceeds 360 |
 | Delivery strategy | auto-chain |
 | Chain strategy | feature-branch-chain |
 
@@ -323,34 +323,55 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Completion gate:** only the reviewed 8B.1 behavior may be the base for 8C; export must be absent or explicitly unsupported in source, tests, packaging, and artifacts.
 
-### Slice 8C — Deterministic x64 packaging and provenance (~300 lines)
+### Slice 8C1 — Deterministic self-contained win-x64 recovery publish (~280–340 lines)
 
-**Dependency/base:** reviewed 8B.1 after the retired 8B.2 removal work unit; PR #4 targets `feature/aibar-foundation-slice-8b1-diagnostic-command`. **Scope:** deterministic x64 W10/11 publish, SBOM, signed per-user MSIX when credentials exist, unpackaged self-contained recovery artifact, dependency/source provenance and MIT notices. **Non-goals:** install lifecycle and policy approval. Packaging must prove diagnostic filesystem export is absent and unsupported.
+**Dependency/base:** reviewed 8B.1 after retired 8B.2 removal; PR #4 targets `feature/aibar-foundation-slice-8b1-diagnostic-command`. **Scope:** fresh-output-only self-contained `Release/win-x64` recovery publish and complete deterministic ZIP/inventory/identity. **Non-goals:** MSIX, SBOM, signing, provenance, notices, installability, lifecycle, and release claims.
 
-- [ ] **RED:** assert reproducible artifact identity, x64 target, SBOM completeness, signing-available/unavailable paths, self-contained recovery output, and provenance notice presence.
-- [ ] **GREEN:** add packaging scripts/configuration and deterministic artifact generation without embedding secrets or user data.
-- [ ] **TRIANGULATE:** rebuild twice, inspect manifests/dependencies/notices, and verify unsigned fallback is explicit.
-- [ ] **REFACTOR:** isolate signing inputs and publish metadata. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~Packaging`. Runtime: two clean publish runs and artifact diff. Rollback: remove packaging scripts/artifacts; preserve application behavior.
+**Correction status:** the unsafe pre-correction 8C1 candidate, its destructive-path behavior, tests, apply-progress, and prior green results remain historical and non-authoritative. A fresh-output-only 8C1 candidate has been reconstructed and execution-verified from the current scoped files. No approval, receipt, staging, commit, or Slice 8C2 work is claimed.
+
+**Fresh-output safety contract:** `scripts/Publish-Deterministic.ps1` accepts only a nonexistent output leaf beneath an existing caller-owned directory. Before any process launch or filesystem creation it must reject empty paths, roots, repository/source overlap, an existing file, empty or non-empty directory, any reparse leaf, missing/inaccessible/unclassifiable parent, and any observed reparse ancestor. It repeats observations immediately before collision-failing leaf creation. It contains absolutely no `Remove-Item -Recurse`, deletion, cleanup, replacement, reuse, rollback, or move-over-existing operation. A post-creation failure reports the incomplete caller-owned output and leaves it untouched; retry requires a different nonexistent leaf. These path checks are only observed defense in depth, not an identity-proof claim.
+
+**Implementation work units:**
+
+- [x] Replace `tests/AIBar.Domain.Tests/PackagingTests.cs` with executable `PackagingRecoveryTests.cs`; remove implementation-source text assertions from acceptance evidence, and keep 8C2+ tasks unchanged and unchecked. <!-- sdd-owner: implementation -->
+- [x] **RED:** accept the recorded deterministic review finding and immutable prior-candidate evidence that the legacy workflow deleted or replaced caller-owned output; do not rerun unsafe code, delete a sentinel, or reconstruct destructive conditions. The RED gate is satisfied by preserving that evidence reference and requiring executable corrected-contract rejection with sentinel preservation. <!-- sdd-owner: implementation -->
+- [x] **GREEN:** rewrite only `scripts/Publish-Deterministic.ps1` (or a narrowly extracted `scripts/packaging/` helper) to perform the complete non-mutating admission sequence, collision-failing fresh leaf creation, self-contained `Release/win-x64` publish, recursive inventory, deterministic ZIP, and manifest outputs. No MSIX/SBOM/signing/provenance/notices or application edits. <!-- sdd-owner: implementation -->
+- [x] **GREEN verification:** with a unique existing caller-owned temporary parent, verify sentinel preservation and fail-closed behavior for an existing file, empty/non-empty directory, leaf reparse point and observed reparse ancestor where supported, filesystem root, repository overlap, parent-as-file/unclassifiable parent, and missing parent; assert process-not-launched markers for every pre-creation rejection. `IOException` and `UnauthorizedAccessException` paths must fail closed without publish or cleanup. Actual same-identity access-denied evidence is opportunistic and non-blocking when the environment cannot provide it safely. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE:** run two real publishes under separately created absolute temporary parents and compare recursive publish path sets/hashes, ZIP bytes and entries, inventory bytes, manifest bytes, and stable artifact identity; cover spaces/non-ASCII names, reordered enumeration, and a leaf-creation collision. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE failure path:** inject a controlled post-creation publish failure, assert the reported incomplete output remains untouched by the script, and prove retry uses a new nonexistent leaf; tests clean only their GUID temporary parents after child processes exit and never use fixed repository paths. <!-- sdd-owner: implementation -->
+- [x] **REFACTOR/GATE:** verify complete nested runtime/culture/configuration/native artifact inventory and ZIP equality, safe normalized entries, no diagnostic export file/reference, reproducibility, and artifact completeness. Record that no signing, MSIX, SBOM, provenance, notice, installability, lifecycle, release, or adversarial namespace-containment claim is made. <!-- sdd-owner: implementation -->
+- [x] Record the failed combined-8C candidate results and review claims as historical/non-authoritative in the later apply-progress phase; stop before Apply until this corrected task set is approved. <!-- sdd-owner: parent -->
+
+### Slice 8C2 — Distribution metadata, MSIX, SBOM, provenance, notices, and signing gates (~330–360 lines; split if >360)
+
+**Dependency/base:** reviewed 8C1; PR #5 targets the immutable reviewed 8C1 head. **Scope:** valid MSIX inputs/assets, CycloneDX 1.5 graph/file reconciliation, complete provenance/licenses/notices, and explicit capability/signing state. **Non-goal:** install/upgrade/uninstall lifecycle, which remains 8D.
+
+**Mandatory pre-Apply decomposition:** if the implementation forecast exceeds 360 authored lines, split before Apply into `8C2A` (manifest/assets and capability state) followed by `8C2B` (SBOM/provenance/notices and signing runtime gate); no size exception is authorized. <!-- sdd-owner: parent -->
+
+- [ ] **RED:** add executable parser/reconciliation tests that reject the current invalid manifest/assets, `sbom.packages.json`, incomplete notices, and ambiguous MSIX/signing claims. <!-- sdd-owner: implementation -->
+- [ ] **GREEN:** add Windows 10 package-schema manifest, decodable dimensioned PNG assets, CycloneDX 1.5 JSON with canonical identifiers, exact versions, licenses, hashes where available, complete dependency edges, and file/component reconciliation across restore assets, managed/runtime/native publish contents. Add complete provenance and applicable license/notice texts. <!-- sdd-owner: implementation -->
+- [ ] **TRIANGULATE:** use injected deterministic fake capability/command tests for absent MakeAppx, absent SignTool/certificate/secret, publisher mismatch, tool failure, stale outputs, graph changes, native/runtime components, license classes, and separate roots; assert exact sanitized plans and no secret disclosure. <!-- sdd-owner: implementation -->
+- [ ] **GATE:** keep fake capability/command tests separate from the actual Windows SDK/signing gate. When tools or credentials are absent, emit only explicit unavailable/unsigned metadata and never claim signed, installable, distribution-ready, or release-ready output; when available, run real MakeAppx/SignTool inspection and signature/publisher verification. <!-- sdd-owner: implementation -->
 
 ### Slice 8D — Install, upgrade, launch, uninstall, and retention smoke (~340 lines)
 
-**Dependency/base:** 8C branch, including its export-absence proof; PR #5 targets 8C. **Scope:** packaging/runtime smoke harness for clean install, migration/upgrade, startup launch, single instance, uninstall and retention/removal. **Non-goals:** manual DPI matrix and legal gates. Smoke coverage must preserve explicit export-unavailable behavior and prove no export artifact is installed or created.
+**Dependency/base:** reviewed 8C2 branch, including its export-absence proof; PR #6 targets 8C2. **Scope:** packaging/runtime smoke harness for clean install, migration/upgrade, startup launch, single instance, uninstall and retention/removal. **Non-goals:** manual DPI matrix and legal gates. Smoke coverage must preserve explicit export-unavailable behavior and prove no export artifact is installed or created.
 
 - [ ] **RED:** add smoke tests for clean install, upgrade migration, `--startup`, single-instance activation, uninstall, retained/removed user data, and Codex-file hashes.
 - [ ] **GREEN:** wire the install lifecycle harness and migration-safe upgrade/uninstall behavior.
 - [ ] **TRIANGULATE:** rerun with existing DB, locked files, failed migration, disabled integration, and explicit data-removal selection.
-- [ ] **REFACTOR:** make setup/cleanup idempotent and evidence path-free. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSmoke|FullyQualifiedName~Lifecycle"`. Runtime: clean Windows sandbox install → launch → upgrade → uninstall. Rollback: remove smoke harness/lifecycle changes; retain publish outputs from 8C.
+- [ ] **REFACTOR:** make setup/cleanup idempotent and evidence path-free. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSmoke|FullyQualifiedName~Lifecycle"`. Runtime: clean Windows sandbox install → launch → upgrade → uninstall. Rollback: remove smoke harness/lifecycle changes; retain reviewed 8C1/8C2 outputs.
 
 ### Slice 8E — Windows matrix and release gates (~280 lines)
 
-**Dependency/base:** 8D branch, including packaging and smoke proof that export is absent/unsupported; PR #6 targets 8D. **Scope:** W10/W11 manual/VM matrix, private compatibility validation, policy/legal review, remote-free kill-switch and release evidence. **Non-goals:** new product behavior; Slice 7B tiny-positive-rate ETA warning remains deferred. Release evidence must continue to prove no diagnostic export path or artifact exists.
+**Dependency/base:** reviewed 8D branch, including packaging and smoke proof that export is absent/unsupported; PR #7 targets 8D. **Scope:** W10/W11 manual/VM matrix, private compatibility validation, policy/legal review, remote-free kill-switch and release evidence. **Non-goals:** new product behavior; Slice 7B tiny-positive-rate ETA warning remains deferred. Release evidence must continue to prove no diagnostic export path or artifact exists.
 
 - [ ] **RED:** record failing matrix/gate checks for tray recreation, DPI, taskbar placement, sleep/resume, popover focus, unsupported behavior, policy/legal, dependency/license, provenance, private endpoint compatibility, and kill-switch.
 - [ ] **GREEN:** execute and document the matrix and sign-off gates; make unsupported behavior visible and distribution disabled until all pass.
 - [ ] **TRIANGULATE:** repeat on representative W10/W11 VMs and with private integration disabled; verify local analytics remain usable and no remote sink exists.
 - [ ] **REFACTOR:** consolidate release checklist and rollback procedure. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Windows|FullyQualifiedName~ReleaseGate"`. Runtime: W10/W11 VM smoke matrix. Rollback: remove gate evidence/configuration and ship disabled; preserve 8D lifecycle.
 
-**Slice 8 chain:** `7C → 8A → 8B.0 → 8B.1 → 8C → 8D → 8E`; 8B.2 is retired and not an active dependency. The removal work unit is separate, bounded, and must complete before 8C Apply. 8A is autonomous at 481 authored lines solely under its maintainer-approved Slice-8A-only `size:exception`; 8B.0/8B.1 and 8C–8E remain autonomous, `auto-chain`, feature-branch-chain children at ≤400 authored lines with behavior and tests together. 8C must prove export is absent/unsupported.
+**Slice 8 chain:** `7C → 8A → 8B.0 → 8B.1 → 8C1 → 8C2 → 8D → 8E`; 8B.2 is retired and not an active dependency. The removal/disposition work must complete before 8C1 RED. If 8C2 forecasts above 360 lines, the active chain becomes `8B.1 → 8C1 → 8C2A → 8C2B → 8D → 8E`; no size exception is authorized. 8A is autonomous at 481 authored lines solely under its maintainer-approved Slice-8A-only `size:exception`; 8B.0/8B.1 and 8C1–8E remain autonomous, `auto-chain`, feature-branch-chain children at ≤400 authored lines with behavior and tests together. 8C1 must prove recursive recovery reproducibility; 8C2 must prove explicit unavailable/signing state and never overclaim.
 
 ## Cross-Slice Completion Gates
 

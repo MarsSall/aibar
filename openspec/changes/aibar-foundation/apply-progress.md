@@ -1409,3 +1409,34 @@ All three 6C2A.1 checkboxes are visibly `- [x]` in `tasks.md`. Schema v2 adds pa
 **Behavior:** trends require all seven immediately preceding complete local calendar days, excluding today's partial day. ETA is labeled only `simple linear estimate`, requires a fresh primary snapshot, future reset, matching-reset observations, and a positive observed percentage-per-hour rate; unavailable/unsupported results preserve quota and observation facts. No token or quota fact is mutated.
 
 **Verification:** full `dotnet test AIBar.sln --nologo` passed 163/163; `dotnet build AIBar.sln --nologo` succeeded with 0 warnings/0 errors; `git diff --check` passed. Runtime N/A: pure Domain policy. **Checkboxes:** all four Slice 7B lines are `- [x]`. **Files:** `src/AIBar.Domain/DerivedMetricsPolicy.cs`, `tests/AIBar.Domain.Tests/DerivedMetricsTests.cs`, `openspec/changes/aibar-foundation/{tasks,apply-progress}.md`. **Boundary/deviation:** Slice 7B only; corrected TDD chronology. **Rollback:** remove policy/test and revert Slice 7B artifacts, retaining 7A pricing. **Next:** independent review, then Slice 7C.
+
+## Slice 8C1 corrected fresh-output publish (2026-07-21)
+
+**Status:** the corrected Slice 8C1 Apply and final independent verification are complete. The next lifecycle action is bounded review/receipt establishment; no approval, receipt, staging, or commit is claimed. Strict TDD; `auto-chain` / `feature-branch-chain`; 8C1 only.
+
+| TDD evidence | Current result |
+|---|---|
+| RED | The unsafe candidate run exceeded its 300-second limit after entering publish, so no terminal destructive assertion exists. Its code, results, and reviews are historical/non-authoritative. |
+| GREEN/TRIANGULATE | Fresh-output-only admission rejects unsafe leaves and reparse observations, creates collision-failingly, publishes real self-contained output, and creates deterministic recursive inventory/ZIP/manifest artifacts without deletion, cleanup, replacement, reuse, rollback, or move-over-existing. |
+| Verifier follow-up | Fake-command-marker tests prove file/file-parent/missing-parent/repository-overlap/leaf-reparse rejection launches no process. Reparse ran here; unsupported/permission environments explicitly skip. Inaccessible/unclassifiable-directory admission remains unproven without unsafe ACL mutation. |
+| REFACTOR | Child real publishes use `--disable-build-servers`; tests serialize child publishes and never invoke `dotnet test` recursively. |
+
+**Verification:** `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~PackagingRecoveryTests --nologo` passed 9/9; full suite passed 211/211; build 0 warnings/errors; `git diff --check` passed. No generated 8C1 output remains. **Tasks:** the authorized task record marks RED from immutable prior-candidate evidence and marks GREEN verification with opportunistic same-identity access-denied evidence non-blocking; parent historical-record task is truthful. 8C2+ remains unchecked. **Boundary:** no MSIX, signing, SBOM, provenance, notices, lifecycle, release, or external publication.
+
+## Slice 8C1 fresh candidate reconstruction (2026-07-23)
+
+**Status:** Standard mode (`strict_tdd: false`). The abandoned lineage `review-slice-8c1-standalone-20260722` was preserved without lifecycle, authority, or receipt mutation. This bounded reconstruction proves only the current 8C1 candidate; it does not claim review approval, staging, commit, publication, or readiness for 8C2.
+
+**Native runtime attempt:** terminal `complete`; outcome `passed`; no active attempt remains. Runtime revision: `sha256:3be9fbda6b653e089dae7cdf4cfcd65e97f704ee450101d19bbdf622c87f6925` (`next_action: complete`).
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~PackagingRecoveryTests --nologo` — passed 9/9, failed 0, skipped 0. |
+| Runtime harness | The executable focused suite invoked two real self-contained `Release/win-x64` publishes beneath separately created GUID temporary parents; it compared recursive publish inventory and ZIP entries/hashes, ZIP bytes, inventory bytes, manifest bytes, and artifact identity. Admission/failure scenarios also proved pre-creation rejection does not launch the marker command and post-creation failure leaves its caller-owned output. |
+| Full verification | `dotnet test AIBar.sln --nologo` — passed 211/211, failed 0, skipped 0. `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors. `git diff --check` — passed. |
+| Cleanup/process evidence | The tests own and remove their GUID temporary parents after child processes exit. Post-run inspection found no `aibar-8c1-*` temporary directories. The script contains no delete, cleanup, replace, move, MSIX, signing, SBOM, provenance, notice, or diagnostic-export operation. |
+| Rollback boundary | Remove only `scripts/Publish-Deterministic.ps1`, `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs`, and this Slice 8C1 status/evidence update. Do not remove caller-owned incomplete output; the script never cleans it. |
+
+**Current candidate behavior:** the script validates a caller-selected nonexistent leaf below an existing non-reparse parent, repeats admission before collision-failing creation, publishes self-contained `win-x64` output, inventories every recursive publish file, and writes deterministic ZIP/inventory/manifest artifacts. Existing leaves, repository overlap, missing parents, roots, and observed reparse paths fail before publish; post-creation failure reports `PUBLISH_INCOMPLETE_OUTPUT` and preserves the leaf. The contract makes no hostile namespace-identity guarantee.
+
+**Scope and size:** only the 8C1 script and executable recovery test are implementation additions: 40 + 108 = 148 authored lines. With this 8C1 task/progress status update, the fresh work-unit accounting remains below the 400-line cap. Slice 8C2 tasks remain unchecked and untouched.
