@@ -1,5 +1,29 @@
 # Apply Progress — AIBar Foundation
 
+## Current Slice 8C2B1 supersession authority (2026-07-23)
+
+**Current authority:** the failed combined/B1 working candidate, former B1 checkmarks, tests, runtime generations 3–6, generated outputs, and completion claims below are retained only as historical, non-authoritative evidence. No B1 review, durable receipt, or commit exists. The next apply must start from reviewed `f0d15b1` and the new unchecked B1 tasks, reconstructing the candidate rather than continuing it.
+
+Prior generated outputs and runtime evidence MUST NOT be reused as implementation inputs, acceptance evidence, completion authority, or review authority. The working candidate still exists; this planning correction does not claim that any candidate file or output has been discarded, quarantined, restored, or cleaned. MakeAppx/SignTool execution remains B2-owned.
+
+## Slice 8C2B1 applied (2026-07-23)
+
+**Authority/base:** `f0d15b1`; Standard mode (`strict_tdd: false`); `auto-chain` / `feature-branch-chain`, PR #6 only. This supersedes the failed combined-candidate claims without deleting their history below. It retains the reviewed 8C2A manifest/capability planner and removes all unreviewed MakeAppx/SignTool execution or runtime-gate behavior.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingDistribution" --no-restore -m:1` — passed 5/5, failed 0, skipped 0. |
+| Runtime harness | Two GUID-root controlled restore/inventory generations are executed by `PackagingDistributionTests`; each root is disposed after the child PowerShell process exits. It validates bidirectional restore graph and managed/runtime/native/first-party file mapping; no package/signing process is invoked. |
+| Rollback boundary | Revert `.gitignore`, the B1 metadata branch of `scripts/Publish-Deterministic.ps1`, `packaging/{sbom.cdx.json,PROVENANCE.md,THIRD-PARTY-NOTICES.md,LICENSES/**}`, B1 tests, and these OpenSpec records. 8C1 and reviewed 8C2A remain unchanged. |
+
+**Behavior:** canonical CycloneDX 1.5 metadata rejects omitted restored dependencies, unmapped or ambiguous shipped files, incomplete identity/license/origin/edges, missing notices/license text, and placeholder-free component hashes. Test-only scope is explicit in provenance. Metadata contains no root or secret. No MakeAppx, SignTool, MSIX, signing, installability, distribution-ready, lifecycle, or release claim is made.
+
+**Full regression/build:** `dotnet test AIBar.sln --nologo --no-restore -m:1` — passed 216/216, failed 0, skipped 0. `dotnet build AIBar.sln --nologo --no-restore -m:1` — succeeded, 0 warnings, 0 errors. `git diff --check` passed.
+
+**Final corrective evidence (generation 6):** the focused harness runs a real fresh `Release/win-x64` self-contained publish into a GUID-owned temporary parent, consumes `src/AIBar.Desktop/obj/project.assets.json`, and reconciles all 9 restored libraries and 470 published files. It classifies every published file as first-party, managed, runtime, or native; generated metadata is removed when the temporary root is disposed after child PowerShell exits. No MakeAppx, SignTool, MSIX, signing, installability, or release action occurs. The terminal ledger must finish once with request `aibar-8c2b1-final-finish-20260723-01`, expected revision `sha256:9fe0c14c3309b2afbf73dd01d0b483379a8cca2127afd13fad7430c6b4badaf9`, outcome `passed`, and no active attempt; it is the authoritative terminal-revision record.
+
+**Candidate accounting:** `git diff --numstat` plus untracked text accounting before the terminal finish is **193 additions + 21 deletions = 214** authored lines versus `HEAD`, including OpenSpec, notices, and license text; below the 400-line cap. **Rollback:** revert only `.gitignore`, B1 metadata logic/tests, `packaging/{sbom.cdx.json,PROVENANCE.md,THIRD-PARTY-NOTICES.md,LICENSES/**}`, and the B1 OpenSpec records; reviewed 8C2A remains intact.
+
 ## Slice 8C2A applied (2026-07-23)
 
 **Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `auto-chain` / `feature-branch-chain`. This is PR #5's bounded 8C2A unit from reviewed 8C1. It adds metadata inputs and deterministic fake capability planning only. It does not execute MakeAppx or SignTool, create an MSIX, claim package/schema/signature/installability acceptance, add SBOM/provenance/notices, or enter 8C2B, 8D, or 8E.
