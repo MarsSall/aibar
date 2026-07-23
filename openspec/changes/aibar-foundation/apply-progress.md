@@ -1,5 +1,26 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 8C2A applied (2026-07-23)
+
+**Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `auto-chain` / `feature-branch-chain`. This is PR #5's bounded 8C2A unit from reviewed 8C1. It adds metadata inputs and deterministic fake capability planning only. It does not execute MakeAppx or SignTool, create an MSIX, claim package/schema/signature/installability acceptance, add SBOM/provenance/notices, or enter 8C2B, 8D, or 8E.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | Added `PackagingDistributionTests` before implementation. The focused command failed 3/3 because `packaging/AppxManifest.xml` and capability-plan behavior were absent. |
+| Focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingDistribution"` — passed 3/3, failed 0, skipped 0. |
+| TRIANGULATE | Tests parse the manifest and PNG headers/dimensions, cover tool-unavailable, unsigned/signing-unavailable, requested-signing-unavailable, publisher mismatch, stale output preservation, exact planned commands, and secret/path-free JSON. |
+| Full regression / build | `dotnet test AIBar.sln --nologo` — passed 214/214, failed 0, skipped 0. `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors. `git diff --check` — passed. |
+| Runtime harness | N/A — real MakeAppx/SignTool packaging and signing execution is exclusively Slice 8C2B. This slice tests injected deterministic planning and makes no runtime package, signing, installability, lifecycle, or release claim. |
+| Rollback boundary | Revert `scripts/Publish-Deterministic.ps1`, `packaging/AppxManifest.xml`, `packaging/Assets/`, `tests/AIBar.Domain.Tests/PackagingDistributionTests.cs`, and these 8C2A task/progress edits. Reviewed 8C1 recovery publishing remains usable. |
+
+**Behavior:** the x64 full-trust WPF manifest uses a development publisher identity and `internetClient`; publisher binding is checked before a signing plan. Capability planning is explicit: no MakeAppx yields `tool-unavailable`; MakeAppx-only yields `unsigned` plus `signing-unavailable`; requested signing fails closed for missing inputs or publisher mismatch; stale candidate output remains untouched. Planner JSON deliberately omits package-root paths and secrets. PNG assets are valid, dimensioned, and referenced by the manifest.
+
+**Git candidate accounting (versus `HEAD`):** read-only `git diff --numstat HEAD`, plus `git diff --no-index --numstat -- NUL` for each untracked textual file, reports **186 additions + 15 deletions = 201 authored textual lines**, including the approved `tasks.md` planning split. The four PNG assets are binary entries (`-`/`-` in Git numstat), are included in candidate identity, and add no textual authored lines. **201 <= 400**.
+
+**Native runtime status:** generation **2**; work unit **`slice-8c2a`**; terminal outcome **`passed`**; `complete: true`; `next_action: complete`; no `active_attempt` is present. Exact terminal runtime revision: `sha256:f4ddd939e5990340f39e7cd7996c998b5e910c083c7e26c943b76e9214f29af7`.
+
+**Deviation:** none. **Workload / PR boundary:** feature-branch-chain, Slice 8C2A only, base `feature/aibar-foundation-slice-8c1`; no commit, staging, review, PR, SBOM, provenance, notices, signing execution, lifecycle, or release work. **Next dependency:** reviewed 8C2A before Slice 8C2B; no readiness or approval claim is made here.
+
 ## Retired Slice 8B.2 removal verified (2026-07-21)
 
 **Status:** strict TDD is active by parent instruction; authoritative OpenSpec status consumed before work: `applyState: ready`, `nextRecommended: apply`, repo-local workspace/allowed edit root, and `auto-chain` / `feature-branch-chain`. This approved removal work unit stops before Slice 8C.

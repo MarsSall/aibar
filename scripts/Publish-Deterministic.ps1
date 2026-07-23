@@ -1,10 +1,34 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$OutputDirectory,
+    [string]$OutputDirectory,
     [string]$SourceDateEpoch = "1767225600",
-    [string]$PublishCommand = "dotnet"
+    [string]$PublishCommand = "dotnet",
+    [switch]$CapabilityPlan,
+    [string]$MakeAppxPath,
+    [string]$SignToolPath,
+    [string]$CertificateSubject,
+    [string]$Secret,
+    [switch]$SigningRequested,
+    [string]$PackageOutput
 )
 $ErrorActionPreference = "Stop"
+function Write-CapabilityPlan {
+    $publisher = "CN=AIBar Development"
+    $hasMakeAppx = -not [string]::IsNullOrWhiteSpace($MakeAppxPath)
+    $staleOutput = -not [string]::IsNullOrWhiteSpace($PackageOutput) -and (Test-Path -LiteralPath $PackageOutput)
+    $hasSigningInputs = -not [string]::IsNullOrWhiteSpace($SignToolPath) -and -not [string]::IsNullOrWhiteSpace($CertificateSubject) -and -not [string]::IsNullOrWhiteSpace($Secret)
+    $publisherMatches = $CertificateSubject -eq $publisher
+    $msixStatus = if ($staleOutput) { "stale-output" } elseif (-not $hasMakeAppx) { "tool-unavailable" } else { "unsigned" }
+    $signingStatus = "signing-unavailable"
+    if ($SigningRequested) {
+        if (-not $publisherMatches) { $signingStatus = "publisher-mismatch" } elseif (-not $hasSigningInputs) { $signingStatus = "requested-signing-unavailable" } else { $signingStatus = "planned" }
+        if ($msixStatus -ne "stale-output" -and ($signingStatus -ne "planned" -or -not $hasMakeAppx)) { $msixStatus = "failed" }
+    }
+    $commands = [System.Collections.Generic.List[string]]::new()
+    if ($signingStatus -eq "planned" -and $msixStatus -eq "unsigned") { $commands.Add("MakeAppx pack"); $commands.Add("SignTool sign") }
+    [pscustomobject]@{ msixStatus = $msixStatus; signingStatus = $signingStatus; publisher = $publisher; commands = $commands } | ConvertTo-Json -Compress
+}
+if ($CapabilityPlan) { Write-CapabilityPlan; exit 0 }
 function Is-Reparse([string]$Path) { return ((Get-Item -LiteralPath $Path -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 }
 function Assert-FreshLeaf([string]$Leaf, [string]$Repository) {
     if ([string]::IsNullOrWhiteSpace($Leaf)) { throw "OutputDirectory is required." }
