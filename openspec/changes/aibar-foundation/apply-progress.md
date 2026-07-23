@@ -1,5 +1,26 @@
 # Apply Progress — AIBar Foundation
 
+## Current B1a1/B1a2 planning authority (2026-07-23)
+
+**Authority:** maintainer-approved planning splits failed B1a into unchecked 8C2B1a1 pure graph projection/reconciliation/CycloneDX and 8C2B1a2 safe restore/publish acquisition plus live two-root proof. Generation 9 candidate/checkmarks, tests, outputs, counts, and completion claims, and generation 10's failed correction attempt, are historical and non-authoritative. No B1a review, receipt, commit, or approval exists; neither child may inherit completion evidence.
+
+**Required start:** the invalid 93-line generation 9 implementation/test candidate still exists. Before B1a1 Apply, selectively restore the implementation and test paths to exact HEAD `28a2f46` bytes while preserving this planning update; do not review, receipt, commit, or reuse the candidate. This planning update does not claim cleanup, restoration, quarantine, output deletion, staging, or Git/index/history changes have occurred.
+
+**Active chain:** reviewed 8C2A → B1a1 (PR #6) → B1a2 (PR #7) → B1b (PR #8) → B2 (PR #9) → 8D (PR #10) → 8E (PR #11), feature-branch-chain, each child <=400 authored additions+deletions, no exception. B1b depends on reviewed B1a2; B2 depends on reviewed B1b; 8D depends on reviewed B2.
+
+## Historical non-authoritative Slice 8C2B1a generation 9 candidate (2026-07-23)
+
+**Authority/base:** `28a2f46` split plan; Standard mode; `auto-chain` / `feature-branch-chain`, PR #6 only. The real `Release/win-x64` self-contained harness selected the matching restore and published RID graphs and emitted canonical CycloneDX 1.5 nested file evidence without legal/provenance promotion, MakeAppx, or SignTool.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingDistribution" --no-restore -m:1` — passed 4/4, failed 0, skipped 0. |
+| Full suite / build | `dotnet test AIBar.sln --nologo --no-restore -m:1` — passed 215/215; `dotnet build AIBar.sln --nologo --no-restore -m:1` — 0 warnings, 0 errors. |
+| Runtime harness | Two fresh `artifacts/8c2b1/` roots (one reordered and non-ASCII) ran real publish: 9 graph components, 470 artifacts, and byte-identical SBOM/manifest output. Child capture drains stdout/stderr asynchronously; timeout kills/waits its tree; stale leaves and failed/partial children are unaccepted. |
+| Rollback boundary | Revert only `scripts/Publish-Deterministic.ps1`, `tests/AIBar.Domain.Tests/PackagingDistributionTests.cs`, and this B1a evidence/checkmarks; delete only caller-owned ignored `artifacts/8c2b1/` roots. |
+
+**Mapping:** 470 files: 6 first-party, 3 managed, 236 runtime, 4 native, 221 resource. No receipt, license/notice/provenance schema, durable promotion/recovery, MakeAppx, SignTool, lifecycle, or release work was added.
+
 ## Current Slice 8C2B1 supersession authority (2026-07-23)
 
 **Current authority:** the failed combined/B1 working candidate, former B1 checkmarks, tests, runtime generations 3–6, generated outputs, and completion claims below are retained only as historical, non-authoritative evidence. No B1 review, durable receipt, or commit exists. The next apply must start from reviewed `f0d15b1` and the new unchecked B1 tasks, reconstructing the candidate rather than continuing it.
