@@ -1,5 +1,47 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 8C1.1a generation 27 applied (2026-07-24)
+
+**Status:** Standard mode (`strict_tdd: false`) with task-mandated RED-first evidence; `auto-chain` / `feature-branch-chain`, PR #7a only. This child implements only isolated admission and deterministic MSBuild routing. Slice 8C1.1b, B1a2, MakeAppx, and SignTool remain untouched.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | Added `Red_isolated_mode_rejects_a_relative_parent_before_command_launch` before the production change. `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_isolated_mode_rejects_a_relative_parent_before_command_launch" --no-restore -m:1` failed 1/1: the prior script accepted the relative isolation parent and launched the fake command. |
+| GREEN | The same command passed 1/1 after isolated mode required a fully qualified parent and fully qualified children. |
+| Focused / runtime harness | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingRecovery" --no-restore -m:1` passed 12/12. Two marker-owned caller roots (including a space/NFC Unicode root) ran explicit restore then `publish --no-restore`; recursive inventories, ZIPs, manifests, and identities matched byte-for-byte. Repository Desktop `obj/**` and `bin/**` hashes were unchanged. Roots were disposed by test ownership after child exit. |
+| Full regression / build | `dotnet test AIBar.sln --nologo --no-restore -m:1` passed 218/218. `dotnet build AIBar.sln --nologo --no-restore -m:1` succeeded with 0 warnings and 0 errors. `git diff --check` passed. |
+| Process / cleanup | A first focused invocation exceeded the external 120-second command timeout; its PowerShell child was absent afterward and no `aibar-8c1-isolated-*` root remained. The rerun completed 12/12. No MakeAppx or SignTool was invoked. |
+| Rollback boundary | Revert only the isolated admission/routing changes in `scripts/Publish-Deterministic.ps1`, `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs`, and these three task marks/progress evidence; reviewed 8C1 default invocation remains unchanged. |
+
+**Implementation:** isolated mode now rejects relative parent/child paths before launch and revalidates the marker-owned parent plus all external routing children after creation and immediately before both restore and publish. Existing all-or-nothing parameters, NFC, containment, reparse, collision, stale-child, marker, deterministic `DirectoryBuildPropsPath`, explicit restore, and `publish --no-restore` behavior remain. **Authored count:** 97 source/test additions+deletions (`48+3` script; `45+1` tests), below the 400-line ceiling. **Next:** bounded review of 8C1.1a only; 8C1.1b remains unchecked and B1a2 blocked.
+
+## Slice 8C1.1 generation 25 replanning preflight (2026-07-24)
+
+**Status:** failed before implementation. The maintainer authorized splitting the invalid generation-24 correction, but the existing 79-line implementation and 35-line test candidate still lacks comprehensive admission negatives, process-tree ownership/timeout/draining, child-exit-before-cleanup enforcement, cleanup revalidation, repository-wide isolation proof, and RED-first evidence. Completing those concerns as one autonomous correction would exceed the 400 authored-line cap when the existing candidate and required OpenSpec evidence are included. No source or test file was edited and no focused/full/build/runtime command was run in this generation.
+
+**Concrete split:** `8C1.1a` owns fail-closed isolated admission plus explicit external MSBuild routing and two-root deterministic/repository-isolation proof (forecast 260–340 authored lines). `8C1.1b` owns argument-safe restore/publish process lifetime, asynchronous capture, timeout/cancellation child-tree termination/wait, marker-gated post-exit cleanup, and failure/no-tool proof (forecast 240–340). Both retain the exact reviewed 8C1 default invocation; B1a2 remains blocked until both are independently reviewed, receipted, and committed.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test | Not run: the preflight found no complete autonomous implementation unit within the cap. |
+| Runtime harness | Not run: no external root or restore/publish process was created. |
+| Rollback boundary | Revert only this replanning record and the unchecked 8C1.1 task split; existing candidate source/test bytes were not modified. |
+
+**Native attempt:** generation 25 began with request `aibar-8c1-1-split-preflight-20260724-25` from revision `sha256:50969c20a73f193567f0905bfd2efb12e3a3c1dd8502a95414b5efdaf79db5e6` and finished `failed` with request `aibar-8c1-1-split-preflight-finish-20260724-25`; terminal revision `sha256:efd0e153182a8eec5c2c8f5e88211c07e7c1d7e6a95931df14b56a4d1188d71b`, ledger changed-lines `35`. No MakeAppx or SignTool was invoked.
+
+## Prerequisite Slice 8C1.1 applied (2026-07-23)
+
+**Status:** Standard mode; `auto-chain` / `feature-branch-chain`, PR #7a only. This is an opt-in extension to reviewed 8C1: default invocation remains unchanged. No B1a2 policy, MakeAppx, SignTool, signing, MSIX, or lifecycle work was added.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED / focused | The isolated two-root test initially failed before isolation arguments existed. `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingRecovery" --no-restore -m:1` — passed 11/11, failed 0, skipped 0. |
+| Runtime harness | Two caller-owned external roots (one NFC Unicode/space root) completed explicit restore then `publish --no-restore`; inventories, ZIPs, manifests, and artifact identity were byte-identical. Repository Desktop `obj/**` and `bin/**` hashes were unchanged. Marker mismatch and stale-child failures launched no publish; all harness roots were removed only after PowerShell children exited. |
+| Full regression / build / diff | `dotnet test AIBar.sln --nologo --no-restore -m:1` — passed 217/217; `dotnet build AIBar.sln --nologo --no-restore -m:1` — 0 warnings, 0 errors; `git diff --check` passed. |
+| Rollback boundary | Revert only `scripts/Publish-Deterministic.ps1`, `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs`, and these four task/progress marks; exact reviewed 8C1 defaults remain. |
+
+**Implementation:** isolated mode is all-or-nothing and requires a marker-owned external parent plus fresh, unique intermediate/build/restore/package/recovery children. A generated external `DirectoryBuildPropsPath` gives each project its own MSBuild leaf, forwards the same isolation configuration to restore and publish, and maps external paths for deterministic binaries. Failed publishes retain caller-owned incomplete output; the script performs no recursive cleanup or replacement. **Candidate accounting:** 79 source/test additions+deletions, below 400; generation 23 added 0 source lines. **Next:** independent review, receipt, and commit of 8C1.1 before B1a2.
+
 ## Current B1a1/B1a2 planning authority (2026-07-23)
 
 **Authority:** maintainer-approved planning splits failed B1a into unchecked 8C2B1a1 pure graph projection/reconciliation/CycloneDX and 8C2B1a2 safe restore/publish acquisition plus live two-root proof. Generation 9 candidate/checkmarks, tests, outputs, counts, and completion claims, and generation 10's failed correction attempt, are historical and non-authoritative. No B1a review, receipt, commit, or approval exists; neither child may inherit completion evidence.

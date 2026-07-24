@@ -79,6 +79,35 @@ public sealed class PackagingRecoveryTests
         var retry = Path.Combine(parent.Path, "retry"); Assert.Equal(0, Run(retry).ExitCode); Assert.True(Directory.Exists(failed));
     }
 
+    [Fact]
+    public void Isolated_mode_keeps_repository_intermediates_unchanged_and_is_deterministic()
+    {
+        var repositoryState = TreeHash(Path.Combine(RepositoryRoot(), "src", "AIBar.Desktop", "obj"), Path.Combine(RepositoryRoot(), "src", "AIBar.Desktop", "bin"));
+        using var one = Isolation("café one"); using var two = Isolation("two");
+        var firstRun = Run(one.Output, isolation: one); var secondRun = Run(two.Output, isolation: two); Assert.True(firstRun.ExitCode == 0, firstRun.Output); Assert.True(secondRun.ExitCode == 0, secondRun.Output);
+        Assert.Equal(repositoryState, TreeHash(Path.Combine(RepositoryRoot(), "src", "AIBar.Desktop", "obj"), Path.Combine(RepositoryRoot(), "src", "AIBar.Desktop", "bin")));
+        var first = Contract(one.Output); var second = Contract(two.Output);
+        Assert.Equal(first.Files, second.Files); Assert.Equal(first.ZipHash, second.ZipHash); Assert.Equal(first.Inventory, second.Inventory); Assert.Equal(first.Manifest, second.Manifest);
+        Assert.True(File.Exists(Path.Combine(one.Restore, "AIBar.Desktop", "project.assets.json")));
+    }
+
+    [Fact]
+    public void Isolated_mode_rejects_marker_mismatch_and_stale_children_before_publish()
+    {
+        using var markerRoot = Isolation("marker"); var marker = Path.Combine(markerRoot.Parent, "called"); var command = FakeCommand(markerRoot.Parent, marker);
+        File.WriteAllText(Path.Combine(markerRoot.Parent, ".aibar-isolation-marker"), "wrong"); Assert.NotEqual(0, Run(markerRoot.Output, command, isolation: markerRoot).ExitCode); Assert.False(File.Exists(marker)); Assert.False(Directory.Exists(markerRoot.Output));
+        using var staleRoot = Isolation("stale"); File.WriteAllText(staleRoot.Intermediate, "keep"); Assert.NotEqual(0, Run(staleRoot.Output, command, isolation: staleRoot).ExitCode); Assert.Equal("keep", File.ReadAllText(staleRoot.Intermediate)); Assert.False(File.Exists(marker));
+    }
+
+    [Fact]
+    public void Red_isolated_mode_rejects_a_relative_parent_before_command_launch()
+    {
+        using var root = Isolation("relative"); var marker = Path.Combine(root.Parent, "called"); var command = FakeCommand(root.Parent, marker);
+        root.RelativeParent = true;
+        var result = Run(root.Output, command, isolation: root, workingDirectory: root.Parent);
+        Assert.NotEqual(0, result.ExitCode); Assert.False(File.Exists(marker)); Assert.False(Directory.Exists(root.Output));
+    }
+
     private static Snapshot Contract(string root)
     {
         var inventory = File.ReadAllBytes(Path.Combine(root, "recovery-inventory.json")); var manifest = File.ReadAllBytes(Path.Combine(root, "artifact-manifest.json"));
@@ -89,20 +118,35 @@ public sealed class PackagingRecoveryTests
         return new(files, HashFile(Path.Combine(root, "AIBar-win-x64-recovery.zip")), inventory, manifest);
     }
 
-    private static RunResult Run(string output, string? command = null, string? epoch = null)
+    private static RunResult Run(string output, string? command = null, string? epoch = null, IsolationRoot? isolation = null, string? workingDirectory = null)
     {
         var psi = new ProcessStartInfo("pwsh") { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true };
+        if (workingDirectory is not null) psi.WorkingDirectory = workingDirectory;
         psi.ArgumentList.Add("-NoProfile"); psi.ArgumentList.Add("-File"); psi.ArgumentList.Add(Path.Combine(RepositoryRoot(), "scripts", "Publish-Deterministic.ps1")); psi.ArgumentList.Add("-OutputDirectory"); psi.ArgumentList.Add(output);
         if (command is not null) { psi.ArgumentList.Add("-PublishCommand"); psi.ArgumentList.Add(command); }
         if (epoch is not null) { psi.ArgumentList.Add("-SourceDateEpoch"); psi.ArgumentList.Add(epoch); }
+        if (isolation is not null) foreach (var argument in isolation.Arguments()) { psi.ArgumentList.Add(argument.Name); psi.ArgumentList.Add(argument.Value); }
         lock (PublishLock) { using var process = Process.Start(psi)!; var outputText = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd(); process.WaitForExit(); return new(process.ExitCode, outputText); }
     }
     private static string RepositoryRoot() { for (var d = new DirectoryInfo(AppContext.BaseDirectory); ; d = d.Parent!) if (File.Exists(Path.Combine(d.FullName, "AIBar.sln"))) return d.FullName; }
     private static string FakeCommand(string parent, string marker) { var path = Path.Combine(parent, "marker.cmd"); File.WriteAllText(path, $"@echo invoked>\"{marker}\"\r\n@exit /b 0"); return path; }
     private static string Hash(Stream stream) => Convert.ToHexString(SHA256.HashData(stream));
     private static string HashFile(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+    private static string TreeHash(params string[] roots)
+    {
+        var files = roots.SelectMany(root => Directory.Exists(root) ? Directory.GetFiles(root, "*", SearchOption.AllDirectories).OrderBy(path => path, StringComparer.Ordinal).Select(path => $"{Path.GetRelativePath(root, path)}:{HashFile(path)}") : ["missing"]);
+        return Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join("\n", files))));
+    }
     private static TemporaryParent TempParent(string suffix = "") => new(Path.Combine(Path.GetTempPath(), $"aibar-8c1-{Guid.NewGuid():N}{suffix}"));
+    private static IsolationRoot Isolation(string suffix) => new(Path.Combine(Path.GetTempPath(), $"aibar-8c1-isolated-{Guid.NewGuid():N} {suffix}"));
     private sealed class TemporaryParent(string path) : IDisposable { public string Path { get; } = Directory.CreateDirectory(path).FullName; public void Dispose() { if (Directory.Exists(Path)) Directory.Delete(Path, true); } }
     private sealed record RunResult(int ExitCode, string Output);
     private sealed record Snapshot(Dictionary<string, (long, string)> Files, string ZipHash, byte[] Inventory, byte[] Manifest);
+    private sealed class IsolationRoot : IDisposable
+    {
+        public string Parent { get; } public string Marker { get; } = Guid.NewGuid().ToString("N"); public bool RelativeParent { get; set; } public string Intermediate { get; } public string Build { get; } public string Restore { get; } public string Packages { get; } public string Output { get; }
+        public IsolationRoot(string parent) { Parent = Directory.CreateDirectory(parent).FullName; File.WriteAllText(Path.Combine(Parent, ".aibar-isolation-marker"), Marker); Intermediate = Path.Combine(Parent, "intermediate"); Build = Path.Combine(Parent, "build"); Restore = Path.Combine(Parent, "restore"); Packages = Path.Combine(Parent, "packages"); Output = Path.Combine(Parent, "recovery"); }
+        public IEnumerable<(string Name, string Value)> Arguments() { yield return ("-IsolationParent", RelativeParent ? "." : Parent); yield return ("-IsolationMarker", Marker); yield return ("-IntermediateDirectory", Intermediate); yield return ("-BuildOutputDirectory", Build); yield return ("-RestoreMetadataDirectory", Restore); yield return ("-PackageCacheDirectory", Packages); }
+        public void Dispose() { if (Directory.Exists(Parent)) Directory.Delete(Parent, true); }
+    }
 }

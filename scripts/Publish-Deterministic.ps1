@@ -13,7 +13,13 @@ param(
     [switch]$GraphProjection,
     [string]$FixtureDirectory,
     [string]$SbomOutput,
-    [string]$ComplianceOutput
+    [string]$ComplianceOutput,
+    [string]$IsolationParent,
+    [string]$IsolationMarker,
+    [string]$IntermediateDirectory,
+    [string]$BuildOutputDirectory,
+    [string]$RestoreMetadataDirectory,
+    [string]$PackageCacheDirectory
 )
 $ErrorActionPreference = "Stop"
 function Write-CapabilityPlan {
@@ -76,14 +82,53 @@ function Assert-FreshLeaf([string]$Leaf, [string]$Repository) {
     if (Get-ChildItem -LiteralPath $parent -Force | Where-Object Name -eq ([IO.Path]::GetFileName($root))) { throw "OutputDirectory must be a nonexistent leaf." }
     return $root
 }
+function Assert-IsolationState([string]$Parent, [string]$Marker, [string]$Repository) {
+    if (-not [IO.Path]::IsPathFullyQualified($Parent)) { throw "Isolation root must be absolute." }
+    $full = [IO.Path]::GetFullPath($Parent); $volume = [IO.Path]::GetPathRoot($full).TrimEnd('\','/')
+    if ([string]::IsNullOrWhiteSpace($Marker) -or $full.TrimEnd('\','/') -eq $volume -or -not (Test-Path -LiteralPath $full -PathType Container)) { throw "Isolation root is invalid." }
+    $sep = [IO.Path]::DirectorySeparatorChar
+    if ($full -eq $Repository -or $full.StartsWith($Repository + $sep, [StringComparison]::OrdinalIgnoreCase) -or $Repository.StartsWith($full + $sep, [StringComparison]::OrdinalIgnoreCase)) { throw "Isolation root must not overlap repository inputs." }
+    for ($current = $full; ; $current = [IO.DirectoryInfo]::new($current).Parent.FullName) { if (Is-Reparse $current) { throw "Isolation root ancestor must not be a reparse point." }; if ([IO.Path]::GetPathRoot($current).TrimEnd('\','/') -eq $current.TrimEnd('\','/')) { break } }
+    $markerPath = Join-Path $full ".aibar-isolation-marker"
+    try { if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf) -or [IO.File]::ReadAllText($markerPath) -cne $Marker) { throw "Isolation marker does not match." } } catch { throw "Isolation marker cannot be verified." }
+    return $full
+}
+function Assert-IsolationReady($Isolation, [string]$Marker, [string]$Repository) {
+    Assert-IsolationState $Isolation.parent $Marker $Repository | Out-Null
+    foreach ($root in @($Isolation.intermediate,$Isolation.build,$Isolation.restore,$Isolation.packages)) {
+        try { $item = Get-Item -LiteralPath $root -Force; if (-not ($item -is [IO.DirectoryInfo]) -or (Is-Reparse $root)) { throw "Isolation child is invalid." } } catch { throw "Isolation child cannot be revalidated safely." }
+    }
+}
+function Get-IsolationRoots([string]$Repository, [string]$Output) {
+    $values = @($IsolationParent,$IsolationMarker,$IntermediateDirectory,$BuildOutputDirectory,$RestoreMetadataDirectory,$PackageCacheDirectory)
+    $present = @($values | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($present.Count -eq 0) { return $null }; if ($present.Count -ne $values.Count) { throw "Isolation parameters must be supplied together." }
+    $parent = Assert-IsolationState $IsolationParent $IsolationMarker $Repository
+    foreach ($value in @($IntermediateDirectory,$BuildOutputDirectory,$RestoreMetadataDirectory,$PackageCacheDirectory,$Output)) { if (-not [IO.Path]::IsPathFullyQualified($value)) { throw "Isolation child must be absolute." } }
+    $roots = @($IntermediateDirectory,$BuildOutputDirectory,$RestoreMetadataDirectory,$PackageCacheDirectory,$Output | ForEach-Object { [IO.Path]::GetFullPath($_) })
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($root in $roots) {
+        if ($root -cne $root.Normalize([Text.NormalizationForm]::FormC) -or -not $seen.Add($root) -or (Test-Path -LiteralPath $root)) { throw "Isolation child is stale or invalid." }
+        $sep = [IO.Path]::DirectorySeparatorChar; if (-not $root.StartsWith($parent + $sep, [StringComparison]::OrdinalIgnoreCase) -or $root -eq $parent) { throw "Isolation child must be beneath the owned parent." }
+        Assert-FreshLeaf $root $Repository | Out-Null
+    }
+    foreach ($left in $roots) { foreach ($right in $roots) { if ($left -ne $right -and ($left.StartsWith($right + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or $right.StartsWith($left + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase))) { throw "Isolation children must not overlap." } } }
+    return [pscustomobject]@{ parent=$parent; intermediate=$roots[0]; build=$roots[1]; restore=$roots[2]; packages=$roots[3] }
+}
+function Write-IsolationProps($Isolation) {
+    $xml = "<Project><PropertyGroup><BaseIntermediateOutputPath>$($Isolation.intermediate)\`$(MSBuildProjectName)\</BaseIntermediateOutputPath><MSBuildProjectExtensionsPath>$($Isolation.restore)\`$(MSBuildProjectName)\</MSBuildProjectExtensionsPath><RestoreOutputPath>$($Isolation.restore)\`$(MSBuildProjectName)\</RestoreOutputPath><BaseOutputPath>$($Isolation.build)\`$(MSBuildProjectName)\</BaseOutputPath><RestorePackagesPath>$($Isolation.packages)</RestorePackagesPath><PathMap>$($Isolation.parent)=/_/isolation</PathMap><DefaultItemExcludes>`$(DefaultItemExcludes);`$(MSBuildProjectDirectory)\obj\**;`$(MSBuildProjectDirectory)\bin\**</DefaultItemExcludes></PropertyGroup></Project>"
+    $path = Join-Path $Isolation.restore "aibar-isolation.props"; [IO.File]::WriteAllText($path, $xml, [Text.UTF8Encoding]::new($false)); return $path
+}
 try {
     if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { throw "OutputDirectory is required." }
     try { $epoch = [long]::Parse($SourceDateEpoch, [Globalization.CultureInfo]::InvariantCulture) } catch { throw "SourceDateEpoch must be an integer." }
-    $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..")); $outputRoot = Assert-FreshLeaf $OutputDirectory $projectRoot
+    $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..")); $isolation = Get-IsolationRoots $projectRoot $OutputDirectory; $outputRoot = Assert-FreshLeaf $OutputDirectory $projectRoot
     $outputRoot = Assert-FreshLeaf $outputRoot $projectRoot
+    if ($null -ne $isolation) { foreach ($root in @($isolation.intermediate,$isolation.build,$isolation.restore,$isolation.packages)) { New-Item -ItemType Directory -Path $root -ErrorAction Stop | Out-Null }; Assert-IsolationReady $isolation $IsolationMarker $projectRoot }
     New-Item -ItemType Directory -Path $outputRoot -ErrorAction Stop | Out-Null; $created = $true
     $publish = Join-Path $outputRoot "publish"; New-Item -ItemType Directory -Path $publish -ErrorAction Stop | Out-Null
-    & $PublishCommand publish (Join-Path $projectRoot "src\AIBar.Desktop\AIBar.Desktop.csproj") --disable-build-servers --configuration Release --runtime win-x64 --self-contained true --output $publish /p:ContinuousIntegrationBuild=true /p:Deterministic=true /p:DebugType=None
+    $project = Join-Path $projectRoot "src\AIBar.Desktop\AIBar.Desktop.csproj"
+    if ($null -ne $isolation) { $properties = @("/p:DirectoryBuildPropsPath=$(Write-IsolationProps $isolation)"); Assert-IsolationReady $isolation $IsolationMarker $projectRoot; & $PublishCommand restore $project --runtime win-x64 --disable-parallel --nologo @properties; if ($LASTEXITCODE -ne 0) { throw "Self-contained win-x64 restore failed." }; Assert-IsolationReady $isolation $IsolationMarker $projectRoot; & $PublishCommand publish $project --no-restore --disable-build-servers --configuration Release --runtime win-x64 --self-contained true --output $publish /p:ContinuousIntegrationBuild=true /p:Deterministic=true /p:DebugType=None @properties } else { & $PublishCommand publish $project --disable-build-servers --configuration Release --runtime win-x64 --self-contained true --output $publish /p:ContinuousIntegrationBuild=true /p:Deterministic=true /p:DebugType=None }
     if ($LASTEXITCODE -ne 0) { throw "Self-contained win-x64 publish failed." }
     $files = @{}; Get-ChildItem -LiteralPath $publish -Recurse -File | ForEach-Object { $relative = $_.FullName.Substring($publish.Length).TrimStart('\','/') -replace '\\','/'; if ($relative.StartsWith('/') -or $relative.Split('/') -contains '..' -or $files.ContainsKey($relative)) { throw "Unsafe or duplicate publish path." }; $files[$relative] = [ordered]@{ path = $relative; length = $_.Length; sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash } }
     $paths = [string[]]$files.Keys; [Array]::Sort($paths, [StringComparer]::Ordinal); $inventory = @($paths | ForEach-Object { [pscustomobject]$files[$_] })
