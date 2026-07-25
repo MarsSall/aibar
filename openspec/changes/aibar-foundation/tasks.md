@@ -7,11 +7,11 @@
 | Estimated changed lines | Historical slices retained; 8C2A ~250–300, 8C2B1a1 ~300–370, 8C2B1a2 ~330–390, 8C2B1b ~360–390, 8C2B2 ~260–340 |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | Existing chain → 8B.1 → 8C1 → 8C2A → 8C2B1a1 → 8C1.1 → 8C2B1a2 → 8C2B1b → 8C2B2 → 8D → 8E |
-| Delivery strategy | auto-chain |
+| Suggested split | Existing chain → 8B.1 → 8C1 → 8C2A → 8C2B1a1 → 8C1.1a → 8C1.1b1 → 8C1.1b2 → 8C2B1a2 → 8C2B1b → 8C2B2 → 8D → 8E |
+| Delivery strategy | ask-on-risk |
 | Chain strategy | feature-branch-chain |
 
-Decision needed before apply: No
+Decision needed before apply: Yes
 Chained PRs recommended: Yes
 Chain strategy: feature-branch-chain
 400-line budget risk: High
@@ -348,7 +348,7 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 ### Slice 8C2 — Mandatory distribution split: 8C2A → 8C2B1a1 → 8C1.1 → 8C2B1a2 → 8C2B1b → 8C2B2
 
-**Dependency chain:** reviewed 8C1 → 8C2A → B1a1 → reviewed/committed 8C1.1 → B1a2 → B1b → B2 → 8D → 8E. B1a1/B1a2 replace failed B1a; every child is independently reviewed, feature-branch-chain, <=400 lines, with no exception. 8D alone owns lifecycle.
+**Dependency chain:** reviewed 8C1 → 8C2A → B1a1 → reviewed/committed 8C1.1a → reviewed/committed 8C1.1b1 → reviewed/committed 8C1.1b2 → B1a2 → B1b → B2 → 8D → 8E. B1a1/B1a2 replace failed B1a; every child is independently reviewed, feature-branch-chain, <=400 lines, with no exception. 8D alone owns lifecycle.
 
 #### Slice 8C2A — Manifest/assets and capability state (~250–300 lines)
 
@@ -372,7 +372,7 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Status:** the generation-22/23 candidate remains unaccepted after generation 24 found its admission, process-tree, cleanup, repository-wide isolation, deterministic-evidence, and RED coverage incomplete. The maintainer authorized this split on 2026-07-24. Do not claim either child, the prerequisite, or B1a2 complete from the existing candidate or its prior evidence.
 
-**Shared boundary:** reviewed/committed B1a1; each child targets its immediate predecessor in the `feature-branch-chain`. Only `scripts/Publish-Deterministic.ps1` and `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs` may change. No packaging policy, B1a1 graph, runtime artifact, MakeAppx, or SignTool path. B1a2 remains blocked until both children are reviewed, receipted, and committed.
+**Shared boundary:** reviewed/committed B1a1; each child targets its immediate predecessor in the `feature-branch-chain`. Only `scripts/Publish-Deterministic.ps1` and `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs` may change. No packaging policy, B1a1 graph, runtime artifact, MakeAppx, or SignTool path. B1a2 remains blocked until 8C1.1a and both b1 children are reviewed, receipted, and committed. Every child has a hard <=400 authored-line cap, hard 20-minute apply deadline, stop-new-work at minute 18, commands <=5 minutes, and no size exception.
 
 ##### Slice 8C1.1a — Isolated admission and deterministic MSBuild routing (~260–340 authored lines)
 
@@ -380,15 +380,39 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 - [x] **GREEN/TRIANGULATE:** admit only one marker-owned external parent with distinct fresh children; revalidate admission immediately before restore and publish; forward identical project-separated `BaseIntermediateOutputPath`, `MSBuildProjectExtensionsPath`, `RestoreOutputPath`, `BaseOutputPath`, and `RestorePackagesPath` through explicit restore and `publish --no-restore`; prove two Unicode/space roots preserve repository-wide `obj/**` and `bin/**`, and yield byte-identical inventory, ZIP, manifest, and artifact identity. <!-- sdd-owner: implementation -->
 - [x] **GATE:** focused `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingRecovery"`; runtime harness uses two caller-owned external roots. Rollback reverts only this child’s routing/admission/tests, preserving reviewed 8C1 defaults. <!-- sdd-owner: implementation -->
 
-##### Slice 8C1.1b — Owned process lifecycle and cleanup proof (~240–340 authored lines)
+##### Slice 8C1.1b1a — Deterministic executable child/grandchild harness and RED proof (implementation complete; evidence closure recorded)
 
-- [ ] **RED:** test bounded asynchronous stdout/stderr draining, timeout/cancellation, launch/nonzero/partial-output failure, child-plus-grandchild termination and wait, no acceptance before complete process-tree exit, stale incomplete-output preservation, and cleanup refusal after marker/containment/reparse revalidation. <!-- sdd-owner: implementation -->
-- [ ] **GREEN/TRIANGULATE:** use argument-safe owned restore/publish process execution; on timeout/cancel terminate and wait for descendants, then dispose streams/handles. The harness alone cleans only the exact marker-owned external parent after child exit and post-exit validation, recording path-free cleanup evidence; failures retain caller-owned output and never recurse or replace. <!-- sdd-owner: implementation -->
-- [ ] **GATE:** focused recovery test plus required full suite/build; runtime harness proves two-root deterministic output, process-exit-before-cleanup, no-tool behavior, stale/failure preservation, and repository-wide isolation. Rollback reverts only this child’s lifecycle/tests, preserving 8C1.1a and reviewed 8C1 defaults. <!-- sdd-owner: implementation -->
+**Dependency:** reviewed/receipted/committed 8C1.1a. Chain remains **b1a → b1b → b2 → B1a2**. **Review Workload Forecast:** 180–260 authored additions/deletions; risk Low; hard maximum 400; no chained PR recommendation. Apply: ask-always, one isolated work unit; hard 20 minutes; stop new work at minute 18; each command <=5 minutes. Scope is harness/test infrastructure only; no production lifecycle implementation.
+
+- [x] **RED:** Add failing coverage for marker nonce/content, canonical containment, nested-tree reparse rejection, direct-child plus grandchild PID/start-time records, and finite non-saturating stdout/stderr writes; assert no cleanup or saturated-pipe premise.
+- [x] **GREEN:** Correct only `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs`: concurrently drain compiler streams under an enforceable timeout/termination/wait, validate both explicit identities/owned handles, and gate recursive deletion on exact marker, canonical containment, and a complete owned-tree reparse scan.
+- [x] **TRIANGULATE:** Prove publisher/direct completion with the known grandchild alive, finite stdout/stderr coverage without saturation, bounded release/targeted teardown, immediate repeatability, no descendants, and no prohibited sleeps, polling, `.cmd`, global scan, or unbounded wait.
+- [x] **GATE:** Focused b1a test, immediate repeat, exact outputs/hashes where the contract requires, and `git diff --check`; leave the root untouched on any failed ownership check. b1b remains responsible for production lifecycle integration.
+
+**Independent verification disposition:** Native attempt 36 and its receipt remain historical evidence. The four implementation gaps were remediated in terminal attempt 37, and approved receipt `review-246b855802905e01` binds the post-correction test bytes and resolves `R3-001`. Maintainer-authorized evidence closure recorded fresh exact focused-test and current build output digests without changing code. The verifier-owned report remains the authority for lifting the evidence gate; b1b stays blocked until that verification is accepted and the existing review/receipt/commit dependency is satisfied.
+
+##### Slice 8C1.1b1a remediation — bounded correction completed; evidence closure complete
+
+**Forecast:** 220–300 authored lines, risk Medium, one PR/work unit, no chain split; correction stays below the 400-line budget. Allowed implementation path is `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs`; this task ledger is the only planning artifact to change now.
+
+- [x] **RED:** Encode the four failing cases above before correction; preserve the accepted descendant-liveness RED and explicitly avoid saturation/deadlock as proof.
+- [x] **GREEN:** Make the harness satisfy the exact identity, concurrent-drain/timeout, finite-stream, marker/nonce, canonical-containment, and nested-reparse contracts without touching production, b1b, b2, B1a2, native authority, or review records.
+- [x] **TRIANGULATE/GATE:** The correction executed under native authority. The later maintainer-authorized evidence-closure unit captured the current focused b1a test and build output bytes/digests, confirmed no scoped descendants, and passed `git diff --check`; it made no functional code or test behavior change.
+
+**Work-unit evidence:** runtime harness is the generated external child/grandchild scenario; rollback is reverting only the remediation changes in `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs` plus this b1a remediation/task evidence, preserving reviewed 8C1.1a, defaults, and all downstream unchecked tasks. Dependency remains `b1a → b1b → b2 → B1a2`; downstream stays blocked until correction is independently verified, newly reviewed/receipted, and committed.
+
+##### Slice 8C1.1b — Owned process lifecycle implementation (~280–395 authored lines)
+
+**Dependency:** reviewed/receipted/committed 8C1.1b1a. **Review Workload Forecast:** 280–395 authored additions/deletions; risk High; hard maximum 400; no exception. Apply: hard 20 minutes; stop new work at minute 18; each command <=5 minutes. Runtime: reviewed b1a deterministic child/grandchild harness. Rollback removes only lifecycle implementation/integration tests/evidence marks; preserve b1a, 8C1.1a, and reviewed 8C1 defaults.
+
+- [ ] **RED:** using reviewed b1a, add failing tests for bounded drain, launch/nonzero/partial-output handling, timeout/cancel, tree termination, bounded post-kill waits, explicit parent/descendant exit confirmation, and fail-closed output preservation.
+- [ ] **GREEN:** implement owned lifecycle around the current synchronous publisher: drain boundedly, handle launch/nonzero/partial output, cancel/timeout, terminate the tree, wait boundedly after kill, confirm parent and descendants exited, and preserve output on failure.
+- [ ] **TRIANGULATE:** exercise saturated streams, early exit, grandchild survival, cancellation/timeout races, launch failure, nonzero/partial output, and unproven exit; record focused/runtime evidence, process cleanup, and path-free safe status.
+- [ ] **GATE:** reviewed receipt proves bounded cleanup and explicit exit confirmation; no marker-gated cleanup integration or containment revalidation belongs here. B1a2 is blocked until b1b is reviewed, receipted, and committed.
 
 #### Slice 8C2B1a2 — Versioned live-policy authority, external acquisition, and two-root proof (~390 authored lines)
 
-**Dependency:** reviewed and committed 8C1.1 receipt; B1a2 must invoke its reviewed isolated mode and cannot absorb, bypass, or reimplement it. **Start:** reviewed B1a1 plus 8C1.1 commit. **End:** real acquisition feeds B1a1 only through maintainer-reviewed policy. **Allowed paths:** `scripts/Publish-Deterministic.ps1`; `tests/AIBar.Domain.Tests/PackagingDistributionTests.cs`; authorized checked-in `packaging/policies/{win-x64.publish-policy.v1.json,live-publish-policy-1.schema.json,review/win-x64.publish-policy-candidate.v1.json}` only. Runtime/candidate/acquisition leaves are external caller-owned temporary roots, never `artifacts/` or any repository path; 8C1 defaults remain unchanged. No legal/provenance/promotion, MakeAppx, or signing paths.
+**Dependency:** reviewed/receipted/committed 8C1.1b2, after reviewed/receipted/committed 8C1.1b1b, after reviewed/receipted/committed 8C1.1b1a; B1a2 must invoke the reviewed isolated mode and cannot absorb, bypass, or reimplement it. **Start:** reviewed B1a1 plus the complete 8C1.1 receipt chain. **End:** real acquisition feeds B1a1 only through maintainer-reviewed policy. **Allowed paths:** `scripts/Publish-Deterministic.ps1`; `tests/AIBar.Domain.Tests/PackagingDistributionTests.cs`; authorized checked-in `packaging/policies/{win-x64.publish-policy.v1.json,live-publish-policy-1.schema.json,review/win-x64.publish-policy-candidate.v1.json}` only. Runtime/candidate/acquisition leaves are external caller-owned temporary roots, never `artifacts/` or any repository path; 8C1 defaults remain unchanged. No legal/provenance/promotion, MakeAppx, or signing paths.
 
 **Review Workload Forecast:** 390–398 authored additions/deletions (hard maximum 400); generated policy/output is excluded only from authored counting, never from snapshot/hash/receipt binding. Risk: High. Chained PRs: Yes; decision needed: No (force-chained `feature-branch-chain`, no exception or split). If the estimate exceeds 400, stop and replan rather than compress or waive checks.
 
@@ -436,7 +460,7 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 - [ ] **TRIANGULATE:** repeat on W10/W11 with integration disabled; prove local analytics work and no remote sink exists.
 - [ ] **REFACTOR:** consolidate release checklist and rollback procedure. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Windows|FullyQualifiedName~ReleaseGate"`. Runtime: W10/W11 VM smoke matrix. Rollback: remove gate evidence/configuration and ship disabled; preserve 8D lifecycle.
 
-**Active chain:** `8C2A → B1a1 (#6) → 8C1.1 (#7a) → B1a2 (#7) → B1b (#8) → B2 (#9) → 8D (#10) → 8E (#11)`; each PR targets its reviewed predecessor. 8B.2 is retired; failed B1a evidence is non-authoritative; no exception. B1a2 depends on the reviewed/committed 8C1.1 receipt, B1b on reviewed B1a2, B2 on B1b, and 8D on B2.
+**Active chain:** `8C2A → B1a1 (#6) → 8C1.1a (#7a) → 8C1.1b1a → 8C1.1b1b → 8C1.1b2 → B1a2 (#8) → B1b (#9) → B2 (#10) → 8D (#11) → 8E (#12)`; each PR targets its reviewed predecessor. 8B.2 is retired; failed B1a evidence is non-authoritative; no exception. 8C1.1b1b depends on reviewed/receipted/committed 8C1.1b1a; 8C1.1b2 depends on reviewed/receipted/committed 8C1.1b1b; B1a2 depends on reviewed/receipted/committed 8C1.1b2.
 
 ## Cross-Slice Completion Gates
 

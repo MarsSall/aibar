@@ -6,7 +6,7 @@ Build AIBar as a single-process Windows .NET 8 WPF tray application. Presentatio
 
 **Size exception reason:** the full design retains exact credential/privacy boundaries, incremental persistence rules, completed-slice traceability, and literal B1 graph, legal, canonicalization, subprocess, promotion, rollback, and failure contracts. Compressing these below the ordinary tier would remove security or recovery semantics.
 
-**Actual artifact word count:** 4,700 whitespace-delimited words, including headings, tables, and code contracts.
+**Actual artifact word count:** 4,995 whitespace-delimited words, including headings, tables, and code contracts.
 
 ## Architecture Decisions
 
@@ -189,15 +189,25 @@ Only these safe codes are emitted, optionally with non-sensitive enum context: `
 
 #### Prerequisite Slice 8C1.1 — opt-in isolated restore and MSBuild roots
 
-8C1.1 is a small independent child after reviewed B1a1 and before B1a2. It modifies only `scripts/Publish-Deterministic.ps1` and `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs`. Its default invocation remains the reviewed 8C1 behavior: when no isolation arguments are supplied, command shape, output-root guard, publish layout, recursive inventory, deterministic ZIP, artifact manifest, failure reporting, and caller-owned cleanup boundary remain unchanged.
+8C1.1 is a prerequisite chain after reviewed B1a1 and before B1a2: 8C1.1a owns isolated routing; 8C1.1b1a owns only the retained descendant-quiescence RED harness; 8C1.1b1b owns production process lifecycle; and 8C1.1b2 owns its cleanup integration. Changes remain limited to `scripts/Publish-Deterministic.ps1` and `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs`. Default invocation remains the reviewed 8C1 behavior: without isolation arguments, command shape, output-root guard, publish layout, recursive inventory, deterministic ZIP, artifact manifest, failure reporting, and caller-owned cleanup boundary are unchanged.
 
 Isolated mode is explicit and all-or-nothing. The caller supplies one marker-owned external parent plus absolute distinct children for MSBuild intermediates, build outputs, restore metadata, package cache, and the existing fresh 8C1 recovery output leaf. Supplying only a subset fails before process launch. Every path must be beneath the marked parent, outside repository/worktrees in both containment directions, NFC-valid, non-root, and free of observed reparse ancestors. Existing child file/directory, collision, marker mismatch, inaccessible classification, overlap between children, or changed observation fails closed without mutation. The script repeats canonical containment/reparse checks immediately before restore and publish.
 
 Isolated mode performs explicit `dotnet restore`, then `dotnet publish --no-restore`, forwarding the same external properties to both: project-separated `BaseIntermediateOutputPath`, `MSBuildProjectExtensionsPath`, and `RestoreOutputPath`; external `BaseOutputPath`; and `RestorePackagesPath`. Trailing separators and per-project leaves are deterministic MSBuild storage details, never component identity. After success, the selected `project.assets.json`, emitted deps file, publish tree, inventory, ZIP, and artifact manifest all originate from the external owned tree; repository `obj/**` and `bin/**` must remain byte/state unchanged.
 
-Proof covers default-mode compatibility against reviewed 8C1 evidence and isolated-mode runs in two external parents containing spaces and NFC Unicode. It verifies identical inventory paths/hashes, ZIP bytes, manifest bytes, and artifact identity; no root spelling enters evidence. Stale/colliding children and injected restore/publish failure preserve pre-existing bytes and report incomplete caller-owned output. 8C1.1 itself performs no recursive cleanup or replacement: the owning harness waits for restore/publish process-tree exit, disposes handles, validates marker/containment/reparse state, then removes only its external parent and records path-free cleanup proof. MakeAppx and SignTool are never invoked.
+8C1.1a proof covers default-mode compatibility and isolated-mode runs in two external parents containing spaces and NFC Unicode. It verifies identical inventory paths/hashes, ZIP bytes, manifest bytes, and artifact identity; no root spelling enters evidence. Stale/colliding children and injected restore/publish failure preserve pre-existing bytes and report incomplete caller-owned output.
 
-8C1.1 adds no policy generation, graph ownership, SBOM, legal/provenance promotion, B1 receipt, MSIX, signing, lifecycle, or release claim. Rollback reverts only its optional parameters/forwarding and focused tests, restoring exact reviewed 8C1 default behavior. Forecast: 180–260 authored additions/deletions, with a hard 400-line ceiling. It must receive its own review, receipt, and commit before any B1a2 policy-candidate generation or runtime acquisition resumes.
+##### Slice 8C1.1b1a descendant-quiescence RED harness
+
+Attempt 35 is historical failed evidence: it proved that stdout/stderr saturation does not deterministically deadlock the current publisher. The accepted RED instead proves that publisher/direct invocation can complete while a known owned grandchild remains alive, without descendant-exit or tree-quiescence evidence.
+
+The test generates an external `net8.0` direct executable beneath a fresh GUID root whose path contains spaces and NFC Unicode. That executable has explicit child and grandchild modes. GUID-named readiness and release events coordinate them without arbitrary sleeps or polling. The child launches the grandchild with discrete `ProcessStartInfo.ArgumentList` entries, waits boundedly for readiness, records exact child/grandchild identities, and exits zero. The harness establishes identity only from those records and owned process handles—never a global process scan—and retains proof that publisher/direct invocation completed while the known grandchild handle still represents a live process.
+
+After retaining RED, the harness signals release and waits boundedly. It uses targeted termination only if the known owned process remains alive, then performs a second bounded wait. Only after marker, recorded identity, canonical containment, and reparse checks succeed may it delete the harness-owned GUID root. A refused check leaves the root untouched and fails cleanup. `.cmd`, pipe saturation, unbounded waits, MakeAppx, and SignTool are excluded.
+
+b1a adds harness infrastructure and retained RED only; it does not change the synchronous publisher or implement timeout, concurrent stdout/stderr drains, production tree termination/waits, or cleanup integration. Those lifecycle behaviors belong to b1b, with integration remaining in b2. Each child requires its own review, receipt, and commit before B1a2 resumes; each retains the hard 400-line ceiling.
+
+Required `tasks.md` follow-up, not performed: replace only Slice 8C1.1b1a's four bullets (lines 387–390) with this contract. Preserve b1b timeout/drain/tree-lifecycle ownership and b2 integration ownership.
 
 #### Source of truth, generation, and ownership
 
@@ -247,9 +257,9 @@ Tests launch PowerShell and 8C1/8C1.1 `dotnet restore`/`publish` with `ProcessSt
 | Commit state | N/A — B1 does not stage or commit. | No task. |
 | Push state | N/A — B1 does not push or resolve remotes/refspecs. | No task. |
 | PR commands | N/A — B1 issues no PR command. | No task. |
-| Process timeout | Applicable | Fixed timeout cancels acceptance; RED child exceeds timeout → `B1_SUBPROCESS_TIMEOUT`, no promotion. |
-| Child-tree termination | Applicable | Launch in owned job/process tree; timeout/cancel terminates descendants and waits; RED child spawns grandchild holding output, then verify both exit and no acceptance. |
-| Stdout/stderr drain | Applicable | Drain both asynchronously before/while waiting to avoid deadlock; RED fills both streams and must complete or timeout deterministically with sanitized output. |
+| Process timeout | Applicable | b1a uses bounded readiness/release/teardown waits only; b1b owns the production timeout. RED proves publisher completion while the owned grandchild remains alive, then bounded teardown. |
+| Child-tree termination | Applicable | b1a releases and, only if needed, targets the known owned grandchild before a second bounded wait; b1b owns production tree termination/waits. No global process scan is permitted. |
+| Stdout/stderr drain | Applicable | Attempt 35 disproved saturation as deterministic b1a RED. b1b must add and test concurrent production drains; b1a neither saturates pipes nor implements draining. |
 | Exit/failure propagation | Applicable | Nonzero/start failure maps to `B1_SUBPROCESS_FAILED`; RED nonzero child cannot generate success receipt. |
 | Partial output | Applicable | Publish success requires exit zero plus complete inventory/deps reconciliation; RED child writes partial files then fails; staging remains unaccepted. |
 | Stale output | Applicable | Publish/staging leaves must be nonexistent and collision-failing; RED pre-existing file/directory/journal → `B1_STALE_OUTPUT`, bytes unchanged. |
@@ -274,4 +284,4 @@ Release proceeds from developer fixtures/private adapter disabled, to opt-in int
 
 ## Open Questions
 
-None blocking this design. The tasks and progress artifacts now carry the explicit B1 authority reset required before apply.
+None blocking this design. `tasks.md` still contains the superseded b1a saturation/deadlock contract and requires the narrow follow-up identified by this design before b1a Apply; `apply-progress.md` remains historical and unchanged.

@@ -1,5 +1,53 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 8C1.1b1a final evidence closure (2026-07-24)
+
+**Status:** Standard mode (`strict_tdd: false`). This maintainer-authorized evidence-only work unit made no production, lifecycle, or test-behavior change. `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs` was verified unchanged before and after execution: SHA-256 `2D0F79703E24511F33D676E219775602AD0069EB92A75B4C38981CE9A191AA2D`. The latest approved receipt remains `review-246b855802905e01` (generation 1, `approved`, resolved `R3-001`). No b1b, b2, B1a2, review, commit, PR, or `.gitignore` action occurred.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_direct_invocation_completes_while_known_owned_grandchild_remains_alive" --no-restore -m:1 --nologo` — exit 0; passed 1/1, failed 0, skipped 0. Complete raw merged stdout/stderr capture: 978 bytes; SHA-256 `72292AC33A061A64B5E09A5DC28329D19CCE68D422E670CF7C043CFC00B06EC1`. |
+| Current build/type-check | `dotnet build AIBar.sln --no-restore --nologo` — exit 0; 0 warnings, 0 errors. Complete raw merged stdout/stderr capture: 684 bytes; SHA-256 `3C46A2108C5B1215B863E7818B6575E3958A8940C29DD512CA42D3DEFE5D04DA`. This is build/type-check evidence only; no full test suite is claimed. |
+| Runtime harness / cleanup | The focused test is the runtime-generated external child/grandchild harness. After it exited, scoped descendant inspection found no remaining harness/`Harness.csproj` process. Exact captures remain only in the approved external temporary directory `C:\Users\mjsal\AppData\Local\Temp\opencode`; no generated evidence file was added to the repository. |
+| Diff | `git diff --check` — exit 0; no whitespace errors (Git emitted existing LF-to-CRLF advisories only). |
+| Rollback boundary | Revert only this evidence-closure narrative in `openspec/changes/aibar-foundation/{tasks.md,apply-progress.md}`. No functional source or test behavior changed. |
+
+**Task narrative alignment:** stale statements that b1a was incomplete or remediation was not authorized were replaced with the actual attempt-37 remediation, approved `review-246b855802905e01` receipt, and this evidence closure. Historical attempt-36 failure remains historical; the verifier-owned report remains unchanged. **Native work unit:** `slice-8c1-1b1a-final-evidence`, one attempt, maximum 400 changed lines. **Next:** verifier-owned evidence-gate update/acceptance; b1b, b2, and B1a2 remain blocked.
+
+## Slice 8C1.1b1a verification remediation applied (2026-07-24)
+
+**Status:** Standard mode (`strict_tdd: false`). Native attempt 37 remediated all four independent verification CRITICAL findings in one bounded work unit. It changes only `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs` plus this truthful OpenSpec evidence/task state. The prior attempt-36 receipt remains historical and does not bind these bytes. No production lifecycle behavior, publisher-script change, b1b/b2/B1a2 work, MakeAppx, SignTool, commit, PR, or review action occurred.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED-first remediation evidence | Before the passing correction, focused runs exposed incorrect finite-token expectations and release ordering while the harness was extended. The retained descendant-quiescence RED remains direct child exit zero while the recorded grandchild is live; saturation/deadlock is never used as proof. |
+| Focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_direct_invocation_completes_while_known_owned_grandchild_remains_alive" --no-restore -m:1 --nologo` — passed 1/1, failed 0, skipped 0. UTF-8 captured-output SHA-256: `243D8063F9EC5BD3818E5A7F2438D12069FE8DC244400E127E53A70F79D9EEC5`. |
+| Immediate repeat | The exact focused command immediately repeated — passed 1/1, failed 0, skipped 0. UTF-8 captured-output SHA-256: `243D8063F9EC5BD3818E5A7F2438D12069FE8DC244400E127E53A70F79D9EEC5`. |
+| Runtime harness / process and cleanup | The generated `net8.0` child records direct-child PID/start time before launching its grandchild; the grandchild completes the shared child/grandchild record. The test validates the direct owned handle and targeted grandchild handle, sees direct completion while the grandchild remains live, then signals release and bounded-waits for known grandchild exit. Both finite stdout/stderr token pairs are asserted exactly after release. Compiler stdout/stderr drain concurrently and the shared 10-second bound covers execution plus drains; timeout kills only the compiler tree, bounded-waits again, and reports at most 4096 diagnostic characters. Cleanup first requires the exact nonce marker, canonical containment of every known artifact, a non-reparse root, and a complete owned-tree reparse scan; failed admission preserves the root. No descendant remains before deletion. |
+| Diff | `git diff --check` — exit 0; no whitespace errors (Git reported only existing LF-to-CRLF advisories). |
+| Rollback boundary | Revert only the descendant-harness remediation in `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs` and the seven b1a task/evidence edits in `openspec/changes/aibar-foundation/{tasks.md,apply-progress.md}`. Keep 8C1.1a and reviewed 8C1 defaults; b1b/b2/B1a2 remain untouched and blocked. |
+
+**Finding resolution:** (1) cleanup now checks exact nonce marker, canonical known-artifact containment, root and nested reparse points before recursive deletion; (2) compiler output drains concurrently within one bounded execution-and-drain timeout and targeted compiler-tree timeout path; (3) child and grandchild PID/start-time records plus owned-handle validation are present; (4) child and grandchild emit finite non-saturating stdout/stderr tokens, with exact captured stream assertions. **Authored scope:** below the 400-line maximum. **Next:** independent verification/review is required for these new bytes; b1b, b2, and B1a2 remain blocked.
+
+```json
+{"schema":"gentle-ai.remediation-result/v1","lineage_id":"review-d2bee95a21fe9905","generation":1,"mode":"standard","fix_batch":"slice-8c1-1b1a-verification-remediation","failed_evidence_revision":"sha256:3efc2057079cd07ab1b7d2520e1390ecc45873fa6113c70883ff908ff3a32349","outcome":"passed"}
+{"schema":"gentle-ai.remediation-evidence/v1","lineage_id":"review-d2bee95a21fe9905","generation":1,"mode":"standard","fix_batch":"slice-8c1-1b1a-verification-remediation","failed_evidence_revision":"sha256:3efc2057079cd07ab1b7d2520e1390ecc45873fa6113c70883ff908ff3a32349","focused_output_hash":"sha256:243d8063f9ec5bd3818e5a7f2438d12069fe8dc244400e127e53a70f79d9eec5","repeat_output_hash":"sha256:243d8063f9ec5bd3818e5a7f2438d12069fe8dc244400e127e53a70f79d9eec5","diff_check":"passed"}
+```
+
+## Slice 8C1.1b1a descendant-quiescence RED harness applied (2026-07-24)
+
+**Status:** Standard mode (`strict_tdd: false`) with task-mandated retained RED-first evidence. This isolated unit changes only `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs`; it adds no production lifecycle behavior, no `scripts/Publish-Deterministic.ps1` change, and no b1b, b2, B1a2, MakeAppx, or SignTool work.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | The generated external `net8.0` direct executable proves the unchanged direct invocation exits zero while its explicitly recorded, owned grandchild handle remains live. The retained RED is the absence of descendant-exit/tree-quiescence evidence; stream saturation is not used. |
+| Helper compilation / protocol | The test writes `Harness.csproj` and `Program.cs` below a fresh GUID root containing a space and NFC `café`, then runs bounded `dotnet build Harness.csproj --nologo -v:q`. Child-to-grandchild launch uses only `ProcessStartInfo.ArgumentList`; GUID-named ready/release events, exact root argument, PID/start-time identity record, and marker ordering are asserted. |
+| Focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_direct_invocation_completes_while_known_owned_grandchild_remains_alive" --no-restore -m:1 --nologo` — first implementation run failed 1/1 on generated-helper compile (`CS0136`), then passed 1/1 after correcting the protocol; immediate repeat passed 1/1. |
+| Runtime harness / cleanup | Each pass signals release, bounded-waits for the known grandchild, validates PID/start-time identity, marker, containment root, and no root reparse point, then deletes only its owned GUID root. Disposal targets only the recorded process and uses bounded `Kill(entireProcessTree: true)` only if release does not finish it. No global scan, sleep, polling loop, `.cmd`, pipe saturation, or unbounded wait is used. |
+| Rollback boundary | Revert the descendant harness test and these four 8C1.1b1a task marks/progress block only. Keep 8C1.1a isolation, reviewed 8C1 defaults, and all b1b/b2/B1a2 work unchanged. |
+
+**Scope/line count:** 108 authored additions + 0 deletions in the test file, plus four checkbox edits and this evidence record; below the 400-line work-unit cap. **Next:** b1a is implementation-complete but must be independently reviewed/receipted/committed before b1b. No commit, PR, review, MakeAppx, or SignTool action was performed.
+
 ## Slice 8C1.1a generation 27 applied (2026-07-24)
 
 **Status:** Standard mode (`strict_tdd: false`) with task-mandated RED-first evidence; `auto-chain` / `feature-branch-chain`, PR #7a only. This child implements only isolated admission and deterministic MSBuild routing. Slice 8C1.1b, B1a2, MakeAppx, and SignTool remain untouched.

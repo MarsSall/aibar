@@ -214,6 +214,30 @@ The system MUST support the tray, popover, refresh, analytics, and startup behav
 - WHEN the application is used
 - THEN core tray and popover behavior works, or any exception is documented with a visible limitation
 
+### Requirement: Slice 8C1.1b1a descendant-quiescence RED contract
+
+The Slice 8C1.1b1a harness MUST prove the current publisher/direct invocation lacks descendant-tree quiescence evidence without implementing production lifecycle behavior. It MUST use a runtime-generated external `net8.0` direct executable, GUID-named readiness/release events, explicit owned process handles and records, exact discrete arguments, and external roots containing spaces and NFC Unicode. The child MUST launch a known grandchild, wait for readiness, then exit successfully while the known grandchild remains alive. Saturated stdout/stderr MUST NOT be the RED premise.
+
+#### Scenario: Publisher completes while an owned grandchild remains alive
+
+- GIVEN the direct child launches its known grandchild, signals readiness, and exits zero while the grandchild remains alive
+- WHEN the current publisher/direct invocation completes
+- THEN the harness proves completion occurred without descendant-exit or descendant-tree-quiescence evidence
+- AND the result is retained as the b1a RED proof without production lifecycle changes
+
+#### Scenario: Owned teardown removes only the harness root
+
+- GIVEN the RED run has recorded child/grandchild identities and owned handles
+- WHEN the release event is signaled and bounded teardown is performed
+- THEN the harness uses targeted termination only if needed, performs a second bounded wait, verifies identity/marker/containment evidence, and deletes only its external root
+
+#### Scenario: Stream saturation is not treated as deterministic proof
+
+- GIVEN a child writes to stdout or stderr without relying on pipe saturation
+- WHEN the direct invocation completes or fails
+- THEN the harness does not classify stream saturation or a saturated-pipe deadlock as the b1a RED condition
+- AND production timeout, concurrent draining, tree termination, and lifecycle integration remain deferred to Slice 8C1.1b
+
 ### Requirement: Non-goals and deferred capabilities
 
 The MVP MUST NOT claim support for other providers, multiple accounts or roots, WSL attribution, per-project analytics, authoritative billing/invoices/credits, prompt or response ingestion, browser-cookie or password flows, complete fork/replay/cross-file deduplication, reconstructed hourly history, or historical/probabilistic forecasting. Later capabilities MAY be considered only as explicitly scoped follow-up work, including broader providers, multiple roots/accounts, project analytics after privacy review, event/hourly retention, advanced deduplication, and historical forecasting after at least three complete weeks (with run-out probability requiring at least five).
