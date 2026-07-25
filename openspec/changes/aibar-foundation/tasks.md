@@ -401,14 +401,38 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Work-unit evidence:** runtime harness is the generated external child/grandchild scenario; rollback is reverting only the remediation changes in `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs` plus this b1a remediation/task evidence, preserving reviewed 8C1.1a, defaults, and all downstream unchecked tasks. Dependency remains `b1a → b1b → b2 → B1a2`; downstream stays blocked until correction is independently verified, newly reviewed/receipted, and committed.
 
-##### Slice 8C1.1b — Owned process lifecycle implementation (~280–395 authored lines)
+##### Slice 8C1.1b — Owned process lifecycle implementation (~180–260 authored lines)
 
-**Dependency:** reviewed/receipted/committed 8C1.1b1a. **Review Workload Forecast:** 280–395 authored additions/deletions; risk High; hard maximum 400; no exception. Apply: hard 20 minutes; stop new work at minute 18; each command <=5 minutes. Runtime: reviewed b1a deterministic child/grandchild harness. Rollback removes only lifecycle implementation/integration tests/evidence marks; preserve b1a, 8C1.1a, and reviewed 8C1 defaults.
+**Dependency:** reviewed/receipted/committed 8C1.1b1a. **Review Workload Forecast:** 180–260 authored additions/deletions; risk Medium; hard maximum 400; no exception. Apply: hard 20 minutes; stop new work at minute 18; each command <=5 minutes. Runtime: reviewed b1a deterministic child/grandchild harness. Rollback removes only lifecycle implementation/integration tests/evidence marks; preserve b1a, 8C1.1a, and reviewed 8C1 defaults.
 
-- [ ] **RED:** using reviewed b1a, add failing tests for bounded drain, launch/nonzero/partial-output handling, timeout/cancel, tree termination, bounded post-kill waits, explicit parent/descendant exit confirmation, and fail-closed output preservation.
-- [ ] **GREEN:** implement owned lifecycle around the current synchronous publisher: drain boundedly, handle launch/nonzero/partial output, cancel/timeout, terminate the tree, wait boundedly after kill, confirm parent and descendants exited, and preserve output on failure.
-- [ ] **TRIANGULATE:** exercise saturated streams, early exit, grandchild survival, cancellation/timeout races, launch failure, nonzero/partial output, and unproven exit; record focused/runtime evidence, process cleanup, and path-free safe status.
-- [ ] **GATE:** reviewed receipt proves bounded cleanup and explicit exit confirmation; no marker-gated cleanup integration or containment revalidation belongs here. B1a2 is blocked until b1b is reviewed, receipted, and committed.
+- [x] **RED:** deterministic tests cover bounded timeout/cancellation, fail-closed known-descendant identity/quiescence, launch failure, cleanup guarantees, and saturated concurrent stdout/stderr draining.
+- [x] **GREEN:** the lifecycle helper passes the narrowed contract: bounded cancellation, fail-closed known-descendant identity/quiescence, launch-failure handling, cleanup guarantees, and concurrent saturated-stream draining.
+- [x] **TRIANGULATE:** the narrowed lifecycle matrix is executable and passing for timeout/cancellation, known-descendant refusal, launch failure, cleanup, and saturated stdout/stderr streams.
+- [x] **GATE:** final independent scoped verification passed the focused owned-lifecycle tests, full `PackagingRecovery` filter, solution build, whitespace check, task/evidence alignment, and zero-Harness-process check. No marker-gated cleanup integration or containment revalidation belongs here. B1a2 remains blocked.
+
+**Scope-correction rationale:** The prior nonzero-exit test could not distinguish exit code 7 from cancellation and placed its sentinel outside the recovery output. Further proof was judged disproportionate to current AIBar progress. The deferred hardening backlog item **B1B-HARDEN-NONZERO-PARTIAL-OUTPUT** will restore deterministic nonzero-exit-with-partial-output preservation proof outside the current b1b closure path; it is not a b1b acceptance requirement.
+
+##### Slice 8C1.1b2 — Cleanup integration and ownership gate (planning correction)
+
+**Dependency:** completed 8C1.1b1b implementation, then its independent review gate. **Start:** b1b leaves the owned process tree terminated or reports failure with the incomplete output preserved. **End:** cleanup runs only after deterministic ownership and exit checks, or refuses without traversal. This block does not authorize Apply; the current uncommitted b1b plus ledger diff is 138 lines and remains reviewer burden.
+
+**Review Workload Forecast:** estimated 180–260 authored additions/deletions for this unit, including behavior tests and bounded task/progress evidence; combined with the current 138-line uncommitted diff, expected reviewer burden is approximately 318–398 lines. Risk: Medium (near the 400-line budget). Chained PRs recommended: No for this bounded unit; chain strategy remains pending because the session contract does not select one. Decision needed before apply: Yes (ask-always; no silent implementation authorization).
+
+Decision needed before apply: Yes
+Chained PRs recommended: No
+Chain strategy: pending
+400-line budget risk: Medium
+
+**Allowed paths:** `scripts/Publish-Deterministic.ps1`; `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs`. No other source, test, packaging, project, configuration, `.gitignore`, or OpenSpec artifact may change except a minimal task/progress cross-reference required to record completion evidence.
+
+- [ ] **8C1.1b2-RED:** Add behavior-first tests for cleanup admission after b1b: parent and every owned child are known, the parent marker/nonce matches, canonical containment and complete nested reparse checks pass, all recorded child/descendant handles have exited, and any failed check preserves the incomplete output without traversal or success evidence. <!-- sdd-owner: implementation -->
+- [ ] **8C1.1b2-GREEN:** Integrate cleanup only after b1b reports successful bounded process completion; revalidate exact marker, canonical containment, and reparses immediately before removing only the owned external parent. Never clean output on timeout, cancellation, launch/nonzero/partial failure, live descendant, ownership mismatch, stale bytes, or inaccessible/unclassifiable state. <!-- sdd-owner: implementation -->
+- [ ] **8C1.1b2-TRIANGULATE:** Verify successful cleanup, refusal with sentinel preservation, child-exit-before-delete ordering, repeatability with unique external roots, and path/secret-free failure status. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingRecovery" --no-restore -m:1 --nologo`; then `dotnet build AIBar.sln --no-restore --nologo` and `git diff --check`. <!-- sdd-owner: implementation -->
+- [ ] **8C1.1b2-GATE:** Review only this work unit against the two allowed implementation paths and the current 138-line baseline; stop before B1a2. Rollback reverts only b2 cleanup integration/tests and its minimal task/progress evidence, preserving reviewed b1b, b1a, and 8C1.1a. <!-- sdd-owner: implementation -->
+
+**Deterministic cleanup/rollback boundary:** cleanup is permitted only after exit confirmation plus marker, containment, and reparse revalidation; it removes only the exact caller-owned external parent. Any uncertainty leaves bytes untouched and reports failure. Rollback removes only b2 changes/evidence; it never deletes caller data, traverses an unowned root, or alters prior slices.
+
+**Explicit exclusions:** no MakeAppx, SignTool, MSIX, signing, B1a2, unrelated slices, `.gitignore`, commits, PRs, receipts, staging, publication, or release evidence. Stable Gentle AI is authoritative; the retired receipt workflow is not reintroduced. <!-- sdd-owner: parent -->
 
 #### Slice 8C2B1a2 — Versioned live-policy authority, external acquisition, and two-root proof (~390 authored lines)
 

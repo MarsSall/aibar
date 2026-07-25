@@ -19,7 +19,12 @@ param(
     [string]$IntermediateDirectory,
     [string]$BuildOutputDirectory,
     [string]$RestoreMetadataDirectory,
-    [string]$PackageCacheDirectory
+    [string]$PackageCacheDirectory,
+    [ValidateRange(1, 600)]
+    [int]$ProcessTimeoutSeconds = 300,
+    [ValidateRange(0, 600000)]
+    [int]$CancelAfterMilliseconds = 0,
+    [string]$KnownDescendantIdentityPath
 )
 $ErrorActionPreference = "Stop"
 function Write-CapabilityPlan {
@@ -119,6 +124,54 @@ function Write-IsolationProps($Isolation) {
     $xml = "<Project><PropertyGroup><BaseIntermediateOutputPath>$($Isolation.intermediate)\`$(MSBuildProjectName)\</BaseIntermediateOutputPath><MSBuildProjectExtensionsPath>$($Isolation.restore)\`$(MSBuildProjectName)\</MSBuildProjectExtensionsPath><RestoreOutputPath>$($Isolation.restore)\`$(MSBuildProjectName)\</RestoreOutputPath><BaseOutputPath>$($Isolation.build)\`$(MSBuildProjectName)\</BaseOutputPath><RestorePackagesPath>$($Isolation.packages)</RestorePackagesPath><PathMap>$($Isolation.parent)=/_/isolation</PathMap><DefaultItemExcludes>`$(DefaultItemExcludes);`$(MSBuildProjectDirectory)\obj\**;`$(MSBuildProjectDirectory)\bin\**</DefaultItemExcludes></PropertyGroup></Project>"
     $path = Join-Path $Isolation.restore "aibar-isolation.props"; [IO.File]::WriteAllText($path, $xml, [Text.UTF8Encoding]::new($false)); return $path
 }
+function Invoke-OwnedProcess([string]$FileName, [string[]]$Arguments, [string]$Failure) {
+    $start = [Diagnostics.ProcessStartInfo]::new($FileName)
+    $start.UseShellExecute = $false; $start.RedirectStandardOutput = $true; $start.RedirectStandardError = $true
+    foreach ($argument in $Arguments) { $start.ArgumentList.Add($argument) }
+    $process = $null; $timeout = [Threading.CancellationTokenSource]::new(); $linked = $null; $known = @()
+    try {
+        $timeout.CancelAfter([TimeSpan]::FromSeconds($ProcessTimeoutSeconds))
+        $linked = [Threading.CancellationTokenSource]::CreateLinkedTokenSource($timeout.Token, $PSCmdlet.PipelineStopToken)
+        if ($CancelAfterMilliseconds -gt 0) { $linked.CancelAfter($CancelAfterMilliseconds) }
+        $process = [Diagnostics.Process]::Start($start)
+        if ($null -eq $process) { throw $Failure }
+        $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
+        try { $process.WaitForExitAsync($linked.Token).GetAwaiter().GetResult() }
+        catch [OperationCanceledException] {
+            if (-not $process.HasExited) { $process.Kill($true) }
+            try { $process.WaitForExitAsync().WaitAsync([TimeSpan]::FromSeconds($ProcessTimeoutSeconds)).GetAwaiter().GetResult() }
+            catch [TimeoutException] { throw $Failure }
+            throw $Failure
+        }
+        if ($process.ExitCode -ne 0) { throw $Failure }
+        if (-not [string]::IsNullOrWhiteSpace($KnownDescendantIdentityPath)) {
+            try {
+                $identity = Get-Content -LiteralPath $KnownDescendantIdentityPath -Raw | ConvertFrom-Json
+                foreach ($name in @("child", "grandchild")) {
+                    $record = $identity.$name
+                    if ($null -eq $record) { throw "missing identity" }
+                    $known += [Diagnostics.Process]::GetProcessById([int]$record.pid)
+                    if ($known[-1].StartTime.ToUniversalTime().Ticks -ne [long]$record.startTicks) { throw "identity changed" }
+                }
+            }
+            catch { throw $Failure }
+            foreach ($descendant in $known) {
+                if (-not $descendant.HasExited) {
+                    try { $descendant.Kill($true); $descendant.WaitForExitAsync().WaitAsync([TimeSpan]::FromSeconds($ProcessTimeoutSeconds)).GetAwaiter().GetResult() }
+                    catch { }
+                    throw $Failure
+                }
+            }
+        }
+        try { [Threading.Tasks.Task]::WhenAll($stdout, $stderr).WaitAsync([TimeSpan]::FromSeconds($ProcessTimeoutSeconds)).GetAwaiter().GetResult() }
+        catch { throw $Failure }
+    }
+    finally {
+        foreach ($descendant in $known) { $descendant.Dispose() }
+        if ($null -ne $linked) { $linked.Dispose() }; $timeout.Dispose()
+        if ($null -ne $process) { $process.Dispose() }
+    }
+}
 try {
     if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { throw "OutputDirectory is required." }
     try { $epoch = [long]::Parse($SourceDateEpoch, [Globalization.CultureInfo]::InvariantCulture) } catch { throw "SourceDateEpoch must be an integer." }
@@ -128,8 +181,7 @@ try {
     New-Item -ItemType Directory -Path $outputRoot -ErrorAction Stop | Out-Null; $created = $true
     $publish = Join-Path $outputRoot "publish"; New-Item -ItemType Directory -Path $publish -ErrorAction Stop | Out-Null
     $project = Join-Path $projectRoot "src\AIBar.Desktop\AIBar.Desktop.csproj"
-    if ($null -ne $isolation) { $properties = @("/p:DirectoryBuildPropsPath=$(Write-IsolationProps $isolation)"); Assert-IsolationReady $isolation $IsolationMarker $projectRoot; & $PublishCommand restore $project --runtime win-x64 --disable-parallel --nologo @properties; if ($LASTEXITCODE -ne 0) { throw "Self-contained win-x64 restore failed." }; Assert-IsolationReady $isolation $IsolationMarker $projectRoot; & $PublishCommand publish $project --no-restore --disable-build-servers --configuration Release --runtime win-x64 --self-contained true --output $publish /p:ContinuousIntegrationBuild=true /p:Deterministic=true /p:DebugType=None @properties } else { & $PublishCommand publish $project --disable-build-servers --configuration Release --runtime win-x64 --self-contained true --output $publish /p:ContinuousIntegrationBuild=true /p:Deterministic=true /p:DebugType=None }
-    if ($LASTEXITCODE -ne 0) { throw "Self-contained win-x64 publish failed." }
+    if ($null -ne $isolation) { $properties = @("/p:DirectoryBuildPropsPath=$(Write-IsolationProps $isolation)"); $restoreArguments = @("restore", $project, "--runtime", "win-x64", "--disable-parallel", "--nologo") + $properties; Assert-IsolationReady $isolation $IsolationMarker $projectRoot; Invoke-OwnedProcess $PublishCommand $restoreArguments "Self-contained win-x64 restore failed."; $publishArguments = @("publish", $project, "--no-restore", "--disable-build-servers", "--configuration", "Release", "--runtime", "win-x64", "--self-contained", "true", "--output", $publish, "/p:ContinuousIntegrationBuild=true", "/p:Deterministic=true", "/p:DebugType=None") + $properties; Assert-IsolationReady $isolation $IsolationMarker $projectRoot; Invoke-OwnedProcess $PublishCommand $publishArguments "Self-contained win-x64 publish failed." } else { Invoke-OwnedProcess $PublishCommand @("publish", $project, "--disable-build-servers", "--configuration", "Release", "--runtime", "win-x64", "--self-contained", "true", "--output", $publish, "/p:ContinuousIntegrationBuild=true", "/p:Deterministic=true", "/p:DebugType=None") "Self-contained win-x64 publish failed." }
     $files = @{}; Get-ChildItem -LiteralPath $publish -Recurse -File | ForEach-Object { $relative = $_.FullName.Substring($publish.Length).TrimStart('\','/') -replace '\\','/'; if ($relative.StartsWith('/') -or $relative.Split('/') -contains '..' -or $files.ContainsKey($relative)) { throw "Unsafe or duplicate publish path." }; $files[$relative] = [ordered]@{ path = $relative; length = $_.Length; sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash } }
     $paths = [string[]]$files.Keys; [Array]::Sort($paths, [StringComparer]::Ordinal); $inventory = @($paths | ForEach-Object { [pscustomobject]$files[$_] })
     function Write-Json([string]$Path, $Value) { [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Compress -Depth 4), [Text.UTF8Encoding]::new($false)) }

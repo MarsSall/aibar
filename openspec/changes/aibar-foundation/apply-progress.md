@@ -1,5 +1,19 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 8C1.1b1b narrowed-contract cleanup (2026-07-25)
+
+**Status:** Standard mode (`strict_tdd: false`). Maintainer-approved mechanical cleanup removed the invalid/deferred nonzero-exit-with-partial-output test and its nonzero harness branch. The valid saturated-stream test and all other proven lifecycle tests remain. RED, GREEN, and TRIANGULATE remain checked under the narrowed task contract; the independent GATE remains unchecked. This record is apply evidence only, not independent verification or review approval. No production script, b1b2, B1a2, MakeAppx, SignTool, review, commit, PR, or cleanup integration changed.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Scope correction | The maintainer reduced the b1b contract because the removed test neither distinguished exit code 7 from cancellation nor proved preservation inside recovery output. `B1B-HARDEN-NONZERO-PARTIAL-OUTPUT` defers that proof outside current b1b acceptance. |
+| Lifecycle behavior | `Invoke-OwnedProcess` uses `ProcessStartInfo.ArgumentList`, concurrent `ReadToEndAsync` stdout/stderr tasks, a timeout linked to `PipelineStopToken`, bounded cancellation, `Kill(entireProcessTree: true)`, and bounded post-kill waits. On ordinary exit, an optional explicit known-descendant identity record is required to parse and match PID/start ticks; a live or unprovable descendant fails closed, retains the incomplete output, and never becomes success. |
+| Focused lifecycle proof | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Owned_lifecycle" --no-restore -m:1 --nologo` — passed 5/5, failed 0, skipped 0, 1 m 29 s. |
+| Focused recovery / build | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingRecovery" --no-restore -m:1 --nologo` — passed 18/18; `dotnet build AIBar.sln --no-restore --nologo` — 0 warnings, 0 errors; `git diff --check` passed; `Get-Process -Name Harness` — 0. |
+| Rollback boundary | Revert only the removed test/nonzero harness branch and this b1b evidence/ledger alignment; preserve the existing production script, saturation test, b1a, 8C1.1a, and b1b2. |
+
+**Changed-line count:** active review diff remains below the 400-line hard cap. **Next:** pending scoped verification; b1b2 and all downstream slices remain out of scope.
+
 ## Slice 8C1.1b1a final evidence closure (2026-07-24)
 
 **Status:** Standard mode (`strict_tdd: false`). This maintainer-authorized evidence-only work unit made no production, lifecycle, or test-behavior change. `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs` was verified unchanged before and after execution: SHA-256 `2D0F79703E24511F33D676E219775602AD0069EB92A75B4C38981CE9A191AA2D`. The latest approved receipt remains `review-246b855802905e01` (generation 1, `approved`, resolved `R3-001`). No b1b, b2, B1a2, review, commit, PR, or `.gitignore` action occurred.

@@ -1,5 +1,101 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
+evidence_revision: current-scoped-worktree-2026-07-25
+verdict: pass
+blockers: 0
+critical_findings: 0
+requirements: 1/1
+scenarios: 8/8
+tasks: 4/4
+test_command: 'dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Owned_lifecycle" --no-restore -m:1 --nologo'
+test_exit_code: 0
+build_command: 'dotnet build AIBar.sln --no-restore --nologo'
+build_exit_code: 0
+```
+
+# Final Independent Verification — aibar-foundation Slice 8C1.1b1b
+
+## Status: PASS — narrowed scoped gate complete
+
+This final independent Standard-mode (`strict_tdd: false`) verification is scoped only to Slice `8C1.1b1b`. The maintainer narrowed the task contract and deferred nonzero-exit-with-partial-output preservation as `B1B-HARDEN-NONZERO-PARTIAL-OUTPUT`; that deferred item is explicitly excluded from current acceptance. `8C1.1b2` was not implemented or verified.
+
+## Scope and completeness
+
+| Metric | Result |
+|---|---|
+| Artifact store / mode | OpenSpec / Standard |
+| Dedicated normative b1b spec requirement/scenario | None; verification uses the maintainer-approved narrowed task contract |
+| Scoped b1b task contract | 4/4 complete: RED, GREEN, TRIANGULATE, and independent GATE |
+| Scoped implementation paths | `scripts/Publish-Deterministic.ps1`; `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs` |
+| Out of scope | Newly planned `8C1.1b2`, B1a2+, MakeAppx, SignTool, receipts, archive, staging/commit/PR |
+| Coverage | Not configured; no threshold available |
+
+The lack of a dedicated b1b requirement/scenario in `spec.md` remains. The verified acceptance authority is the narrowed contract in `tasks.md:408–413`, read with the lifecycle design context in `design.md:237–243` and the explicit maintainer scope correction.
+
+## Build and runtime evidence
+
+| Evidence | Exact command | Result |
+|---|---|---|
+| Focused lifecycle proof | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Owned_lifecycle" --no-restore -m:1 --nologo` | Exit 0; passed 5/5, failed 0, skipped 0; 1 m 23 s |
+| Focused recovery regression | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingRecovery" --no-restore -m:1 --nologo` | Exit 0; passed 18/18, failed 0, skipped 0; 6 m 52 s |
+| Build/type-check | `dotnet build AIBar.sln --no-restore --nologo` | Exit 0; 0 warnings, 0 errors; 5.13 s |
+| Whitespace proof | `git diff --check` | Exit 0; no whitespace errors; Git emitted only existing LF-to-CRLF advisories |
+| Scoped process cleanup | `Get-Process -Name Harness -ErrorAction SilentlyContinue` | `HARNESS_PROCESS_COUNT=0` |
+
+These commands were executed independently for this verification and cover the narrowed lifecycle matrix, including the retained saturated-stream case.
+
+## Maintainer scope correction
+
+The prior nonzero-exit-with-partial-output test was invalid: it accepted any nonzero result rather than exit code 7 and wrote its sentinel outside recovery output. The maintainer explicitly reduced b1b scope, removed that test and its dedicated harness branch, and deferred the requirement as `B1B-HARDEN-NONZERO-PARTIAL-OUTPUT`. No production behavior changed. `8C1.1b2` remains out of scope.
+
+## Requirement and task coverage
+
+| Contract source | Required behavior | Runtime/static evidence | Result |
+|---|---|---|---|
+| `tasks.md:408` RED | Bounded timeout/cancellation, fail-closed known-descendant identity/quiescence, launch failure, cleanup guarantees, and saturated concurrent drains | Focused 5/5 and recovery 18/18 passed. | VERIFIED |
+| `tasks.md:409` GREEN | Narrowed owned lifecycle helper contract | Runtime matrix passed; source inspection confirms discrete arguments, concurrent drains, linked cancellation, tree kill, bounded waits, and fail-closed identity checks. | VERIFIED |
+| `tasks.md:410` TRIANGULATE | Narrowed executable lifecycle matrix including saturated streams | Timeout, cancellation, live/missing identity, launch failure, incomplete-output retention, saturation, bounded harness cleanup, and leak checks passed. | VERIFIED |
+| `tasks.md:411` GATE | Independent scoped verification | All required commands passed; task and ledger state aligned. | COMPLETE |
+
+**Coverage summary:** 1/1 narrowed task-contract requirement and 8/8 in-scope behaviors verified. Coverage instrumentation is not configured.
+
+## Correctness and design coherence
+
+| Decision / behavior | Result | Evidence |
+|---|---|---|
+| Discrete argument-safe subprocess launch | PASS | `ProcessStartInfo.ArgumentList` is used for restore/publish arguments. |
+| Concurrent stdout/stderr reads | PASS | Both `ReadToEndAsync` operations start before process waiting. |
+| Timeout and pipeline cancellation | PASS | Linked timeout, `PipelineStopToken`, and deterministic cancellation seam; both runtime cases pass. |
+| Cancellation tree termination and bounded direct wait | PASS | `Kill(entireProcessTree: true)` plus bounded `WaitForExitAsync().WaitAsync(...)`; known child/grandchild exit assertions pass. |
+| Failure preserves caller-owned incomplete output | PASS | Runtime recovery suite passes and asserts the output leaf remains. |
+| Known-descendant refusal | PASS | Live and missing/unprovable identity cases passed; PID/start-tick mismatches fail closed in source. |
+| Saturated stream draining | PASS | The retained 1 MiB-per-stream saturation test completed inside its seven-second outer bound. |
+| b2 cleanup integration excluded | PASS | No newly planned `8C1.1b2` cleanup behavior was verified or implemented. |
+
+## Ledger alignment
+
+- `JD-A-FINAL-001` and `JD-B-FINAL-001` are `wont-fix` because the maintainer explicitly narrowed scope and deferred the invalid requirement as `B1B-HARDEN-NONZERO-PARTIAL-OUTPUT`.
+- The final target state is `JUDGMENT: APPROVED`; `SDD: VERIFIED` for the narrowed contract.
+
+Historical review findings and statuses remain preserved; review evidence was not used as a substitute for runtime verification.
+
+## Historical findings superseded by scope correction
+
+The former nonzero-partial-output test finding is superseded by the maintainer scope correction and backlog deferral. Any remaining independent findings must be assessed only against the narrowed task contract.
+
+## Worktree mutation summary
+
+- This apply cleanup changed only the recovery test and b1b evidence/ledger alignment; `.gitignore`, b1b2, MakeAppx, SignTool, staging, commits, PRs, and receipts remain untouched.
+- `scripts/Publish-Deterministic.ps1` was unchanged by this invocation.
+
+## Verdict
+
+**PASS.** Slice `8C1.1b1b` satisfies the user-approved narrowed contract with no blockers or critical findings. Deferred `B1B-HARDEN-NONZERO-PARTIAL-OUTPUT`, `8C1.1b2`, and downstream work remain separate and out of scope.
+
+---
+
+```yaml
+schema: gentle-ai.verify-result/v1
 evidence_revision: sha256:bc9a39d9b45a4ed4738f29881341d8ba3d9765c70ec1dc5728e574dd8f339838
 verdict: pass
 blockers: 0

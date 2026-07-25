@@ -133,6 +133,44 @@ public sealed class PackagingRecoveryTests
         Assert.Equal(["child-stderr", "grandchild-stderr"], child.StandardError.ReadToEnd().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).Order());
     }
 
+    [Theory]
+    [InlineData(1, 0)]
+    [InlineData(30, 5000)]
+    public async Task Owned_lifecycle_terminates_known_descendant_on_timeout_or_cancellation(int timeoutSeconds, int cancelAfterMilliseconds)
+    {
+        using var harness = DescendantHarness.Create(); var output = Path.Combine(harness.Root, "recovery");
+        var run = Task.Run(() => Run(output, harness.Executable, timeoutSeconds: timeoutSeconds, cancelAfterMilliseconds: cancelAfterMilliseconds, environment: harness.PublisherEnvironment()));
+        Assert.True(harness.Ready.WaitOne(10_000), "The known grandchild did not signal readiness.");
+        using var child = harness.OpenRecordedChild();
+        using var grandchild = harness.OpenRecordedGrandchild();
+        var result = await run.WaitAsync(TimeSpan.FromSeconds(8));
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.True(child.HasExited, "The known child was still alive when publisher termination returned.");
+        Assert.True(grandchild.HasExited, "The known grandchild was still alive when publisher termination returned.");
+        Assert.True(Directory.Exists(output));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Owned_lifecycle_rejects_early_success_when_known_descendant_is_live_or_unprovable(bool missingIdentity)
+    {
+        using var harness = DescendantHarness.Create();
+        var environment = new Dictionary<string, string>(harness.PublisherEnvironment()) { ["AIBAR_PUBLISH_MODE"] = "early" };
+        var result = Run(Path.Combine(harness.Root, "recovery"), harness.Executable, timeoutSeconds: 2, environment: environment,
+            knownDescendantIdentityPath: missingIdentity ? Path.Combine(harness.Root, "missing.json") : harness.IdentityRecord);
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.True(Directory.Exists(Path.Combine(harness.Root, "recovery")));
+    }
+
+    [Fact]
+    public void Owned_lifecycle_concurrently_drains_saturated_stdout_and_stderr_within_bound()
+    {
+        using var harness = DescendantHarness.Create(); var output = Path.Combine(harness.Root, "recovery");
+        var result = Run(output, harness.Executable, timeoutSeconds: 2, boundedWaitSeconds: 7, environment: new Dictionary<string, string>(harness.PublisherEnvironment()) { ["AIBAR_PUBLISH_MODE"] = "saturated" });
+        Assert.Equal(0, result.ExitCode); Assert.True(Directory.Exists(output));
+    }
+
     private static Snapshot Contract(string root)
     {
         var inventory = File.ReadAllBytes(Path.Combine(root, "recovery-inventory.json")); var manifest = File.ReadAllBytes(Path.Combine(root, "artifact-manifest.json"));
@@ -143,7 +181,7 @@ public sealed class PackagingRecoveryTests
         return new(files, HashFile(Path.Combine(root, "AIBar-win-x64-recovery.zip")), inventory, manifest);
     }
 
-    private static RunResult Run(string output, string? command = null, string? epoch = null, IsolationRoot? isolation = null, string? workingDirectory = null)
+    private static RunResult Run(string output, string? command = null, string? epoch = null, IsolationRoot? isolation = null, string? workingDirectory = null, int? timeoutSeconds = null, int? cancelAfterMilliseconds = null, int? boundedWaitSeconds = null, IReadOnlyDictionary<string, string>? environment = null, string? knownDescendantIdentityPath = null)
     {
         var psi = new ProcessStartInfo("pwsh") { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true };
         if (workingDirectory is not null) psi.WorkingDirectory = workingDirectory;
@@ -151,7 +189,11 @@ public sealed class PackagingRecoveryTests
         if (command is not null) { psi.ArgumentList.Add("-PublishCommand"); psi.ArgumentList.Add(command); }
         if (epoch is not null) { psi.ArgumentList.Add("-SourceDateEpoch"); psi.ArgumentList.Add(epoch); }
         if (isolation is not null) foreach (var argument in isolation.Arguments()) { psi.ArgumentList.Add(argument.Name); psi.ArgumentList.Add(argument.Value); }
-        lock (PublishLock) { using var process = Process.Start(psi)!; var outputText = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd(); process.WaitForExit(); return new(process.ExitCode, outputText); }
+        if (timeoutSeconds is not null) { psi.ArgumentList.Add("-ProcessTimeoutSeconds"); psi.ArgumentList.Add(timeoutSeconds.Value.ToString()); }
+        if (cancelAfterMilliseconds is not null) { psi.ArgumentList.Add("-CancelAfterMilliseconds"); psi.ArgumentList.Add(cancelAfterMilliseconds.Value.ToString()); }
+        if (knownDescendantIdentityPath is not null) { psi.ArgumentList.Add("-KnownDescendantIdentityPath"); psi.ArgumentList.Add(knownDescendantIdentityPath); }
+        if (environment is not null) foreach (var pair in environment) psi.Environment[pair.Key] = pair.Value;
+        lock (PublishLock) { using var process = Process.Start(psi)!; var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync(); var work = Task.WhenAll(process.WaitForExitAsync(), stdout, stderr); if (boundedWaitSeconds is not null) Assert.True(work.Wait(TimeSpan.FromSeconds(boundedWaitSeconds.Value)), "PowerShell process exceeded its bounded wait."); else work.Wait(); return new(process.ExitCode, stdout.Result + stderr.Result); }
     }
     private static string RepositoryRoot() { for (var d = new DirectoryInfo(AppContext.BaseDirectory); ; d = d.Parent!) if (File.Exists(Path.Combine(d.FullName, "AIBar.sln"))) return d.FullName; }
     private static string FakeCommand(string parent, string marker) { var path = Path.Combine(parent, "marker.cmd"); File.WriteAllText(path, $"@echo invoked>\"{marker}\"\r\n@exit /b 0"); return path; }
@@ -205,6 +247,31 @@ if (args[0] == "child")
     Console.Out.WriteLine("child-stdout"); Console.Error.WriteLine("child-stderr");
     Environment.Exit(childReady.WaitOne(10000) ? 0 : 3);
 }
+if (args[0] == "publish")
+{
+    var mode = Environment.GetEnvironmentVariable("AIBAR_PUBLISH_MODE");
+    if (mode == "saturated") { File.WriteAllText(Environment.GetEnvironmentVariable("AIBAR_MARKER")!, $"owned-marker:{Environment.GetEnvironmentVariable("AIBAR_NONCE")}"); Console.Out.Write(new string('o', 1_048_576)); Console.Error.Write(new string('e', 1_048_576)); Environment.Exit(0); }
+    var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("AIBAR_HARNESS_EXE")!) { UseShellExecute = false };
+    foreach (var value in new[] { "publisher-child", Environment.GetEnvironmentVariable("AIBAR_HARNESS_EXE")!, Environment.GetEnvironmentVariable("AIBAR_READY")!, Environment.GetEnvironmentVariable("AIBAR_RELEASE")!, Environment.GetEnvironmentVariable("AIBAR_MARKER")!, Environment.GetEnvironmentVariable("AIBAR_IDENTITY")!, Environment.GetEnvironmentVariable("AIBAR_ARGUMENTS")!, Environment.GetEnvironmentVariable("AIBAR_ROOT")!, Environment.GetEnvironmentVariable("AIBAR_NONCE")! }) start.ArgumentList.Add(value);
+    using var child = Process.Start(start)!;
+    if (Environment.GetEnvironmentVariable("AIBAR_PUBLISH_MODE") == "early")
+    {
+        using var publisherReady = EventWaitHandle.OpenExisting(Environment.GetEnvironmentVariable("AIBAR_READY")!);
+        Environment.Exit(publisherReady.WaitOne(10000) ? 0 : 5);
+    }
+    child.WaitForExit();
+    Environment.Exit(child.ExitCode);
+}
+if (args[0] == "publisher-child")
+{
+    File.WriteAllText(args[5], JsonSerializer.Serialize(new { child = new { pid = Environment.ProcessId, startTicks = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks } }));
+    var start = new ProcessStartInfo(args[1]) { UseShellExecute = false };
+    start.ArgumentList.Add("grandchild");
+    start.ArgumentList.Add(args[2]); start.ArgumentList.Add(args[3]); start.ArgumentList.Add(args[4]); start.ArgumentList.Add(args[5]); start.ArgumentList.Add(args[6]); start.ArgumentList.Add(args[7]); start.ArgumentList.Add(args[8]);
+    using var grandchild = Process.Start(start)!;
+    using var publisherRelease = EventWaitHandle.OpenExisting(args[3]);
+    Environment.Exit(publisherRelease.WaitOne(60000) ? 0 : 4);
+}
 using var ready = EventWaitHandle.OpenExisting(args[1]);
 using var release = EventWaitHandle.OpenExisting(args[2]);
 var identity = JsonDocument.Parse(File.ReadAllText(args[4]));
@@ -242,12 +309,23 @@ Environment.Exit(release.WaitOne(10000) ? 0 : 4);
             return Process.Start(start)!;
         }
 
+        public IReadOnlyDictionary<string, string> PublisherEnvironment() => new Dictionary<string, string>
+        {
+            ["AIBAR_HARNESS_EXE"] = Executable, ["AIBAR_READY"] = ReadyName, ["AIBAR_RELEASE"] = ReleaseName,
+            ["AIBAR_MARKER"] = Marker, ["AIBAR_IDENTITY"] = IdentityRecord, ["AIBAR_ARGUMENTS"] = ArgumentRecord,
+            ["AIBAR_ROOT"] = Root, ["AIBAR_NONCE"] = Nonce
+        };
+
         public void ValidateRecordedChild(Process child) => ValidateIdentity("child", child);
 
-        public Process OpenRecordedGrandchild()
+        public Process OpenRecordedChild() => OpenRecorded("child");
+
+        public Process OpenRecordedGrandchild() => OpenRecorded("grandchild");
+
+        private Process OpenRecorded(string name)
         {
             using var identity = JsonDocument.Parse(File.ReadAllText(IdentityRecord));
-            var record = identity.RootElement.GetProperty("grandchild");
+            var record = identity.RootElement.GetProperty(name);
             var process = Process.GetProcessById(record.GetProperty("pid").GetInt32());
             Assert.Equal(record.GetProperty("startTicks").GetInt64(), process.StartTime.ToUniversalTime().Ticks);
             return process;
