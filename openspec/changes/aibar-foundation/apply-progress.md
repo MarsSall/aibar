@@ -1,5 +1,11 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 8C1.1b2c — C1 rollback for replan (2026-07-26)
+
+**Status:** Standard mode (`strict_tdd: false`). The uncommitted C1 capability-admission/quarantine implementation and its tests were removed after the confirmed `JD-B2C-C1-001` TOCTOU finding. C1, C2, and C3 RED/GREEN/TRIANGULATE/GATE tasks are all unchecked; the three-unit b2c feature-branch-chain plan remains the authority for a future handle-bound replan.
+
+**Rollback-for-replan:** deleted only `DirectoryCapability.cs`, `Cleanup.cs`, and `DirectoryCapabilityTests.cs`; removed C1 completion claims and reset its task marks. This checkpoint preserves b2a/b2b behavior, the independently verified readiness-harness repair below, b2c planning, and historical review evidence. No C1 production behavior, types, tests, receipt, or approval remains.
+
 ### R3-INC-C1-001 Fix Round 1 — b2b readiness harness (2026-07-26)
 
 **Scope:** committed b2b test harness synchronization/diagnostics only; no production supervisor, C1 behavior, C2/C3, cleanup deletion, scavenger, or PowerShell production integration changed. The nested helper now follows an explicit root-started → test-authorized child launch → child-ready → root-ready → root-exited → test-release handshake. It emits only fixed safe progress/failure codes; on a failed handshake the test reports root-exit state, exit code, recognized safe code, and bounded stdout/stderr byte counts, never raw tail text or paths.

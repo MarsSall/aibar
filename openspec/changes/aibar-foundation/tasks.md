@@ -457,14 +457,49 @@ Historical mapping (not fixed here): `JD-B2B-001` → units 1–2; `JD-B2B-002` 
 - [x] **TRIANGULATE:** repeat fake matrix and event-gated saturation/descendant tests; assert no hangs, leaked pipes, paths/PIDs/secrets, or b2c scavenging.
 - [x] **GATE:** focused test, build, `git diff --check`, zero-helper/process check, and review-line receipt. Rollback Unit 3 only.
 
-###### 8C1.1b2c — Directory capability, quarantine, scavenger, and PowerShell integration (~340–385 lines)
+###### 8C1.1b2c — Replanned cleanup chain (three autonomous units)
 
-- [ ] **8C1.1b2c-RED:** Test root/child identity, reparse, containment, extras/missing entries, access/rename/reopen/deletion faults, pre/post-commit status separation, DPAPI metadata validation, aged-quarantine scavenger skips, and PowerShell closed-request integration.
-- [ ] **8C1.1b2c-GREEN:** Create collision-failing nonce leaves and capability handles; admit exact children; atomically rename to quarantine; retain protected bounded-retry metadata on every post-commit failure; resume only from validated quarantine; invoke the fixed worker without shell composition or caller-supplied roots/PIDs.
-- [ ] **8C1.1b2c-TRIANGULATE:** Run two external Unicode/space roots and injected failures; prove `CLEANUP_REFUSED` leaves original bytes, `CLEANUP_PARTIAL` retains quarantine, successful removal follows quiescence, retries never rename back, no repository `obj/bin` changes occur, and status/evidence are path/secret-free.
-- [ ] **8C1.1b2c-GATE:** Run `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, `git diff --check`, and the external-root runtime test. Rollback removes only b2c files/integration; reviewed b2b and b1b remain intact.
+**Dependency:** reviewed/committed b2b Unit 3. Feature-branch-chain: C1a targets b2b Unit 3; C1b targets C1a; C2 targets C1b; C3 targets C2. All units are ask-always, hard <=350 authored review lines, and rollback-safe. No unit claims complete cleanup until its own failure semantics are proven.
 
-**Total forecast:** 650–890 authored lines; each unit ≤330, review workload ~30–50 minutes/unit; three commits/PRs: b2a → Unit 1 → Unit 2 → Unit 3. No implementation or progress evidence is claimed by this plan. <!-- sdd-owner: parent -->
+**Review mapping:** `JD-B2C-C1-001` maps to C1a's retained-capability admission and C1b's identity-bound commit. The confirmed TOCTOU is not accepted as repaired by path revalidation alone; C1b must prove a concrete safe Windows strategy or stop for design amendment.
+
+##### b2c-C1a — Retained capability and admission foundation (~180–260 lines)
+
+**Dependency/base:** reviewed/committed b2b Unit 3; C1b targets reviewed C1a. **Allowed paths:** `tools/AIBar.Packaging.Supervisor/DirectoryCapability.cs`; `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`; this task ledger only. **End:** live retained root capability with exact root/direct-child identities, final paths, volume, canonical containment, reparse, and allowlist validation. No rename, mutation, deletion, scavenger, or PowerShell.
+
+- [ ] **RED:** Add failing tests for root/child identity, final handle paths, same-volume proof, containment, non-reparse state, exact allowlist, missing/extra/substituted entries, access faults, and identity/reparse races; prove admission failure leaves bytes untouched.
+- [ ] **GREEN:** Implement supervisor-created collision-failing capability handles and read-only admission/revalidation that retains live handles and captured identities through the commit boundary; expose only safe statuses and no sensitive values.
+- [ ] **TRIANGULATE:** Reorder enumeration and vary Unicode/space roots, volumes, access, identity, final-path, containment, and reparse observations; assert deterministic refusal, no mutation, and no path/secret output.
+- [ ] **GATE:** Run `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor"`, `dotnet build AIBar.sln --no-restore --nologo`, `git diff --check`, and zero-helper check. Rollback removes only C1a code/tests/task marks.
+
+##### b2c-C1b — Identity-bound same-volume quarantine commit (~220–330 lines)
+
+**Dependency/base:** reviewed/committed C1a; C2 targets reviewed/committed C1b. **Allowed paths:** `tools/AIBar.Packaging.Supervisor/Cleanup.cs`; `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`; this task ledger only. **End:** committed retained quarantine for C2. No deletion, rename-back, scavenger, or PowerShell.
+
+- [ ] **RED:** Add failing race tests for last-moment root/child identity, reparse, parent/root/child substitution, volume, and final-path validation; require rename failure to return `CLEANUP_REFUSED` with original bytes unchanged.
+- [ ] **GREEN:** While retained capabilities remain live, implement a concrete approved Win32 same-volume atomic rename strategy bound to the retained identity; rename is the sole irreversible mutation and returns the committed quarantine. If Win32 cannot provide the required identity-bound directory rename semantics, stop and require a design amendment—do not substitute path-only rename or promise handle-relative semantics the primitive cannot support.
+- [ ] **TRIANGULATE:** Inject deterministic pre-rename races, reordered enumeration, collisions, Unicode/space names, and last-moment identity/reparse changes; prove post-validation substitution/race refusal, path/secret-free results, and no deletion/rename-back.
+- [ ] **GATE:** Run the focused supervisor filter, build, `git diff --check`, zero-helper check, and independent rollback receipt. Rollback removes only C1b code/tests/task marks; C1a remains usable.
+
+##### b2c-C2 — Post-commit bounded cleanup and truthful partial state (~240–330 lines)
+
+**Paths:** `tools/AIBar.Packaging.Supervisor/{Cleanup,ScavengerMetadata}.cs`; focused supervisor tests. **End:** guarded deletion or retained quarantine; no rename-back, arbitrary-root deletion, or PowerShell wiring.
+
+- [ ] **RED:** Test reopen/identity/reparse/enumeration/delete/unknown failures before first deletion and mid-delete; DPAPI metadata corruption, retry exhaustion, and cancellation must retain quarantine as `CLEANUP_PARTIAL`.
+- [ ] **GREEN:** Reopen and revalidate the committed quarantine, delete only handle-anchored bounded recursive entries, and write protected metadata containing retained identity, phase, bounded retry count, and next eligible time.
+- [ ] **TRIANGULATE:** Prove successful removal only after quiescence, every post-commit failure stays `CLEANUP_PARTIAL`, retries never rename back, no path/secret leakage occurs, and no arbitrary root can be selected.
+- [ ] **GATE:** Focused fault matrix, build, diff check, and retained-quarantine receipt. C2 rollback removes only post-commit cleanup/metadata/tests; C1 remains usable.
+
+##### b2c-C3 — Opt-in scavenger and approved PowerShell boundary (~220–320 lines)
+
+**Paths:** `tools/AIBar.Packaging.Supervisor/{Scavenger,Program}.cs`; `scripts/Publish-Deterministic.ps1`; focused supervisor/recovery tests. **End:** opt-in aged-quarantine recovery plus closed-request integration, only because explicitly approved by this b2c scope.
+
+- [ ] **RED:** Test aged/current-user/ACL/DPAPI/identity/reparse/lock admission, skip/refusal behavior, closed PowerShell request, no caller roots/PIDs/shell text, and no repository `obj/bin` changes.
+- [ ] **GREEN:** Implement bounded scavenger retry from validated supervisor quarantines and invoke the fixed worker through the typed protocol without shell composition or path/secret output.
+- [ ] **TRIANGULATE:** Run two external Unicode/space roots and injected unknown failures; prove refused scavenging retains quarantine, successful cleanup is truthful, and all statuses/evidence are path/secret-free.
+- [ ] **GATE:** Focused supervisor/recovery tests, build, diff check, external-root runtime gate, and zero-helper check. C3 rollback removes only scavenger/PowerShell integration/tests.
+
+**Total b2c forecast:** 860–1,280 authored lines across C1a/C1b/C2/C3; each unit <=350, review workload ~25–45 minutes/unit. Dependency chain: b2a → b2b Units 1–3 → C1a → C1b → C2 → C3. <!-- sdd-owner: parent -->
 
 #### Slice 8C2B1a2 — Versioned live-policy authority, external acquisition, and two-root proof (~390 authored lines)
 

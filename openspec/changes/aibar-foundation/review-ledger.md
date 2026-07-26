@@ -63,6 +63,10 @@ Fix round 1: JD-B2A-001 now bounds stdin during reads and rejects the 4097th byt
 
 `JUDGMENT: ESCALATED`
 
+## Pre-commit reliability review — C1 rollback/replan checkpoint
+
+One exhaustive reliability sweep returned an empty findings ledger. The verified readiness-handshake repair and documentation-only C1 rollback/replan form a safe checkpoint; no rejected C1 production/test implementation remains.
+
 ## Judgment Day — Slice 8C1.1b2b Unit 1 — Round 1
 
 | id | lens | location | severity | status | evidence |
@@ -126,6 +130,28 @@ Both blind re-judges verified `JD-B2-INT-001`; no blocker, critical, suspect, or
 ## Pre-commit reliability review — Integrated b2a+b2b correction
 
 One exhaustive reliability sweep returned an empty findings ledger. The bounded test-harness/task-traceability correction is approved for an isolated commit; production supervisor code, b2c, `AIBar.sln`, and unrelated `.gitignore` remain excluded.
+
+## C1 combined-gate incident audit
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| R3-INC-C1-001 | reliability | `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs:201-232` | BLOCKER | verified | Scoped re-review verified the acyclic root-started → authorized launch → child-ready → root-ready → root-exited → release handshake, bounded safe diagnostics, retained production interop semantics, and repeated readiness gates. This verifies the b2b harness repair only; it grants no C1 completion. |
+
+At audit time, one general refuter evaluated the candidate and it stood. C1 remained GATE-unchecked until the targeted harness repair passed repeated readiness and combined gates.
+
+### Fix Round 1 evidence
+
+The repair preserves the actual `ProcessSupervisor` plus `WindowsProcessSupervisorInterop` descendant-delay path. It adds no production behavior and does not extend the test's five-second external readiness bounds. The incident is **fixed, not verified**; independent scoped re-review remains required.
+
+## Judgment Day — Slice 8C1.1b2c-C1 — Round 1
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| JD-B2C-C1-001 | judgment-day | historical uncommitted `DirectoryCapability.cs:3-12,67-110`; `Cleanup.cs:12-19` | CRITICAL | wont-fix | Both blind judges confirmed admission released identity evidence and later renamed by path only. The rejected implementation was removed rather than repaired: no retained handle or identity-bound commit closed the TOCTOU window. |
+
+Round 1 verdict: one independently confirmed CRITICAL data-loss finding. The final C1 receipt was already 361/400, leaving insufficient margin for the required handle-bound commit design and deterministic race proof. **Rollback-for-replan:** the uncommitted C1 production/types/tests and completion claims were removed; the three-unit b2c plan remains pending for a fresh handle-bound design and proof. This historical `JUDGMENT: ESCALATED` does not approve any future C1 implementation.
+
+`JUDGMENT: ESCALATED`
 
 ## Pre-commit reliability review — Slice 8C1.1b2b Unit 2
 
