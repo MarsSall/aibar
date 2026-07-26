@@ -28,6 +28,44 @@
 
 **Changed paths:** `tools/AIBar.Packaging.Supervisor/{JobObjectInterop.cs,ProcessSupervisor.cs}`; `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`; `openspec/changes/aibar-foundation/{tasks.md,apply-progress.md}`. **Task state:** Unit 1 RED/GREEN/TRIANGULATE/GATE are checked; Units 2 and 3 remain unchecked. **Rollback boundary:** remove only the two Unit 1 supervisor files, Unit 1 test additions, four Unit 1 task marks, and this block; b2a remains runnable. **`.gitignore`:** HEAD/index/worktree blobs are identical and it remains unstaged.
 
+## Slice 8C1.1b2b Unit 2 — Concurrent drains and authoritative quiescence (2026-07-26)
+
+**Status:** INVALIDATED PENDING REPAIR. Standard mode (`strict_tdd: false`), feature-branch-chain Unit 2 only. The power-loss audit found the claimed focused gate unsupported: the real descendant helper did not signal, and EOF-grace plus genuine production saturation proof were absent. Unit 2 task marks and the evidence below are provisional until the targeted repair completes; Unit 3 remains out of scope.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | Focused `PackagingSupervisor` compilation failed before the Unit 2 observer existed: `FakeLaunchInterop` lacked the exit/signal/query/packet/stream controls and `ProcessSupervisor.ObserveAsync` was missing (`CS0117`, `CS1061`). |
+| GREEN | The focused command passed 29/29 after adding concurrent bounded stream drains, live root/Job observation, cached root exit retrieval, bounded EOF wait, and native `WaitForSingleObject`/`QueryInformationJobObject`/completion-port/pipe seams. |
+| TRIANGULATE | Fake saturation retains 65,536 bytes and exactly one discarded byte on each stream; lost/duplicate/reordered packet values remain non-decisive; a delayed nonzero active count prevents success; zero observations are timestamp-proven separated. The combined focused command passed 30/30, including the existing event-gated owned child/grandchild helper. |
+| GATE | Focused combined test command passed 30/30; `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings/errors; `git diff --check` passed with LF-to-CRLF advisories only; `Get-Process -Name Harness,powershell` returned 0. |
+
+**Changed paths:** `tools/AIBar.Packaging.Supervisor/{JobObjectInterop.cs,ProcessSupervisor.cs}`; `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`; `openspec/changes/aibar-foundation/{tasks.md,apply-progress.md}`. **Task state:** Unit 2 RED/GREEN/TRIANGULATE/GATE are checked; Unit 3 and b2c remain unchecked. **Rollback boundary:** remove only Unit 2 observer/interop/test additions, its four task marks, and this evidence block; preserve b2a and Unit 1. **`.gitignore`:** not edited or staged.
+
+### Unit 2 repair round — incident closure evidence (2026-07-26)
+
+The preceding Unit 2 table is historical and was invalidated after the power-loss audit. Fresh RED reproduced the descendant helper failure at `PackagingSupervisorTests.cs:215` (29/30). The cause was twofold: the helper used the unavailable Windows PowerShell `ProcessStartInfo.ArgumentList` API, and asynchronous `FileStream` mode on an anonymous pipe did not drain the real saturation writer. The helper now uses the compatible `Arguments` string, waits for child readiness before root exit, and production pipe reads use synchronous pipe handles with asynchronous drain tasks.
+
+| Repair evidence | Exact result |
+|---|---|
+| EOF grace | A gated non-EOF stream reaches authoritative quiescence, returns after the 25 ms grace with `EofCompleted=false`, then is explicitly released. |
+| Packets | Lost, duplicate, and reordered packet sequences each succeed only after root signal, one zero exit retrieval, and three live queries (`1,0,0`); packets remain advisory. |
+| Real Windows harnesses | Event-gated root/descendant remains active after root exit until release. A separate event-gated production `WindowsProcessSupervisorInterop` saturation run drains both 65,537-byte streams without deadlock, retains 65,536-byte tails, and counts exactly one discarded byte per stream. |
+| Focused GREEN | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo` passed 33/33. |
+
+Unit 2 RED/GREEN/TRIANGULATE/GATE marks are restored only from this fresh evidence. Unit 3 cancellation, timeout, query-failure containment, and status classification; b2c; cleanup; PowerShell integration; and unrelated behavior remain out of scope.
+
+### Unit 2 Fix Round 2 — deterministic descendant readiness (2026-07-26)
+
+The remaining failure was harness ordering, not a production observer defect: the descendant-ready event was implicitly session-scoped and the test inferred root exit through `Task.Delay(100)`. The helper now uses explicit `Local\\` event names, suppresses the `Process.Start` pipeline object, and signals a separate root-exited event only after the descendant-ready wait and immediately before root exit. The test waits for that acknowledgement rather than time-based scheduling; it does not increase the 5-second readiness bound. The Windows PowerShell-compatible `Arguments` construction was retained and the production observer was not changed.
+
+| Final evidence | Exact result |
+|---|---|
+| Prior failure / bounded diagnosis | The earlier 32/33 readiness failure could not be reproduced in 15 isolated pre-correction executions. Command construction remained `-NoProfile -NonInteractive -EncodedCommand`; child readiness/release events were present, the child waits release, and no helper exit/stderr-tail failure was observed. The missing root-exit acknowledgement and implicit namespace were the remaining nondeterministic harness boundary. |
+| Repetition | The corrected descendant test passed 10/10 isolated executions. The complete `PackagingSupervisor` filter passed 33/33 on three repetitions, then 33/33 in the final focused gate. |
+| Final gates | `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings/errors; `git diff --check` passed with LF-to-CRLF advisories only; `ZERO_HELPER_COUNT=0` for `powershell`/`Harness`. |
+
+R3-INC-U2-001, R3-INC-U2-002, and R3-INC-U2-003 are fixed by this round, not verified. Unit 3, b2c, cleanup/scavenging, PowerShell production integration, and unrelated behavior remain out of scope.
+
 ### Judgment Day Fix Round 1 — b2b Unit 1 (2026-07-26)
 
 **Scope:** Maintainer-authorized correction only for `JD-B2B-U1-001` and `JD-B2B-U1-002`. `AttributeList` now validates its sizing and initialization calls, frees all unmanaged allocations on constructor failure, and `ProcessSupervisor` fails closed as `ProcessStartFailed` after disposing Job/port/pipe/process/thread ownership if launch interop throws. A Windows-native event-gated test now exercises `ProcessSupervisor` with `WindowsProcessSupervisorInterop`: its PowerShell helper signals only after resume, is already in the Job when observed, and exits after launch disposal. This is Unit 1 launch/containment evidence only; no drain, quiescence, timeout, cancellation, or b2c claim is made.

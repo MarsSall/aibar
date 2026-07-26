@@ -196,6 +196,128 @@ public sealed class PackagingSupervisorTests
         Assert.True(helper.WaitForExit(10_000));
     }
 
+    [Fact]
+    public async Task Windows_quiescence_waits_for_an_event_gated_descendant_after_root_exit()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var readyName = $"Local\\aibar-ready-{Guid.NewGuid():N}"; var rootExitedName = $"Local\\aibar-root-exited-{Guid.NewGuid():N}"; var releaseName = $"Local\\aibar-release-{Guid.NewGuid():N}";
+        using var ready = new EventWaitHandle(false, EventResetMode.ManualReset, readyName);
+        using var rootExited = new EventWaitHandle(false, EventResetMode.ManualReset, rootExitedName);
+        using var release = new EventWaitHandle(false, EventResetMode.ManualReset, releaseName);
+        var powershell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+        var child = $"[Threading.EventWaitHandle]::OpenExisting('{readyName}').Set(); [Threading.EventWaitHandle]::OpenExisting('{releaseName}').WaitOne()";
+        var childCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(child));
+        var script = $"$child='{childCommand}'; $start=[Diagnostics.ProcessStartInfo]::new((Join-Path $PSHOME 'powershell.exe')); $start.UseShellExecute=$false; $start.Arguments=\"-NoProfile -NonInteractive -EncodedCommand $child\"; [void][Diagnostics.Process]::Start($start); [Threading.EventWaitHandle]::OpenExisting('{readyName}').WaitOne(); [Threading.EventWaitHandle]::OpenExisting('{rootExitedName}').Set(); exit";
+        var command = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+        using var supervisor = new ProcessSupervisor(new WindowsProcessSupervisorInterop());
+        var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new(powershell, $"\"{powershell}\" -NoProfile -NonInteractive -EncodedCommand {command}")).Launch);
+
+        var observation = supervisor.ObserveAsync(launch, new(TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(25), TimeSpan.FromSeconds(2)));
+        Assert.True(ready.WaitOne(TimeSpan.FromSeconds(5)));
+        Assert.True(rootExited.WaitOne(TimeSpan.FromSeconds(5)));
+        Assert.False(observation.IsCompleted);
+        release.Set();
+        Assert.True((await observation).Succeeded);
+    }
+
+    [Fact]
+    public async Task Completion_requires_root_exit_and_two_separated_authoritative_zero_queries()
+    {
+        var interop = new FakeLaunchInterop { RootSignaled = true, ExitCode = 0, ActiveProcesses = [1, 0, 0] };
+        using var supervisor = new ProcessSupervisor(interop);
+        var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+
+        var result = await supervisor.ObserveAsync(launch, new(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(10), TimeSpan.Zero));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(3, interop.ActiveQueryCount);
+        Assert.Equal(1, interop.ExitCodeQueryCount);
+        Assert.True(Stopwatch.GetElapsedTime(interop.QueryTimestamps[1], interop.QueryTimestamps[2]) >= TimeSpan.FromMilliseconds(8));
+    }
+
+    [Fact]
+    public async Task Completion_packets_and_saturated_streams_cannot_decide_quiescence()
+    {
+        var interop = new FakeLaunchInterop
+        {
+            RootSignaled = true,
+            ExitCode = 0,
+            ActiveProcesses = [1, 0, 0],
+            Packets = [true, false, true, true],
+            Stdout = new MemoryStream(Enumerable.Repeat((byte)'o', 65_537).ToArray()),
+            Stderr = new MemoryStream(Enumerable.Repeat((byte)'e', 65_537).ToArray())
+        };
+        using var supervisor = new ProcessSupervisor(interop);
+        var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+
+        var result = await supervisor.ObserveAsync(launch, new(TimeSpan.FromSeconds(1), TimeSpan.Zero, TimeSpan.Zero));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(64 * 1024, result.StdoutTail.Length);
+        Assert.Equal(1, result.StdoutDiscardedBytes);
+        Assert.Equal(64 * 1024, result.StderrTail.Length);
+        Assert.Equal(1, result.StderrDiscardedBytes);
+        Assert.Equal(3, interop.ActiveQueryCount);
+    }
+
+    [Fact]
+    public async Task Completion_packets_are_advisory_when_lost_duplicated_or_reordered()
+    {
+        foreach (var packets in new[] { new List<bool>(), new List<bool> { true, true }, new List<bool> { false, true, false } })
+        {
+            var interop = new FakeLaunchInterop { RootSignaled = true, ExitCode = 0, ActiveProcesses = [1, 0, 0], Packets = packets };
+            using var supervisor = new ProcessSupervisor(interop);
+            var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+            var result = await supervisor.ObserveAsync(launch, new(TimeSpan.FromSeconds(1), TimeSpan.Zero, TimeSpan.Zero));
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(3, interop.ActiveQueryCount);
+        }
+    }
+
+    [Fact]
+    public async Task Completion_limits_post_quiescence_EOF_grace()
+    {
+        var stdout = new EofGateStream();
+        var interop = new FakeLaunchInterop { RootSignaled = true, ExitCode = 0, ActiveProcesses = [0, 0], Stdout = stdout };
+        using var supervisor = new ProcessSupervisor(interop);
+        var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+        var started = Stopwatch.GetTimestamp();
+
+        var result = await supervisor.ObserveAsync(launch, new(TimeSpan.FromSeconds(1), TimeSpan.Zero, TimeSpan.FromMilliseconds(25)));
+        stdout.Complete();
+
+        Assert.False(result.Succeeded);
+        Assert.True(result.Quiescent);
+        Assert.False(result.EofCompleted);
+        Assert.True(Stopwatch.GetElapsedTime(started) >= TimeSpan.FromMilliseconds(20));
+    }
+
+    [Fact]
+    public async Task Windows_event_gated_saturation_drains_both_production_pipes_without_deadlock()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var readyName = $"aibar-ready-{Guid.NewGuid():N}"; var releaseName = $"aibar-release-{Guid.NewGuid():N}";
+        using var ready = new EventWaitHandle(false, EventResetMode.ManualReset, readyName);
+        using var release = new EventWaitHandle(false, EventResetMode.ManualReset, releaseName);
+        var powershell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+        var script = "$bytes=New-Object byte[] 65537; [Console]::OpenStandardOutput().Write($bytes,0,$bytes.Length); [Console]::Error.Write(('e' * 65537)); [void][Threading.EventWaitHandle]::OpenExisting('" + readyName + "').Set(); [void][Threading.EventWaitHandle]::OpenExisting('" + releaseName + "').WaitOne()";
+        using var supervisor = new ProcessSupervisor(new WindowsProcessSupervisorInterop());
+        var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new(powershell, $"\"{powershell}\" -NoProfile -NonInteractive -Command \"{script}\"")).Launch);
+
+        var observation = supervisor.ObserveAsync(launch, new(TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(25), TimeSpan.FromSeconds(1)));
+        Assert.True(ready.WaitOne(TimeSpan.FromSeconds(5)));
+        Assert.False(observation.IsCompleted);
+        release.Set();
+        var result = await observation;
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(64 * 1024, result.StdoutTail.Length);
+        Assert.Equal(1, result.StdoutDiscardedBytes);
+        Assert.Equal(64 * 1024, result.StderrTail.Length);
+        Assert.Equal(1, result.StderrDiscardedBytes);
+    }
+
     private sealed class FakeClock : ISupervisorClock { public long ElapsedMilliseconds => 0; }
     private sealed class FakeRandom : ISupervisorRandom { public void Fill(Span<byte> bytes) => bytes.Clear(); }
     private sealed class FakeInterop : ISupervisorInterop { }
@@ -208,6 +330,15 @@ public sealed class PackagingSupervisorTests
         public List<string> Calls { get; } = [];
         public List<SupervisorSafeHandle> Handles { get; } = [];
         public IReadOnlyList<string> InheritedHandles { get; private set; } = [];
+        public bool RootSignaled { get; set; }
+        public int ExitCode { get; set; }
+        public List<uint> ActiveProcesses { get; set; } = [];
+        public List<bool> Packets { get; set; } = [];
+        public Stream Stdout { get; set; } = new MemoryStream();
+        public Stream Stderr { get; set; } = new MemoryStream();
+        public int ActiveQueryCount { get; private set; }
+        public int ExitCodeQueryCount { get; private set; }
+        public List<long> QueryTimestamps { get; } = [];
         private T Track<T>(T handle) where T : SupervisorSafeHandle { Handles.Add(handle); return handle; }
         public SafeJobHandle? CreateJob() { Calls.Add("CreateJob"); return Fault == LaunchFault.CreateJob ? null : Track(new TrackingJobHandle()); }
         public bool ConfigureJob(SafeJobHandle job) { Calls.Add("ConfigureJob"); return Fault != LaunchFault.ConfigureJob; }
@@ -228,7 +359,11 @@ public sealed class PackagingSupervisorTests
         public bool AssignProcessToJob(SafeJobHandle job, SafeProcessHandle process) { Calls.Add("Assign"); return Fault != LaunchFault.Assign; }
         public bool ResumeThread(SafeThreadHandle thread) { Calls.Add("Resume"); return Fault != LaunchFault.Resume; }
         public void TerminateProcess(SafeProcessHandle process) => Calls.Add("TerminateProcess");
-        public bool TryGetExitCode(SafeProcessHandle process, out int exitCode) { exitCode = 0; return true; }
+        public bool TryGetExitCode(SafeProcessHandle process, out int exitCode) { ExitCodeQueryCount++; exitCode = ExitCode; return true; }
+        public bool IsProcessSignaled(SafeProcessHandle process) => RootSignaled;
+        public bool TryGetActiveProcesses(SafeJobHandle job, out uint activeProcesses) { ActiveQueryCount++; QueryTimestamps.Add(Stopwatch.GetTimestamp()); activeProcesses = ActiveProcesses.Count == 0 ? 0 : ActiveProcesses[0]; if (ActiveProcesses.Count > 0) ActiveProcesses.RemoveAt(0); return true; }
+        public bool ObserveCompletionPacket(SafeCompletionPortHandle port) { if (Packets.Count == 0) return false; var packet = Packets[0]; Packets.RemoveAt(0); return packet; }
+        public Stream OpenReadPipe(SafePipeHandle pipe) => pipe is TrackingPipeHandle { Name: "parent-stdout" } ? Stdout : Stderr;
     }
 
     private sealed class TrackingJobHandle : SafeJobHandle { public TrackingJobHandle() : base(new IntPtr(1), true) { } protected override bool ReleaseHandle() => true; }
@@ -236,6 +371,18 @@ public sealed class PackagingSupervisorTests
     private sealed class TrackingPipeHandle : SafePipeHandle { public TrackingPipeHandle(string name) : base(new IntPtr(1), true) { Name = name; } public string Name { get; } protected override bool ReleaseHandle() => true; }
     private sealed class TrackingProcessHandle : SafeProcessHandle { public TrackingProcessHandle() : base(new IntPtr(1), true) { } protected override bool ReleaseHandle() => true; }
     private sealed class TrackingThreadHandle : SafeThreadHandle { public TrackingThreadHandle() : base(new IntPtr(1), true) { } protected override bool ReleaseHandle() => true; }
+
+    private sealed class EofGateStream : MemoryStream
+    {
+        private readonly TaskCompletionSource _eof = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void Complete() => _eof.TrySetResult();
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (Position < Length) return await base.ReadAsync(buffer, cancellationToken);
+            await _eof.Task.WaitAsync(cancellationToken);
+            return 0;
+        }
+    }
 
     [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsProcessInJob(SafeProcessHandle process, IntPtr job, [MarshalAs(UnmanagedType.Bool)] out bool result);

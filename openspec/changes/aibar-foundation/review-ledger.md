@@ -57,9 +57,42 @@ Both blind re-judges verified `JD-B2B-U1-001` and `JD-B2B-U1-002`. Focused tests
 
 `JUDGMENT: APPROVED`
 
+## Pre-commit reliability review — Slice 8C1.1b2b Unit 2
+
+One exhaustive reliability sweep returned an empty findings ledger, including explicit triage of both single-judge informational signals. Unit 2 is approved for an isolated work-unit commit; Unit 3, b2c, and unrelated `.gitignore` remain excluded.
+
 ## Pre-commit reliability review — Slice 8C1.1b2b Unit 1
 
 One exhaustive reliability sweep returned an empty findings ledger. Unit 1 is approved for an isolated work-unit commit; planning-only re-slicing, Units 2/3, b2c, and unrelated `.gitignore` remain outside its implementation diff.
+
+## Power-loss incident audit — Slice 8C1.1b2b Unit 2
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| R3-INC-U2-001 | reliability | `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs:200-220` | BLOCKER | verified | Final scoped review verified deterministic `Local\\` events and an explicit root-exited acknowledgement after descendant readiness; the corrected test passed 10/10 without increasing the timeout. |
+| R3-INC-U2-002 | reliability | `openspec/changes/aibar-foundation/tasks.md:434-437` | CRITICAL | verified | Final scoped review verified the marks are backed by EOF-grace, advisory-packet, descendant, and real production-saturation evidence; the complete suite passed 33/33 repeatedly. |
+| R3-INC-U2-003 | reliability | `openspec/changes/aibar-foundation/apply-progress.md:38-49` | CRITICAL | verified | Final scoped review verified the progress record accurately invalidates prior evidence and records the deterministic correction, repeated focused gates, clean build/diff, and zero helpers. |
+
+One general refuter evaluated the complete candidate list; all three findings stand. Targeted repair is required before Unit 2 implementation can resume.
+
+### Repair round evidence
+
+Fresh RED reproduced 29/30 at descendant readiness. Fresh GREEN passed 33/33 after repairing anonymous-pipe drain mode and the Windows PowerShell helper, adding bounded EOF grace, packet-advisory variants, and a production event-gated 65,537-byte-per-stream saturation proof. Build/diff/process gates remain required for the Unit 2 receipt. These rows are **fixed**, not verified.
+
+### Fix Round 2 — final persisted state
+
+The remaining descendant harness ambiguity used implicit session event names and inferred root exit with a 100 ms delay. It now uses explicit `Local\\` names and a root-exited acknowledgement after descendant readiness; no production supervisor behavior changed. The prior readiness failure did not recur in 15 isolated pre-correction attempts; corrected readiness passed 10/10, the complete focused suite passed 33/33 three times plus the final 33/33 gate, build passed with 0 warnings/errors, `git diff --check` passed, and `ZERO_HELPER_COUNT=0`. Final scoped reliability review verified `R3-INC-U2-001..003`; the incident is closed.
+
+## Judgment Day — Slice 8C1.1b2b Unit 2 — Round 1
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| JD-A-B2B-U2-001 | judgment-day | `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs:210-218`; `apply-progress.md:52,59` | CRITICAL | info | Single-judge suspect: the helper acknowledges imminent root exit before executing `exit`, so the descendant-delay assertion may occur before authoritative root termination. Not independently confirmed; non-blocking. |
+| JD-B-B2B-U2-001 | judgment-day | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:102-107`; `PackagingSupervisorTests.cs:253,271` | CRITICAL | info | Single-judge suspect: a non-positive observation interval uses `Task.Yield()`, which may not prove temporal separation between zero-active queries. Not independently confirmed; non-blocking. |
+
+The blind judges returned no overlapping BLOCKER/CRITICAL finding. Both single-judge signals are retained as informational suspects under the Judgment Day convergence contract; they do not drive a fix round. Unit 2 remains within its 288/400 review budget.
+
+`JUDGMENT: APPROVED`
 
 ### Fix Round 1 — maintainer-authorized correction
 

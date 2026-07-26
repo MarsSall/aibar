@@ -1,7 +1,7 @@
 using System.ComponentModel;
+using Microsoft.Win32.SafeHandles;
 using System.Runtime.InteropServices;
 using System.Text;
-using Microsoft.Win32.SafeHandles;
 
 namespace AIBar.Packaging.Supervisor;
 
@@ -46,6 +46,15 @@ public sealed class WindowsProcessSupervisorInterop : IProcessSupervisorInterop
     public bool ResumeThread(SafeThreadHandle thread) => Native.ResumeThread(thread) != uint.MaxValue;
     public void TerminateProcess(SafeProcessHandle process) => Native.TerminateProcess(process, 1);
     public bool TryGetExitCode(SafeProcessHandle process, out int exitCode) => Native.GetExitCodeProcess(process, out exitCode);
+    public bool IsProcessSignaled(SafeProcessHandle process) => Native.WaitForSingleObject(process, 0) == 0;
+    public bool TryGetActiveProcesses(SafeJobHandle job, out uint activeProcesses)
+    {
+        activeProcesses = 0; var size = Marshal.SizeOf<Native.BasicAccounting>(); var memory = Marshal.AllocHGlobal(size);
+        try { if (!Native.QueryInformationJobObject(job, 1, memory, (uint)size, IntPtr.Zero)) return false; activeProcesses = Marshal.PtrToStructure<Native.BasicAccounting>(memory).ActiveProcesses; return true; }
+        finally { Marshal.FreeHGlobal(memory); }
+    }
+    public bool ObserveCompletionPacket(SafeCompletionPortHandle port) => Native.GetQueuedCompletionStatus(port, out _, out _, out _, 0);
+    public Stream OpenReadPipe(SafePipeHandle pipe) => new FileStream(new SafeFileHandle(pipe.DangerousGetHandle(), false), FileAccess.Read, 4096, false);
     private static bool Set<T>(SafeJobHandle job, int type, T value) where T : struct { var size = Marshal.SizeOf<T>(); var memory = Marshal.AllocHGlobal(size); try { Marshal.StructureToPtr(value, memory, false); return Native.SetInformationJobObject(job, type, memory, (uint)size); } finally { Marshal.FreeHGlobal(memory); } }
 
     private sealed class AttributeList : IDisposable
@@ -82,6 +91,7 @@ public sealed class WindowsProcessSupervisorInterop : IProcessSupervisorInterop
         [StructLayout(LayoutKind.Sequential)] internal struct SecurityAttributes { public int Length; public IntPtr Descriptor; [MarshalAs(UnmanagedType.Bool)] public bool InheritHandle; }
         [StructLayout(LayoutKind.Sequential)] internal struct BasicLimit { public long PerProcessUserTime, PerJobUserTime; public uint LimitFlags; public UIntPtr MinWorkingSet, MaxWorkingSet, ActiveProcessLimit; public IntPtr Affinity; public uint PriorityClass, SchedulingClass; }
         [StructLayout(LayoutKind.Sequential)] internal struct IoCounters { public ulong ReadOperationCount, WriteOperationCount, OtherOperationCount, ReadTransferCount, WriteTransferCount, OtherTransferCount; }
+        [StructLayout(LayoutKind.Sequential)] internal struct BasicAccounting { public long TotalUserTime, TotalKernelTime, ThisPeriodUserTime, ThisPeriodKernelTime; public uint TotalPageFaultCount, TotalProcesses, ActiveProcesses, TotalTerminatedProcesses; }
         [StructLayout(LayoutKind.Sequential)] internal struct ExtendedLimit { public BasicLimit Basic; public IoCounters Io; public UIntPtr ProcessMemoryLimit, JobMemoryLimit, PeakProcessMemoryUsed, PeakJobMemoryUsed; }
         [StructLayout(LayoutKind.Sequential)] internal struct AssociateCompletionPort { public IntPtr CompletionKey; public IntPtr Port; }
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] internal struct StartupInfo { public int Size; public string? Reserved, Desktop, Title; public int X, Y, XSize, YSize, XCountChars, YCountChars, FillAttribute, Flags, ShowWindow; public short Reserved2; public IntPtr Reserved2Pointer, StdInput, StdOutput, StdError; }
@@ -97,6 +107,9 @@ public sealed class WindowsProcessSupervisorInterop : IProcessSupervisorInterop
         [DllImport("kernel32.dll", SetLastError = true)] internal static extern uint ResumeThread(SafeThreadHandle thread);
         [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool TerminateProcess(SafeProcessHandle process, uint exitCode);
         [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool GetExitCodeProcess(SafeProcessHandle process, out int exitCode);
+        [DllImport("kernel32.dll", SetLastError = true)] internal static extern uint WaitForSingleObject(SafeProcessHandle handle, uint milliseconds);
+        [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool QueryInformationJobObject(SafeJobHandle job, int informationClass, IntPtr data, uint length, IntPtr returnLength);
+        [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool GetQueuedCompletionStatus(SafeCompletionPortHandle port, out uint bytes, out UIntPtr key, out IntPtr overlapped, uint milliseconds);
         [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool CloseHandle(IntPtr handle);
         [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool InitializeProcThreadAttributeList(IntPtr list, int count, int flags, ref nuint size);
         [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool UpdateProcThreadAttribute(IntPtr list, uint flags, IntPtr attribute, IntPtr value, nuint size, IntPtr previous, IntPtr returnedSize);

@@ -436,10 +436,10 @@ Historical mapping (not fixed here): `JD-B2B-001` → units 1–2; `JD-B2B-002` 
 
 **Start:** Unit 1; **end:** concurrent bounded stdout/stderr 64-KiB tails with discard counts, EOF grace, completion-port advisory wakeups, deadline handling, and authoritative repeated live `ActiveProcesses == 0` proof after normal exit and termination.
 
-- [ ] **RED:** event-gated saturation and fake tests cover lost/duplicate/reordered packets, descendant-delayed zero, root exit retrieval, and two queries separated by the observation interval.
-- [ ] **GREEN:** implement bounded drains and query loop; success requires signaled root, zero exit, two successful zero-active queries while handles remain open.
-- [ ] **TRIANGULATE:** prove packets never decide outcome, saturation never hangs, and descendants delay success.
-- [ ] **GATE:** focused tests, Windows helper with child/descendant events, build, diff check, and no surviving helpers. Rollback only Unit 2.
+- [x] **RED:** event-gated saturation and fake tests cover lost/duplicate/reordered packets, descendant-delayed zero, root exit retrieval, and two queries separated by the observation interval.
+- [x] **GREEN:** implement bounded drains and query loop; success requires signaled root, zero exit, two successful zero-active queries while handles remain open.
+- [x] **TRIANGULATE:** prove packets never decide outcome, saturation never hangs, and descendants delay success.
+- [x] **GATE:** focused tests, Windows helper with child/descendant events, build, diff check, and no surviving helpers. Rollback only Unit 2.
 
 ###### Unit 3 — Cancellation/timeout containment and classification (180–260 review lines)
 
