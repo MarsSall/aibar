@@ -1,5 +1,11 @@
 # Apply Progress — AIBar Foundation
 
+### R3-INC-C1-001 Fix Round 1 — b2b readiness harness (2026-07-26)
+
+**Scope:** committed b2b test harness synchronization/diagnostics only; no production supervisor, C1 behavior, C2/C3, cleanup deletion, scavenger, or PowerShell production integration changed. The nested helper now follows an explicit root-started → test-authorized child launch → child-ready → root-ready → root-exited → test-release handshake. It emits only fixed safe progress/failure codes; on a failed handshake the test reports root-exit state, exit code, recognized safe code, and bounded stdout/stderr byte counts, never raw tail text or paths.
+
+**Verified evidence:** isolated readiness passed 10/10; full `PackagingSupervisor` passed 47/47; the original combined filter passed 57/57 while C1 was present; `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings/errors; `git diff --check` passed (LF-to-CRLF advisories only); `ZERO_HELPER_COUNT=0` after excluding the invoking shell. `R3-INC-C1-001` is independently **verified** as a b2b readiness-harness repair. The C1-only and combined C1 receipts are superseded by this rejected-implementation rollback and grant no C1 completion, approval, or future-design authority. **Rollback boundary:** retain this harness synchronization; a future C1 replan must be separately implemented and reviewed.
+
 ## Slice 8C1.1b2b Unit 3 — Cancellation/timeout containment and classification (2026-07-26)
 
 **Status:** Standard mode (`strict_tdd: false`), feature-branch-chain Unit 3 only. Cancellation, deadline timeout, ActiveProcesses-query failure, EOF/drain failure, and Job-termination failure now return closed status classifications. This unit does not implement b2c, cleanup/scavenging, PowerShell integration, or packaging/runtime behavior.

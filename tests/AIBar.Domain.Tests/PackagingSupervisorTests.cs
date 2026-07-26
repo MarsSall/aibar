@@ -201,20 +201,34 @@ public sealed class PackagingSupervisorTests
     public async Task Windows_quiescence_waits_for_an_event_gated_descendant_after_root_exit()
     {
         if (!OperatingSystem.IsWindows()) return;
-        var readyName = $"Local\\aibar-ready-{Guid.NewGuid():N}"; var rootExitedName = $"Local\\aibar-root-exited-{Guid.NewGuid():N}"; var releaseName = $"Local\\aibar-release-{Guid.NewGuid():N}";
+        var rootStartedName = $"Local\\aibar-root-started-{Guid.NewGuid():N}"; var allowChildName = $"Local\\aibar-allow-child-{Guid.NewGuid():N}"; var readyName = $"Local\\aibar-ready-{Guid.NewGuid():N}"; var rootReadyName = $"Local\\aibar-root-ready-{Guid.NewGuid():N}"; var rootExitedName = $"Local\\aibar-root-exited-{Guid.NewGuid():N}"; var releaseName = $"Local\\aibar-release-{Guid.NewGuid():N}";
+        using var rootStarted = new EventWaitHandle(false, EventResetMode.ManualReset, rootStartedName);
+        using var allowChild = new EventWaitHandle(false, EventResetMode.ManualReset, allowChildName);
         using var ready = new EventWaitHandle(false, EventResetMode.ManualReset, readyName);
+        using var rootReady = new EventWaitHandle(false, EventResetMode.ManualReset, rootReadyName);
         using var rootExited = new EventWaitHandle(false, EventResetMode.ManualReset, rootExitedName);
         using var release = new EventWaitHandle(false, EventResetMode.ManualReset, releaseName);
         var powershell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
-        var child = $"[Threading.EventWaitHandle]::OpenExisting('{readyName}').Set(); [Threading.EventWaitHandle]::OpenExisting('{releaseName}').WaitOne()";
+        var child = $"try {{ Write-Output 'child-ready'; [Threading.EventWaitHandle]::OpenExisting('{readyName}').Set(); [Threading.EventWaitHandle]::OpenExisting('{releaseName}').WaitOne() }} catch {{ Write-Output 'child-startup-failed'; exit 31 }}";
         var childCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(child));
-        var script = $"$child='{childCommand}'; $start=[Diagnostics.ProcessStartInfo]::new((Join-Path $PSHOME 'powershell.exe')); $start.UseShellExecute=$false; $start.Arguments=\"-NoProfile -NonInteractive -EncodedCommand $child\"; [void][Diagnostics.Process]::Start($start); [Threading.EventWaitHandle]::OpenExisting('{readyName}').WaitOne(); [Threading.EventWaitHandle]::OpenExisting('{rootExitedName}').Set(); exit";
+        var script = $"[Threading.EventWaitHandle]::OpenExisting('{rootStartedName}').Set(); [Threading.EventWaitHandle]::OpenExisting('{allowChildName}').WaitOne(); try {{ $child='{childCommand}'; $start=[Diagnostics.ProcessStartInfo]::new((Join-Path $PSHOME 'powershell.exe')); $start.UseShellExecute=$false; $start.Arguments=\"-NoProfile -NonInteractive -EncodedCommand $child\"; $childProcess=[Diagnostics.Process]::Start($start); if ($null -eq $childProcess) {{ Write-Output 'child-start-failed'; exit 41 }}; Write-Output 'child-launched'; if (-not [Threading.EventWaitHandle]::OpenExisting('{readyName}').WaitOne(4000)) {{ Write-Output 'child-ready-timeout'; exit 42 }}; [Threading.EventWaitHandle]::OpenExisting('{rootReadyName}').Set(); Write-Output 'root-ready'; exit }} catch {{ Write-Output 'root-startup-failed'; exit 43 }} finally {{ [Threading.EventWaitHandle]::OpenExisting('{rootExitedName}').Set() }}";
         var command = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
         using var supervisor = new ProcessSupervisor(new WindowsProcessSupervisorInterop());
         var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new(powershell, $"\"{powershell}\" -NoProfile -NonInteractive -EncodedCommand {command}")).Launch);
 
         var observation = supervisor.ObserveAsync(launch, new(TimeSpan.FromSeconds(10), TimeSpan.FromMilliseconds(25), TimeSpan.FromSeconds(2)));
-        Assert.True(ready.WaitOne(TimeSpan.FromSeconds(5)));
+        Assert.True(rootStarted.WaitOne(TimeSpan.FromSeconds(5)));
+        allowChild.Set();
+        var handshake = WaitHandle.WaitAny([rootReady, rootExited], 5_000);
+        if (handshake != 0)
+        {
+            release.Set();
+            var failure = await observation;
+            var diagnostics = Encoding.UTF8.GetString(failure.StdoutTail.Concat(failure.StderrTail).ToArray());
+            var safeCode = new[] { "child-ready", "child-launched", "root-ready", "child-startup-failed", "child-start-failed", "child-ready-timeout", "root-startup-failed" }.LastOrDefault(diagnostics.Contains) ?? "none";
+            Assert.Fail($"Nested helper readiness failed: rootExited={handshake == 1}, exitCode={failure.ExitCode?.ToString() ?? "unavailable"}, safeCode={safeCode}, stdoutBytes={failure.StdoutTail.Length + failure.StdoutDiscardedBytes}, stderrBytes={failure.StderrTail.Length + failure.StderrDiscardedBytes}.");
+            return;
+        }
         Assert.True(rootExited.WaitOne(TimeSpan.FromSeconds(5)));
         Assert.False(observation.IsCompleted);
         release.Set();
