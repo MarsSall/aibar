@@ -43,6 +43,20 @@ Fix round 1: JD-B2A-001 now bounds stdin during reads and rejects the 4097th byt
 
 One exhaustive reliability sweep returned an empty findings ledger. The final b2a work unit is approved for an isolated commit; unrelated `.gitignore`, pre-existing planning changes, and b2b/b2c remain excluded.
 
+## Judgment Day — Slice 8C1.1b2b — Round 1
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| JD-B2B-001 | judgment-day | `tools/AIBar.Packaging.Supervisor/JobObjectInterop.cs:13-41` | CRITICAL | wont-fix | Both blind judges confirmed no production implementation of `IProcessSupervisorInterop` exists. Native launch, explicit inherited-handle control, suspended assignment/resume ordering, completion-port association, concurrent pipe drains, exit retrieval, active-process queries, and owned handle lifetimes are declared or faked but not wired into an executable supervisor. The rejected implementation was rolled back for replanning, so the defective code no longer exists. |
+| JD-B2B-002 | judgment-day | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:24-38` | CRITICAL | wont-fix | Both blind judges confirmed cancellation and timeout terminate and return without the required bounded repeated post-termination `ActiveProcesses == 0` proof, so callers can receive a terminal result while descendants remain alive. The rejected implementation was rolled back for replanning, so the defective code no longer exists. |
+| JD-B2B-003 | judgment-day | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:35` | CRITICAL | wont-fix | Both blind judges confirmed an active-process query failure returns `QuiescenceUnproved` without terminating containment or establishing disposal/handle ownership, allowing descendants to outlive the supervision call. The rejected implementation was rolled back for replanning, so the defective code no longer exists. |
+| JD-A-B2B-004 | judgment-day | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:39-40` | CRITICAL | info | Single-judge suspect: post-quiescence EOF waiting ignores cancellation and can misclassify a late cancellation. Not independently confirmed; non-blocking until fix-touched behavior is reviewed. |
+| JD-B-B2B-003 | judgment-day | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:21-23,39-43` | CRITICAL | info | Single-judge suspect: abandoned or timed-out drain tasks can retain pipes and handles. Not independently confirmed; non-blocking until fix-touched behavior is reviewed. |
+
+Round 1 verdict: three independently confirmed CRITICAL findings and two single-judge suspect signals retained as non-blocking information. The checked b2b tasks and apply evidence currently overstate completion. The rejected implementation was rolled back for replanning.
+
+Historical Round 1 terminal state: `JUDGMENT: ESCALATED` — it does not approve any future b2b implementation.
+
 ### Fix round 1 scoped re-judgment
 
 Both blind judges verified `JD-B2A-001` and `JD-B2A-002`; no defect remains open. The terminal judgment remains escalated because the judges disagreed on review-budget accounting and evidence sufficiency: Judge A calculated 381 changed lines and approved, while Judge B calculated 481 candidate lines and requested a clean b2a-only receipt plus explicit post-fix build evidence.
