@@ -247,3 +247,86 @@ The MVP MUST NOT claim support for other providers, multiple accounts or roots, 
 - GIVEN a user or configuration requests a deferred capability
 - WHEN the system evaluates the request
 - THEN it presents an explicit unsupported or later-capability state and does not silently approximate it as MVP behavior
+
+## ADDED Requirements — Slice 8C1.1b2 packaging supervisor
+
+### Requirement: Closed typed supervisor protocol
+
+The packaging supervisor MUST accept only a length-bounded closed-schema operation selected from a fixed allowlist, with operation-specific typed arguments and caller-selected ownership authority. It MUST NOT accept generic shell text, arbitrary roots, caller-supplied identity/nonce/cleanup markers, arbitrary environment, or echo paths, secrets, command text, PIDs, or capability material.
+
+#### Scenario: Invalid or sensitive request
+- GIVEN a request contains shell text, an arbitrary root, an identity claim, or an unknown field
+- WHEN the supervisor validates it
+- THEN it rejects with `INVALID_REQUEST` and emits no sensitive value
+
+### Requirement: Kernel-owned process membership
+
+The supervisor MUST create a fresh Job Object with `KILL_ON_JOB_CLOSE` and no breakaway, create the root worker suspended, assign it before resume, and retain safe process/thread handles through assignment, resume, and exit-code retrieval. Any start or assignment failure MUST terminate the retained process safely before returning failure.
+
+#### Scenario: Assignment failure
+- GIVEN a suspended root cannot be assigned to the fresh Job Object
+- WHEN assignment fails
+- THEN the supervisor terminates and closes the retained process safely and returns `JOB_ASSIGN_FAILED` without cleanup success
+
+### Requirement: Bounded worker lifecycle and streams
+
+The supervisor MUST drain stdout and stderr concurrently from launch into bounded diagnostic tails, discard excess bytes with counts, retrieve the root exit code, and enforce one overall deadline plus bounded post-quiescence EOF grace. Timeout and production cancellation MUST terminate the Job and use the same bounded lifecycle proof.
+
+#### Scenario: Saturation, timeout, or cancellation
+- GIVEN either stream saturates or the worker exceeds its deadline or is cancelled
+- WHEN the supervisor handles the condition
+- THEN drains remain bounded, the Job is terminated, and it returns `OUTPUT_DRAIN_FAILED`, `TIMEOUT`, or `CANCELLED` without hanging
+
+### Requirement: Authoritative quiescence
+
+Completion notifications MUST be advisory wake-ups only. Success MUST require a signaled root handle, zero root exit code, and two successful bounded `ActiveProcesses == 0` queries separated by the observation interval while live Job and root handles remain open. Unknown or nonzero query results MUST fail closed; closing the Job MUST NOT be completion evidence.
+
+#### Scenario: Lost, duplicate, or reordered notifications
+- GIVEN completion packets are lost, duplicated, delayed, or out of order
+- WHEN the supervisor evaluates completion
+- THEN packets cannot decide success or failure; only the bounded repeated live-handle queries can do so
+
+### Requirement: Explicit external-process boundary
+
+The supervisor MUST document that processes created through pre-existing build servers, brokers, or services are outside Job membership and MUST NOT claim to own them. Worker configuration MUST disable supported build-server delegation where possible; inability to disable it MUST produce a conservative non-success outcome.
+
+#### Scenario: Active-process uncertainty
+- GIVEN a query fails, remains uncertain, or a delegated process may be outside the Job
+- WHEN quiescence is evaluated
+- THEN the supervisor returns `QUIESCENCE_UNPROVED` and does not clean up
+
+### Requirement: Capability and physical identity admission
+
+The supervisor MUST create the isolation root, retain a cryptographic capability, hold an exclusive capability handle, and validate physical identity, final path, canonical containment, and reparse state on every admission boundary. Unknown, substituted, extra, missing, or raced identity MUST fail closed. Malicious same-user or administrator interference is outside the threat-model guarantee.
+
+#### Scenario: Reparse or identity race
+- GIVEN a root or child changes identity or becomes a reparse point between validation steps
+- WHEN admission or revalidation runs
+- THEN it returns `ROOT_IDENTITY_CHANGED` or `REPARSE_DETECTED` and preserves bytes before commit
+
+### Requirement: Irreversible cleanup state machine
+
+Cleanup MUST perform read-only admission, then an atomic same-volume quarantine rename as the sole irreversible commit. Before commit, any failure MUST preserve the original namespace and return `CLEANUP_REFUSED`. After commit, every reopen, identity, reparse, enumeration, rename, deletion, or unknown failure MUST retain quarantine and return `CLEANUP_PARTIAL`; it MUST never claim pristine preservation or rollback. Protected metadata MUST contain only retained identity, phase, bounded retry count, and next eligibility.
+
+#### Scenario: Rename or post-quarantine deletion failure
+- GIVEN quarantine rename fails, or deletion fails after quarantine commits
+- WHEN cleanup reports the result
+- THEN rename failure preserves the original tree as `CLEANUP_REFUSED`; post-commit failure retains quarantine as `CLEANUP_PARTIAL` without claiming original-path preservation
+
+### Requirement: Safe status and observability taxonomy
+
+Supervisor status and structured events MUST use only path/secret-free stable codes, including `INVALID_REQUEST`, `ROOT_CREATE_FAILED`, `JOB_CREATE_FAILED`, `JOB_CONFIG_FAILED`, `PROCESS_START_FAILED`, `JOB_ASSIGN_FAILED`, `PROCESS_RESUME_FAILED`, `TIMEOUT`, `CANCELLED`, `PROCESS_FAILED`, `OUTPUT_DRAIN_FAILED`, `QUIESCENCE_UNPROVED`, `CLEANUP_REFUSED`, `CLEANUP_PARTIAL`, and `INTERNAL_UNKNOWN`. Events MAY expose phase, coarse duration, active count, exit code, byte counts, truncation, and retry metadata, but MUST NOT expose paths, PIDs, commands, environment, nonce, handles, secrets, or exception text.
+
+#### Scenario: Status emission
+- GIVEN any success or fault transition
+- WHEN status is serialized or logged
+- THEN it contains only the closed response fields and permitted coarse observability values
+
+### Requirement: Conservative recovery and degradation
+
+The supervisor MAY run an opt-in scavenger only for aged supervisor-owned quarantines after current-user ownership/ACL, protected capability metadata, physical identity, reparse, and lock admission. Any refusal MUST retain quarantine and perform no deletion. On rollback or unsupported capability, it MUST preserve bytes and disable cleanup rather than guess.
+
+#### Scenario: Scavenger refusal
+- GIVEN scavenger metadata is missing/invalid, identity is uncertain, or an extra entry exists
+- WHEN scavenger admission runs
+- THEN it refuses mutation, retains quarantine, records bounded retry metadata, and returns `CLEANUP_PARTIAL`

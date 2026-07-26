@@ -26,6 +26,34 @@ Historical round verdict: `JUDGMENT: APPROVED` — it does not approve the curre
 
 Current target terminal state: `JUDGMENT: APPROVED`; `SDD: VERIFIED` for the narrowed Slice 8C1.1b1b contract.
 
+## Judgment Day — Slice 8C1.1b2 Job Object design — Round 1
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| JD-DESIGN-001 | judgment-day | `design.md:220,235` | CRITICAL | verified | Both re-judges verified completion messages are advisory and bounded repeated `ActiveProcesses == 0` queries with live handles are authoritative. |
+| JD-DESIGN-002 | judgment-day | `design.md:227-233` | CRITICAL | verified | Both final re-judges verified the quarantine rename is irreversible and every post-commit failure becomes `CLEANUP_PARTIAL` with retained quarantine and bounded retry/scavenger metadata. |
+| JD-A-DESIGN-002 | judgment-day | `design.md:223,264` | CRITICAL | info | Single-judge suspect: the generic argument array may need an operation-specific typed allowlist; it was not independently confirmed and is non-blocking. |
+| JD-B-DESIGN-002 | judgment-day | `design.md:219,225` | CRITICAL | info | Single-judge suspect: assignment failure and root exit retrieval may need additional retained-handle interop; it was not independently confirmed and is non-blocking. |
+| JD-B-DESIGN-003 | judgment-day | `design.md:220,223,229` | CRITICAL | info | Single-judge suspect: the production cancellation channel needs clarification; it was not independently confirmed and is non-blocking. |
+| JD-DESIGN-INFO-001 | judgment-day | `design.md:214,219,220,231` | WARNING | info | Job membership excludes pre-existing build servers and broker/service-mediated process creation; the threat model and worker configuration must state this limitation. |
+| JD-DESIGN-INFO-002 | judgment-day | `design.md:231-235` | WARNING | info | The proposed cleanup/scavenger child lacks a defensible under-400-line forecast and likely requires another split. |
+
+Fix round 1: JD-DESIGN-001 and JD-DESIGN-002 are fixed pending scoped re-judgment. The three suspect CRITICAL findings and two informational warnings are unchanged.
+
+### Fix round 1 re-judgment
+
+JD-DESIGN-001 is verified. JD-DESIGN-002 remains confirmed open because one post-commit branch still uses pre-commit refusal semantics.
+
+`JUDGMENT: ESCALATED`
+
+`JUDGMENT: ESCALATED`
+
+### Fix round 2 final re-judgment
+
+Both blind judges verified JD-DESIGN-002. JD-DESIGN-001 remains verified; single-judge suspects remain recorded as non-blocking information.
+
+`JUDGMENT: APPROVED`
+
 ## Judgment Day — narrowed-scope cleanup
 
 Both blind judges returned empty findings ledgers. They independently confirmed that valid lifecycle and saturated-stream coverage remain, the deferred hardening item is truthful, and the prior suspect findings are correctly marked `wont-fix` following explicit maintainer-approved scope reduction.

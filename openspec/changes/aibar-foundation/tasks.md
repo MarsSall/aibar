@@ -412,27 +412,53 @@ Each slice below is a candidate commit/PR with its tests and directly related do
 
 **Scope-correction rationale:** The prior nonzero-exit test could not distinguish exit code 7 from cancellation and placed its sentinel outside the recovery output. Further proof was judged disproportionate to current AIBar progress. The deferred hardening backlog item **B1B-HARDEN-NONZERO-PARTIAL-OUTPUT** will restore deterministic nonzero-exit-with-partial-output preservation proof outside the current b1b closure path; it is not a b1b acceptance requirement.
 
-##### Slice 8C1.1b2 — Cleanup integration and ownership gate (planning correction)
+##### Slice 8C1.1b2 — Windows Job Object packaging supervisor (planned chain)
 
-**Dependency:** completed 8C1.1b1b implementation, then its independent review gate. **Start:** b1b leaves the owned process tree terminated or reports failure with the incomplete output preserved. **End:** cleanup runs only after deterministic ownership and exit checks, or refuses without traversal. This block does not authorize Apply; the current uncommitted b1b plus ledger diff is 138 lines and remains reviewer burden.
+**Dependency:** reviewed/receipted/committed 8C1.1b1b; preserve deferred `B1B-HARDEN-NONZERO-PARTIAL-OUTPUT`, completed b1b, B1a1+, and unrelated tasks exactly. **Start invariant:** b1b behavior remains the rollback baseline and no supervisor project exists. **End invariant:** B1a2 can invoke a typed, kernel-owned, fail-closed supervisor without caller PID/marker authority. **Non-goals:** MakeAppx, SignTool, MSIX, signing, policy/legal evidence, promotion, lifecycle, `.gitignore`, commits/PRs, receipts, or implementation during planning.
 
-**Review Workload Forecast:** estimated 180–260 authored additions/deletions for this unit, including behavior tests and bounded task/progress evidence; combined with the current 138-line uncommitted diff, expected reviewer burden is approximately 318–398 lines. Risk: Medium (near the 400-line budget). Chained PRs recommended: No for this bounded unit; chain strategy remains pending because the session contract does not select one. Decision needed before apply: Yes (ask-always; no silent implementation authorization).
+**Review Workload Forecast:** ~1,030–1,140 authored changed lines total; risk High; three chained review units are required. Delivery contract is interactive, ask-always, `review_budget_lines: 400`; `chain_strategy` remains pending user choice (do not select `stacked-to-main` or `feature-branch-chain`).
 
 Decision needed before apply: Yes
-Chained PRs recommended: No
+Chained PRs recommended: Yes
 Chain strategy: pending
-400-line budget risk: Medium
+400-line budget risk: High
 
-**Allowed paths:** `scripts/Publish-Deterministic.ps1`; `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs`. No other source, test, packaging, project, configuration, `.gitignore`, or OpenSpec artifact may change except a minimal task/progress cross-reference required to record completion evidence.
+Each unit is independently reviewable, testable, rollback-safe, and <=400 lines. No receipts are created; stable Gentle AI remains authoritative. Apply must stop at the unit boundary selected by the user.
 
-- [ ] **8C1.1b2-RED:** Add behavior-first tests for cleanup admission after b1b: parent and every owned child are known, the parent marker/nonce matches, canonical containment and complete nested reparse checks pass, all recorded child/descendant handles have exited, and any failed check preserves the incomplete output without traversal or success evidence. <!-- sdd-owner: implementation -->
-- [ ] **8C1.1b2-GREEN:** Integrate cleanup only after b1b reports successful bounded process completion; revalidate exact marker, canonical containment, and reparses immediately before removing only the owned external parent. Never clean output on timeout, cancellation, launch/nonzero/partial failure, live descendant, ownership mismatch, stale bytes, or inaccessible/unclassifiable state. <!-- sdd-owner: implementation -->
-- [ ] **8C1.1b2-TRIANGULATE:** Verify successful cleanup, refusal with sentinel preservation, child-exit-before-delete ordering, repeatability with unique external roots, and path/secret-free failure status. Focused: `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingRecovery" --no-restore -m:1 --nologo`; then `dotnet build AIBar.sln --no-restore --nologo` and `git diff --check`. <!-- sdd-owner: implementation -->
-- [ ] **8C1.1b2-GATE:** Review only this work unit against the two allowed implementation paths and the current 138-line baseline; stop before B1a2. Rollback reverts only b2 cleanup integration/tests and its minimal task/progress evidence, preserving reviewed b1b, b1a, and 8C1.1a. <!-- sdd-owner: implementation -->
+###### 8C1.1b2a — Typed protocol, state machine, and supervisor foundation (~300–360 lines)
 
-**Deterministic cleanup/rollback boundary:** cleanup is permitted only after exit confirmation plus marker, containment, and reparse revalidation; it removes only the exact caller-owned external parent. Any uncertainty leaves bytes untouched and reports failure. Rollback removes only b2 changes/evidence; it never deletes caller data, traverses an unowned root, or alters prior slices.
+**Dependency:** b1b reviewed/committed. **Allowed paths:** `tools/AIBar.Packaging.Supervisor/AIBar.Packaging.Supervisor.csproj`, `tools/AIBar.Packaging.Supervisor/Program.cs`, `tools/AIBar.Packaging.Supervisor/Protocol.cs`, `tools/AIBar.Packaging.Supervisor/SupervisorState.cs`, `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`, and the minimal solution/project reference needed to test the supervisor. **Start:** no packaging supervisor dependency or runtime integration. **End:** dependency-isolated `net8.0-windows` x64 executable/library seam with closed request/response DTOs and deterministic state transitions; no native process launch.
 
-**Explicit exclusions:** no MakeAppx, SignTool, MSIX, signing, B1a2, unrelated slices, `.gitignore`, commits, PRs, receipts, staging, publication, or release evidence. Stable Gentle AI is authoritative; the retired receipt workflow is not reintroduced. <!-- sdd-owner: parent -->
+- [ ] **8C1.1b2a-RED:** Add fake-driven tests for schema/version/operation/timeout/argument bounds, rejection of PID/root/nonce/shell/environment authority, every state transition, cancellation and terminal-status precedence, bounded diagnostics, and response secret/path freedom.
+- [ ] **8C1.1b2a-GREEN:** Add the BCL/Win32-only project, typed protocol, stable statuses (`INVALID_REQUEST` through `INTERNAL_UNKNOWN`), state machine, injected clock/randomness/interop ports, and one length-bounded JSON stdin/stdout boundary; keep the application projects independent.
+- [ ] **8C1.1b2a-TRIANGULATE:** Mutate every closed-schema field, reorder/duplicate packets and callbacks, exhaust limits, cancel at each transition, and assert deterministic response bytes plus no arbitrary command text, root spelling, PID, nonce, exception, or secret.
+- [ ] **8C1.1b2a-GATE:** Run `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, and `git diff --check`. Rollback removes only this project/reference/protocol/tests; b1b remains runnable.
+
+**Workload Forecast — b2a:** Chained PRs recommended: Yes (total chain); 400-line budget risk: Medium; Decision needed before apply: Yes; no runtime harness, native calls, cleanup, PowerShell, or B1a2 wiring.
+
+###### 8C1.1b2b — Job Object launch, drains, timeout, and authoritative quiescence (~360–395 lines)
+
+**Dependency:** reviewed b2a. **Allowed paths:** `tools/AIBar.Packaging.Supervisor/JobObjectInterop.cs`, `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs`, `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`, and b2a project files only as required. **Start:** typed state machine with fake interop; **end:** suspended assignment-before-resume, inherited descendants, concurrent 64-KiB stream tails, exit-code capture, timeout/cancellation termination, advisory completion packets, and repeated `ActiveProcesses == 0` proof. **Non-goals:** directory cleanup, scavenger, PowerShell, policy, packaging/signing.
+
+- [ ] **8C1.1b2b-RED:** Add fake and Windows-gated tests for every pre-resume failure, assignment/resume ordering, lost/duplicate/reordered completion packets, root nonzero exit, saturated stdout/stderr, EOF grace, timeout, cancellation, and descendant-delayed quiescence.
+- [ ] **8C1.1b2b-GREEN:** Implement SafeHandle-based native calls, Job Object kill-on-close and completion port, suspended `CreateProcessW` with explicit inherited handles, concurrent bounded drains, `TerminateJobObject`, root exit retrieval, and two successful zero-active queries separated by the fixed interval before success.
+- [ ] **8C1.1b2b-TRIANGULATE:** Run fake matrix plus the event-gated helper on Windows; prove completion packets never decide outcome, assignment precedes resume, no descendant survives the bounded proof, cancellation/timeout cannot await EOF indefinitely, and statuses contain no paths/PIDs/secrets.
+- [ ] **8C1.1b2b-GATE:** Run `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, `git diff --check`, and a scoped zero-helper-process check. Rollback removes only native supervisor files/tests; b2a remains usable.
+
+**Workload Forecast — b2b:** Chained PRs recommended: Yes; 400-line budget risk: Medium; Decision needed before apply: Yes; runtime proof is Windows-gated and test-owned; no cleanup or PowerShell integration.
+
+###### 8C1.1b2c — Directory capability, quarantine, scavenger, and PowerShell integration (~340–385 lines)
+
+**Dependency:** reviewed b2b. **Allowed paths:** `tools/AIBar.Packaging.Supervisor/DirectoryCapability.cs`, `tools/AIBar.Packaging.Supervisor/QuarantineScavenger.cs`, `tools/AIBar.Packaging.Supervisor/Program.cs`, `scripts/Publish-Deterministic.ps1`, `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`, and minimal supervisor project files. **Start:** b2b proves owned process quiescence but no deletion. **End:** supervisor-created capability root, read-only admission, same-volume quarantine commit, post-commit `CLEANUP_PARTIAL`, guarded DPAPI scavenger, and typed PowerShell invocation. **Non-goals:** B1a2 policy/graph/legal/promotion, caller cleanup authority, path-based ownership, MakeAppx/SignTool, unrelated packaging.
+
+- [ ] **8C1.1b2c-RED:** Test root/child identity, reparse, containment, extras/missing entries, access/rename/reopen/deletion faults, pre/post-commit status separation, DPAPI metadata validation, aged-quarantine scavenger skips, and PowerShell closed-request integration.
+- [ ] **8C1.1b2c-GREEN:** Create collision-failing nonce leaves and capability handles; admit exact children; atomically rename to quarantine; retain protected bounded-retry metadata on every post-commit failure; resume only from validated quarantine; invoke the fixed worker without shell composition or caller-supplied roots/PIDs.
+- [ ] **8C1.1b2c-TRIANGULATE:** Run two external Unicode/space roots and injected failures; prove `CLEANUP_REFUSED` leaves original bytes, `CLEANUP_PARTIAL` retains quarantine, successful removal follows quiescence, retries never rename back, no repository `obj/bin` changes occur, and status/evidence are path/secret-free.
+- [ ] **8C1.1b2c-GATE:** Run `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, `git diff --check`, and the external-root runtime test. Rollback removes only b2c files/integration; reviewed b2b and b1b remain intact.
+
+**Workload Forecast — b2c:** Chained PRs recommended: Yes; 400-line budget risk: Medium; Decision needed before apply: Yes; no receipts, repository cleanup, policy evidence, signing, commits, or PRs.
+
+**Chain recommendation:** total forecast exceeds 400; preserve order `b2a → b2b → b2c`, with the user choosing the pending chain strategy before Apply. Each child must state its immediate reviewed predecessor, start/end invariant, dependency diagram, verification command, rollback boundary, and out-of-scope list in its review artifact; this task update itself creates no receipts or implementation evidence. <!-- sdd-owner: parent -->
 
 #### Slice 8C2B1a2 — Versioned live-policy authority, external acquisition, and two-root proof (~390 authored lines)
 
