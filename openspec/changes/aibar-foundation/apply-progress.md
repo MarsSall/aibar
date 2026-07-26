@@ -1,5 +1,26 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 8C1.1b2a typed protocol and supervisor foundation (2026-07-26)
+
+**Status:** Standard mode (`strict_tdd: false`) with the task-mandated RED → GREEN → TRIANGULATE → GATE sequence. This feature-branch-chain work unit adds only the dependency-isolated supervisor executable seam, closed protocol/state-machine foundation, focused fake-driven tests, and solution/test references. It does not implement Job Object native calls, process launch, stream drains, cleanup, scavenging, PowerShell integration, B1a2, MakeAppx, SignTool, or application runtime integration.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo` failed before implementation because `AIBar.Packaging.Supervisor` and its protocol interfaces did not exist (`CS0234`, `CS0246`). |
+| GREEN | After adding the BCL-only `net8.0-windows` x64 project, typed DTOs/statuses, JSON boundary, bounded diagnostic tail, and fake-injected state machine, the focused command passed 9/9. |
+| TRIANGULATE | Added closed-field mutation coverage for version, operation, timeout, PID/root authority, oversized input, duplicate fields, reordered fields/callbacks, terminal cancellation precedence, deterministic response bytes, and bounded diagnostic tail behavior. The focused command passed 11/11. |
+| GATE | `dotnet build AIBar.sln --no-restore --nologo` succeeded with 0 warnings and 0 errors; `git diff --check` passed (Git emitted LF-to-CRLF advisory warnings only). |
+| Dependency boundary | `AIBar.Packaging.Supervisor` references no AIBar application project or package. Only `AIBar.Domain.Tests` references it for focused tests; application projects remain independent. |
+| Rollback boundary | Remove the supervisor project, its solution/test references, `PackagingSupervisorTests.cs`, the four b2a checkbox marks, and this evidence block. The committed b1b script behavior remains runnable. |
+
+**Changed paths:** `AIBar.sln`; `tools/AIBar.Packaging.Supervisor/{AIBar.Packaging.Supervisor.csproj,Program.cs,Protocol.cs,SupervisorState.cs}`; `tests/AIBar.Domain.Tests/{AIBar.Domain.Tests.csproj,PackagingSupervisorTests.cs}`; `openspec/changes/aibar-foundation/{tasks.md,apply-progress.md}`. **Task state:** `8C1.1b2a-RED`, `GREEN`, `TRIANGULATE`, and `GATE` are checked; b2b/b2c remain unchecked. **`.gitignore`:** untouched. **Next:** independent review/verification of b2a before b2b; no commit, push, PR, or receipt was created.
+
+### Judgment Day fix round 1 — b2a input boundary (2026-07-26)
+
+**Scope:** Maintainer-authorized correction of only `JD-B2A-001` and `JD-B2A-002`. `Program` now consumes stdin through a fixed 4097-byte buffer and returns the closed invalid response as soon as the 4097th byte arrives, without waiting for EOF or allocating an unbounded stream. `protocolVersion` now uses non-throwing Int32 parsing, so out-of-range and fractional JSON numbers produce only `invalid-request` response bytes. Focused RED failed with missing `HandleAsync` (`CS0117`); GREEN passed `15/15` PackagingSupervisor tests, including a no-EOF over-limit stream and three invalid numeric versions. b2b/b2c remain untouched. Both ledger entries were verified by both scoped re-judges.
+
+**Independent terminal verification:** Focused PackagingSupervisor tests passed `15/15`; a fresh `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings and 0 errors; `git diff --check` passed with LF-to-CRLF advisories only. The final b2a receipt is 504 gross HEAD-relative lines and 362 review-relevant lines from the approved planning baseline; the detailed accounting is in `review-ledger.md`.
+
 ## Slice 8C1.1b1b narrowed-contract cleanup (2026-07-25)
 
 **Status:** Standard mode (`strict_tdd: false`). Maintainer-approved mechanical cleanup removed the invalid/deferred nonzero-exit-with-partial-output test and its nonzero harness branch. The valid saturated-stream test and all other proven lifecycle tests remain. RED, GREEN, and TRIANGULATE remain checked under the narrowed task contract; the independent GATE remains unchecked. This record is apply evidence only, not independent verification or review approval. No production script, b1b2, B1a2, MakeAppx, SignTool, review, commit, PR, or cleanup integration changed.

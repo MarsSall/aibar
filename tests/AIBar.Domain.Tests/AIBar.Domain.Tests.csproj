@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\src\AIBar.Domain\AIBar.Domain.csproj" />
     <ProjectReference Include="..\..\src\AIBar.Application\AIBar.Application.csproj" />
     <ProjectReference Include="..\..\src\AIBar.Desktop\AIBar.Desktop.csproj" />
+    <ProjectReference Include="..\..\tools\AIBar.Packaging.Supervisor\AIBar.Packaging.Supervisor.csproj" />
   </ItemGroup>
 
 </Project>

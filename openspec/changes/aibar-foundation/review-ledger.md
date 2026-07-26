@@ -26,6 +26,31 @@ Historical round verdict: `JUDGMENT: APPROVED` — it does not approve the curre
 
 Current target terminal state: `JUDGMENT: APPROVED`; `SDD: VERIFIED` for the narrowed Slice 8C1.1b1b contract.
 
+## Judgment Day — Slice 8C1.1b2a — Round 1
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| JD-B2A-001 | judgment-day | `tools/AIBar.Packaging.Supervisor/Program.cs:9-11` | CRITICAL | verified | Both scoped re-judges verified stdin is now bounded during reading to 4097 bytes and over-limit input is rejected without requiring EOF or another read. |
+| JD-B2A-002 | judgment-day | `tools/AIBar.Packaging.Supervisor/Protocol.cs:47,55` | CRITICAL | verified | Both scoped re-judges verified non-throwing integer conversion returns closed `INVALID_REQUEST` responses for overflow, underflow, and fractional protocol versions without stack traces or absolute paths. |
+
+Round 1 verdict: two independently confirmed CRITICAL findings. No warnings or single-judge suspects were reported. Fixes require explicit maintainer approval before the first remediation round.
+
+Fix round 1: JD-B2A-001 now bounds stdin during reads and rejects the 4097th byte before EOF; JD-B2A-002 uses non-throwing Int32 validation. Focused behavior tests passed; both findings await blind scoped re-judgment.
+
+`JUDGMENT: ESCALATED`
+
+## Pre-commit reliability review — Slice 8C1.1b2a
+
+One exhaustive reliability sweep returned an empty findings ledger. The final b2a work unit is approved for an isolated commit; unrelated `.gitignore`, pre-existing planning changes, and b2b/b2c remain excluded.
+
+### Fix round 1 scoped re-judgment
+
+Both blind judges verified `JD-B2A-001` and `JD-B2A-002`; no defect remains open. The terminal judgment remains escalated because the judges disagreed on review-budget accounting and evidence sufficiency: Judge A calculated 381 changed lines and approved, while Judge B calculated 481 candidate lines and requested a clean b2a-only receipt plus explicit post-fix build evidence.
+
+Independent receipt (2026-07-26): count tracked paths with `git diff --numstat`, untracked b2a files with `git diff --no-index --numstat NUL <path>`, solution semantics with `git diff --ignore-space-at-eol --numstat -- AIBar.sln`, and the four task completions against the approved planning baseline as four additions plus four deletions. The final b2a gross is 504 lines: 412 executable/project/test, 50 pre-existing task-planning delta, 21 apply evidence, and 21 b2a ledger lines. The review-relevant total is 362: 312 executable/project/test after excluding 100 line-ending-only solution lines, plus 8 task-state lines, 21 apply-evidence lines, and 21 ledger lines. Separate non-b2a workspace deltas are 61 design lines, 83 spec lines, and 28 unrelated design-ledger lines; `.gitignore` has 0 normalized content lines and its filtered hash matches `HEAD`. Focused tests passed 15/15, the fresh post-fix solution build passed with 0 warnings/errors, and `git diff --check` passed with advisory line-ending warnings only. The b2a work unit is therefore within the 400-line review budget; b2b/b2c remain pending.
+
+`JUDGMENT: APPROVED`
+
 ## Judgment Day — Slice 8C1.1b2 Job Object design — Round 1
 
 | id | lens | location | severity | status | evidence |
