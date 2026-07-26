@@ -1,5 +1,30 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 8C1.1b2b Unit 3 — Cancellation/timeout containment and classification (2026-07-26)
+
+**Status:** Standard mode (`strict_tdd: false`), feature-branch-chain Unit 3 only. Cancellation, deadline timeout, ActiveProcesses-query failure, EOF/drain failure, and Job-termination failure now return closed status classifications. This unit does not implement b2c, cleanup/scavenging, PowerShell integration, or packaging/runtime behavior.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | Added fake cancellation, deadline timeout, active-process query/termination failure, EOF/drain failure, and late-cancellation tests. The focused command failed at compile time because `ObserveAsync` had no cancellation overload, `CompletionObservation` exposed no status, and the fake had no Job termination seam. |
+| GREEN | `ObserveAsync` retains live ownership through terminal classification, terminates the Job before the bounded two-query proof on containment paths, cancels/disposes and bounded-waits both drains, retrieves exit code opportunistically, and disposes the launch exactly once. Status precedence keeps cancellation/timeout above worker success; failed termination/proof is `QUIESCENCE_UNPROVED`; failed EOF/drains is `OUTPUT_DRAIN_FAILED`. |
+| TRIANGULATE | Focused `PackagingSupervisor` passed 38/38 three times. Existing event-gated Windows descendant and production 65,537-byte-per-stream saturation tests remain in the same filter; fake paths prove timeout/cancellation/query/termination/EOF and late-cancellation races without sensitive diagnostics. |
+| GATE | Focused `PackagingSupervisor` passed 38/38; `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings/errors; `git diff --check` passed (LF-to-CRLF advisories only); `ZERO_HELPER_COUNT=0`. Unit-3 diff receipt: 152 additions + 35 deletions = 187 lines, below the 400-line hard stop. |
+
+**Changed paths:** `tools/AIBar.Packaging.Supervisor/{JobObjectInterop.cs,ProcessSupervisor.cs}`; `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`; `openspec/changes/aibar-foundation/{tasks.md,apply-progress.md}`. **Task state:** only Unit 3 RED/GREEN/TRIANGULATE/GATE marks are checked; Units 1/2 history is preserved and b2c remains unchecked. **Rollback boundary:** revert only the Unit 3 interop/supervisor/test additions and these four task/progress edits; retain b2a and committed Units 1/2. **`.gitignore`:** untouched and unstaged.
+
+### Judgment Day Fix Round 1 — b2b Unit 3 (2026-07-26)
+
+**Scope:** Maintainer-authorized correction only for `JD-B2B-U3-001` and `JD-B2B-U3-002`. Failed post-termination repeated-zero proofs now override cancellation or timeout with `QuiescenceUnproved`. Drain containment now cancels and disposes both streams, then awaits the drain aggregate before returning, preventing a delayed cancellation-resistant read from mutating the returned tail or retaining an owned pipe. No Unit 1/2 behavior, b2c, sensitive output, or suspect-only behavior changed.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | The retained failed-proof matrix failed against the prior implementation: cancellation and timeout incorrectly returned `Cancelled`/`Timeout` when query failure or the repeated zero proof failed. |
+| GREEN | The matrix covers cancellation and deadline timeout with query failure and a `0,1` repeated-query failure; all return `QuiescenceUnproved`. A cancellation-resistant drain ignores its cancellation token, releases only after stream disposal, and proves returned tails, drain completion, pipe closure, and `OutputDrainFailed`. Fix Round 1 adds deterministic deadline-boundary, first/second pipe-open, and initial-drain-fault containment coverage. |
+| GATE | Focused `PackagingSupervisor` passed 47/47; `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings/errors; `git diff --check` passed (LF-to-CRLF advisories only); `ZERO_HELPER_COUNT=0`. |
+
+`JD-B2B-U3-001` and `JD-B2B-U3-002` are **fixed**, not verified. `R3-B2B-U3-001` and `R3-B2B-U3-002` are also fixed by this correction, not verified. The three single-judge suspects remain informational and unchanged. **Unit-3-only receipt:** 345 additions + 38 deletions = **383** review lines, below the 400-line hard stop. **Rollback boundary:** revert only this Fix Round 1 supervisor/test/ledger/progress delta, retaining the pre-existing Unit 3 work and all Unit 1/2 and b2c bytes.
+
 ## Slice 8C1.1b2a typed protocol and supervisor foundation (2026-07-26)
 
 **Status:** Standard mode (`strict_tdd: false`) with the task-mandated RED → GREEN → TRIANGULATE → GATE sequence. This feature-branch-chain work unit adds only the dependency-isolated supervisor executable seam, closed protocol/state-machine foundation, focused fake-driven tests, and solution/test references. It does not implement Job Object native calls, process launch, stream drains, cleanup, scavenging, PowerShell integration, B1a2, MakeAppx, SignTool, or application runtime integration.

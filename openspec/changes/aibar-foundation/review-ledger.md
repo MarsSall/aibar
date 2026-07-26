@@ -57,9 +57,45 @@ Both blind re-judges verified `JD-B2B-U1-001` and `JD-B2B-U1-002`. Focused tests
 
 `JUDGMENT: APPROVED`
 
+## Pre-commit reliability review — Slice 8C1.1b2b Unit 3
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| R3-B2B-U3-001 | reliability | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:90-117,157-161` | CRITICAL | verified | Scoped re-review verified deadline expiry is rechecked after the observation interval and before the decisive query; deterministic time-provider coverage proves it enters timeout containment instead of success. |
+| R3-B2B-U3-002 | reliability | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:90-101,126-140` | CRITICAL | verified | Scoped re-review verified both pipe opens and drain startup are protected; failures contain/prove the Job, close partial ownership, dispose launch exactly once, and return truthful closed status. |
+
+One general refuter evaluated the complete candidate list; both findings stand. Unit 3 must not be committed until they are fixed and scoped re-review verifies them.
+
+### Fix Round 1
+
+Only `R3-B2B-U3-001` and `R3-B2B-U3-002` were changed by this correction. Scoped reliability re-review verified both rows. Focused deterministic coverage passed 47/47, build passed with zero warnings/errors, `git diff --check` passed, no helper survived, and the final Unit 3 receipt is 383/400. The existing Unit 3 evidence and informational rows remain historical.
+
+Pre-commit recommendation: APPROVED.
+
 ## Pre-commit reliability review — Slice 8C1.1b2b Unit 2
 
 One exhaustive reliability sweep returned an empty findings ledger, including explicit triage of both single-judge informational signals. Unit 2 is approved for an isolated work-unit commit; Unit 3, b2c, and unrelated `.gitignore` remain excluded.
+
+## Judgment Day — Slice 8C1.1b2b Unit 3 — Round 1
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| JD-B2B-U3-001 | judgment-day | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:118-132` | CRITICAL | verified | Both scoped re-judges verified every failed post-containment repeated-zero proof becomes truthful `QUIESCENCE_UNPROVED` for cancellation and timeout paths. |
+| JD-B2B-U3-002 | judgment-day | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:158-161` | CRITICAL | verified | Both scoped re-judges verified streams are cancelled/disposed and the drain aggregate is unconditionally awaited before return, preventing post-return mutation or retained pipe ownership. |
+| JD-B2B-U3-INFO-001 | judgment-day | `openspec/changes/aibar-foundation/apply-progress.md` | WARNING | info | Scoped re-judgment observed a one-line receipt discrepancy: persisted 310/400 versus current 309/400. Both remain safely below the review budget. |
+| JD-A-B2B-U3-002 | judgment-day | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:96-109` | CRITICAL | info | Single-judge suspect: zero confirmation can cross the deadline before its second query without rechecking timeout. Not independently confirmed; non-blocking. |
+| JD-B-B2B-U3-002 | judgment-day | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:89-125` | CRITICAL | info | Single-judge suspect: pipe/interop exceptions outside the protected region may bypass containment and disposal. Not independently confirmed; non-blocking. |
+| JD-B-B2B-U3-004 | judgment-day | `tools/AIBar.Packaging.Supervisor/ProcessSupervisor.cs:125-132` | CRITICAL | info | Single-judge suspect: cancellation arriving after the final check but before terminal selection may still produce success. Not independently confirmed; non-blocking. |
+
+Round 1 verdict: two independently confirmed CRITICAL findings and three single-judge suspect signals retained as non-blocking information. Unit 3 remains within its 187/400 review budget.
+
+`JUDGMENT: ESCALATED`
+
+### Fix Round 1 — maintainer-authorized correction
+
+`JD-B2B-U3-001` now converts every failed post-containment authoritative repeated-zero proof to `QUIESCENCE_UNPROVED`, including cancellation and deadline-timeout paths. `JD-B2B-U3-002` now closes cancellation-resistant drains and awaits their completion before returning, so the result tail and owned pipes cannot outlive the observation. Focused tests passed 43/43, build passed with zero warnings/errors, `git diff --check` passed, and no helper survived. Both scoped re-judges verified the rows; the three single-judge suspects remain informational and unchanged.
+
+`JUDGMENT: APPROVED`
 
 ## Pre-commit reliability review — Slice 8C1.1b2b Unit 1
 

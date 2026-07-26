@@ -45,6 +45,7 @@ public sealed class WindowsProcessSupervisorInterop : IProcessSupervisorInterop
     public bool AssignProcessToJob(SafeJobHandle job, SafeProcessHandle process) => Native.AssignProcessToJobObject(job, process);
     public bool ResumeThread(SafeThreadHandle thread) => Native.ResumeThread(thread) != uint.MaxValue;
     public void TerminateProcess(SafeProcessHandle process) => Native.TerminateProcess(process, 1);
+    public bool TerminateJob(SafeJobHandle job) => Native.TerminateJobObject(job, 1);
     public bool TryGetExitCode(SafeProcessHandle process, out int exitCode) => Native.GetExitCodeProcess(process, out exitCode);
     public bool IsProcessSignaled(SafeProcessHandle process) => Native.WaitForSingleObject(process, 0) == 0;
     public bool TryGetActiveProcesses(SafeJobHandle job, out uint activeProcesses)
@@ -106,6 +107,7 @@ public sealed class WindowsProcessSupervisorInterop : IProcessSupervisorInterop
         [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool AssignProcessToJobObject(SafeJobHandle job, SafeProcessHandle process);
         [DllImport("kernel32.dll", SetLastError = true)] internal static extern uint ResumeThread(SafeThreadHandle thread);
         [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool TerminateProcess(SafeProcessHandle process, uint exitCode);
+        [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool TerminateJobObject(SafeJobHandle job, uint exitCode);
         [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool GetExitCodeProcess(SafeProcessHandle process, out int exitCode);
         [DllImport("kernel32.dll", SetLastError = true)] internal static extern uint WaitForSingleObject(SafeProcessHandle handle, uint milliseconds);
         [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool QueryInformationJobObject(SafeJobHandle job, int informationClass, IntPtr data, uint length, IntPtr returnLength);

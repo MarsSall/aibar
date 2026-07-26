@@ -293,6 +293,145 @@ public sealed class PackagingSupervisorTests
         Assert.True(Stopwatch.GetElapsedTime(started) >= TimeSpan.FromMilliseconds(20));
     }
 
+    [Theory]
+    [InlineData(true, SupervisorStatus.Cancelled)]
+    [InlineData(false, SupervisorStatus.Timeout)]
+    public async Task Containment_classifies_cancellation_and_timeout_only_after_job_quiescence(bool cancel, SupervisorStatus expected)
+    {
+        var interop = new FakeLaunchInterop { ActiveProcesses = [0, 0] };
+        using var supervisor = new ProcessSupervisor(interop);
+        var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+        using var cancellation = new CancellationTokenSource();
+        if (cancel) cancellation.Cancel();
+
+        var result = await supervisor.ObserveAsync(launch, new(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.FromMilliseconds(25)), cancellation.Token);
+
+        Assert.Equal(expected, result.Status);
+        Assert.Equal(1, interop.TerminateJobCount);
+        Assert.True(result.Quiescent);
+        Assert.Equal(2, interop.ActiveQueryCount);
+        Assert.All(interop.Handles, handle => Assert.True(handle.IsClosed));
+    }
+
+    [Fact]
+    public async Task Query_and_termination_failure_are_truthfully_unproved_and_do_not_return_success()
+    {
+        var interop = new FakeLaunchInterop { RootSignaled = true, FailActiveQuery = true, TerminateJobSucceeds = false };
+        using var supervisor = new ProcessSupervisor(interop);
+        var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+
+        var result = await supervisor.ObserveAsync(launch, new(TimeSpan.FromSeconds(1), TimeSpan.Zero, TimeSpan.FromMilliseconds(25)));
+
+        Assert.Equal(SupervisorStatus.QuiescenceUnproved, result.Status);
+        Assert.False(result.Succeeded);
+        Assert.Equal(1, interop.TerminateJobCount);
+        Assert.All(interop.Handles, handle => Assert.True(handle.IsClosed));
+    }
+
+    [Theory]
+    [InlineData(true, true, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, false, true)]
+    public async Task Failed_post_containment_repeated_zero_proof_is_truthfully_unproved(bool cancel, bool queryFails, bool nonzero)
+    {
+        var interop = new FakeLaunchInterop
+        {
+            ActiveProcesses = nonzero ? [0, 1] : [0, 0],
+            FailActiveQuery = queryFails
+        };
+        using var supervisor = new ProcessSupervisor(interop);
+        var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+        using var cancellation = new CancellationTokenSource();
+        if (cancel) cancellation.Cancel();
+
+        var result = await supervisor.ObserveAsync(launch, new(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.FromMilliseconds(25)), cancellation.Token);
+
+        Assert.Equal(SupervisorStatus.QuiescenceUnproved, result.Status);
+        Assert.False(result.Quiescent);
+        Assert.Equal(1, interop.TerminateJobCount);
+        Assert.All(interop.Handles, handle => Assert.True(handle.IsClosed));
+    }
+
+    [Fact]
+    public async Task Eof_failure_cancels_drains_and_reports_output_drain_failed()
+    {
+        var stdout = new EofGateStream();
+        var interop = new FakeLaunchInterop { RootSignaled = true, ExitCode = 0, ActiveProcesses = [0, 0], Stdout = stdout };
+        using var supervisor = new ProcessSupervisor(interop);
+        var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+
+        var result = await supervisor.ObserveAsync(launch, new(TimeSpan.FromSeconds(1), TimeSpan.Zero, TimeSpan.FromMilliseconds(25)));
+
+        Assert.Equal(SupervisorStatus.OutputDrainFailed, result.Status);
+        Assert.False(result.Succeeded);
+        Assert.All(interop.Handles, handle => Assert.True(handle.IsClosed));
+    }
+
+    [Fact]
+    public async Task Cancellation_resistant_drains_are_closed_and_completed_before_return()
+    {
+        var stdout = new CancellationResistantDrainStream();
+        var interop = new FakeLaunchInterop { RootSignaled = true, ExitCode = 0, ActiveProcesses = [0, 0], Stdout = stdout };
+        using var supervisor = new ProcessSupervisor(interop);
+        var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+
+        var result = await supervisor.ObserveAsync(launch, new(TimeSpan.FromSeconds(1), TimeSpan.Zero, TimeSpan.Zero));
+
+        Assert.Equal(SupervisorStatus.OutputDrainFailed, result.Status);
+        Assert.True(stdout.Disposed);
+        Assert.True(stdout.ReadCompleted);
+        Assert.Equal("late", Encoding.UTF8.GetString(result.StdoutTail));
+        Assert.All(interop.Handles, handle => Assert.True(handle.IsClosed));
+    }
+
+    [Fact]
+    public async Task Late_cancellation_during_EOF_wait_overrides_success_and_contains_the_job()
+    {
+        var stdout = new EofGateStream();
+        var interop = new FakeLaunchInterop { RootSignaled = true, ExitCode = 0, ActiveProcesses = [0, 0, 0, 0], Stdout = stdout };
+        using var supervisor = new ProcessSupervisor(interop); using var cancellation = new CancellationTokenSource();
+        var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+        var observation = supervisor.ObserveAsync(launch, new(TimeSpan.FromSeconds(1), TimeSpan.Zero, TimeSpan.FromSeconds(1)), cancellation.Token);
+
+        await Task.Delay(20); cancellation.Cancel();
+        var result = await observation;
+
+        Assert.Equal(SupervisorStatus.Cancelled, result.Status);
+        Assert.False(result.Succeeded);
+        Assert.Equal(1, interop.TerminateJobCount);
+    }
+
+    [Fact]
+    public async Task Zero_confirmation_cannot_succeed_after_the_deterministic_deadline()
+    {
+        var time = new ManualTimeProvider(); var interop = new FakeLaunchInterop { RootSignaled = true, ActiveProcesses = [0, 0, 0] };
+        interop.OnActiveQuery = () => time.Advance(TimeSpan.FromTicks(1));
+        using var supervisor = new ProcessSupervisor(interop, time); var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+        var result = await supervisor.ObserveAsync(launch, new(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero));
+        Assert.Equal(SupervisorStatus.Timeout, result.Status); Assert.False(result.Succeeded); Assert.Equal(3, interop.ActiveQueryCount);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task Pipe_open_failures_are_contained_and_closed(int failingOpen)
+    {
+        var interop = new FakeLaunchInterop { ActiveProcesses = [0, 0], FailOpenAt = failingOpen };
+        using var supervisor = new ProcessSupervisor(interop); var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+        var result = await supervisor.ObserveAsync(launch, new(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero));
+        Assert.Equal(SupervisorStatus.OutputDrainFailed, result.Status); Assert.True(result.Quiescent); Assert.Equal(1, interop.TerminateJobCount); Assert.All(interop.Handles, handle => Assert.True(handle.IsClosed));
+    }
+
+    [Fact]
+    public async Task Initial_drain_failure_is_contained_and_closed()
+    {
+        var interop = new FakeLaunchInterop { ActiveProcesses = [0, 0], Stdout = new FailingReadStream() };
+        using var supervisor = new ProcessSupervisor(interop); var launch = Assert.IsType<ProcessLaunch>(supervisor.Launch(new("worker.exe", "worker.exe --internal")).Launch);
+        var result = await supervisor.ObserveAsync(launch, new(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero));
+        Assert.Equal(SupervisorStatus.OutputDrainFailed, result.Status); Assert.True(result.Quiescent); Assert.Equal(1, interop.TerminateJobCount); Assert.All(interop.Handles, handle => Assert.True(handle.IsClosed));
+    }
+
     [Fact]
     public async Task Windows_event_gated_saturation_drains_both_production_pipes_without_deadlock()
     {
@@ -338,6 +477,12 @@ public sealed class PackagingSupervisorTests
         public Stream Stderr { get; set; } = new MemoryStream();
         public int ActiveQueryCount { get; private set; }
         public int ExitCodeQueryCount { get; private set; }
+        public int TerminateJobCount { get; private set; }
+        public bool TerminateJobSucceeds { get; set; } = true;
+        public bool FailActiveQuery { get; set; }
+        public int FailOpenAt { get; set; }
+        public Action? OnActiveQuery { get; set; }
+        private int _openCount;
         public List<long> QueryTimestamps { get; } = [];
         private T Track<T>(T handle) where T : SupervisorSafeHandle { Handles.Add(handle); return handle; }
         public SafeJobHandle? CreateJob() { Calls.Add("CreateJob"); return Fault == LaunchFault.CreateJob ? null : Track(new TrackingJobHandle()); }
@@ -359,11 +504,12 @@ public sealed class PackagingSupervisorTests
         public bool AssignProcessToJob(SafeJobHandle job, SafeProcessHandle process) { Calls.Add("Assign"); return Fault != LaunchFault.Assign; }
         public bool ResumeThread(SafeThreadHandle thread) { Calls.Add("Resume"); return Fault != LaunchFault.Resume; }
         public void TerminateProcess(SafeProcessHandle process) => Calls.Add("TerminateProcess");
+        public bool TerminateJob(SafeJobHandle job) { TerminateJobCount++; Calls.Add("TerminateJob"); return TerminateJobSucceeds; }
         public bool TryGetExitCode(SafeProcessHandle process, out int exitCode) { ExitCodeQueryCount++; exitCode = ExitCode; return true; }
         public bool IsProcessSignaled(SafeProcessHandle process) => RootSignaled;
-        public bool TryGetActiveProcesses(SafeJobHandle job, out uint activeProcesses) { ActiveQueryCount++; QueryTimestamps.Add(Stopwatch.GetTimestamp()); activeProcesses = ActiveProcesses.Count == 0 ? 0 : ActiveProcesses[0]; if (ActiveProcesses.Count > 0) ActiveProcesses.RemoveAt(0); return true; }
+        public bool TryGetActiveProcesses(SafeJobHandle job, out uint activeProcesses) { ActiveQueryCount++; QueryTimestamps.Add(Stopwatch.GetTimestamp()); activeProcesses = ActiveProcesses.Count == 0 ? 0 : ActiveProcesses[0]; if (ActiveProcesses.Count > 0) ActiveProcesses.RemoveAt(0); OnActiveQuery?.Invoke(); return !FailActiveQuery; }
         public bool ObserveCompletionPacket(SafeCompletionPortHandle port) { if (Packets.Count == 0) return false; var packet = Packets[0]; Packets.RemoveAt(0); return packet; }
-        public Stream OpenReadPipe(SafePipeHandle pipe) => pipe is TrackingPipeHandle { Name: "parent-stdout" } ? Stdout : Stderr;
+        public Stream OpenReadPipe(SafePipeHandle pipe) { if (++_openCount == FailOpenAt) throw new InvalidOperationException(); return pipe is TrackingPipeHandle { Name: "parent-stdout" } ? Stdout : Stderr; }
     }
 
     private sealed class TrackingJobHandle : SafeJobHandle { public TrackingJobHandle() : base(new IntPtr(1), true) { } protected override bool ReleaseHandle() => true; }
@@ -382,6 +528,56 @@ public sealed class PackagingSupervisorTests
             await _eof.Task.WaitAsync(cancellationToken);
             return 0;
         }
+    }
+
+    private sealed class CancellationResistantDrainStream : Stream
+    {
+        private readonly TaskCompletionSource<byte[]> _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private bool _returnedPayload;
+        public bool Disposed { get; private set; }
+        public bool ReadCompleted { get; private set; }
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_returnedPayload) return 0;
+            var payload = await _released.Task;
+            payload.CopyTo(buffer);
+            _returnedPayload = true;
+            ReadCompleted = true;
+            return payload.Length;
+        }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && !Disposed)
+            {
+                Disposed = true;
+                _ = ReleaseAsync();
+            }
+            base.Dispose(disposing);
+        }
+        private async Task ReleaseAsync() { await Task.Delay(10); _released.TrySetResult(Encoding.UTF8.GetBytes("late")); }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private long _timestamp;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => _timestamp;
+        public void Advance(TimeSpan value) => _timestamp += value.Ticks;
+    }
+
+    private sealed class FailingReadStream : MemoryStream
+    {
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => ValueTask.FromException<int>(new InvalidOperationException());
     }
 
     [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]

@@ -445,10 +445,10 @@ Historical mapping (not fixed here): `JD-B2B-001` → units 1–2; `JD-B2B-002` 
 
 **Start:** Unit 2; **end:** timeout/cancellation/query-failure containment, draining-task cancellation/cleanup, deterministic status classification, and safe terminal ownership.
 
-- [ ] **RED:** inject cancellation/timeout/query/EOF failures and assert `TIMEOUT`, `CANCELLED`, `OUTPUT_DRAIN_FAILED`, or `QUIESCENCE_UNPROVED` without premature success.
-- [ ] **GREEN:** terminate the Job, use the same bounded repeated proof, cancel/await drains safely, retrieve exit where possible, and close every handle deterministically.
-- [ ] **TRIANGULATE:** repeat fake matrix and event-gated saturation/descendant tests; assert no hangs, leaked pipes, paths/PIDs/secrets, or b2c scavenging.
-- [ ] **GATE:** focused test, build, `git diff --check`, zero-helper/process check, and review-line receipt. Rollback Unit 3 only.
+- [x] **RED:** inject cancellation/timeout/query/EOF failures and assert `TIMEOUT`, `CANCELLED`, `OUTPUT_DRAIN_FAILED`, or `QUIESCENCE_UNPROVED` without premature success.
+- [x] **GREEN:** terminate the Job, use the same bounded repeated proof, cancel/await drains safely, retrieve exit where possible, and close every handle deterministically.
+- [x] **TRIANGULATE:** repeat fake matrix and event-gated saturation/descendant tests; assert no hangs, leaked pipes, paths/PIDs/secrets, or b2c scavenging.
+- [x] **GATE:** focused test, build, `git diff --check`, zero-helper/process check, and review-line receipt. Rollback Unit 3 only.
 
 **Total forecast:** 650–890 authored lines; each unit ≤330, review workload ~30–50 minutes/unit; three commits/PRs: b2a → Unit 1 → Unit 2 → Unit 3. No implementation or progress evidence is claimed by this plan. <!-- sdd-owner: parent -->
 
