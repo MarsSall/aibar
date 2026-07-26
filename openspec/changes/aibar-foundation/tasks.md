@@ -423,6 +423,13 @@ Chain strategy: feature-branch-chain
 
 Historical mapping (not fixed here): `JD-B2B-001` → units 1–2; `JD-B2B-002` → units 2–3; `JD-B2B-003` → unit 3; suspects `JD-A-B2B-004` and `JD-B-B2B-003` → unit 3. Preserve the ledger unchanged.
 
+###### 8C1.1b2a — Typed protocol, state machine, and supervisor foundation (~300–360 lines)
+
+- [x] **8C1.1b2a-RED:** Add fake-driven tests for schema/version/operation/timeout/argument bounds, rejection of PID/root/nonce/shell/environment authority, every state transition, cancellation and terminal-status precedence, bounded diagnostics, and response secret/path freedom.
+- [x] **8C1.1b2a-GREEN:** Add the BCL/Win32-only project, typed protocol, stable statuses (`INVALID_REQUEST` through `INTERNAL_UNKNOWN`), state machine, injected clock/randomness/interop ports, and one length-bounded JSON stdin/stdout boundary; keep the application projects independent.
+- [x] **8C1.1b2a-TRIANGULATE:** Mutate every closed-schema field, reorder/duplicate packets and callbacks, exhaust limits, cancel at each transition, and assert deterministic response bytes plus no arbitrary command text, root spelling, PID, nonce, exception, or secret.
+- [x] **8C1.1b2a-GATE:** Run `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, and `git diff --check`. Rollback removes only this project/reference/protocol/tests; b1b remains runnable.
+
 ###### Unit 1 — Production interop and suspended launch (220–300 review lines)
 
 **Paths:** `JobObjectInterop.cs`, `ProcessSupervisor.cs`, b2a project files, focused tests. **Start:** b2a fake seam; **end:** production `IProcessSupervisorInterop`, dedicated SafeHandles, Job creation/configuration (`KILL_ON_JOB_CLOSE`, no breakaway), completion-port ownership, pipes, explicit inherited-handle list, suspended `CreateProcessW`, assignment-before-resume, safe process/thread/job/port/pipe closure, and root exit-code retrieval.
@@ -449,6 +456,13 @@ Historical mapping (not fixed here): `JD-B2B-001` → units 1–2; `JD-B2B-002` 
 - [x] **GREEN:** terminate the Job, use the same bounded repeated proof, cancel/await drains safely, retrieve exit where possible, and close every handle deterministically.
 - [x] **TRIANGULATE:** repeat fake matrix and event-gated saturation/descendant tests; assert no hangs, leaked pipes, paths/PIDs/secrets, or b2c scavenging.
 - [x] **GATE:** focused test, build, `git diff --check`, zero-helper/process check, and review-line receipt. Rollback Unit 3 only.
+
+###### 8C1.1b2c — Directory capability, quarantine, scavenger, and PowerShell integration (~340–385 lines)
+
+- [ ] **8C1.1b2c-RED:** Test root/child identity, reparse, containment, extras/missing entries, access/rename/reopen/deletion faults, pre/post-commit status separation, DPAPI metadata validation, aged-quarantine scavenger skips, and PowerShell closed-request integration.
+- [ ] **8C1.1b2c-GREEN:** Create collision-failing nonce leaves and capability handles; admit exact children; atomically rename to quarantine; retain protected bounded-retry metadata on every post-commit failure; resume only from validated quarantine; invoke the fixed worker without shell composition or caller-supplied roots/PIDs.
+- [ ] **8C1.1b2c-TRIANGULATE:** Run two external Unicode/space roots and injected failures; prove `CLEANUP_REFUSED` leaves original bytes, `CLEANUP_PARTIAL` retains quarantine, successful removal follows quiescence, retries never rename back, no repository `obj/bin` changes occur, and status/evidence are path/secret-free.
+- [ ] **8C1.1b2c-GATE:** Run `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, `git diff --check`, and the external-root runtime test. Rollback removes only b2c files/integration; reviewed b2b and b1b remain intact.
 
 **Total forecast:** 650–890 authored lines; each unit ≤330, review workload ~30–50 minutes/unit; three commits/PRs: b2a → Unit 1 → Unit 2 → Unit 3. No implementation or progress evidence is claimed by this plan. <!-- sdd-owner: parent -->
 

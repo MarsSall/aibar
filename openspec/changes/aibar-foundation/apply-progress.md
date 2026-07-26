@@ -25,6 +25,18 @@
 
 `JD-B2B-U3-001` and `JD-B2B-U3-002` are **fixed**, not verified. `R3-B2B-U3-001` and `R3-B2B-U3-002` are also fixed by this correction, not verified. The three single-judge suspects remain informational and unchanged. **Unit-3-only receipt:** 345 additions + 38 deletions = **383** review lines, below the 400-line hard stop. **Rollback boundary:** revert only this Fix Round 1 supervisor/test/ledger/progress delta, retaining the pre-existing Unit 3 work and all Unit 1/2 and b2c bytes.
 
+### Judgment Day Fix Round 1 continuation — integrated b2a+b2b (2026-07-26)
+
+`JD-B2-INT-001` teardown correction is **fixed, not verified**. Fresh gates passed: partial child-only/missing-identity and complete-identity cleanup 4/4 twice; affected owned-lifecycle filter 5/5 twice; focused `PackagingSupervisor` 47/47; full `AIBar.sln` 273/273; build 0 warnings/errors; `git diff --check`; and `HARNESS_HELPER_COUNT=0`. The retained direct-completion/live-grandchild RED remains unchanged, and partial identity preserves the root rather than deleting unvalidated grandchild ownership. b2a is 4/4, b2b 12/12, b2c 0/4; no b2c code was added.
+
+The authoritative complete correction receipt counts implementation/tests/tasks/apply evidence (excluding verifier/ledger records): **235/400**. `JD-B2-INT-INFO-001` remains WARNING/info: the narrower verifier-only receipt is not substituted for this complete receipt.
+
+### Judgment Day Fix Round 2 — `JD-B2-INT-001` (2026-07-26)
+
+**RED:** the initial harness extension exposed the prior recursive child-tree termination contradiction; the deterministic live-unpublished-grandchild assertion requires the original failure, unmarked/unrecorded grandchild liveness, preserved root, and retained PID cleanup evidence. **GREEN:** validated child and grandchild teardown uses direct `Kill()` only; unavailable grandchild identity stops cleanup without deleting the root. The test releases its own unvalidated helper only after assertions.
+
+**GATE:** cleanup matrix 5/5 twice; owned lifecycle plus retained direct-completion/live-grandchild RED 6/6 twice; focused `PackagingSupervisor` 47/47; full `AIBar.sln` 274/274 once; build 0 warnings/errors; `git diff --check`; `HARNESS_HELPER_COUNT=0`. `JD-B2-INT-001` is **fixed, not verified**. b2a remains 4/4, b2b 12/12, b2c 0/4; no b2c code. Complete correction receipt (implementation/tests/tasks/apply, excluding verifier/ledger) is **320/400**.
+
 ## Slice 8C1.1b2a typed protocol and supervisor foundation (2026-07-26)
 
 **Status:** Standard mode (`strict_tdd: false`) with the task-mandated RED → GREEN → TRIANGULATE → GATE sequence. This feature-branch-chain work unit adds only the dependency-isolated supervisor executable seam, closed protocol/state-machine foundation, focused fake-driven tests, and solution/test references. It does not implement Job Object native calls, process launch, stream drains, cleanup, scavenging, PowerShell integration, B1a2, MakeAppx, SignTool, or application runtime integration.
@@ -1738,3 +1750,16 @@ All three 6C2A.1 checkboxes are visibly `- [x]` in `tasks.md`. Schema v2 adds pa
 **Current candidate behavior:** the script validates a caller-selected nonexistent leaf below an existing non-reparse parent, repeats admission before collision-failing creation, publishes self-contained `win-x64` output, inventories every recursive publish file, and writes deterministic ZIP/inventory/manifest artifacts. Existing leaves, repository overlap, missing parents, roots, and observed reparse paths fail before publish; post-creation failure reports `PUBLISH_INCOMPLETE_OUTPUT` and preserves the leaf. The contract makes no hostile namespace-identity guarantee.
 
 **Scope and size:** only the 8C1 script and executable recovery test are implementation additions: 40 + 108 = 148 authored lines. With this 8C1 task/progress status update, the fresh work-unit accounting remains below the 400-line cap. Slice 8C2 tasks remain unchecked and untouched.
+
+## Integrated b2 corrective gate — bounded test-harness and task-ledger correction (2026-07-26)
+
+**Status:** Standard mode. The full-suite failure was reproduced as an incomplete child-only identity record during teardown: the child writes its record before the grandchild record exists, so a timeout/failure path could mask the real harness failure with `KeyNotFoundException`. The lifecycle harness also started the publisher through `Task.Run` and competed with parallel Windows process fixtures. `RunningProcess` now starts the publisher synchronously, preserves bounded completion, and uses `SemaphoreSlim` rather than thread-affine monitor ownership; the two Windows process-harness classes run in a non-parallel collection. No production supervisor behavior changed.
+
+| Corrective evidence | Result |
+|---|---|
+| RED / root cause | Six pre-correction targeted executions passed 3/3, but the mandated full gate failed 269/271. During the correction, a full run reproduced the partial-record teardown path (`KeyNotFoundException` for missing `grandchild`) and a separate concurrent Windows event fixture missed its 5-second readiness bound. |
+| GREEN / repeat | The affected lifecycle filter passed 3/3 four consecutive times; focused `PackagingSupervisor` passed 47/47; zero scoped helpers remained. |
+| Full gates | `dotnet test AIBar.sln --no-restore -m:1 --nologo` passed 271/271 twice (372.50 s, 341.12 s). `dotnet build AIBar.sln --no-restore -m:1 --nologo` passed with 0 warnings/errors; `git diff --check` passed. |
+| Task ledger | Restored the approved explicit b2a 4/4 checked rows and b2c 0/4 unchecked rows; current b2b Units 1–3 remain 12/12 checked. |
+
+`SDD-VERIFY-B2-INTEGRATED-001` and `SDD-VERIFY-B2-INTEGRATED-002` are **fixed, not verified** at this historical apply-time corrective-gate status. Subsequent scoped verification exists by reference in `verify-report.md` and `review-ledger.md`; it does not rewrite this apply-time status. `AIBar.sln` was restored exactly to `HEAD` after the scope audit; the historical committed-range trailing-whitespace warning remains informational. No b2c code, cleanup/scavenging, PowerShell integration, staging, commit, push, or PR action occurred. **Receipt (recomputed against `e5cca98`):** authorized test/harness changes are 61 additions + 5 deletions (tracked tests via `git diff --numstat e5cca98 --`, plus the 4-addition untracked `WindowsProcessHarnessCollection.cs` via `git diff --no-index --numstat -- NUL <path>`); `tasks.md` is 14 additions; this apply-progress evidence is 13 additions. `verify-report.md` (171 additions), `review-ledger.md` (24 additions), and unrelated metadata are excluded. Total: 88 additions + 5 deletions = **93** review lines, below the 400-line hard stop.

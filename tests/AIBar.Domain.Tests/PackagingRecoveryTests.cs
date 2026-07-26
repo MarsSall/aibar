@@ -6,9 +6,10 @@ using System.Text.Json;
 
 namespace AIBar.Domain.Tests;
 
+[Collection("WindowsProcessHarness")]
 public sealed class PackagingRecoveryTests
 {
-    private static readonly object PublishLock = new();
+    private static readonly SemaphoreSlim PublishLock = new(1, 1);
     [Fact]
     public void Red_existing_sentinel_tree_is_rejected_and_unchanged()
     {
@@ -139,11 +140,11 @@ public sealed class PackagingRecoveryTests
     public async Task Owned_lifecycle_terminates_known_descendant_on_timeout_or_cancellation(int timeoutSeconds, int cancelAfterMilliseconds)
     {
         using var harness = DescendantHarness.Create(); var output = Path.Combine(harness.Root, "recovery");
-        var run = Task.Run(() => Run(output, harness.Executable, timeoutSeconds: timeoutSeconds, cancelAfterMilliseconds: cancelAfterMilliseconds, environment: harness.PublisherEnvironment()));
+        using var run = StartRun(output, harness.Executable, timeoutSeconds: timeoutSeconds, cancelAfterMilliseconds: cancelAfterMilliseconds, environment: harness.PublisherEnvironment());
         Assert.True(harness.Ready.WaitOne(10_000), "The known grandchild did not signal readiness.");
         using var child = harness.OpenRecordedChild();
         using var grandchild = harness.OpenRecordedGrandchild();
-        var result = await run.WaitAsync(TimeSpan.FromSeconds(8));
+        var result = await run.CompleteAsync(TimeSpan.FromSeconds(8));
         Assert.NotEqual(0, result.ExitCode);
         Assert.True(child.HasExited, "The known child was still alive when publisher termination returned.");
         Assert.True(grandchild.HasExited, "The known grandchild was still alive when publisher termination returned.");
@@ -171,6 +172,79 @@ public sealed class PackagingRecoveryTests
         Assert.Equal(0, result.ExitCode); Assert.True(Directory.Exists(output));
     }
 
+    [Fact]
+    public void Partial_identity_cleanup_preserves_primary_failure_and_harness_root()
+    {
+        var harness = DescendantHarness.Create(); var root = harness.Root;
+        Process? child = null;
+        try
+        {
+            child = harness.StartChildOnly();
+            Assert.True(harness.Ready.WaitOne(10_000), "The child-only identity record was not written within the bounded wait.");
+            Action primaryFailure = () =>
+            {
+                try { throw new InvalidOperationException("original test failure"); }
+                finally { harness.Dispose(); }
+            };
+            Assert.Throws<InvalidOperationException>(primaryFailure);
+            Assert.True(child.HasExited, "The validated child was still alive after bounded cleanup.");
+            Assert.True(Directory.Exists(root), "Partial identity cleanup deleted a root while grandchild ownership was unprovable.");
+        }
+        finally
+        {
+            child?.Dispose();
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void Unpublished_grandchild_cleanup_preserves_primary_failure_root_and_manual_evidence()
+    {
+        var harness = DescendantHarness.Create(); var root = harness.Root;
+        Process? child = null;
+        Process? grandchild = null;
+        try
+        {
+            child = harness.StartChildWithUnpublishedGrandchild();
+            Assert.True(harness.Ready.WaitOne(10_000), "The unpublished grandchild did not signal readiness within the bounded wait.");
+            grandchild = harness.OpenUnpublishedGrandchild();
+            Action primaryFailure = () =>
+            {
+                try { throw new InvalidOperationException("original test failure"); }
+                finally { harness.Dispose(); }
+            };
+            Assert.Throws<InvalidOperationException>(primaryFailure);
+            Assert.True(child.HasExited, "The validated child was still alive after bounded cleanup.");
+            Assert.False(grandchild.HasExited, "Cleanup terminated the unvalidated grandchild.");
+            Assert.True(Directory.Exists(root), "Cleanup deleted the root while the grandchild was unvalidated.");
+            Assert.False(File.Exists(harness.Marker), "The unpublished grandchild unexpectedly published an ownership marker.");
+            Assert.Equal(grandchild.Id.ToString(), File.ReadAllText(harness.ArgumentRecord));
+        }
+        finally
+        {
+            if (grandchild is not null)
+            {
+                harness.ReleaseUnpublishedGrandchild();
+                if (!grandchild.WaitForExit(10_000)) { grandchild.Kill(); grandchild.WaitForExit(10_000); }
+                grandchild.Dispose();
+            }
+            child?.Dispose();
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void Completed_identity_cleanup_removes_owned_harness_root()
+    {
+        var harness = DescendantHarness.Create(); var root = harness.Root;
+        var child = harness.StartChild();
+        Assert.True(harness.Ready.WaitOne(10_000), "The known grandchild did not signal readiness.");
+        Assert.True(child.WaitForExit(10_000), "The validated child did not complete within the bounded wait.");
+        child.Dispose();
+        harness.Dispose();
+        Assert.False(Directory.Exists(root), "Completed owned identity cleanup did not remove the harness root.");
+    }
+
     private static Snapshot Contract(string root)
     {
         var inventory = File.ReadAllBytes(Path.Combine(root, "recovery-inventory.json")); var manifest = File.ReadAllBytes(Path.Combine(root, "artifact-manifest.json"));
@@ -183,6 +257,12 @@ public sealed class PackagingRecoveryTests
 
     private static RunResult Run(string output, string? command = null, string? epoch = null, IsolationRoot? isolation = null, string? workingDirectory = null, int? timeoutSeconds = null, int? cancelAfterMilliseconds = null, int? boundedWaitSeconds = null, IReadOnlyDictionary<string, string>? environment = null, string? knownDescendantIdentityPath = null)
     {
+        using var run = StartRun(output, command, epoch, isolation, workingDirectory, timeoutSeconds, cancelAfterMilliseconds, environment, knownDescendantIdentityPath);
+        return run.Complete(boundedWaitSeconds is null ? null : TimeSpan.FromSeconds(boundedWaitSeconds.Value));
+    }
+
+    private static RunningProcess StartRun(string output, string? command = null, string? epoch = null, IsolationRoot? isolation = null, string? workingDirectory = null, int? timeoutSeconds = null, int? cancelAfterMilliseconds = null, IReadOnlyDictionary<string, string>? environment = null, string? knownDescendantIdentityPath = null)
+    {
         var psi = new ProcessStartInfo("pwsh") { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true };
         if (workingDirectory is not null) psi.WorkingDirectory = workingDirectory;
         psi.ArgumentList.Add("-NoProfile"); psi.ArgumentList.Add("-File"); psi.ArgumentList.Add(Path.Combine(RepositoryRoot(), "scripts", "Publish-Deterministic.ps1")); psi.ArgumentList.Add("-OutputDirectory"); psi.ArgumentList.Add(output);
@@ -193,7 +273,17 @@ public sealed class PackagingRecoveryTests
         if (cancelAfterMilliseconds is not null) { psi.ArgumentList.Add("-CancelAfterMilliseconds"); psi.ArgumentList.Add(cancelAfterMilliseconds.Value.ToString()); }
         if (knownDescendantIdentityPath is not null) { psi.ArgumentList.Add("-KnownDescendantIdentityPath"); psi.ArgumentList.Add(knownDescendantIdentityPath); }
         if (environment is not null) foreach (var pair in environment) psi.Environment[pair.Key] = pair.Value;
-        lock (PublishLock) { using var process = Process.Start(psi)!; var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync(); var work = Task.WhenAll(process.WaitForExitAsync(), stdout, stderr); if (boundedWaitSeconds is not null) Assert.True(work.Wait(TimeSpan.FromSeconds(boundedWaitSeconds.Value)), "PowerShell process exceeded its bounded wait."); else work.Wait(); return new(process.ExitCode, stdout.Result + stderr.Result); }
+        PublishLock.Wait();
+        try
+        {
+            var process = Process.Start(psi)!;
+            return new RunningProcess(process, process.StandardOutput.ReadToEndAsync(), process.StandardError.ReadToEndAsync());
+        }
+        catch
+        {
+            PublishLock.Release();
+            throw;
+        }
     }
     private static string RepositoryRoot() { for (var d = new DirectoryInfo(AppContext.BaseDirectory); ; d = d.Parent!) if (File.Exists(Path.Combine(d.FullName, "AIBar.sln"))) return d.FullName; }
     private static string FakeCommand(string parent, string marker) { var path = Path.Combine(parent, "marker.cmd"); File.WriteAllText(path, $"@echo invoked>\"{marker}\"\r\n@exit /b 0"); return path; }
@@ -208,6 +298,40 @@ public sealed class PackagingRecoveryTests
     private static IsolationRoot Isolation(string suffix) => new(Path.Combine(Path.GetTempPath(), $"aibar-8c1-isolated-{Guid.NewGuid():N} {suffix}"));
     private sealed class TemporaryParent(string path) : IDisposable { public string Path { get; } = Directory.CreateDirectory(path).FullName; public void Dispose() { if (Directory.Exists(Path)) Directory.Delete(Path, true); } }
     private sealed record RunResult(int ExitCode, string Output);
+    private sealed class RunningProcess(Process process, Task<string> stdout, Task<string> stderr) : IDisposable
+    {
+        private readonly Task _work = Task.WhenAll(process.WaitForExitAsync(), stdout, stderr);
+        private bool _disposed;
+
+        public RunResult Complete(TimeSpan? bound)
+        {
+            if (bound is { } timeout) Assert.True(_work.Wait(timeout), "PowerShell process exceeded its bounded wait.");
+            else _work.GetAwaiter().GetResult();
+            return new(process.ExitCode, stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult());
+        }
+
+        public async Task<RunResult> CompleteAsync(TimeSpan bound)
+        {
+            await _work.WaitAsync(bound);
+            return new(process.ExitCode, await stdout + await stderr);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            try
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                _work.Wait(TimeSpan.FromSeconds(10));
+            }
+            finally
+            {
+                process.Dispose();
+                PublishLock.Release();
+            }
+        }
+    }
     private sealed record Snapshot(Dictionary<string, (long, string)> Files, string ZipHash, byte[] Inventory, byte[] Manifest);
     private sealed class DescendantHarness : IDisposable
     {
@@ -247,6 +371,24 @@ if (args[0] == "child")
     Console.Out.WriteLine("child-stdout"); Console.Error.WriteLine("child-stderr");
     Environment.Exit(childReady.WaitOne(10000) ? 0 : 3);
 }
+if (args[0] == "child-only")
+{
+    File.WriteAllText(args[5], JsonSerializer.Serialize(new { child = new { pid = Environment.ProcessId, startTicks = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks } }));
+    using var childOnlyReady = EventWaitHandle.OpenExisting(args[2]);
+    using var childOnlyRelease = EventWaitHandle.OpenExisting(args[3]);
+    childOnlyReady.Set();
+    Environment.Exit(childOnlyRelease.WaitOne(10000) ? 0 : 3);
+}
+if (args[0] == "child-unpublished")
+{
+    File.WriteAllText(args[5], JsonSerializer.Serialize(new { child = new { pid = Environment.ProcessId, startTicks = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks } }));
+    var start = new ProcessStartInfo(args[1]) { UseShellExecute = false };
+    start.ArgumentList.Add("unpublished-grandchild");
+    start.ArgumentList.Add(args[2]); start.ArgumentList.Add(args[3]); start.ArgumentList.Add(args[4]); start.ArgumentList.Add(args[5]); start.ArgumentList.Add(args[6]); start.ArgumentList.Add(args[7]); start.ArgumentList.Add(args[8]);
+    using var grandchild = Process.Start(start)!;
+    using var childUnpublishedRelease = EventWaitHandle.OpenExisting(args[3]);
+    Environment.Exit(childUnpublishedRelease.WaitOne(10000) ? 0 : 3);
+}
 if (args[0] == "publish")
 {
     var mode = Environment.GetEnvironmentVariable("AIBAR_PUBLISH_MODE");
@@ -271,6 +413,14 @@ if (args[0] == "publisher-child")
     using var grandchild = Process.Start(start)!;
     using var publisherRelease = EventWaitHandle.OpenExisting(args[3]);
     Environment.Exit(publisherRelease.WaitOne(60000) ? 0 : 4);
+}
+if (args[0] == "unpublished-grandchild")
+{
+    using var unpublishedReady = EventWaitHandle.OpenExisting(args[1]);
+    using var unpublishedRelease = new EventWaitHandle(false, EventResetMode.ManualReset, $"Local\\aibar-unpublished-release-{args[7]}");
+    File.WriteAllText(args[5], Environment.ProcessId.ToString());
+    unpublishedReady.Set();
+    Environment.Exit(unpublishedRelease.WaitOne(10000) ? 0 : 4);
 }
 using var ready = EventWaitHandle.OpenExisting(args[1]);
 using var release = EventWaitHandle.OpenExisting(args[2]);
@@ -309,6 +459,22 @@ Environment.Exit(release.WaitOne(10000) ? 0 : 4);
             return Process.Start(start)!;
         }
 
+        public Process StartChildOnly()
+        {
+            var start = new ProcessStartInfo(Executable) { UseShellExecute = false };
+            start.ArgumentList.Add("child-only"); start.ArgumentList.Add(Executable); start.ArgumentList.Add(ReadyName); start.ArgumentList.Add(ReleaseName);
+            start.ArgumentList.Add(Marker); start.ArgumentList.Add(IdentityRecord); start.ArgumentList.Add(ArgumentRecord); start.ArgumentList.Add(Root); start.ArgumentList.Add(Nonce);
+            return Process.Start(start)!;
+        }
+
+        public Process StartChildWithUnpublishedGrandchild()
+        {
+            var start = new ProcessStartInfo(Executable) { UseShellExecute = false };
+            start.ArgumentList.Add("child-unpublished"); start.ArgumentList.Add(Executable); start.ArgumentList.Add(ReadyName); start.ArgumentList.Add(ReleaseName);
+            start.ArgumentList.Add(Marker); start.ArgumentList.Add(IdentityRecord); start.ArgumentList.Add(ArgumentRecord); start.ArgumentList.Add(Root); start.ArgumentList.Add(Nonce);
+            return Process.Start(start)!;
+        }
+
         public IReadOnlyDictionary<string, string> PublisherEnvironment() => new Dictionary<string, string>
         {
             ["AIBAR_HARNESS_EXE"] = Executable, ["AIBAR_READY"] = ReadyName, ["AIBAR_RELEASE"] = ReleaseName,
@@ -321,6 +487,19 @@ Environment.Exit(release.WaitOne(10000) ? 0 : 4);
         public Process OpenRecordedChild() => OpenRecorded("child");
 
         public Process OpenRecordedGrandchild() => OpenRecorded("grandchild");
+
+        public Process OpenUnpublishedGrandchild()
+        {
+            var process = Process.GetProcessById(int.Parse(File.ReadAllText(ArgumentRecord)));
+            Assert.False(process.HasExited);
+            return process;
+        }
+
+        public void ReleaseUnpublishedGrandchild()
+        {
+            using var release = EventWaitHandle.OpenExisting($"Local\\aibar-unpublished-release-{Nonce}");
+            release.Set();
+        }
 
         private Process OpenRecorded(string name)
         {
@@ -336,12 +515,14 @@ Environment.Exit(release.WaitOne(10000) ? 0 : 4);
             try
             {
                 Release.Set();
-                if (File.Exists(IdentityRecord))
-                    try { using var grandchild = OpenRecordedGrandchild(); if (!grandchild.WaitForExit(BoundedWaitMilliseconds)) { grandchild.Kill(true); Assert.True(grandchild.WaitForExit(BoundedWaitMilliseconds)); } }
-                    catch (ArgumentException) { }
-                ValidateOwnedCleanupAdmission();
-                Directory.Delete(Root, true);
+                if (!TryTerminateValidatedGrandchild())
+                {
+                    TerminateValidatedChild();
+                    if (!TryTerminateValidatedGrandchild()) return;
+                }
+                if (HasOwnedCleanupAdmission()) Directory.Delete(Root, true);
             }
+            catch { }
             finally { Ready.Dispose(); Release.Dispose(); }
         }
 
@@ -353,20 +534,75 @@ Environment.Exit(release.WaitOne(10000) ? 0 : 4);
             Assert.Equal(record.GetProperty("startTicks").GetInt64(), process.StartTime.ToUniversalTime().Ticks);
         }
 
-        private void ValidateOwnedCleanupAdmission()
+        private void TerminateValidatedChild()
         {
-            var canonicalRoot = Path.GetFullPath(Root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            Assert.False(new DirectoryInfo(canonicalRoot).Attributes.HasFlag(FileAttributes.ReparsePoint));
-            Assert.Equal($"owned-marker:{Nonce}", File.ReadAllText(Marker));
-            foreach (var path in new[] { Marker, IdentityRecord, ArgumentRecord, Executable })
-                Assert.StartsWith(canonicalRoot + Path.DirectorySeparatorChar, Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase);
-            var pending = new Stack<string>(); pending.Push(canonicalRoot);
-            while (pending.Count > 0)
-                foreach (var entry in Directory.EnumerateFileSystemEntries(pending.Pop()))
+            if (!TryOpenRecorded("child", out var child)) return;
+            using (child!)
+                if (!child!.WaitForExit(BoundedWaitMilliseconds))
                 {
-                    Assert.False(File.GetAttributes(entry).HasFlag(FileAttributes.ReparsePoint), $"Owned cleanup rejected reparse point: {entry}");
-                    if (Directory.Exists(entry)) pending.Push(entry);
+                    child!.Kill();
+                    child!.WaitForExit(BoundedWaitMilliseconds);
                 }
+        }
+
+        private bool TryTerminateValidatedGrandchild()
+        {
+            try
+            {
+                using var identity = JsonDocument.Parse(File.ReadAllText(IdentityRecord));
+                var record = identity.RootElement.GetProperty("grandchild");
+                var pid = record.GetProperty("pid").GetInt32();
+                var startTicks = record.GetProperty("startTicks").GetInt64();
+                Process grandchild;
+                try { grandchild = Process.GetProcessById(pid); }
+                catch (ArgumentException) { return true; }
+                using (grandchild)
+                {
+                    if (startTicks != grandchild.StartTime.ToUniversalTime().Ticks) return false;
+                    if (!grandchild.WaitForExit(BoundedWaitMilliseconds))
+                    {
+                        grandchild.Kill();
+                        return grandchild.WaitForExit(BoundedWaitMilliseconds);
+                    }
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+
+        private bool TryOpenRecorded(string name, out Process? process)
+        {
+            process = null;
+            try
+            {
+                using var identity = JsonDocument.Parse(File.ReadAllText(IdentityRecord));
+                var record = identity.RootElement.GetProperty(name);
+                var candidate = Process.GetProcessById(record.GetProperty("pid").GetInt32());
+                if (record.GetProperty("startTicks").GetInt64() != candidate.StartTime.ToUniversalTime().Ticks) { candidate.Dispose(); return false; }
+                process = candidate;
+                return true;
+            }
+            catch { return false; }
+        }
+
+        private bool HasOwnedCleanupAdmission()
+        {
+            try
+            {
+                var canonicalRoot = Path.GetFullPath(Root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (new DirectoryInfo(canonicalRoot).Attributes.HasFlag(FileAttributes.ReparsePoint) || File.ReadAllText(Marker) != $"owned-marker:{Nonce}") return false;
+                foreach (var path in new[] { Marker, IdentityRecord, ArgumentRecord, Executable })
+                    if (!Path.GetFullPath(path).StartsWith(canonicalRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return false;
+                var pending = new Stack<string>(); pending.Push(canonicalRoot);
+                while (pending.Count > 0)
+                    foreach (var entry in Directory.EnumerateFileSystemEntries(pending.Pop()))
+                    {
+                        if (File.GetAttributes(entry).HasFlag(FileAttributes.ReparsePoint)) return false;
+                        if (Directory.Exists(entry)) pending.Push(entry);
+                    }
+                return true;
+            }
+            catch { return false; }
         }
 
         private static string Bounded(Task<string> stdout, Task<string> stderr)

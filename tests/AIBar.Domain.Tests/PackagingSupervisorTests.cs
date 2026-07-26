@@ -5,6 +5,7 @@ using AIBar.Packaging.Supervisor;
 
 namespace AIBar.Domain.Tests;
 
+[Collection("WindowsProcessHarness")]
 public sealed class PackagingSupervisorTests
 {
     [Theory]

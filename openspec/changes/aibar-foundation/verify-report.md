@@ -394,3 +394,259 @@ No dedicated LSP/lint/typecheck/coverage command is configured or injected. The 
 ## Blockers and next action
 
 Slice 5B blockers: **none**. Whole-change/archive remains blocked by later unchecked tasks in `tasks.md`. Next: advance only to the separately bounded Slice 5C work unit; do not archive the whole change. No stage, commit, push, PR, review approval, authority mutation, or Judgment Day action was performed.
+
+---
+
+```yaml
+schema: gentle-ai.verify-result/v1
+evidence_revision: e5cca98473c45efbd89ddc31f9066a0e6d579c6c
+scope: integrated-b2a-plus-b2b-units-1-2-3-only
+verdict: fail
+blockers: 2
+critical_findings: 2
+warnings: 1
+requirements: 5/5-runtime-covered
+scoped_tasks_present: 12/12
+scoped_tasks_expected: 16/16
+focused_test_exit_code: 0
+full_test_exit_code: 1
+build_exit_code: 0
+```
+
+# Integrated b2a+b2b supervisor verification — 2026-07-26
+
+## Status: FAIL — b2c blocked
+
+This Standard-mode (`strict_tdd: false`) verification covers only the completed Windows Job Object packaging supervisor chain: b2a commit `2b2189a`, b2b Unit 1 `c5dd209`, Unit 2 `4e54ea4`, and Unit 3 `e5cca98`. It does **not** verify the full unfinished `aibar-foundation` change, b2c quarantine/scavenging/PowerShell integration, B1a2, packaging/signing, or release readiness.
+
+## Exact execution evidence
+
+| Evidence | Exact command | Result |
+|---|---|---|
+| Focused supervisor | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo` | Exit 0; 47 passed, 0 failed, 0 skipped; 5 s. |
+| Full solution | `dotnet test AIBar.sln --no-restore -m:1 --nologo` | Exit 1; 269 passed, 2 failed, 0 skipped; 271 total; 9 m 28 s. Failures: `Owned_lifecycle_concurrently_drains_saturated_stdout_and_stderr_within_bound` and timeout case of `Owned_lifecycle_terminates_known_descendant_on_timeout_or_cancellation`. |
+| Failure triage rerun | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Owned_lifecycle_concurrently_drains_saturated_stdout_and_stderr_within_bound|FullyQualifiedName~Owned_lifecycle_terminates_known_descendant_on_timeout_or_cancellation" --no-restore -m:1 --nologo` | Exit 0; 3 passed, 0 failed, 0 skipped; 19 s. This does not erase the failed full-suite gate. |
+| Solution build | `dotnet build AIBar.sln --no-restore -m:1 --nologo` | Exit 0; 0 warnings, 0 errors; 3.97 s. |
+| Current worktree whitespace | `git diff --check` | Exit 0. |
+| Committed chain whitespace | `git diff --check 2b2189a^..e5cca98` | Exit 2; trailing-whitespace findings on `AIBar.sln:18-21,47-50,57`. |
+| Scoped helper leak check | `Get-CimInstance Win32_Process` filtered to supervisor/Harness/PowerShell/dotnet command lines containing supervisor event names, `Harness.csproj`, or `AIBar.Packaging.Supervisor` | `SCOPED_HELPER_PROCESS_COUNT=0`. |
+| `.gitignore` integrity | Git blob hashes for HEAD/index/worktree plus porcelain-v2 status | All three hashes `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; byte-identical; unstaged metadata-only `.M`. |
+
+No command timed out. Coverage is not configured, so no coverage percentage is claimed.
+
+## Requirements and tasks matrix
+
+| Contract | Runtime/static evidence | Result |
+|---|---|---|
+| Closed typed protocol and deterministic state machine | Closed-field, duplicate/reordered-field, 4097-byte no-EOF, invalid numeric version, deterministic response, transition-order, terminal-precedence, and bounded-tail tests passed in focused 47/47. | COMPLIANT |
+| Native Job lifecycle and ownership | Production `KILL_ON_JOB_CLOSE`, IOCP association, dedicated SafeHandles, three-handle inheritance allowlist, suspended launch, assignment-before-resume, exit-code retention, pre-resume fault matrix, and real Job-contained event-gated launch passed. | COMPLIANT |
+| Bounded streams and authoritative completion | Concurrent 64-KiB tails, exact discard counts, EOF grace, advisory packet variants, signaled-root/zero-exit requirement, deadline-aware repeated live `ActiveProcesses == 0`, real descendant delay, and real 65,537-byte-per-stream saturation passed. | COMPLIANT |
+| Failure containment and truthful classification | Cancellation, timeout, active-query failure, termination failure, failed repeated-zero proof, pipe-open failure, initial drain failure, EOF failure, late cancellation, cancellation-resistant drain completion, handle closure, and deterministic-deadline tests passed. | COMPLIANT |
+| Safe observability and b2c exclusion | Closed response fields expose no path/PID/secret/exception text; source search found no quarantine/scavenger/capability/DPAPI/deletion implementation. Cleanup enum values remain protocol taxonomy only. | COMPLIANT |
+| b2a task state | Commit `2b2189a` checked 4/4 b2a tasks, but current `tasks.md` removed those rows in `19a7943`; only prose says b2a is committed. | CRITICAL — current ledger incomplete |
+| b2b Units 1–3 task state | Current `tasks.md:426-451` has 12/12 checked tasks; apply-progress and review-ledger preserve repaired/verified incidents and approved unit evidence. | COMPLETE |
+| b2c task state | Commit `19a7943` removed the prior four unchecked b2c rows while current prose says b2c “remains unchanged and out of scope.” No b2c implementation exists, but the required unchecked task state is absent. | CRITICAL — current ledger incomplete |
+
+Runtime compliance summary: 5/5 scoped behavioral contracts have passing focused coverage. Task presentation summary: 12/12 current b2b rows checked, but only 12 of the expected 16 completed b2a+b2b rows remain present; the four expected unchecked b2c rows are also absent.
+
+## Commit-chain and design coherence
+
+- The ancestry is linear: `2b2189a → 19a7943 → c5dd209 → 4e54ea4 → e5cca98`; all three requested b2b commits descend from b2a in order.
+- Each implementation commit remains below 400 gross changed lines in its own stat: b2a 366, Unit 1 356, Unit 2 303, Unit 3 385 additions+deletions.
+- Source behavior follows the b2a/b2b design boundary. `Program` remains the b2a protocol seam; b2c PowerShell/runtime integration is neither implemented nor claimed.
+- Existing historical findings were not reopened without current evidence. The two full-suite failures and current task-ledger deletion are fresh contradictory evidence.
+
+## Findings
+
+### CRITICAL
+
+1. **The required full solution test gate failed.** The exact mandated command exited 1 with two `PackagingRecoveryTests` failures. A focused rerun passed 3/3, indicating non-determinism rather than a stable supervisor failure, but the SDD verify contract treats any failed test command as blocking. b2c must not start until a fresh full suite passes under an authorized correction/verification cycle.
+2. **The current task ledger is not truthful and complete for the requested scope.** Replanning commit `19a7943` removed the four checked b2a rows and the four unchecked b2c rows. Current prose claims b2a is committed and b2c remains unchanged, while the explicit states no longer exist. This fails the requested artifact-completeness gate even though b2b Units 1–3 are correctly checked 12/12 and no b2c production code exists.
+
+### WARNING
+
+1. **The committed chain is not whitespace-clean under a range diff.** Current `git diff --check` passes, but `git diff --check 2b2189a^..e5cca98` reports trailing whitespace on the supervisor additions in `AIBar.sln`. This is informational relative to runtime behavior but should be corrected in a separately authorized work unit.
+
+### SUGGESTION
+
+None.
+
+## Artifact mutation and verdict
+
+This verification appended only this scoped section and the matching review-ledger section. Production, tests, tasks, `.gitignore`, index, commits, remotes, and PR state were not modified.
+
+**FAIL.** Focused supervisor behavior and build evidence are green, no scoped helper survived, and no b2c implementation is present. Nevertheless, the failed mandatory full-suite command and incomplete current b2a/b2c task ledger are CRITICAL and block b2c. This verdict does not assess or verify the full `aibar-foundation` change.
+
+---
+
+## Corrective gate addendum — integrated b2 blockers (2026-07-26)
+
+Only the two integrated CRITICAL blockers were corrected. The failed full-suite behavior reproduced as a test-harness race: a child-only identity record can be observed before the grandchild record is written, and the timeout test previously queued publisher startup on the thread pool while Windows process fixtures ran in parallel. The harness now starts the publisher synchronously with bounded completion, uses non-thread-affine serialization, tolerates an incomplete record only during cleanup, and serializes the two Windows process-harness classes. Production supervisor code is unchanged.
+
+| Gate | Result |
+|---|---|
+| Affected lifecycle repeat | 3/3 passed four consecutive times. |
+| Focused supervisor | 47/47 passed. |
+| Full suite 1 | 271/271 passed; 372.50 s. |
+| Full suite 2 | 271/271 passed; 341.12 s. |
+| Build / whitespace / helpers | Build 0 warnings/errors; current `git diff --check` passed; zero scoped helpers. |
+| Tasks | b2a 4/4 checked; b2b Units 1–3 12/12 checked; b2c 0/4 checked. |
+
+`SDD-VERIFY-B2-INTEGRATED-001` and `SDD-VERIFY-B2-INTEGRATED-002` were **fixed, not verified** at this corrective-gate stage. The historical `AIBar.sln` committed-range whitespace finding remains WARNING/info; the current worktree does not alter `AIBar.sln`. b2c remains unimplemented and out of scope.
+
+---
+
+## Final scoped re-verification — integrated b2a+b2b blockers (2026-07-26)
+
+### Result Contract
+
+```yaml
+scope: integrated-b2a-plus-b2b-units-1-2-3-only
+verdict: pass
+blockers_verified_closed: 2/2
+affected_lifecycle_repeats: 4/4
+focused_supervisor: 47/47
+full_solution_runs: 2/2
+build_exit_code: 0
+current_diff_check_exit_code: 0
+scoped_helper_process_count: 0
+correction_receipt: 80/400
+b2c_verified: false
+full_change_verified: false
+```
+
+This independent Standard-mode re-verification is intentionally limited to the two integrated b2a+b2b CRITICAL blockers. It verifies b2a plus b2b Units 1–3 only. It does **not** verify b2c, the full unfinished `aibar-foundation` change, packaging/signing, or release readiness.
+
+### Commands and results
+
+| Gate | Exact command | Independent result |
+|---|---|---|
+| Affected lifecycle repeat | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Owned_lifecycle_concurrently_drains_saturated_stdout_and_stderr_within_bound|FullyQualifiedName~Owned_lifecycle_terminates_known_descendant_on_timeout_or_cancellation" --no-restore -m:1 --nologo` repeated four times | Exit 0 on every run; 3/3 passed each time; durations 13 s, 12 s, 12 s, 12 s. |
+| Focused supervisor | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo` | Exit 0; 47 passed, 0 failed, 0 skipped; 3 s. |
+| Full solution run 1 | `dotnet test AIBar.sln --no-restore -m:1 --nologo` | Exit 0; 271 passed, 0 failed, 0 skipped; 5 m 46 s. |
+| Full solution run 2 | `dotnet test AIBar.sln --no-restore -m:1 --nologo` | Exit 0; 271 passed, 0 failed, 0 skipped; 5 m 48 s. |
+| Build | `dotnet build AIBar.sln --no-restore -m:1 --nologo` | Exit 0; 0 warnings, 0 errors; 2.02 s. |
+| Current diff | `git diff --check` | Exit 0. |
+| Helper leak | `Get-CimInstance Win32_Process` with the scoped supervisor/harness/event filter | `SCOPED_HELPER_PROCESS_COUNT=0`. |
+| Solution restoration | `git diff --quiet -- AIBar.sln`; `git status --short -- AIBar.sln` | Exit 0 and no status entry: the unauthorized cleanup is absent and the worktree does not alter the solution. |
+| Historical solution warning | `git diff --check 2b2189a^..e5cca98` | Exit 2 at `AIBar.sln:18-21,47-50,57`; retained as committed-range WARNING/info, not attributed to the current worktree. |
+| `.gitignore` integrity | `git rev-parse HEAD:.gitignore`; `git hash-object .gitignore`; `git diff --quiet -- .gitignore` | HEAD/worktree hash `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; diff exit 0. Porcelain still reports metadata-only ` M .gitignore`. |
+| Production/b2c exclusion | `git diff --name-only -- src tools scripts` plus untracked-file inspection | No production diff; the only untracked path is the test collection definition. No b2c production code was added. |
+
+### Per-finding verdicts
+
+| Finding | Proof | Verdict |
+|---|---|---|
+| `SDD-VERIFY-B2-INTEGRATED-001` — nondeterministic lifecycle full-suite gate | Diff/source inspection proves the child record can precede the grandchild record; cleanup now tolerates only partial/invalid identity reads. Publisher startup is synchronous, completion remains bounded, `SemaphoreSlim` permits release from asynchronous completion, and both Windows external-process test classes share a collection with `DisableParallelization = true`. No production file changed. No behavior assertion was removed; the readiness and completion bounds remain 10 seconds and 8 seconds rather than being inflated. Runtime gates passed 3/3 ×4, 47/47, and 271/271 ×2. | **VERIFIED CLOSED** |
+| `SDD-VERIFY-B2-INTEGRATED-002` — incomplete task matrix | Current approved rows explicitly show b2a 4/4 checked, b2b Units 1–3 12/12 checked, and b2c 0/4 checked. | **VERIFIED CLOSED** |
+
+### Task matrix
+
+| Slice | Checked | Unchecked | Result |
+|---|---:|---:|---|
+| b2a | 4/4 | 0 | COMPLETE |
+| b2b Units 1–3 | 12/12 | 0 | COMPLETE |
+| b2c | 0/4 | 4/4 | NOT STARTED / OUT OF SCOPE |
+
+### Review receipt
+
+Independent `--numstat` accounting over correction-touched tests plus `tasks.md`, including the untracked collection definition and excluding `verify-report.md`, `review-ledger.md`, `apply-progress.md`, and metadata-only `.gitignore`:
+
+- additions: 75
+- deletions: 5
+- gross review lines: **80/400 — PASS**
+
+### Artifacts and residual risks
+
+Only `verify-report.md` and `review-ledger.md` were updated by this re-verification. Production, tests, tasks, `apply-progress.md`, `.gitignore`, `AIBar.sln`, the index, commits, remotes, and PR state were not modified.
+
+The historical `AIBar.sln` committed-range whitespace warning remains informational. The earlier corrective evidence in `apply-progress.md` says current trailing whitespace was removed and records a pre-restoration 226-line receipt; that artifact was outside this read-only verifier's write allowance. This final report supersedes those two statements for the scoped re-verification: current `AIBar.sln` has no worktree diff, and the evidence-excluded correction receipt is 80 lines.
+
+### Final verdict and next recommendation
+
+**PASS — BOTH INTEGRATED CRITICAL BLOCKERS VERIFIED CLOSED.** Only integrated b2a+b2b is verified. b2c and the full change remain unverified and out of scope. The next recommendation is to preserve this bounded correction for review; do not begin b2c until separately authorized.
+
+---
+
+## Judgment Day Fix Round 1 continuation — `JD-B2-INT-001` (2026-07-26)
+
+This is gate evidence only; it does not independently re-judge the fix. The ledger row is **fixed, not verified**.
+
+| Gate | Result |
+|---|---|
+| Partial/missing-marker and complete cleanup | 4/4 passed twice |
+| Affected owned lifecycle | 5/5 passed twice |
+| Focused supervisor | 47/47 passed |
+| Full solution | 273/273 passed once |
+| Build / diff / helpers | 0 warnings/errors; clean; `HARNESS_HELPER_COUNT=0` |
+| Scope / matrix | Direct-completion/live-grandchild RED retained; unvalidated grandchild ownership is not recursively cleaned; b2a 4/4, b2b 12/12, b2c 0/4; no b2c code |
+
+The complete correction receipt is **235/400**, counting implementation/tests/tasks/apply evidence and excluding verifier/ledger evidence records. `JD-B2-INT-INFO-001` remains WARNING/info; the narrower verifier-only receipt is not authoritative for the complete correction.
+
+---
+
+## Judgment Day Fix Round 2 — `JD-B2-INT-001` (2026-07-26)
+
+This is gate evidence only; the ledger row is **fixed, not verified**. Direct termination replaced recursive tree termination for validated identities. The new deterministic unpublished-grandchild case proves cleanup preserves the original failure, live unvalidated grandchild, root, and manual PID evidence; its test-only release cleans the helper after assertion.
+
+| Gate | Result |
+|---|---|
+| Cleanup matrix | 5/5 passed twice |
+| Lifecycle and direct-completion RED | 6/6 passed twice |
+| Focused supervisor / full solution | 47/47; 274/274 passed once |
+| Build / diff / helpers | 0 warnings/errors; clean; `HARNESS_HELPER_COUNT=0` |
+| Scope / matrix / receipt | b2a 4/4, b2b 12/12, b2c 0/4; no b2c code; 320/400 |
+
+`JD-B2-INT-INFO-001` remains WARNING/info.
+
+---
+
+## Final scoped integrated b2a+b2b verification closure — 2026-07-26
+
+### Result Contract
+
+```yaml
+scope: integrated-b2a-plus-b2b-units-1-2-3-only
+mode: standard
+verdict: pass
+open_critical_findings: 0
+judgment_day_status: approved
+task_matrix:
+  b2a: 4/4
+  b2b: 12/12
+  b2c: 0/4
+persisted_cleanup_matrix: 5/5x2
+persisted_lifecycle_matrix: 6/6x2
+persisted_focused_supervisor: 47/47
+persisted_full_solution: 274/274
+focused_spot_check: 1/1
+build_exit_code: 0
+diff_check_exit_code: 0
+scoped_helper_process_count: 0
+authoritative_correction_receipt: 320/400
+b2c_verified: false
+full_change_verified: false
+```
+
+### Status and evidence
+
+**PASS — final scoped integrated b2a+b2b verification is closed.** Both final scoped re-judges approved `JD-B2-INT-001` after Fix Round 2, and no CRITICAL finding remains open. Current source inspection confirms cleanup terminates only directly and individually PID/start-time-validated child or grandchild identities. The partial-identity path returns before root deletion when grandchild identity is unavailable. The deterministic unpublished-grandchild test preserves the original failure, live unvalidated grandchild, root, absent ownership marker, and PID evidence until test-only post-assertion release.
+
+Fresh persisted gates from the immediately completed fix/re-judgment remain internally consistent: cleanup 5/5 twice, lifecycle plus retained direct-completion RED 6/6 twice, focused supervisor 47/47, full solution 274/274, build with zero warnings/errors, clean current diff check, and zero helpers. This closure did not repeat the approximately ten-minute full suite because no contradictory evidence was found. A focused current-worktree spot check of `Unpublished_grandchild_cleanup_preserves_primary_failure_root_and_manual_evidence` passed 1/1; a fresh solution build passed with zero warnings/errors; `git diff --check` passed; and the corrected scoped helper query returned zero.
+
+### Scope and artifact consistency
+
+| Gate | Result |
+|---|---|
+| Task matrix | b2a 4/4 checked; b2b Units 1–3 12/12 checked; b2c 0/4 checked and explicitly not started |
+| Production and b2c diff | No `src/**`, `tools/**`, or `scripts/**` worktree diff; no b2c implementation added |
+| Solution | No `AIBar.sln` worktree diff |
+| `.gitignore` | HEAD, index, and worktree blob are identical (`16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`); metadata-only status is preserved |
+| Review boundary | Fix Round 2 authoritative complete correction receipt is **320/400** |
+| Warning receipt | `JD-B2-INT-INFO-001` remains WARNING/info as historical receipt-label accounting; it is non-blocking and does not replace the authoritative 320/400 receipt |
+
+Only this report and `review-ledger.md` were updated for final closure. Code, tests, tasks, apply evidence, `.gitignore`, `AIBar.sln`, index, commits, remotes, and PR state were not modified by this verification.
+
+### Final recommendation and residual risk
+
+Preserve this bounded integrated b2a+b2b result as the terminal scoped verification record. Do not represent it as b2c or full-change verification. Slice b2c and the unfinished full `aibar-foundation` change remain unverified and require separately authorized implementation and verification. The historical committed-range `AIBar.sln` whitespace warning and `JD-B2-INT-INFO-001` remain informational.

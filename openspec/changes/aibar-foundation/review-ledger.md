@@ -26,6 +26,30 @@ Historical round verdict: `JUDGMENT: APPROVED` — it does not approve the curre
 
 Current target terminal state: `JUDGMENT: APPROVED`; `SDD: VERIFIED` for the narrowed Slice 8C1.1b1b contract.
 
+## Integrated b2a+b2b supervisor verification — 2026-07-26
+
+**Scope:** b2a `2b2189a` plus b2b Unit 1 `c5dd209`, Unit 2 `4e54ea4`, and Unit 3 `e5cca98` only. This does not verify the full unfinished change or b2c.
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| SDD-VERIFY-B2-INTEGRATED-001 | verification | `dotnet test AIBar.sln --no-restore -m:1 --nologo` | CRITICAL | verified | Bounded correction independently re-verified: the affected 3-test lifecycle filter passed four consecutive runs, focused supervisor passed 47/47, and the full solution passed 271/271 twice. Source/diff inspection confirms synchronous bounded publisher startup, cross-thread-safe semaphore serialization, guarded partial identity-record cleanup, and a non-parallel Windows harness collection without weakened assertions or inflated behavior bounds. |
+| SDD-VERIFY-B2-INTEGRATED-002 | verification | `openspec/changes/aibar-foundation/tasks.md:415-465`; commit `19a7943` | CRITICAL | verified | Current approved matrix is explicit and truthful: b2a 4/4 checked, b2b Units 1–3 12/12 checked, and b2c 0/4 checked. No production diff or b2c implementation is present. |
+| SDD-VERIFY-B2-INTEGRATED-003 | verification | `AIBar.sln:18-21,47-50,57` | WARNING | info | Current worktree `git diff --check` passes; committed range `git diff --check 2b2189a^..e5cca98` exits 2 on trailing whitespace in solution additions. |
+
+The original integrated gate failed despite focused 47/47, a clean build, zero scoped helpers, content-identical `.gitignore`, and no b2c implementation. The final scoped re-verification below supersedes that original disposition for findings 001/002 only; it does not authorize or verify b2c.
+
+### Corrective gate — bounded integrated blockers
+
+| id | status | evidence |
+|---|---|---|
+| SDD-VERIFY-B2-INTEGRATED-001 | verified | Independent rerun passed affected lifecycle 3/3 ×4, focused supervisor 47/47, full solution 271/271 ×2, build, current diff check, and zero-helper gate. The correction addresses the child/grandchild identity race and Windows harness scheduling without changing production or inflating the 10-second readiness and 8-second completion bounds. |
+| SDD-VERIFY-B2-INTEGRATED-002 | verified | Independent inspection confirms approved b2a 4/4 checked, b2b Units 1–3 12/12 checked, and b2c 0/4 checked. No b2c production diff exists. |
+| SDD-VERIFY-B2-INTEGRATED-003 | info | Historical committed-range `AIBar.sln` warning remains informational. The current worktree does not alter `AIBar.sln` (`git diff --quiet -- AIBar.sln` exit 0); no cleanup is claimed by this correction. |
+
+### Final scoped re-verification — integrated b2a+b2b only
+
+Both integrated CRITICAL blockers are verified closed. This verdict covers only b2a plus b2b Units 1–3; it does not verify b2c or the full `aibar-foundation` change. The independently counted correction receipt is 75 additions + 5 deletions = 80 review lines after excluding verification evidence and unrelated metadata, within the 400-line hard limit. `.gitignore` remains content-identical to HEAD, `AIBar.sln` remains unchanged by the worktree, and the historical committed-range solution warning is retained as information.
+
 ## Judgment Day — Slice 8C1.1b2a — Round 1
 
 | id | lens | location | severity | status | evidence |
@@ -71,6 +95,37 @@ One general refuter evaluated the complete candidate list; both findings stand. 
 Only `R3-B2B-U3-001` and `R3-B2B-U3-002` were changed by this correction. Scoped reliability re-review verified both rows. Focused deterministic coverage passed 47/47, build passed with zero warnings/errors, `git diff --check` passed, no helper survived, and the final Unit 3 receipt is 383/400. The existing Unit 3 evidence and informational rows remain historical.
 
 Pre-commit recommendation: APPROVED.
+
+## Judgment Day — Integrated b2a+b2b correction — Round 1
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| JD-B2-INT-001 | judgment-day | `tests/AIBar.Domain.Tests/PackagingRecoveryTests.cs:198-229,379-430,519-547` | CRITICAL | verified | Both final scoped re-judges verified Fix Round 2: recursive tree kill is removed, only individually PID/start-time-validated identities terminate, and an unvalidated live grandchild survives while root/evidence/original failure remain preserved. |
+| JD-B2-INT-INFO-001 | judgment-day | `apply-progress.md:1753`; `verify-report.md:503-516,551-563` | WARNING | info | Both judges confirmed contradictory receipt labels: the complete authorized correction is 93/400 including apply-progress, while verification artifacts call the narrower 80-line count the correction receipt. Both remain below budget. |
+
+Round 1 verdict: one independently confirmed CRITICAL finding and one informational WARNING. The correction cannot be approved until teardown is structurally race-safe.
+
+`JUDGMENT: ESCALATED`
+
+### Fix Round 1 continuation evidence
+
+`JD-B2-INT-001` is **fixed, not verified**. Partial/missing-identity plus complete-identity cleanup passed 4/4 twice; owned lifecycle passed 5/5 twice; focused supervisor passed 47/47; the full solution passed 273/273; build, current diff check, and zero-Harness-helper gates passed. The retained direct-completion/live-grandchild RED is preserved, and no cleanup of unvalidated grandchild ownership is claimed. Matrix: b2a 4/4, b2b 12/12, b2c 0/4; no b2c code. The authoritative complete correction receipt is 235/400 including apply evidence. `JD-B2-INT-INFO-001` remains WARNING/info.
+
+### Fix Round 1 scoped re-judgment
+
+Judge B verified the finding, but Judge A kept it open because recursive child-tree termination can kill an unvalidated live grandchild. Under the contradiction rule the finding remains open. `JUDGMENT: ESCALATED`.
+
+### Fix Round 2 evidence
+
+`JD-B2-INT-001` is **fixed, not verified**. The partial-identity fallback now terminates a recorded child directly, never its process tree; complete cleanup directly terminates only a recorded grandchild. The new event-gated unpublished-grandchild case preserves the original exception, keeps the grandchild live without a marker or grandchild identity, retains the root and PID record for bounded manual cleanup, then releases that helper from the test only. Cleanup matrix passed 5/5 twice; lifecycle/direct-completion RED passed 6/6 twice; focused supervisor passed 47/47; full solution passed 274/274; build, diff, and zero-helper gates passed. Matrix remains b2a 4/4, b2b 12/12, b2c 0/4; no b2c code. The complete correction receipt is 320/400. `JD-B2-INT-INFO-001` remains WARNING/info.
+
+### Fix Round 2 final scoped re-judgment
+
+Both blind re-judges verified `JD-B2-INT-001`; no blocker, critical, suspect, or contradiction remains open. `JD-B2-INT-INFO-001` remains canonical WARNING/info. `JUDGMENT: APPROVED`.
+
+## Pre-commit reliability review — Integrated b2a+b2b correction
+
+One exhaustive reliability sweep returned an empty findings ledger. The bounded test-harness/task-traceability correction is approved for an isolated commit; production supervisor code, b2c, `AIBar.sln`, and unrelated `.gitignore` remain excluded.
 
 ## Pre-commit reliability review — Slice 8C1.1b2b Unit 2
 
@@ -221,3 +276,16 @@ No BLOCKER or CRITICAL defect was found in the remediation. PID/start-tick ident
 Historical round verdict: `JUDGMENT: APPROVED` — it does not approve the current narrowed target.
 
 Current target terminal state: `JUDGMENT: APPROVED`; `SDD: VERIFIED` for the narrowed Slice 8C1.1b1b contract.
+
+## Final SDD verification closure — integrated b2a+b2b — 2026-07-26
+
+**Scope:** b2a plus b2b Units 1–3 only. b2c and the full unfinished `aibar-foundation` change remain unverified.
+
+| id | severity | final status | closure evidence |
+|---|---|---|---|
+| `JD-B2-INT-001` | CRITICAL | verified / closed | Both final scoped re-judges approved Fix Round 2. Current source uses direct `Kill()` only after individual PID/start-time validation; partial identity returns before root deletion; deterministic unpublished-grandchild coverage preserves the unvalidated live grandchild, original failure, root, marker absence, and PID evidence until post-assertion release. |
+| `JD-B2-INT-INFO-001` | WARNING | info | Historical receipt-label accounting remains informational and non-blocking. The authoritative complete Fix Round 2 correction receipt for this closure is **320/400**; narrower historical counts do not replace it. |
+| `SDD-VERIFY-B2-INTEGRATED-001` | CRITICAL | verified / closed | Persisted gates remain cleanup 5/5 twice, lifecycle plus retained RED 6/6 twice, supervisor 47/47, full solution 274/274, clean build/diff, and zero helpers. Current spot check passed 1/1, build passed with zero warnings/errors, and zero helpers remained. |
+| `SDD-VERIFY-B2-INTEGRATED-002` | CRITICAL | verified / closed | Current task matrix is truthful: b2a 4/4, b2b 12/12, b2c 0/4. No production, b2c, or `AIBar.sln` worktree diff exists; `.gitignore` content remains identical across HEAD/index/worktree. |
+
+Final scoped disposition: `SDD: VERIFIED`; **PASS** for integrated b2a+b2b only. No CRITICAL finding remains open. The committed-range `AIBar.sln` whitespace warning remains informational. No b2c or full-change verification is claimed.
