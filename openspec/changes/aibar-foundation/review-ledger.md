@@ -39,6 +39,32 @@ Fix round 1: JD-B2A-001 now bounds stdin during reads and rejects the 4097th byt
 
 `JUDGMENT: ESCALATED`
 
+## Judgment Day — Slice 8C1.1b2b Unit 1 — Round 1
+
+| id | lens | location | severity | status | evidence |
+|---|---|---|---|---|---|
+| JD-B2B-U1-001 | judgment-day | `tools/AIBar.Packaging.Supervisor/JobObjectInterop.cs:51-60`; `ProcessSupervisor.cs:50-63` | CRITICAL | verified | Both scoped re-judges verified exception-safe attribute-list construction, complete allocation/handle cleanup, and deterministic `PROCESS_START_FAILED` conversion through the production launch path. |
+| JD-B2B-U1-002 | judgment-day | `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs:120-208`; `PackagingRecoveryTests.cs:113-134`; `apply-progress.md:26` | CRITICAL | verified | Both scoped re-judges verified the Windows test now traverses `ProcessSupervisor` and `WindowsProcessSupervisorInterop`, proves resume-gated execution and Job membership, and confirms helper termination when owned handles close. |
+| JD-A-B2B-U1-002 | judgment-day | `tools/AIBar.Packaging.Supervisor/JobObjectInterop.cs:47`; `ProcessSupervisor.cs:53-56` | CRITICAL | info | Single-judge suspect: a failed `TerminateProcess` after assignment failure can leave an unassigned suspended process because the native result is discarded. Not independently confirmed; retained as non-blocking information. |
+
+Round 1 verdict: two independently confirmed CRITICAL findings and one single-judge suspect signal. No Unit 2, Unit 3, or b2c behavior was reviewed.
+
+`JUDGMENT: ESCALATED`
+
+### Fix round 1 final scoped re-judgment
+
+Both blind re-judges verified `JD-B2B-U1-001` and `JD-B2B-U1-002`. Focused tests passed 27/27, the solution built with zero warnings/errors, no helper process survived, and the final Unit 1 receipt is 329/400 review lines. The single-judge suspect remains informational and does not block this unit.
+
+`JUDGMENT: APPROVED`
+
+## Pre-commit reliability review — Slice 8C1.1b2b Unit 1
+
+One exhaustive reliability sweep returned an empty findings ledger. Unit 1 is approved for an isolated work-unit commit; planning-only re-slicing, Units 2/3, b2c, and unrelated `.gitignore` remain outside its implementation diff.
+
+### Fix Round 1 — maintainer-authorized correction
+
+`JD-B2B-U1-001` now checks both attribute-list initialization phases, releases initialized/uninitialized list memory and inherited-handle storage on every constructor failure, and converts launch exceptions to `ProcessStartFailed` after disposing all locally owned resources. `JD-B2B-U1-002` now has a Windows-native event-gated test through `ProcessSupervisor` and `WindowsProcessSupervisorInterop`: the helper signals after resume, is observed in its Job, and exits when the launch is disposed. Focused RED failed with the unhandled launch exception; focused GREEN and native coverage passed. Both rows are `fixed`, pending scoped re-judgment; no Unit 2/3 or b2c semantics are claimed.
+
 ## Pre-commit reliability review — Slice 8C1.1b2a
 
 One exhaustive reliability sweep returned an empty findings ledger. The final b2a work unit is approved for an isolated commit; unrelated `.gitignore`, pre-existing planning changes, and b2b/b2c remain excluded.

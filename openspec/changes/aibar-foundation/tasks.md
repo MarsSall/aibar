@@ -427,10 +427,10 @@ Historical mapping (not fixed here): `JD-B2B-001` → units 1–2; `JD-B2B-002` 
 
 **Paths:** `JobObjectInterop.cs`, `ProcessSupervisor.cs`, b2a project files, focused tests. **Start:** b2a fake seam; **end:** production `IProcessSupervisorInterop`, dedicated SafeHandles, Job creation/configuration (`KILL_ON_JOB_CLOSE`, no breakaway), completion-port ownership, pipes, explicit inherited-handle list, suspended `CreateProcessW`, assignment-before-resume, safe process/thread/job/port/pipe closure, and root exit-code retrieval.
 
-- [ ] **RED:** fake tests fail for every pre-resume native failure and assert exact call order, handle ownership, inherited-handle allowlist, and deterministic failure codes.
-- [ ] **GREEN:** implement only production native interop/launch and safe-handle disposal; never expose paths, PIDs, commands, secrets, or exceptions.
-- [ ] **TRIANGULATE:** fake fault matrix plus a Windows native `ProcessSupervisor`/`WindowsProcessSupervisorInterop` event-gated helper proves it signals only after launch resumes, is already Job-contained, and exits after launch disposal.
-- [ ] **GATE:** focused supervisor tests, build, `git diff --check`, and zero helper-process check. Rollback only this unit; b2a stays runnable.
+- [x] **RED:** fake tests fail for every pre-resume native failure and assert exact call order, handle ownership, inherited-handle allowlist, and deterministic failure codes.
+- [x] **GREEN:** implement only production native interop/launch and safe-handle disposal; never expose paths, PIDs, commands, secrets, or exceptions.
+- [x] **TRIANGULATE:** fake fault matrix plus a Windows native `ProcessSupervisor`/`WindowsProcessSupervisorInterop` event-gated helper proves it signals only after launch resumes, is already Job-contained, and exits after launch disposal.
+- [x] **GATE:** focused supervisor tests, build, `git diff --check`, and zero helper-process check. Rollback only this unit; b2a stays runnable.
 
 ###### Unit 2 — Concurrent bounded drains and authoritative quiescence (250–330 review lines)
 

@@ -15,6 +15,29 @@
 
 **Changed paths:** `AIBar.sln`; `tools/AIBar.Packaging.Supervisor/{AIBar.Packaging.Supervisor.csproj,Program.cs,Protocol.cs,SupervisorState.cs}`; `tests/AIBar.Domain.Tests/{AIBar.Domain.Tests.csproj,PackagingSupervisorTests.cs}`; `openspec/changes/aibar-foundation/{tasks.md,apply-progress.md}`. **Task state:** `8C1.1b2a-RED`, `GREEN`, `TRIANGULATE`, and `GATE` are checked; b2b/b2c remain unchecked. **`.gitignore`:** untouched. **Next:** independent review/verification of b2a before b2b; no commit, push, PR, or receipt was created.
 
+## Slice 8C1.1b2b Unit 1 — Production interop and suspended launch (2026-07-26)
+
+**Status:** Standard mode (`strict_tdd: false`), feature-branch-chain Unit 1 only. This adds a dependency-isolated `IProcessSupervisorInterop`, Windows Job/IOCP/anonymous-pipe/CreateProcessW interop, dedicated safe-handle ownership, explicit three-handle inheritance allowlist, suspended launch, assignment before resume, and root exit-code seam. It does not add drains, quiescence, timeout/cancellation classification, cleanup/scavenging, PowerShell integration, or downstream behavior.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | The focused test command failed before implementation with missing `IProcessSupervisorInterop`, `ProcessSupervisor`, safe handles, pipe/process records, and launch request types (`CS0246`). |
+| GREEN | Added native `KILL_ON_JOB_CLOSE` Job configuration without breakaway, completion-port association, three anonymous pipes with parent ends made non-inheritable, `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, `CREATE_SUSPENDED|EXTENDED_STARTUPINFO_PRESENT`, assignment-before-resume, failure termination, disposal, and exit-code retrieval. Focused `PackagingSupervisor` passed 25/25. |
+| TRIANGULATE | Eight fake pre-resume/at-resume faults assert exact call order, status, termination where needed, allowlisted child handles only, and all owned handles closed. The existing event-gated child/grandchild harness also passed in the combined focused command; `Get-Process -Name Harness` returned 0 afterward. |
+| GATE | `dotnet test ... --filter "FullyQualifiedName~PackagingSupervisor|FullyQualifiedName~Red_direct_invocation_completes_while_known_owned_grandchild_remains_alive" --no-restore -m:1 --nologo` passed 26/26; `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings/errors; `git diff --check` passed (LF-to-CRLF advisories only). |
+
+**Changed paths:** `tools/AIBar.Packaging.Supervisor/{JobObjectInterop.cs,ProcessSupervisor.cs}`; `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`; `openspec/changes/aibar-foundation/{tasks.md,apply-progress.md}`. **Task state:** Unit 1 RED/GREEN/TRIANGULATE/GATE are checked; Units 2 and 3 remain unchecked. **Rollback boundary:** remove only the two Unit 1 supervisor files, Unit 1 test additions, four Unit 1 task marks, and this block; b2a remains runnable. **`.gitignore`:** HEAD/index/worktree blobs are identical and it remains unstaged.
+
+### Judgment Day Fix Round 1 — b2b Unit 1 (2026-07-26)
+
+**Scope:** Maintainer-authorized correction only for `JD-B2B-U1-001` and `JD-B2B-U1-002`. `AttributeList` now validates its sizing and initialization calls, frees all unmanaged allocations on constructor failure, and `ProcessSupervisor` fails closed as `ProcessStartFailed` after disposing Job/port/pipe/process/thread ownership if launch interop throws. A Windows-native event-gated test now exercises `ProcessSupervisor` with `WindowsProcessSupervisorInterop`: its PowerShell helper signals only after resume, is already in the Job when observed, and exits after launch disposal. This is Unit 1 launch/containment evidence only; no drain, quiescence, timeout, cancellation, or b2c claim is made.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | With the exception-to-result catch disabled, the focused launch fault matrix failed 1/9 on `CreateProcessException` with an unhandled `InvalidOperationException`. |
+| GREEN | Restoring the catch passed focused `PackagingSupervisor` 27/27, including the deterministic exception result/handle closure and the real Windows native launch test. |
+| GATE / receipt | `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings/errors; `git diff --check` passed with LF-to-CRLF advisories only; `Get-Process -Name powershell` returned 0. Reproducible Unit-1 receipt: pre-fix 259 + this correction 70 = 329 review-relevant lines, within 400. Both ledger rows are fixed, not verified. |
+
 ### Judgment Day fix round 1 — b2a input boundary (2026-07-26)
 
 **Scope:** Maintainer-authorized correction of only `JD-B2A-001` and `JD-B2A-002`. `Program` now consumes stdin through a fixed 4097-byte buffer and returns the closed invalid response as soon as the 4097th byte arrives, without waiting for EOF or allocating an unbounded stream. `protocolVersion` now uses non-throwing Int32 parsing, so out-of-range and fractional JSON numbers produce only `invalid-request` response bytes. Focused RED failed with missing `HandleAsync` (`CS0117`); GREEN passed `15/15` PackagingSupervisor tests, including a no-EOF over-limit stream and three invalid numeric versions. b2b/b2c remain untouched. Both ledger entries were verified by both scoped re-judges.
