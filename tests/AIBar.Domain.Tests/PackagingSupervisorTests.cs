@@ -1,6 +1,7 @@
 using System.Text;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using NativeSafeFileHandle = Microsoft.Win32.SafeHandles.SafeFileHandle;
 using AIBar.Packaging.Supervisor;
 
 namespace AIBar.Domain.Tests;
@@ -472,9 +473,233 @@ public sealed class PackagingSupervisorTests
         Assert.Equal(1, result.StderrDiscardedBytes);
     }
 
+    [Fact]
+    public void Directory_capability_retains_live_handles_and_refuses_changed_admission_without_mutation()
+    {
+        var fileSystem = new FakeDirectoryCapabilityFileSystem();
+        Assert.True(DirectoryCapability.TryCreate(fileSystem, "C:\\space café", "root", ["restore", "publish"], out var capability, out var status));
+        using (var retained = Assert.IsType<DirectoryCapability>(capability))
+        {
+            Assert.Equal(SupervisorStatus.Success, status);
+            Assert.Equal(3, fileSystem.LiveHandleCount);
+            var mutations = fileSystem.MutationCount;
+            Assert.True(retained.TryValidate(out status));
+
+            foreach (var refusal in new[] { "extra", "duplicate", "missing", "identity", "final-path", "volume", "access" })
+            {
+                fileSystem.Refusal = refusal;
+                Assert.False(retained.TryValidate(out status));
+                Assert.Equal(SupervisorStatus.RootIdentityChanged, status);
+                Assert.Equal(mutations, fileSystem.MutationCount);
+            }
+
+            fileSystem.Refusal = "reparse";
+            Assert.False(retained.TryValidate(out status));
+            Assert.Equal(SupervisorStatus.ReparseDetected, status);
+            Assert.Equal(mutations, fileSystem.MutationCount);
+        }
+    }
+
+    [Fact]
+    public void Directory_capability_is_deterministic_for_reordered_unicode_space_and_containment_observations()
+    {
+        var fileSystem = new FakeDirectoryCapabilityFileSystem { ReverseEnumeration = true };
+        Assert.True(DirectoryCapability.TryCreate(fileSystem, "C:\\space café", "root Ω", ["restore files", "publicación"], out var capability, out var status));
+        using (var retained = Assert.IsType<DirectoryCapability>(capability))
+        {
+            Assert.True(retained.TryValidate(out status));
+            Assert.Equal(SupervisorStatus.Success, status);
+            fileSystem.Refusal = "containment";
+            Assert.False(retained.TryValidate(out status));
+            Assert.Equal(SupervisorStatus.RootIdentityChanged, status);
+        }
+    }
+
+    [Fact]
+    public void Windows_directory_capability_retains_a_live_nonreparse_same_volume_admission()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var parent = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"aibar c1a café {Guid.NewGuid():N}"));
+        try
+        {
+            Assert.True(DirectoryCapability.TryCreate(new WindowsDirectoryCapabilityFileSystem(), parent.FullName, "root Ω", ["restore files", "publish files"], out var capability, out var status));
+            using (var retained = Assert.IsType<DirectoryCapability>(capability))
+            {
+                Assert.True(retained.TryValidate(out status));
+                Assert.Equal(SupervisorStatus.Success, status);
+            }
+        }
+        finally { Directory.Delete(parent.FullName, true); }
+    }
+
+    [Fact]
+    public void Native_rename_readiness_refuses_invalid_leaf_identity_reparse_volume_share_and_child_set_before_call()
+    {
+        Assert.Equal(0x00130089u, DirectoryCapability.RenameSourceAccess); Assert.Equal(0x001000A0u, DirectoryCapability.QuarantineParentAccess);
+        Assert.All(new[] { "", ".", "..", "bad/name", "bad\\name", "bad:name", "CON" }, leaf => Assert.False(DirectoryCapability.IsSimpleLeaf(leaf)));
+        Assert.True(NativeRenameReadiness.IsSuccessfulStatus(0, 0)); Assert.False(NativeRenameReadiness.IsSuccessfulStatus(0, unchecked((int)0x103))); Assert.False(NativeRenameReadiness.IsSuccessfulStatus(unchecked((int)0xC0000001), 0));
+        var fileSystem = new FakeDirectoryCapabilityFileSystem(); fileSystem.TryCreateDirectory("C:\\quarantine");
+        Assert.True(DirectoryCapability.TryCreateRenameReady(fileSystem, "C:\\source", "root", ["restore", "publish"], "C:\\quarantine", out var capability, out _));
+        using var retained = Assert.IsType<DirectoryCapability>(capability);
+        foreach (var refusal in new[] { "root-identity", "parent-identity", "reparse", "parent-reparse", "volume", "extra", "share" })
+        {
+            fileSystem.Refusal = refusal;
+            var result = NativeRenameReadiness.Prove(retained, "quarantine-root");
+            Assert.Equal(SupervisorStatus.CleanupRefused, result.Status); Assert.Equal(0, result.NativeCallCount);
+        }
+        fileSystem.Refusal = null;
+        var invalid = NativeRenameReadiness.Prove(retained, "bad/name"); Assert.Equal(SupervisorStatus.CleanupRefused, invalid.Status); Assert.Equal(0, invalid.NativeCallCount);
+    }
+
+    [Fact]
+    public void Windows_native_rename_readiness_proves_relative_success_collision_and_no_residue()
+    {
+        if (!OperatingSystem.IsWindows() || IntPtr.Size != 8) return;
+        Assert.True(NativeRenameReadiness.IsCompatibleForCurrentProcess());
+        using var parent = new NativeReadinessRoot();
+        using (var retained = NativeReadiness(parent.Path, "source"))
+        {
+            var result = NativeRenameReadiness.Prove(retained, "quarantine-source");
+            Assert.Equal(SupervisorStatus.Success, result.Status); Assert.Equal(1, result.NativeCallCount); Assert.True(result.ChildrenReleased);
+            Assert.Equal(retained.Source.Identity, result.Source!.Identity); Assert.True(Directory.Exists(Path.Combine(parent.Quarantine, "quarantine-source")));
+        }
+        using (var retained = NativeReadiness(parent.Path, "collision"))
+        {
+            var target = Path.Combine(parent.Quarantine, "collision-target"); Directory.CreateDirectory(target); File.WriteAllText(Path.Combine(target, "sentinel"), "keep");
+            var result = NativeRenameReadiness.Prove(retained, "collision-target");
+            Assert.Equal(SupervisorStatus.CleanupRefused, result.Status); Assert.Equal(1, result.NativeCallCount); Assert.True(Directory.Exists(Path.Combine(parent.Path, "collision"))); Assert.Equal("keep", File.ReadAllText(Path.Combine(target, "sentinel")));
+        }
+    }
+
+    [Theory]
+    [InlineData(false, 8, true, true, 10)]
+    [InlineData(true, 4, true, true, 10)]
+    [InlineData(true, 8, false, true, 10)]
+    [InlineData(true, 8, true, false, 10)]
+    [InlineData(true, 8, true, true, 9)]
+    public void Native_readiness_refuses_unsupported_platform_abi_entrypoint_or_information_class_without_a_native_call(bool supportedWindows, int pointerSize, bool layoutsValid, bool entryPointAvailable, int informationClass)
+    {
+        Assert.False(NativeRenameReadiness.IsCompatible(supportedWindows, pointerSize, layoutsValid, entryPointAvailable, informationClass));
+        var fileSystem = new FakeDirectoryCapabilityFileSystem(); fileSystem.TryCreateDirectory("C:\\quarantine");
+        Assert.True(DirectoryCapability.TryCreateRenameReady(fileSystem, "C:\\source", "root", ["child"], "C:\\quarantine", out var capability, out _));
+        using var retained = Assert.IsType<DirectoryCapability>(capability);
+
+        var result = NativeRenameReadiness.Prove(retained, "quarantine-root", () => false);
+
+        Assert.Equal(SupervisorStatus.CleanupRefused, result.Status); Assert.Equal(0, result.NativeCallCount); Assert.False(result.ChildrenReleased);
+        Assert.True(retained.TryValidateRenameReady(out _));
+    }
+
+    [Fact]
+    public void C1b0_readiness_refusal_preserves_the_unissued_commit_boundary()
+    {
+        var assembly = typeof(DirectoryCapability).Assembly;
+        Assert.Equal("AIBar.Packaging.Supervisor.Program", assembly.EntryPoint!.DeclaringType!.FullName);
+        var fileSystem = new FakeDirectoryCapabilityFileSystem(); fileSystem.TryCreateDirectory("C:\\quarantine");
+        Assert.True(DirectoryCapability.TryCreateRenameReady(fileSystem, "C:\\source", "root", ["child"], "C:\\quarantine", out var capability, out _));
+        using var retained = Assert.IsType<DirectoryCapability>(capability);
+
+        var result = NativeRenameReadiness.Prove(retained, "quarantine-root", () => false);
+
+        Assert.Equal(SupervisorStatus.CleanupRefused, result.Status); Assert.Equal(0, result.NativeCallCount); Assert.False(result.ChildrenReleased);
+        Assert.True(retained.TryValidateRenameReady(out _));
+    }
+
+    [Fact]
+    public void C1b1_commit_refuses_invalid_leaf_before_native_call()
+    {
+        var fileSystem = new FakeDirectoryCapabilityFileSystem(); fileSystem.TryCreateDirectory("C:\\quarantine");
+        Assert.True(DirectoryCapability.TryCreateRenameReady(fileSystem, "C:\\source", "root", ["child"], "C:\\quarantine", out var capability, out _));
+        using var retained = Assert.IsType<DirectoryCapability>(capability);
+        var result = Cleanup.Commit(retained, "bad/name");
+        Assert.Equal(SupervisorStatus.CleanupRefused, result.Status); Assert.Equal(0, result.NativeCallCount); Assert.False(result.ChildrenReleased);
+        Assert.True(retained.TryValidateRenameReady(out _));
+    }
+
+    [Fact]
+    public void C1b1_commit_preserves_retained_handle_relative_success()
+    {
+        if (!OperatingSystem.IsWindows() || IntPtr.Size != 8) return;
+        using var parent = new NativeReadinessRoot(); using var retained = NativeReadiness(parent.Path, "source");
+        var result = Cleanup.Commit(retained, "quarantine-source");
+        Assert.Equal(SupervisorStatus.Success, result.Status); Assert.Equal(1, result.NativeCallCount); Assert.True(result.ChildrenReleased);
+        Assert.Equal(retained.Source.Identity, result.Source!.Identity); Assert.True(Directory.Exists(Path.Combine(parent.Quarantine, "quarantine-source")));
+    }
+
+    [Fact]
+    public void C1b1_commit_refuses_collision_without_replacement()
+    {
+        if (!OperatingSystem.IsWindows() || IntPtr.Size != 8) return;
+        using var parent = new NativeReadinessRoot(); using var retained = NativeReadiness(parent.Path, "collision");
+        var target = Path.Combine(parent.Quarantine, "collision-target"); Directory.CreateDirectory(target); File.WriteAllText(Path.Combine(target, "sentinel"), "keep");
+        var result = Cleanup.Commit(retained, "collision-target");
+        Assert.Equal(SupervisorStatus.CleanupRefused, result.Status); Assert.Equal(1, result.NativeCallCount); Assert.True(result.ChildrenReleased);
+        Assert.True(Directory.Exists(Path.Combine(parent.Path, "collision"))); Assert.Equal("keep", File.ReadAllText(Path.Combine(target, "sentinel")));
+    }
+
+    private static DirectoryCapability NativeReadiness(string parent, string leaf)
+    {
+        Assert.True(DirectoryCapability.TryCreateRenameReady(new WindowsDirectoryCapabilityFileSystem(), parent, leaf, ["child"], Path.Combine(parent, "quarantine"), out var capability, out var status));
+        Assert.Equal(SupervisorStatus.Success, status); return Assert.IsType<DirectoryCapability>(capability);
+    }
+    private sealed class NativeReadinessRoot : IDisposable
+    {
+        public string Path { get; } = Directory.CreateDirectory(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"aibar-c1b0-{Guid.NewGuid():N}")).FullName;
+        public string Quarantine { get; }
+        public NativeReadinessRoot() => Quarantine = Directory.CreateDirectory(System.IO.Path.Combine(Path, "quarantine")).FullName;
+        public void Dispose() { if (Directory.Exists(Path)) Directory.Delete(Path, true); }
+    }
+
     private sealed class FakeClock : ISupervisorClock { public long ElapsedMilliseconds => 0; }
     private sealed class FakeRandom : ISupervisorRandom { public void Fill(Span<byte> bytes) => bytes.Clear(); }
     private sealed class FakeInterop : ISupervisorInterop { }
+
+    private sealed class FakeDirectoryCapabilityFileSystem : IDirectoryCapabilityFileSystem
+    {
+        private readonly Dictionary<string, DirectoryObservation> _nodes = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<IntPtr, string> _handles = [];
+        public int MutationCount { get; private set; }
+        public int LiveHandleCount { get; private set; }
+        public string? Refusal { get; set; }
+        public bool ReverseEnumeration { get; set; }
+        public bool TryCreateDirectory(string path)
+        {
+            if (_nodes.ContainsKey(path)) return false;
+            _nodes[path] = new(new(7, path), path, false); MutationCount++; return true;
+        }
+        public NativeSafeFileHandle? OpenDirectory(string path, uint desiredAccess)
+        {
+            if (!_nodes.ContainsKey(path) || Refusal == "access") return null;
+            var handle = new NativeSafeFileHandle(new IntPtr(_handles.Count + 1), false); _handles[handle.DangerousGetHandle()] = path; LiveHandleCount++; return handle;
+        }
+        public bool TryObserve(NativeSafeFileHandle handle, out DirectoryObservation observation)
+        {
+            observation = default!;
+            if (Refusal == "access" || !_handles.TryGetValue(handle.DangerousGetHandle(), out var path) || path is null || !_nodes.TryGetValue(path, out var current) || current is null) return false;
+            observation = current;
+            if (path.EndsWith("publish", StringComparison.OrdinalIgnoreCase))
+            {
+                if (Refusal == "identity") observation = observation with { Identity = new(7, "substituted") };
+                if (Refusal == "final-path") observation = observation with { FinalPath = observation.FinalPath + "-changed" };
+                if (Refusal == "volume") observation = observation with { Identity = new(8, observation.Identity.FileId) };
+            }
+            if (Refusal == "root-identity" && path.EndsWith("root", StringComparison.OrdinalIgnoreCase)) observation = observation with { Identity = new(7, "substituted-root") };
+            if (Refusal == "parent-identity" && path.EndsWith("quarantine", StringComparison.OrdinalIgnoreCase)) observation = observation with { Identity = new(7, "substituted-parent") };
+            if (Refusal == "volume" && path.EndsWith("quarantine", StringComparison.OrdinalIgnoreCase)) observation = observation with { Identity = new(8, observation.Identity.FileId) };
+            if (Refusal == "containment" && path != _nodes.Keys.First()) observation = observation with { FinalPath = "C:\\elsewhere" };
+            if (Refusal == "reparse" || Refusal == "parent-reparse" && path.EndsWith("quarantine", StringComparison.OrdinalIgnoreCase)) observation = observation with { IsReparsePoint = true };
+            return true;
+        }
+        public bool HasRequiredRenameShare(NativeSafeFileHandle source, NativeSafeFileHandle parent) => Refusal != "share";
+        public bool TryEnumerateDirectChildren(NativeSafeFileHandle root, out IReadOnlyList<string> names)
+        {
+            if (Refusal == "access" || !_handles.TryGetValue(root.DangerousGetHandle(), out var rootPath)) { names = []; return false; }
+            var prefix = rootPath + Path.DirectorySeparatorChar;
+            names = _nodes.Keys.Where(path => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && path[prefix.Length..].IndexOf(Path.DirectorySeparatorChar) < 0).Select(path => path[prefix.Length..]).Where(name => Refusal != "missing" || name != "publish").Concat(Refusal == "extra" ? ["extra"] : Refusal == "duplicate" ? ["publish"] : []).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+            if (ReverseEnumeration) names = names.Reverse().ToArray();
+            return true;
+        }
+    }
 
     public enum LaunchFault { None, CreateJob, ConfigureJob, CreatePort, AssociatePort, CreatePipes, CreateProcess, CreateProcessException, Assign, Resume }
 

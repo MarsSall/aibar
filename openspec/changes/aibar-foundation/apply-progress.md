@@ -1,10 +1,57 @@
 # Apply Progress — AIBar Foundation
 
+## Slice 8C1.1b2c C1b0 — Native API readiness proof (2026-07-30)
+
+**Status:** Standard mode (`strict_tdd: false`), maintainer-approved `size:exception`, C1b0 only. `DirectoryCapability` now has a separate rename-ready constructor that retains a source handle opened with `DELETE|SYNCHRONIZE`, a distinct same-volume non-reparse quarantine-parent handle opened with `FILE_TRAVERSE|FILE_READ_ATTRIBUTES|SYNCHRONIZE`, and no `FILE_SHARE_DELETE`. `NativeRenameReadiness` is a test-only readiness/proof seam called only from tests: it validates one strict simple leaf, closes child observation handles once, manually builds and zeroes the x64 native buffer, and makes one `ntdll!NtSetInformationFile(FileRenameInformation=10)` call. No production quarantine commit is wired.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo` failed before production code with `CS0117` for missing `TryCreateRenameReady` and `CS0103` for missing `NativeRenameReadiness`. |
+| GREEN / focused test | The same focused command passed 52/52, failed 0, skipped 0. Fake cases refuse source/parent identity substitution, reparse, volume, extra-child, and share drift before the native call; invalid/reserved/path leaf has call count 0; pending/non-success is not success. |
+| Runtime harness | `Windows_native_rename_readiness_proves_relative_success_collision_and_no_residue` uses the exact production P/Invoke on Windows x64. It proved retained-source identity continuity under the retained quarantine parent, one native success, collision refusal with an unchanged sentinel/source, one-way child release, and test-root disposal. |
+| Gate | `dotnet build AIBar.sln --no-restore --nologo` — exit 0; 0 warnings, 0 errors. `git diff --check` — exit 0 (existing LF-to-CRLF advisories only). `Get-Process -Name Harness -ErrorAction SilentlyContinue` — `HARNESS_HELPER_COUNT=0`; no `aibar-c1b0-*` temporary root remains. |
+| Rollback boundary | Remove only C1b0 additions in `DirectoryCapability.cs`, C1b0 tests in `PackagingSupervisorTests.cs`, these three C1b0 task marks, and this progress block. Retain C1a and leave C1b1/C2/C3 unchecked. |
+
+**Scope/cleanup:** no `Cleanup.cs`, production caller, Win32/path/shell/helper fallback, deletion, rename-back, scavenger, PowerShell, C2, or C3 behavior was added. The native buffer is freed and zeroed in `finally`; capability disposal closes child/source/parent handles exactly once. `.gitignore` is untouched by this unit.
+
+### C1b0 bounded verification correction (2026-07-30)
+
+**Status:** Standard mode (`strict_tdd: false`), native objective generation 51 / attempt 52. This correction is bound to failed verification evidence `sha256:43409e6d615699bb4e30cfc3e111e18fe491110b00b2c59ba4cd4396e2ddeacd`. It adds only a test-only compatibility seam and deterministic C1b0 coverage; C1b1 remains absent, unwired, and 0/3 unchecked.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Gate diagnosis | The previously failed focused and full commands were each reproduced once before editing and passed 52/52 and 279/279. The event-gated descendant test has no C1b0 dependency and the prior three lifecycle failures did not recur in the serialized clean run; they are classified as pre-existing environmental/test-isolation interference, not candidate-caused. No lifecycle test or production supervisor behavior changed. |
+| RED / GREEN | The new focused filter initially failed at compile time because the deterministic compatibility and no-call seams did not exist. After the smallest seam was added, it passed 6/6. |
+| C1b0 missing coverage | Unsupported Windows, x86, layout, entrypoint, and information-class inputs all return false without loading/calling native rename; `Prove(..., () => false)` returns `CLEANUP_REFUSED`, makes zero native calls, and retains children. A separate test proves no `Cleanup` type or C1b1 entrypoint/wiring exists when readiness is absent. |
+| Focused / runtime / regression | `PackagingSupervisor` passed 58/58; exact Windows native rename runtime passed 1/1; full `AIBar.sln` passed 285/285; clean build passed with 0 warnings and 0 errors. |
+| Rollback boundary | Revert only the compatibility seam in `DirectoryCapability.cs`, the two C1b0 correction tests, and this evidence block. Preserve C1a, existing C1b0 proof, and all unchecked C1b1/C2/C3 work. |
+
+```json
+{"schema":"gentle-ai.remediation-result/v1","lineage_id":"sha256:5dd516b1823de6ee3aaf28ef5b6e1bb6fbdebb9afd0f23bacaf5e38fbbb74f8f","generation":51,"mode":"standard","fix_batch":"b2c-c1b0-verification-correction","failed_evidence_revision":"sha256:43409e6d615699bb4e30cfc3e111e18fe491110b00b2c59ba4cd4396e2ddeacd","outcome":"passed"}
+{"schema":"gentle-ai.remediation-evidence/v1","lineage_id":"sha256:5dd516b1823de6ee3aaf28ef5b6e1bb6fbdebb9afd0f23bacaf5e38fbbb74f8f","generation":51,"mode":"standard","fix_batch":"b2c-c1b0-verification-correction","failed_evidence_revision":"sha256:43409e6d615699bb4e30cfc3e111e18fe491110b00b2c59ba4cd4396e2ddeacd","focused_result":"58/58","runtime_result":"1/1","full_result":"285/285","build_result":"0-warnings-0-errors","diff_check":"passed"}
+```
+
 ## Slice 8C1.1b2c — C1 rollback for replan (2026-07-26)
 
 **Status:** Standard mode (`strict_tdd: false`). The uncommitted C1 capability-admission/quarantine implementation and its tests were removed after the confirmed `JD-B2C-C1-001` TOCTOU finding. C1, C2, and C3 RED/GREEN/TRIANGULATE/GATE tasks are all unchecked; the three-unit b2c feature-branch-chain plan remains the authority for a future handle-bound replan.
 
 **Rollback-for-replan:** deleted only `DirectoryCapability.cs`, `Cleanup.cs`, and `DirectoryCapabilityTests.cs`; removed C1 completion claims and reset its task marks. This checkpoint preserves b2a/b2b behavior, the independently verified readiness-harness repair below, b2c planning, and historical review evidence. No C1 production behavior, types, tests, receipt, or approval remains.
+
+## Slice 8C1.1b2c C1a — Retained capability admission (2026-07-29)
+
+**Status:** Standard mode (`strict_tdd: false`), feature-branch-chain C1a only. `DirectoryCapability` collision-failingly creates a caller-selected leaf and its direct allowlist, opens and retains root/direct-child `FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT` handles without `FILE_SHARE_DELETE`, and captures `FILE_ID_INFO`, final handle paths, volume, and reparse observations. Read-only revalidation requires the exact allowlist with no duplicates, retained identity/final-path equality, same volume, canonical child containment, and non-reparse state. It reports only `ROOT_CREATE_FAILED`, `ROOT_IDENTITY_CHANGED`, or `REPARSE_DETECTED` on refusal; it has no rename, deletion, scavenger, PowerShell, or path-only quarantine behavior.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | The added admission matrix initially failed 1/49 because a successful `TryValidate` retained its default refusal status. The assertion was corrected so successful validation emits `SUCCESS`; refusal cases remain closed. |
+| GREEN | The capability retains all live safe handles and snapshots after successful admission. A failure during creation disposes only incomplete local setup; successful admission has no release path invocation before a future commit owner decides its lifecycle. |
+| TRIANGULATE | Fake observations cover extra/duplicate/missing-equivalent allowlist mismatch, substituted identity, changed final path, volume mismatch, access fault, reparse, containment escape, reordered enumeration, and Unicode/space names. Every refusal leaves the fake mutation counter unchanged after initial creation. |
+| Focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo` — exit 0; passed 50/50, failed 0, skipped 0. |
+| Runtime harness | The same filter executes `Windows_directory_capability_retains_a_live_nonreparse_same_volume_admission` on Windows using `WindowsDirectoryCapabilityFileSystem` and a generated Unicode/space temporary parent. It validates real retained directory handles; test teardown removes only its generated harness parent after capability disposal. |
+| GATE | `dotnet build AIBar.sln --no-restore --nologo` — exit 0; 0 warnings, 0 errors. `git diff --check` — exit 0 (existing LF-to-CRLF advisories only). `ZERO_HELPER_COUNT=0` for `Harness,powershell`. |
+| Rollback boundary | Remove only `DirectoryCapability.cs`, C1a test additions in `PackagingSupervisorTests.cs`, the four C1a task marks, and this progress block. b2a/b2b remain; C1b/C2/C3 remain unchecked. |
+
+**Scope/cleanup:** no production rename, deletion, identity-evidence release, quarantine commit, or path-only fallback was implemented. `.gitignore` remains unstaged and byte-identical to `HEAD` (`16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`). Native attempt 43 (`b2c-c1a-apply-20260729-01`) was not begun, reset, or finished by this work; terminal finish remains orchestrator-owned.
 
 ### R3-INC-C1-001 Fix Round 1 — b2b readiness harness (2026-07-26)
 
@@ -71,7 +118,7 @@ The authoritative complete correction receipt counts implementation/tests/tasks/
 | Work Unit Evidence | Exact result |
 |---|---|
 | RED | The focused test command failed before implementation with missing `IProcessSupervisorInterop`, `ProcessSupervisor`, safe handles, pipe/process records, and launch request types (`CS0246`). |
-| GREEN | Added native `KILL_ON_JOB_CLOSE` Job configuration without breakaway, completion-port association, three anonymous pipes with parent ends made non-inheritable, `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, `CREATE_SUSPENDED|EXTENDED_STARTUPINFO_PRESENT`, assignment-before-resume, failure termination, disposal, and exit-code retrieval. Focused `PackagingSupervisor` passed 25/25. |
+| GREEN | Added native `KILL_ON_JOB_CLOSE` Job configuration without breakaway, completion-port association, three anonymous pipes with parent ends made non-inheritable, `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, `CREATE_SUSPENDED|EXTENDED_STARTUPINFO_PRESENT`, assignment-before-resume, failure termination, disposal, and exit-code retrieval. Focused`PackagingSupervisor` passed 25/25. |
 | TRIANGULATE | Eight fake pre-resume/at-resume faults assert exact call order, status, termination where needed, allowlisted child handles only, and all owned handles closed. The existing event-gated child/grandchild harness also passed in the combined focused command; `Get-Process -Name Harness` returned 0 afterward. |
 | GATE | `dotnet test ... --filter "FullyQualifiedName~PackagingSupervisor|FullyQualifiedName~Red_direct_invocation_completes_while_known_owned_grandchild_remains_alive" --no-restore -m:1 --nologo` passed 26/26; `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings/errors; `git diff --check` passed (LF-to-CRLF advisories only). |
 
@@ -1775,3 +1822,67 @@ All three 6C2A.1 checkboxes are visibly `- [x]` in `tasks.md`. Schema v2 adds pa
 | Task ledger | Restored the approved explicit b2a 4/4 checked rows and b2c 0/4 unchecked rows; current b2b Units 1–3 remain 12/12 checked. |
 
 `SDD-VERIFY-B2-INTEGRATED-001` and `SDD-VERIFY-B2-INTEGRATED-002` are **fixed, not verified** at this historical apply-time corrective-gate status. Subsequent scoped verification exists by reference in `verify-report.md` and `review-ledger.md`; it does not rewrite this apply-time status. `AIBar.sln` was restored exactly to `HEAD` after the scope audit; the historical committed-range trailing-whitespace warning remains informational. No b2c code, cleanup/scavenging, PowerShell integration, staging, commit, push, or PR action occurred. **Receipt (recomputed against `e5cca98`):** authorized test/harness changes are 61 additions + 5 deletions (tracked tests via `git diff --numstat e5cca98 --`, plus the 4-addition untracked `WindowsProcessHarnessCollection.cs` via `git diff --no-index --numstat -- NUL <path>`); `tasks.md` is 14 additions; this apply-progress evidence is 13 additions. `verify-report.md` (171 additions), `review-ledger.md` (24 additions), and unrelated metadata are excluded. Total: 88 additions + 5 deletions = **93** review lines, below the 400-line hard stop.
+
+## Slice 8C1.1b2c C1b1 — rolled back incomplete apply (2026-07-30)
+
+**Status:** failed/incomplete, Standard mode (`strict_tdd: false`), native attempt 55 only. The C1b1 RED tests were added before production code and failed to compile because `Cleanup` did not exist. A bounded `Cleanup.cs` candidate then passed its three C1b1 tests and the 61/61 focused `PackagingSupervisor` suite, including Windows retained-handle relative rename success and collision refusal. It was rolled back because the required full-solution runtime gate did not complete: both `dotnet test AIBar.sln --no-restore -m:1 --nologo` invocations were externally aborted before a result was emitted. No C1b1 implementation, runtime mutation, test, task completion, or C2/C3 behavior is retained.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~C1b1_commit" --no-restore -m:1 --nologo` failed before production code with `CS0103`: `Cleanup` did not exist. |
+| Discarded candidate evidence | C1b1 focused tests passed 3/3; the temporary candidate also passed `PackagingSupervisor` 61/61. These are non-terminal evidence only because the candidate was removed. |
+| Required full gate | `dotnet test AIBar.sln --no-restore -m:1 --nologo` was started twice and externally aborted before a test result/output artifact was available; no pass/fail result is claimed. |
+| Post-rollback focused/build | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo` passed 58/58. `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings and 0 errors. |
+| Cleanup/process | No `aibar-c1b1-*` temporary root exists. The only observed `dotnet.exe` was the `VBCSCompiler` server, not a test/harness process. No C1b1 helper or native-call process survives. |
+| Diff | `git diff --check` still reports only the pre-existing trailing whitespace at `openspec/changes/aibar-foundation/verify-report.md:67-68`; C1b1 did not change that file. |
+| Rollback boundary | Removed only temporary `tools/AIBar.Packaging.Supervisor/Cleanup.cs` and its C1b1 test edits. The three C1b1 task lines remain visibly unchecked; C1b0 remains usable. |
+
+**Scope and status:** Structured status consumed: `applyState=ready`, `actionContext.mode=repo-local`, workspace root `C:/Users/mjsal/Desarrollos IA/Modificacion de Terminales/aibar`, authorized work unit `C1b1 only`. No action-context warning applied. No C2/C3, staging, commit, push, PR, review, deletion, rename-back, scavenger, PowerShell, shell, helper, or fallback behavior was retained. `.gitignore` HEAD/index/worktree blob remains `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1` and unstaged.
+
+**Remaining tasks:**
+
+- [ ] **RED:** Add tests before production code for the explicit external-root, cleanup-ownership, and native-security threat cases: final identity/reparse/share/containment/same-volume/complete-child-set gates, source/parent substitution, invalid leaf, collision, unsupported/native failures, child transition/disposal, and post-success uncertainty (`CLEANUP_PARTIAL`); preserve every C1b0 refusal case.
+- [ ] **GREEN:** After C1b0 passes, implement one `NtSetInformationFile(FileRenameInformation)` call on retained source with the retained quarantine-parent relative target, `ReplaceIfExists=FALSE`, bounded native buffer, and closed `NTSTATUS` handling; use `CLEANUP_REFUSED` pre-commit and retained `CLEANUP_PARTIAL` after issued-call uncertainty.
+- [ ] **TRIANGULATE/GATE:** Run focused supervisor tests, one bounded Windows 10/11 x64 runtime proof, `dotnet test AIBar.sln --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, `git diff --check`, and zero-helper inspection. Prove identity continuity, collision refusal, no Win32/path/shell/helper fallback, no deletion, and no rename-back.
+
+## C1b1 retry attempt 56 — terminal failure rollback (2026-07-30)
+
+**Status:** failed. The retry candidate’s only C1b1 production file, `tools/AIBar.Packaging.Supervisor/Cleanup.cs`, and its three C1b1 test cases were removed; the retained C1b0 test again asserts that no `Cleanup` type exists. The candidate had passed C1b1 3/3, `PackagingSupervisor` 61/61, and a clean build with 0 warnings/errors, but its required `dotnet test AIBar.sln --no-restore -m:1 --nologo` run was externally aborted before totals or an exit code. That full-suite evidence is conclusively **inconclusive**, was not rerun, and invalidates the candidate.
+
+| Terminal evidence | Exact result |
+|---|---|
+| Post-rollback focused test | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo` — exit 0; passed 58/58, failed 0, skipped 0. |
+| Post-rollback clean build | `dotnet clean AIBar.sln --nologo` — exit 0; 0 warnings, 0 errors. The preliminary unsupported `--no-restore` clean modifier was rejected before the successful clean and did not run a build. `dotnet build AIBar.sln --no-restore --nologo` — exit 0; 0 warnings, 0 errors. |
+| Cleanup/process | `Cleanup.cs` absent; C1b1 test methods absent; `aibar-c1b1-*` temporary roots = 0; `Harness` helper processes = 0; matching `dotnet`/`testhost` processes = 0. |
+| Scoped integrity | `git diff --check -- tools/AIBar.Packaging.Supervisor/Cleanup.cs tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs` — exit 0. `.gitignore` HEAD/index/worktree blob is byte-identical: `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`. |
+| Task ledger | C1b1 RED, GREEN, and TRIANGULATE/GATE remain visibly `- [ ]`; C2/C3 were not changed. |
+
+**Terminal evidence revision:** `sha256:54749e9499271d9e89ac4f6b924c5fefba59ab136314a1fe3608659effb9cd55`, SHA-256 over the canonical UTF-8/LF `gentle-ai.sdd-attempt-terminal-evidence/v1` statement covering the candidate result, aborted full gate, rollback, post-rollback checks, cleanup, `.gitignore`, scoped diff, and task state.
+
+**Structured status consumed:** native attempt status before rollback was ordinal 56 active at `sha256:3cd9eaea8df2ee420c6f9a551dabdca2d64001b67db758b0db4762dd3c9cd40c`, `next_action=finish`, `decision_required=false`. The supplied action context limited this work to C1b1 contractual rollback; no `actionContext` fields were supplied, so no additional action-context warning can be evaluated. **Workload/PR boundary:** terminal rollback only; no staging, commit, push, PR, review, C2, or C3 work.
+
+**Remaining tasks (unchanged):**
+
+- [ ] **RED:** Add tests before production code for the explicit external-root, cleanup-ownership, and native-security threat cases: final identity/reparse/share/containment/same-volume/complete-child-set gates, source/parent substitution, invalid leaf, collision, unsupported/native failures, child transition/disposal, and post-success uncertainty (`CLEANUP_PARTIAL`); preserve every C1b0 refusal case.
+- [ ] **GREEN:** After C1b0 passes, implement one `NtSetInformationFile(FileRenameInformation)` call on retained source with the retained quarantine-parent relative target, `ReplaceIfExists=FALSE`, bounded native buffer, and closed `NTSTATUS` handling; use `CLEANUP_REFUSED` pre-commit and retained `CLEANUP_PARTIAL` after issued-call uncertainty.
+- [ ] **TRIANGULATE/GATE:** Run focused supervisor tests, one bounded Windows 10/11 x64 runtime proof, `dotnet test AIBar.sln --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, `git diff --check`, and zero-helper inspection. Prove identity continuity, collision refusal, no Win32/path/shell/helper fallback, no deletion, and no rename-back.
+
+## C1b1 background verification attempt 57 — successful closure (2026-07-30)
+
+**Status:** passed; Standard mode (`strict_tdd: false`), C1b1 only. This closes the background full-suite verification retry and preserves the failed/rolled-back attempt-55/56 history above. No implementation behavior was changed during closure.
+
+| Evidence | Exact result |
+|---|---|
+| Candidate accounting | `Cleanup.cs` +7; C1b1 additions in `PackagingSupervisorTests.cs` +32/-1; 40 changed lines, within the 350-line limit. |
+| Focused and regression | C1b1 focused tests passed 3/3; `PackagingSupervisor` passed 61/61. |
+| Clean/build | `dotnet clean AIBar.sln --nologo` and `dotnet build AIBar.sln --no-restore --nologo` each exited 0 with 0 warnings and 0 errors. |
+| Background full suite | `dotnet test AIBar.sln --no-restore -m:1 --nologo` exited 0: 288 passed, 0 failed, 0 skipped, duration 5m32s. Its full-output digest is unavailable because the verifier persisted no output artifact. |
+| Integrity/cleanup | Candidate-only whitespace inspection passed; `Cleanup.cs` is present; no matching test process, helper, or `aibar-c1b1-*` root remains; `.gitignore` HEAD/worktree hash is `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`. |
+
+**Task ledger:** C1b1 RED, GREEN, and TRIANGULATE/GATE are marked `[x]` in `tasks.md`; C2 and C3 remain unchanged and unchecked.
+
+**Evidence revision:** `sha256:d257b04eb11ce8755c7d0b59c5713afc1ae3eacbf27774cbbc5ee9312cc8a04e`, SHA-256 of canonical structured attempt-57 evidence including the results above and current scoped hashes for `Cleanup.cs` (`sha256:225bd1dcc731f10763304fa52f45e19c555e42f9f10295c5d0fb1828678821ca`) and `PackagingSupervisorTests.cs` (`sha256:55ba6132fdac9167f0076c7585587c50d656529c83ebe0cce1a49d4dadf9177a`).
+
+**Structured status consumed:** authoritative OpenSpec status reported `applyState=ready`, `actionContext.mode=repo-local`, workspace root `C:/Users/mjsal/Desarrollos IA/Modificacion de Terminales/aibar`, and the only blocker was active attempt 57 at `sha256:a7c57f5318de177addb8fc6d42694e8a101cc3cb81429810fe4a5e18154abfa2`; native attempt status reported `next_action=finish`, `decision_required=false`.
+
+**Workload/PR boundary:** C1b1 only, 40/350 candidate lines. No stage, commit, push, PR, review, C2, or C3 work. **Remaining implementation tasks:** C2/C3 and later planned slices remain unchecked.

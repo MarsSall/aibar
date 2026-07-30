@@ -1,5 +1,256 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
+evidence_revision: sha256:8f668033461f6ccbf8c3ce8a64cd12596deaba1e21ecd4263bfe81749ad99e7d
+verdict: pass
+blockers: 0
+critical_findings: 0
+requirements: 1/1
+scenarios: 3/3
+test_command: 'dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo'
+test_exit_code: 0
+test_output_hash: sha256:c5dc4a85c2807e2c02927c8f0de8905e18ff250e90d0cdb4a66448fd12b7fe13
+build_command: 'dotnet clean AIBar.sln --nologo && dotnet build AIBar.sln --no-restore --nologo'
+build_exit_code: 0
+build_output_hash: sha256:3aa6ede9bfb099635f7d205b39340d30243ef7e70e36eeee25f1d2ab340ae411
+```
+
+# Scoped Independent Re-verification — aibar-foundation b2c C1b0
+
+## Status: PASS — corrected C1b0 only; whole change not verified
+
+Standard verification (`strict_tdd: false`) covers only corrected C1b0. It consumes failed evidence `sha256:43409e6d615699bb4e30cfc3e111e18fe491110b00b2c59ba4cd4396e2ddeacd`, correction evidence `sha256:4c3b45a5c8b78624b73d8a4392072006441b346760e0bd5a82f02232548eefc6`, and running attempt-53 finish revision `sha256:19723e0e6d6ccc39e7eb7bded3077e3951b7339c74b681a8bca38678946b7cd1`. C1b1 remains absent, unwired, blocked, and 0/3 unchecked.
+
+## Scope and completeness
+
+| Metric | Result |
+|---|---|
+| Scoped requirement | 1/1 complete |
+| C1b0 scenarios | 3/3 compliant |
+| C1b0 tasks | 3/3 checked and runtime-supported |
+| C1b1 tasks | 0/3 unchecked; excluded and blocked |
+| Coverage | Not configured; no percentage claimed |
+| Artifact mode | OpenSpec; scoped Standard re-verification |
+
+## Commands and exact results
+
+| Gate | Exact result |
+|---|---|
+| New compatibility/prerequisite coverage | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Native_readiness_refuses_unsupported_platform_abi_entrypoint_or_information_class_without_a_native_call|FullyQualifiedName~Missing_readiness_keeps_C1b1_unavailable_and_unwired" --no-restore -m:1 --nologo`; exit 0; 6/6; 1,177 bytes; SHA-256`d7052936bed0df11374fc50b1e390bcf275484651995faf788125cedcdff799c` |
+| Exact native runtime | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Windows_native_rename_readiness_proves_relative_success_collision_and_no_residue" --no-restore -m:1 --nologo`; exit 0; 1/1; 1,179 bytes; SHA-256 `322ddf990d4c5c3c026895e00185f1267d02bb00ad295d1f6fc362a92e60ff25` |
+| Focused PackagingSupervisor | Exact envelope command; exit 0; 58/58; 1,176 bytes; SHA-256 `c5dc4a85c2807e2c02927c8f0de8905e18ff250e90d0cdb4a66448fd12b7fe13` |
+| Full solution serialized | `dotnet test AIBar.sln --no-restore -m:1 --nologo`; exit 0; 285/285; 1,181 bytes; SHA-256 `14d862bc4d741db5613811cc8568e9c7abf349ca2be0739247be548666eb4c6c` |
+| Clean build | Exact envelope command; exit 0; clean and build each 0 warnings/0 errors; 48,040 bytes; SHA-256 `3aa6ede9bfb099635f7d205b39340d30243ef7e70e36eeee25f1d2ab340ae411` |
+| Whitespace | `git diff --check`; exit 0; LF-to-CRLF advisories only; 1,004 bytes; SHA-256 `1eba40cbabcbc93747b31a564896c5342b80c043954d9ef3e476d18d70ce1aee` |
+| Cleanup / identity | `SCOPED_PROCESS_COUNT=0`; `C1B0_TEMP_ROOT_COUNT=0`; `.gitignore` HEAD/index/worktree Git blob `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1` |
+
+## Requirement and scenario matrix
+
+| Requirement / scenario | Passing evidence | Result |
+|---|---|---|
+| Capability and physical identity admission / C1b0 prerequisite | `Missing_readiness_keeps_C1b1_unavailable_and_unwired` proves no `Cleanup` type or C1b1 entrypoint and zero native calls while children/source remain admitted. | COMPLIANT |
+| Capability and physical identity admission / approved native contract | Runtime 1/1 plus focused threat matrix prove retained source and distinct same-volume parent binding, x64 layouts/class 10, one relative native call, collision refusal/no overwrite, invalid-leaf no-call, direct-status success only, one-way child release, exact disposal, and zero residue. | COMPLIANT |
+| Capability and physical identity admission / unsupported native contract | Five deterministic theory cases cover unsupported Windows, pointer width, layouts, entry point, and information class; each refuses before native call, preserves children, and leaves C1b1 unavailable. | COMPLIANT |
+
+## Applicable threat matrix
+
+| Case | Evidence | Result |
+|---|---|---|
+| Source/parent identity or path substitution; reparse; containment; volume; exact child set; share drift | Fake refusal matrix returns `CLEANUP_REFUSED` with native-call count 0; retained handles remain the authority. | PASS |
+| Invalid/reserved/path leaf | Refused before native invocation. | PASS |
+| Destination collision / replacement | Native runtime preserves source and target sentinel; replacement remains disabled; no retry. | PASS |
+| Unsupported compatibility / pending / non-success status | Deterministic compatibility cases make zero calls; status contract accepts only direct and IO `STATUS_SUCCESS`. | PASS |
+| No replacement, fallback, helper, or C1b1 weakening | Source inspection finds only `ntdll!NtSetInformationFile`; no Win32/path/shell/copy-delete/helper fallback, no `Cleanup` type, and no production caller. | PASS |
+| Disposal and residue | Child release is one-way; source/parent capability disposal is idempotent; native buffer is zeroed/freed in `finally`; no process or `aibar-c1b0-*` root remains. | PASS |
+
+## Findings
+
+**CRITICAL:** None.
+**WARNING:** None.
+**SUGGESTION:** None.
+
+The correction closes both missing-runtime-coverage findings without weakening the prior native-contract proof. The failed focused/full outcomes are preserved below as historical scoped evidence; this one authorized rerun passed both gates.
+
+## Evidence integrity
+
+Stable evidence is SHA-256 `8f668033461f6ccbf8c3ce8a64cd12596deaba1e21ecd4263bfe81749ad99e7d` over this exact 1,545-byte UTF-8/LF preimage:
+
+```json
+{"apply_progress_sha256":"4c3b45a5c8b78624b73d8a4392072006441b346760e0bd5a82f02232548eefc6","build":{"bytes":48040,"exit":0,"sha256":"3aa6ede9bfb099635f7d205b39340d30243ef7e70e36eeee25f1d2ab340ae411"},"c1b1":"absent-unwired-unchecked-0-of-3","cleanup":{"c1b0_temp_roots":0,"scoped_processes":0},"correction_evidence":"sha256:4c3b45a5c8b78624b73d8a4392072006441b346760e0bd5a82f02232548eefc6","diff_check":{"bytes":1004,"exit":0,"sha256":"1eba40cbabcbc93747b31a564896c5342b80c043954d9ef3e476d18d70ce1aee"},"directory_capability_sha256":"926162140a208fb559f821a6981047b8fc19d678015f855008814ad0c450a2b4","failed_evidence":"sha256:43409e6d615699bb4e30cfc3e111e18fe491110b00b2c59ba4cd4396e2ddeacd","finish_revision":"sha256:19723e0e6d6ccc39e7eb7bded3077e3951b7339c74b681a8bca38678946b7cd1","focused":{"bytes":1176,"exit":0,"passed":58,"sha256":"c5dc4a85c2807e2c02927c8f0de8905e18ff250e90d0cdb4a66448fd12b7fe13"},"full":{"bytes":1181,"exit":0,"passed":285,"sha256":"14d862bc4d741db5613811cc8568e9c7abf349ca2be0739247be548666eb4c6c"},"gitignore":"16d3fd82b1698894b9b3f4d707e12db4f16cd7f1","native":{"bytes":1179,"exit":0,"passed":1,"sha256":"322ddf990d4c5c3c026895e00185f1267d02bb00ad295d1f6fc362a92e60ff25"},"new_coverage":{"bytes":1177,"exit":0,"passed":6,"sha256":"d7052936bed0df11374fc50b1e390bcf275484651995faf788125cedcdff799c"},"packaging_supervisor_tests_sha256":"1a84d6ca7df2b32b5970eecdf76b4ee9992d4ed300d212fc8c45eaf11d1eba26","request_id":"c1b0-reverify-finish-20260730","scope":"aibar-foundation-b2c-c1b0-reverification","verdict":"pass"}
+```
+
+## Verdict
+
+**PASS for corrected C1b0 only.** This is not final `aibar-foundation` verification and does not authorize C1b1, archive, staging, commit, push, or PR.
+
+---
+
+```yaml
+schema: gentle-ai.verify-result/v1
+evidence_revision: sha256:43409e6d615699bb4e30cfc3e111e18fe491110b00b2c59ba4cd4396e2ddeacd
+verdict: fail
+blockers: 3
+critical_findings: 3
+requirements: 0/1
+scenarios: 1/3
+test_command: 'dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo'
+test_exit_code: 1
+test_output_hash: sha256:754378515ae1a3ec824915425697b34ae17ff3e1d036ab4ad02be4fb08c2ac7f
+build_command: 'dotnet clean AIBar.sln --nologo && dotnet build AIBar.sln --no-restore --nologo'
+build_exit_code: 0
+build_output_hash: sha256:681dc04a2ca4e9bc02440a3b0cb9a56a373c628ee0cf041f91120a3da84ff91f
+```
+
+# Scoped Independent Verification — aibar-foundation b2c C1b0
+
+## Status: FAIL — C1b0 only; whole change not verified
+
+Standard verification (`strict_tdd: false`) covers only completed C1b0. C1b1, C2, C3, downstream packaging/signing, release, coverage, and final-change/archive readiness are skipped. C1b1 production commit remains absent, unwired, and 0/3 tasks checked.
+
+## Scope and completeness
+
+| Metric | Result |
+|---|---|
+| Scoped requirement | 0/1 complete |
+| C1b0-specific scenarios | 1/3 compliant |
+| C1b0 task marks | 3/3 checked; TRIANGULATE/GATE is not semantically complete |
+| Coverage | Not configured; no threshold claimed |
+| Artifact mode | OpenSpec; scoped Standard verification |
+
+## Commands and exact results
+
+| Gate | Result |
+|---|---|
+| C1b0 runtime | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Windows_native_rename_readiness_proves_relative_success_collision_and_no_residue" --no-restore -m:1 --nologo`; exit 0; 1/1 passed; 1,171 bytes; SHA-256 `f912b32140307e53a4a14b650d1d95192461b4b23eff81402e1ef306ddc4b5c9` |
+| Focused supervisor | Exact envelope command; exit 1; 51 passed, 1 failed, 0 skipped; failure `Windows_quiescence_waits_for_an_event_gated_descendant_after_root_exit`; 1,931 bytes; SHA-256 `754378515ae1a3ec824915425697b34ae17ff3e1d036ab4ad02be4fb08c2ac7f` |
+| Full regression | `dotnet test AIBar.sln --no-restore -m:1 --nologo`; exit 1; 276 passed, 3 failed, 0 skipped; three `PackagingRecoveryTests` descendant-harness failures; 4,435 bytes; SHA-256 `7b5a86f6da8fde35ef8979fcdf01f8b8f2b587c80fbfe3dd11ba41ac5d793362` |
+| Clean build | Exact envelope command; exit 0; clean 0 warnings/errors and build 0 warnings/errors; 47,985 bytes; SHA-256 `681dc04a2ca4e9bc02440a3b0cb9a56a373c628ee0cf041f91120a3da84ff91f` |
+| Preliminary invalid clean syntax | `dotnet clean AIBar.sln --no-restore --nologo`; exit 1 (`MSB1001`); superseded by the valid clean/build command above, but disclosed |
+| Whitespace | `git diff --check`; exit 0; LF-to-CRLF advisories only |
+| Cleanup | `SCOPED_PROCESS_COUNT=0`; `C1B0_TEMP_ROOT_COUNT=0` |
+
+## C1b0 compliance matrix
+
+| Requirement / scenario | Source and runtime evidence | Result |
+|---|---|---|
+| C1b0 prerequisite | C1b1 `Cleanup.cs` and production callers are absent; C1b1 tasks are unchecked. No passing test exercises a production C1b1 request and proves zero native calls. | UNTESTED |
+| Approved native contract | Exact Windows x64 harness passed relative retained-source-to-retained-parent success, identity continuity, one call, collision no-overwrite/source preservation, child release, disposal, and zero residue. | COMPLIANT |
+| Unsupported native contract | `IsCompatibleForCurrentProcess` statically refuses wrong OS/architecture/layout/entry point, but no test injects unsupported OS, architecture, layout, entry point, or information class. | UNTESTED |
+
+## Static correctness and applicable threat matrix
+
+| Contract point | Evidence | Result |
+|---|---|---|
+| x64 native ABI | `FILE_RENAME_INFORMATION`: size 24, offsets 0/8/16/20; `IO_STATUS_BLOCK`: size 16, Status/Pointer 0, Information 8; class 10; exact `NtSetInformationFile`, `SetLastError=false`; exact `20 + UTF-16 bytes` length | PASS |
+| NTSTATUS completion | Success requires call status 0 and `IO_STATUS_BLOCK.Status` 0; pending and non-success unit assertions exist; no Win32 Boolean/last-error mapping controls success | PASS |
+| Retained capabilities | Source access `0x00130089`; parent `0x001000A0`; share mask 3 excludes `FILE_SHARE_DELETE`; distinct, same-volume, non-reparse observations retained | PASS |
+| Pre-call refusal | Source/parent identity, source/parent reparse, volume, extra child, share, and invalid leaf return call count 0; C1a tests cover containment/exact child set | PASS, but focused command failed elsewhere |
+| Collision and binding | Runtime target sentinel remained unchanged, source remained at original path on collision, and successful identity appeared below the retained quarantine parent | PASS |
+| Fail closed / no fallback | Any compatibility, validation, release, exception, call-status, or IO-status uncertainty refuses; source contains no Win32/path/shell/helper/copy-delete/retry fallback | PASS |
+| Disposal and zeroing | Child handles release once; capability disposal is idempotent; native buffer is zeroed and freed in `finally`; runtime root deletion and process/root counts prove no residue | PASS |
+| C1b1 boundary | `NativeRenameReadiness.Prove` has test callers only; no `Cleanup.cs`, production wiring, deletion, rename-back, scavenger, PowerShell, C2, or C3 behavior | PASS |
+
+## Findings
+
+**CRITICAL**
+
+1. Required focused PackagingSupervisor gate failed (51/52) in the existing Windows descendant-readiness harness.
+2. Required full-solution regression gate failed (276/279) in three existing packaging lifecycle harness cases.
+3. The C1b0 unsupported-native-contract and prerequisite scenarios lack passing runtime coverage; the checked TRIANGULATE/GATE claim includes unsupported OS/architecture/entrypoint/class coverage that the tests do not provide.
+
+**WARNING:** None.
+**SUGGESTION:** Add injectable compatibility/native-call seams in a separately authorized correction; do not alter C1b0 during verification.
+
+## Evidence integrity and skipped final dimensions
+
+Stable evidence SHA-256 is `43409e6d615699bb4e30cfc3e111e18fe491110b00b2c59ba4cd4396e2ddeacd` over the 1,312-byte LF/UTF-8 canonical preimage binding finish revision `sha256:98497cc5aa433503be3406015f1408c06c4029e53915549532fe711a554f95a1`, scoped artifact/source hashes, command outputs, cleanup, `.gitignore`, C1b1 absence, and verdict. `.gitignore` HEAD/index/worktree Git blob is byte-identical at `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; its pre-existing metadata-only status is preserved.
+
+This is not final/full-change verification. Unrelated pending tasks, C1b1+, review, coverage, packaging/signing, release, archive, stage, commit, push, and PR dimensions are explicitly skipped.
+
+## Verdict
+
+**FAIL for scoped C1b0 verification.** The exact native runtime proof and clean build pass, but mandatory focused/full test gates fail and two C1b0-specific scenarios lack passing coverage. The overall change remains incomplete and MUST NOT be reported as PASS.
+
+---
+
+```yaml
+schema: gentle-ai.verify-result/v1
+evidence_revision: sha256:89688e77851d5263c76a2e9d6cb1e4168a2c8d3a6f25daa5d4b7d7b3f6b453eb
+verdict: pass
+blockers: 0
+critical_findings: 0
+requirements: 1/1
+scenarios: 1/1
+test_command: 'dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo'
+test_exit_code: 0
+test_output_hash: sha256:081a1cfa54c825066a63b52e493dccac7835706faa03be072392308845129337
+build_command: 'dotnet build AIBar.sln --no-restore --nologo'
+build_exit_code: 0
+build_output_hash: sha256:78d684a730a059ee7407c5cb4c49ee7d6616b9d37b5deb3a3969d95f737d9461
+```
+
+# Scoped Independent Verification — aibar-foundation b2c C1a
+
+## Status: PASS — retained capability admission only
+
+This Standard-mode (`strict_tdd: false`) verification covers only completed b2c C1a. The overall OpenSpec change remains incomplete. C1b, C2, C3, rename, quarantine, deletion, scavenging, and PowerShell integration were neither implemented nor verified. Native attempt ordinal 44 was already charged and running; this verifier did not begin, reset, or finish it.
+
+## Scope and workload
+
+| Metric | Result |
+|---|---|
+| Scoped requirement / scenario | 1/1 / 1/1 compliant |
+| Scoped tasks | C1a RED/GREEN/TRIANGULATE/GATE 4/4 checked |
+| Review count | 239 authored additions+deletions; within C1a <=350 and global 400 caps |
+| Artifact mode | OpenSpec; Standard verification |
+| Coverage | Not configured; no threshold claimed |
+
+Count preimage: `DirectoryCapability.cs` 112 additions, focused tests 103 additions, `tasks.md` 4 additions + 4 deletions, and `apply-progress.md` 16 additions = 239. `verify-report.md` is verifier evidence and excluded from implementation review accounting.
+
+## Runtime, build, and process evidence
+
+| Gate | Exact result |
+|---|---|
+| Focused supervisor | Exact envelope command; exit 0; 50 passed, 0 failed, 0 skipped; 1,168-byte raw merged output; SHA-256 `081a1cfa54c825066a63b52e493dccac7835706faa03be072392308845129337` |
+| Full solution regression | `dotnet test AIBar.sln --no-restore -m:1 --nologo`; exit 0; 277 passed, 0 failed, 0 skipped; 1,173-byte raw merged output; SHA-256 `c3dc80dd5058f42826b5a903ec29304d83279b0748020ab762d0d81bff4baa1b` |
+| Build/type-check | Exact envelope command; exit 0; 0 warnings, 0 errors; 877-byte raw merged output; SHA-256 `78d684a730a059ee7407c5cb4c49ee7d6616b9d37b5deb3a3969d95f737d9461` |
+| Windows runtime harness | `Windows_directory_capability_retains_a_live_nonreparse_same_volume_admission` ran inside the focused filter on this Windows host and passed |
+| Harness cleanup | No `aibar c1a café *` temporary root remained after the run |
+| Process cleanup | `SCOPED_HELPER_PROCESS_COUNT=0` for matching dotnet/testhost/Harness/PowerShell/cmd processes, excluding the inspection process |
+| Whitespace | `git diff --check` exit 0; only existing LF-to-CRLF advisories |
+
+The first chained full-suite/build shell reached its 900-second wrapper timeout only after the full-suite child had exited 0 and its exact output was hashed; no scoped process survived. The build was then run independently and passed. This is an execution-wrapper note, not a test or build failure.
+
+## Compliance and correctness
+
+| Contract point | Evidence | Result |
+|---|---|---|
+| Retained live capability | Root and direct-child `SafeFileHandle` values remain owned by `DirectoryCapability`; focused fake observes three live handles and the Windows revalidation passes before disposal | COMPLIANT |
+| Handle-derived deterministic identity | `TryObserve` obtains `FILE_ID_INFO` from each retained handle and encodes the 128-bit file ID deterministically with `Convert.ToHexString`; repeat observation must equal captured evidence | COMPLIANT |
+| Reparse and same-volume fail-closed | Root/child `FileAttributeTagInfo`, identity equality, volume equality, containment, access, and exact allowlist checks return only safe refusal statuses; focused race/fault matrix passed | COMPLIANT |
+| Bounded ownership/disposal | Incomplete creation disposes local child/root handles; admitted capability owns and disposes all retained handles; Windows harness deletion succeeds only after capability disposal | COMPLIANT |
+| Read-only C1a boundary | Source and scoped diff contain no rename, deletion, quarantine, cleanup, scavenger, PowerShell, or C1b/C2/C3 implementation | COMPLIANT |
+| Normative reparse/identity-race scenario | `Directory_capability_retains_live_handles_and_refuses_changed_admission_without_mutation` passed identity, final-path, volume, access, allowlist, and reparse refusals without increasing mutation count | COMPLIANT |
+
+## Evidence consistency
+
+Stable evidence revision: `sha256:89688e77851d5263c76a2e9d6cb1e4168a2c8d3a6f25daa5d4b7d7b3f6b453eb`, SHA-256 over the 414-byte LF/UTF-8 manifest binding HEAD `13fdc5e70687be954129fda3f95600782f5b0a09` and current Git blob hashes for `DirectoryCapability.cs`, `PackagingSupervisorTests.cs`, `tasks.md`, and `apply-progress.md`. Apply claims align with fresh 50/50 focused, 277/277 full-suite, build, cleanup, and process evidence.
+
+`.gitignore` HEAD/index/worktree blobs are byte-identical at `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; its pre-existing metadata-only unstaged status was preserved. No production or test file was edited by verification.
+
+## Findings
+
+**CRITICAL:** None.
+**WARNING:** None.
+**SUGGESTION:** None.
+
+## Verdict and orchestrator finish recommendation
+
+**PASS for completed C1a only.** Recommend attempt-44 outcome `passed` for work unit `b2c-c1a-independent-verification`, with changed-line count `239`, evidence revision `sha256:89688e77851d5263c76a2e9d6cb1e4168a2c8d3a6f25daa5d4b7d7b3f6b453eb`, diagnosis `c1a-retained-capability-admission-compliant`, harness disposition `windows-runtime-passed-wrapper-note-nonblocking`, cleanup evidence `no-c1a-temp-root; scoped-helper-count=0`, and process evidence `scoped-helper-count=0`. The overall change remains incomplete; next work, if separately authorized, is C1b—not archive.
+
+---
+
+```yaml
+schema: gentle-ai.verify-result/v1
 evidence_revision: current-scoped-worktree-2026-07-25
 verdict: pass
 blockers: 0
@@ -530,7 +781,7 @@ This independent Standard-mode re-verification is intentionally limited to the t
 | Helper leak | `Get-CimInstance Win32_Process` with the scoped supervisor/harness/event filter | `SCOPED_HELPER_PROCESS_COUNT=0`. |
 | Solution restoration | `git diff --quiet -- AIBar.sln`; `git status --short -- AIBar.sln` | Exit 0 and no status entry: the unauthorized cleanup is absent and the worktree does not alter the solution. |
 | Historical solution warning | `git diff --check 2b2189a^..e5cca98` | Exit 2 at `AIBar.sln:18-21,47-50,57`; retained as committed-range WARNING/info, not attributed to the current worktree. |
-| `.gitignore` integrity | `git rev-parse HEAD:.gitignore`; `git hash-object .gitignore`; `git diff --quiet -- .gitignore` | HEAD/worktree hash `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; diff exit 0. Porcelain still reports metadata-only ` M .gitignore`. |
+| `.gitignore` integrity | `git rev-parse HEAD:.gitignore`; `git hash-object .gitignore`; `git diff --quiet -- .gitignore` | HEAD/worktree hash `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; diff exit 0. Porcelain still reports metadata-only `M .gitignore`. |
 | Production/b2c exclusion | `git diff --name-only -- src tools scripts` plus untracked-file inspection | No production diff; the only untracked path is the test collection definition. No b2c production code was added. |
 
 ### Per-finding verdicts

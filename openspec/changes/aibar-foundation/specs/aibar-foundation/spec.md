@@ -297,21 +297,87 @@ The supervisor MUST document that processes created through pre-existing build s
 
 ### Requirement: Capability and physical identity admission
 
-The supervisor MUST create the isolation root, retain a cryptographic capability, hold an exclusive capability handle, and validate physical identity, final path, canonical containment, and reparse state on every admission boundary. Unknown, substituted, extra, missing, or raced identity MUST fail closed. Malicious same-user or administrator interference is outside the threat-model guarantee.
+For C1b, capability preparation MUST retain the admitted source capability and a distinct non-reparse quarantine-parent capability, including their identities, share state, and same-volume relationship. C1b0 MUST prove on supported Windows 10/11 x64 the approved user-mode `NtSetInformationFile(FileRenameInformation)` relative-rename contract: the retained source handle identifies the source, the retained quarantine-parent handle identifies the relative target root, the target is one validated simple leaf, replacement is disabled, and every non-success `NTSTATUS` fails closed. C1b1 MUST NOT start without that proof. Source-path reopen, destination-path resolution, Win32 rename projections, and unknown, substituted, extra, missing, or raced identity MUST fail closed. Malicious same-user or administrator interference is outside the threat-model guarantee.
 
-#### Scenario: Reparse or identity race
-- GIVEN a root or child changes identity or becomes a reparse point between validation steps
-- WHEN admission or revalidation runs
-- THEN it returns `ROOT_IDENTITY_CHANGED` or `REPARSE_DETECTED` and preserves bytes before commit
+#### Scenario: C1b0 is a prerequisite
+- GIVEN C1a admission exists but C1b0 rename-ready capability preparation is not separately verified
+- WHEN C1b1 commit is requested
+- THEN no native call or namespace mutation is attempted and the source remains admitted but uncommitted
 
-### Requirement: Irreversible cleanup state machine
+#### Scenario: C1b0 proves the approved native contract
 
-Cleanup MUST perform read-only admission, then an atomic same-volume quarantine rename as the sole irreversible commit. Before commit, any failure MUST preserve the original namespace and return `CLEANUP_REFUSED`. After commit, every reopen, identity, reparse, enumeration, rename, deletion, or unknown failure MUST retain quarantine and return `CLEANUP_PARTIAL`; it MUST never claim pristine preservation or rollback. Protected metadata MUST contain only retained identity, phase, bounded retry count, and next eligibility.
+- GIVEN supported Windows 10/11 x64 and retained source and same-volume quarantine-parent capabilities pass identity, reparse, share, child-set, and leaf checks
+- WHEN the bounded C1b0 proof runs
+- THEN it proves retained-handle relative rename success, collision refusal without overwrite, invalid-leaf refusal before the native call, fail-closed status handling, and exact resource disposal with no residue
 
-#### Scenario: Rename or post-quarantine deletion failure
-- GIVEN quarantine rename fails, or deletion fails after quarantine commits
-- WHEN cleanup reports the result
-- THEN rename failure preserves the original tree as `CLEANUP_REFUSED`; post-commit failure retains quarantine as `CLEANUP_PARTIAL` without claiming original-path preservation
+#### Scenario: Unsupported native contract
+
+- GIVEN Windows, process architecture, layout, information class, entry point, or source/parent relationship is unsupported or unprovable
+- WHEN C1b0 evaluates compatibility
+- THEN it refuses the proof, does not admit C1b1, and performs no fallback mutation
+
+#### Scenario: Source-path substitution
+- GIVEN the retained source or quarantine-parent handle remains bound while its path spelling is substituted
+- WHEN C1b1 attempts the quarantine commit
+- THEN the substituted path cannot redirect the mutation; the commit uses the admitted identities or fails closed without path resolution
+
+#### Scenario: Admission identity drift
+- GIVEN the source, parent, or complete observed child set changes, becomes reparse-tainted, loses required share compatibility, or becomes unprovable before commit
+- WHEN the final admission gate runs
+- THEN it returns `CLEANUP_REFUSED` before the native call and preserves the source namespace
+
+### Requirement: C1b identity-bound quarantine commit
+
+C1b1 MUST perform last-moment identity, reparse, share, containment, same-volume, and complete-child-set checks, make an explicit one-way child-observation transition, and then issue exactly one approved native relative rename using the retained admitted source and quarantine-parent capabilities. The target MUST be one validated simple leaf with replacement disabled. Every non-success `NTSTATUS` MUST fail closed. The checks and rename are not one atomic multi-object transaction: C1b1 MUST NOT claim atomic parent-ID or child-set validation with the rename. Pre-commit uncertainty MUST return `CLEANUP_REFUSED` with ownership and source-path state safely classified; success followed by uncertain observation MUST return `CLEANUP_PARTIAL` with quarantine retained and MUST NOT rename back. Win32 `FileRenameInfo`, absolute/path-based move or rename, shell, helper process, child deletion, copy-delete emulation, and target-changing retries are forbidden.
+
+#### Scenario: Child-handle transition
+- GIVEN the final gate validates the retained source, parent, and exact child set
+- WHEN C1b1 crosses the commit boundary
+- THEN child observation handles are disposed exactly once in an explicit one-way transition, while source and parent capabilities remain retained for the single native commit
+
+#### Scenario: Successful identity-bound commit
+
+- GIVEN the admitted source object has a different current name but its retained identity, parent capability, complete child set, and same-volume evidence remain valid
+- WHEN the single relative native commit succeeds
+- THEN the quarantine contains the admitted source identity under the retained parent and no source pathname was reopened
+
+#### Scenario: Destination collision
+- GIVEN a fresh simple target leaf is selected and another entry appears at that destination
+- WHEN the single namespace commit is attempted
+- THEN it fails without replacement, retry, or source mutation and returns `CLEANUP_REFUSED`
+
+#### Scenario: Cross-volume refusal
+
+- GIVEN the retained source and quarantine-parent capabilities are on different volumes
+- WHEN C1b1 evaluates the commit
+- THEN it returns `CLEANUP_REFUSED` before mutation and never emulates the operation with copy-delete
+
+#### Scenario: Unsupported rename
+- GIVEN the filesystem, filter, access/share state, or volume relationship cannot support the rename
+- WHEN C1b1 evaluates or attempts the commit
+- THEN it fails closed, preserves the source, and does not emulate the operation with copy-delete
+
+#### Scenario: Invalid target leaf
+
+- GIVEN the requested leaf is empty, rooted, a separator/device/stream form, reserved, or collides case-insensitively with a protected name
+- WHEN C1b1 validates the target
+- THEN it refuses before the native call and leaves ownership and source-path state unchanged
+
+#### Scenario: Native failure classification
+
+- GIVEN the final gate passed but the single native call returns a non-success `NTSTATUS`, including collision or unsupported completion
+- WHEN C1b1 handles the result
+- THEN it returns `CLEANUP_REFUSED`, performs no retry or fallback, and safely classifies the source as still owned at its original namespace
+
+#### Scenario: Ownership and disposal
+- GIVEN C1b1 has either refused before commit or committed successfully
+- WHEN the operation releases resources
+- THEN every temporary buffer and handle is disposed exactly once, with root and parent ownership transferred only after success
+
+#### Scenario: Post-success observation failure
+- GIVEN the identity-bound namespace commit returned success
+- WHEN immediate observation of the retained source and parent is uncertain
+- THEN the result is `CLEANUP_PARTIAL`, the quarantine is retained, and no rename-back is attempted
 
 ### Requirement: Safe status and observability taxonomy
 
@@ -322,11 +388,11 @@ Supervisor status and structured events MUST use only path/secret-free stable co
 - WHEN status is serialized or logged
 - THEN it contains only the closed response fields and permitted coarse observability values
 
-### Requirement: Conservative recovery and degradation
+### Requirement: C1b scope boundary
 
-The supervisor MAY run an opt-in scavenger only for aged supervisor-owned quarantines after current-user ownership/ACL, protected capability metadata, physical identity, reparse, and lock admission. Any refusal MUST retain quarantine and perform no deletion. On rollback or unsupported capability, it MUST preserve bytes and disable cleanup rather than guess.
+C1b MUST stop at the retained quarantine capability and its immediate observation result. It MUST NOT perform deletion, scavenging, rename-back, PowerShell integration, or C2/C3 behavior; those are separate future scopes.
 
-#### Scenario: Scavenger refusal
-- GIVEN scavenger metadata is missing/invalid, identity is uncertain, or an extra entry exists
-- WHEN scavenger admission runs
-- THEN it refuses mutation, retains quarantine, records bounded retry metadata, and returns `CLEANUP_PARTIAL`
+#### Scenario: Commit-only boundary
+- GIVEN C1b has committed a quarantine or returned a fail-closed refusal
+- WHEN the C1b operation completes
+- THEN it performs no deletion, scavenging, rename-back, PowerShell, C2, or C3 action
