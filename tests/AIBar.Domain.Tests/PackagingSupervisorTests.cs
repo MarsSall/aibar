@@ -561,7 +561,14 @@ public sealed class PackagingSupervisorTests
         {
             var result = NativeRenameReadiness.Prove(retained, "quarantine-source");
             Assert.Equal(SupervisorStatus.Success, result.Status); Assert.Equal(1, result.NativeCallCount); Assert.True(result.ChildrenReleased);
-            Assert.Equal(retained.Source.Identity, result.Source!.Identity); Assert.True(Directory.Exists(Path.Combine(parent.Quarantine, "quarantine-source")));
+            var committed = Assert.IsType<CommittedQuarantineCapability>(result.Capability);
+            try
+            {
+                Assert.Equal(retained.Source.Identity, result.Source!.Identity); Assert.Equal(retained.Source.Identity, committed.Source.Identity); Assert.True(committed.Evidence.HasValidDigest());
+                Assert.True(Directory.Exists(Path.Combine(parent.Quarantine, "quarantine-source")));
+            }
+            finally { committed.Dispose(); retained.Dispose(); }
+            Assert.True(committed.HandlesReleased); Assert.False(committed.Evidence.HasValidDigest());
         }
         using (var retained = NativeReadiness(parent.Path, "collision"))
         {
@@ -617,6 +624,44 @@ public sealed class PackagingSupervisorTests
     }
 
     [Fact]
+    public void Committed_child_evidence_freezes_handle_derived_records_before_the_one_way_release()
+    {
+        var fileSystem = new FakeDirectoryCapabilityFileSystem(); fileSystem.TryCreateDirectory("C:\\quarantine");
+        Assert.True(DirectoryCapability.TryCreateRenameReady(fileSystem, "C:\\source", "root", ["restore", "publish"], "C:\\quarantine", out var capability, out _));
+        using var retained = Assert.IsType<DirectoryCapability>(capability);
+
+        Assert.True(retained.TryFreezeChildEvidence(out var evidence));
+        using (var frozen = Assert.IsType<CommittedChildEvidence>(evidence))
+        {
+            Assert.Equal("CommittedChildEvidence/v1", frozen.Version);
+            Assert.Equal(32, frozen.Digest.Length); Assert.Equal(32, frozen.CorrelationKey.Length);
+            Assert.Equal(2, frozen.Children.Count); Assert.True(frozen.HasValidDigest());
+            Assert.All(frozen.Children, child => { Assert.Equal(32, child.LeafTag.Length); Assert.Equal(16, child.FileId.Length); Assert.Equal(CommittedChildObjectKind.Directory, child.Kind); Assert.False(child.IsReparsePoint); });
+            var expectedTag = System.Security.Cryptography.HMACSHA256.HashData(frozen.CorrelationKey, Encoding.Unicode.GetBytes("restore"));
+            Assert.Contains(frozen.Children, child => child.LeafTag.SequenceEqual(expectedTag));
+            var exposedDigest = frozen.Digest; exposedDigest[0] ^= 0xff;
+            Assert.True(frozen.HasValidDigest());
+        }
+
+        Assert.True(retained.ReleaseChildHandles());
+        Assert.False(retained.TryFreezeChildEvidence(out _));
+    }
+
+    [Fact]
+    public void Committed_child_evidence_rejects_oversized_or_collision_checked_input_before_any_commit()
+    {
+        var fileSystem = new FakeDirectoryCapabilityFileSystem(); fileSystem.TryCreateDirectory("C:\\quarantine");
+        Assert.False(DirectoryCapability.TryCreateRenameReady(fileSystem, "C:\\source", "root", ["same", "SAME"], "C:\\quarantine", out _, out _));
+        Assert.False(DirectoryCapability.TryCreateRenameReady(fileSystem, "C:\\source", "root", [new string('x', 256)], "C:\\quarantine", out _, out _));
+        Assert.Equal(1, fileSystem.MutationCount);
+
+        var duplicateFileSystem = new FakeDirectoryCapabilityFileSystem { DuplicateChildIdentity = true }; duplicateFileSystem.TryCreateDirectory("C:\\quarantine");
+        Assert.True(DirectoryCapability.TryCreateRenameReady(duplicateFileSystem, "C:\\source", "root", ["restore", "publish"], "C:\\quarantine", out var duplicateCapability, out _));
+        using var retained = Assert.IsType<DirectoryCapability>(duplicateCapability);
+        Assert.False(retained.TryFreezeChildEvidence(out _));
+    }
+
+    [Fact]
     public void C1b1_commit_preserves_retained_handle_relative_success()
     {
         if (!OperatingSystem.IsWindows() || IntPtr.Size != 8) return;
@@ -662,10 +707,11 @@ public sealed class PackagingSupervisorTests
         public int LiveHandleCount { get; private set; }
         public string? Refusal { get; set; }
         public bool ReverseEnumeration { get; set; }
+        public bool DuplicateChildIdentity { get; set; }
         public bool TryCreateDirectory(string path)
         {
             if (_nodes.ContainsKey(path)) return false;
-            _nodes[path] = new(new(7, path), path, false); MutationCount++; return true;
+            _nodes[path] = new(new(7, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(path))[..16])), path, false); MutationCount++; return true;
         }
         public NativeSafeFileHandle? OpenDirectory(string path, uint desiredAccess)
         {
@@ -677,6 +723,7 @@ public sealed class PackagingSupervisorTests
             observation = default!;
             if (Refusal == "access" || !_handles.TryGetValue(handle.DangerousGetHandle(), out var path) || path is null || !_nodes.TryGetValue(path, out var current) || current is null) return false;
             observation = current;
+            if (DuplicateChildIdentity && path.EndsWith("publish", StringComparison.OrdinalIgnoreCase)) observation = observation with { Identity = _nodes[_nodes.Keys.Single(node => node.EndsWith("restore", StringComparison.OrdinalIgnoreCase))].Identity };
             if (path.EndsWith("publish", StringComparison.OrdinalIgnoreCase))
             {
                 if (Refusal == "identity") observation = observation with { Identity = new(7, "substituted") };

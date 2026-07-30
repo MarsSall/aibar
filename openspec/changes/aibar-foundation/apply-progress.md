@@ -1886,3 +1886,41 @@ All three 6C2A.1 checkboxes are visibly `- [x]` in `tasks.md`. Schema v2 adds pa
 **Structured status consumed:** authoritative OpenSpec status reported `applyState=ready`, `actionContext.mode=repo-local`, workspace root `C:/Users/mjsal/Desarrollos IA/Modificacion de Terminales/aibar`, and the only blocker was active attempt 57 at `sha256:a7c57f5318de177addb8fc6d42694e8a101cc3cb81429810fe4a5e18154abfa2`; native attempt status reported `next_action=finish`, `decision_required=false`.
 
 **Workload/PR boundary:** C1b1 only, 40/350 candidate lines. No stage, commit, push, PR, review, C2, or C3 work. **Remaining implementation tasks:** C2/C3 and later planned slices remain unchecked.
+
+## Slice b2c-C2 — blocked pre-implementation authority check (2026-07-30)
+
+**Status:** blocked before implementation. The authoritative OpenSpec apply status was ready for the explicitly authorized `b2c-C2` feature-branch-chain work unit; receipt-driven review is disabled and strict TDD is false. The active attempt remains parent-owned attempt 58 and was not begun, reset, or finished here.
+
+**Blocker:** C2 requires revalidation of the committed retained quarantine and its exact direct-child identities before any handle-anchored deletion. `DirectoryCapability` retains those observations privately, but its C1b commit releases and clears the child-handle map and exposes no immutable child-identity snapshot or post-commit cleanup capability. The C2-only allowed implementation paths exclude `DirectoryCapability.cs`; reopening from a path or trusting an unbound enumeration would violate the exact-identity/no-arbitrary-root contract. No safe C2 implementation can therefore be added in this bounded unit without an explicitly authorized C1/C2 boundary amendment.
+
+**No mutation/evidence:** no C2 production or test code, C2 task checkbox, runtime root, helper process, staging, commit, review, or authority record was changed. No focused/full/build command was run because the required capability proof is unavailable before the RED implementation boundary. `git diff --check` passed before this evidence update; `.gitignore` remained pre-existing, unstaged, and byte-for-byte unchanged.
+
+**Remaining C2 tasks (unchanged):**
+
+- [ ] **RED:** Test reopen/identity/reparse/enumeration/delete/unknown failures before first deletion and mid-delete; DPAPI metadata corruption, retry exhaustion, and cancellation must retain quarantine as `CLEANUP_PARTIAL`.
+- [ ] **GREEN:** Reopen and revalidate the committed quarantine, delete only handle-anchored bounded recursive entries, and write protected metadata containing retained identity, phase, bounded retry count, and next eligible time.
+- [ ] **TRIANGULATE:** Prove successful removal only after quiescence, every post-commit failure stays `CLEANUP_PARTIAL`, retries never rename back, no path/secret leakage occurs, and no arbitrary root can be selected.
+- [ ] **GATE:** Focused fault matrix, build, diff check, and retained-quarantine receipt. C2 rollback removes only post-commit cleanup/metadata/tests; C1 remains usable.
+
+**Required decision:** authorize a narrowly scoped amendment that exposes an immutable post-commit retained-quarantine child-identity capability to C2 (with no path-only fallback), then re-run C2 under a new or explicitly continued native attempt. C3 remains out of scope.
+
+## b2c-C1b-evidence — Immutable child-evidence producer and capability transfer (2026-07-30)
+
+**Status:** complete for this producer unit only; Standard mode (`strict_tdd: false`), feature-branch-chain boundary `864bb14 → b2c-C1b-evidence`. Native attempt 59 was already active and remains parent-owned; this executor did not begin, reset, finish, or otherwise mutate the native ledger.
+
+| Evidence | Exact result |
+| --- | --- |
+| RED | `dotnet test ... --filter "FullyQualifiedName~CommittedChildEvidence" --no-restore -m:1 --nologo` initially failed at compile time because `DirectoryCapability.TryFreezeChildEvidence` and `CommittedChildObjectKind` did not exist. |
+| GREEN/TRIANGULATE | `CommittedChildEvidence/v1` now clones and seals root/parent `FILE_ID_INFO` data, a 32-byte digest, a 32-byte random correlation key, and sorted collision-checked direct-child HMAC tags. Capture re-observes only live retained handles before the one-way child release; failure zeroes temporary key/tag/identity buffers. Successful native commit transfers the committed capability exactly once; its disposal owns the transferred live capability and zeroes evidence. |
+| Focused | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor\|FullyQualifiedName~CommittedChildEvidence" --no-restore -m:1 --nologo` — exit 0; 63/63 passed, 0 failed, 0 skipped. |
+| Native runtime | `Windows_native_rename_readiness_proves_relative_success_collision_and_no_residue` — exit 0; 1/1 passed. It proves retained-source identity continuity, quarantine-parent relative commit, collision refusal/no overwrite, evidence validity, exact committed-capability disposal, and zero `aibar-c1b0-*` residue. |
+| Full regression | `dotnet test AIBar.sln --no-restore -m:1 --nologo` — exit 0; 290/290 passed, 0 failed, 0 skipped, 5m25s. The earlier parent-timeout run was incomplete; its lingering PIDs were absent at recovery inspection, so no process was terminated. |
+| Build / whitespace | `dotnet build AIBar.sln --no-restore --nologo` — exit 0; 0 warnings, 0 errors. `git diff --check` — exit 0; existing LF-to-CRLF advisories only. |
+
+**Task state:** the four `b2c-C1b-evidence` RED/GREEN/TRIANGULATE/GATE task checkboxes are now `[x]`. C2, C3, DPAPI retry metadata, deletion, scavenging, packaging/release, and ledger operations remain unimplemented and unchecked.
+
+**Cleanup and safety:** the recovery PIDs named by the parent no longer existed when inspected. Current surviving `dotnet.exe` processes are shared `VBCSCompiler`/MSBuild workers, not testhost or attempt-owned helpers, so they were not terminated. No `aibar-c1b0-*` root remains. `NUL` was a Git-Bash filesystem entry created by `2>NUL` redirection (not a Windows device via Git Bash); it was safely removed and no longer appears in Git status. `.gitignore` content remains byte-identical to HEAD/index (`16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`) and was not edited.
+
+**Rollback boundary:** before C2 lands, remove only `CommittedChildEvidence.cs`, the producer additions in `DirectoryCapability.cs`, producer tests, these four task marks, and this evidence block; retain historical C1b `864bb14`. If C2 later lands, disable/remove C2 first. No C2 deletion path is reachable from this unit.
+
+**Evidence revision:** `sha256:1306f56b3f9cef7c1b3f3c04bef03b918eae543f2d06cd14576a7591a7022069` (canonical final source/test/task hashes plus RED/focused/full/build/native/diff, cleanup, and producer-only scope evidence).

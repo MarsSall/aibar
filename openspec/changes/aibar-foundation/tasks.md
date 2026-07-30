@@ -4,23 +4,21 @@
 
 | Field | Value |
 |-------|-------|
-| Estimated changed lines | Historical slices retained; 8C2A ~250–300, 8C2B1a1 ~300–370, 8C2B1a2 ~330–390, 8C2B1b ~360–390, 8C2B2 ~260–340 |
-| 400-line budget risk | High |
+| Estimated changed lines | 560–750 authored lines across two new units; producer 260–360, C2 consumer 300–390 |
+| Producer budget risk | Low against the maintainer-approved 800-line cap; expected scope remains 260–360 |
 | Chained PRs recommended | Yes |
-| Suggested split | Existing chain → 8B.1 → 8C1 → 8C2A → 8C2B1a1 → 8C1.1a → 8C1.1b1 → 8C1.1b2 → 8C2B1a2 → 8C2B1b → 8C2B2 → 8D → 8E |
-| Delivery strategy | ask-on-risk |
+| Suggested split | `864bb14` → C1b immutable-evidence producer → C2 exact-bijection consumer; C3 remains a separate future change |
+| Delivery strategy | auto-forecast |
 | Chain strategy | feature-branch-chain |
 
-Decision needed before apply: Yes
+Decision needed before producer apply: No — maintainer approved an 800-line producer cap; this does not authorize C2 or C3
 Chained PRs recommended: Yes
 Chain strategy: feature-branch-chain
-400-line budget risk: High
-Literal-plan tier: exceptional — chained-PR path, runtime gate, and per-child rollback evidence
-Size-scope: active Slice 8C2 section only
-Active-section word count: 1179
-Full-artifact word count: 6947
+Producer budget risk: Low at the 800-line ceiling; stop on scope expansion
 
-Each slice below is a candidate commit/PR with its tests and directly related documentation. Do not merge slices together if the authored forecast exceeds 400 lines. Generated fixtures may be separated operationally, but remain bound to the behavior they verify.
+The estimate covers only the new C1b→C2 amendment. Every implementation unit has a hard authored changed-line cap of 400; split or stop before the cap is exceeded. Generated fixtures remain bound to the behavior they verify and do not authorize a size exception. Attempt 58 is terminal failed with `decision_required` and must not be reset, retried, or reused.
+
+Each unit below is a candidate commit/PR with its tests and directly related evidence. Historical completed marks remain historical; no new unit is marked complete.
 
 ## Implementation Tasks
 
@@ -480,53 +478,74 @@ Historical mapping (not fixed here): `JD-B2B-001` → units 1–2; `JD-B2B-002` 
 - [x] **GREEN:** Extend `DirectoryCapability.cs` to retain source `DELETE|SYNCHRONIZE` and a distinct non-reparse same-volume quarantine-parent handle with no `FILE_SHARE_DELETE`; prove `ntdll!NtSetInformationFile(FileRenameInformation)` with exact checked native buffer/layout and `RootDirectory` contract, without production commit behavior.
 - [x] **TRIANGULATE/GATE:** Exercise source/parent identity substitution, reparse, containment, same-volume, exact child-set, access/share, unsupported OS/architecture/entrypoint/class, pending/non-success status, one-way child release, exact buffer/handle disposal, and zero residue. Run focused `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, `git diff --check`, and `Get-Process -Name Harness -ErrorAction SilentlyContinue` (zero helpers).
 
-**Rollback:** remove only C1b0 capability/test changes and task marks; retain verified C1a. C1b1/C2/C3 remain unchecked.
+**Rollback:** remove only C1b0 capability/test changes and task marks; retain verified C1a and the preserved historical C1b1 boundary. The new immutable-evidence producer, C2, and C3 remain unchecked.
 
-##### b2c-C1b1 — Identity-bound quarantine commit (~220–320 authored lines)
+##### b2c-C1b1 — Historical identity-bound quarantine commit (preserved)
 
-**Dependency/base:** reviewed/committed C1b0 only; C2 consumes the retained quarantine capability. **Paths:** `tools/AIBar.Packaging.Supervisor/Cleanup.cs`, `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`, this ledger only. **End:** retained quarantine for C2. **Forbidden:** `SetFileInformationByHandle`, Win32/path/absolute-target move, reopen-by-source-path, shell, subprocess/helper fallback, replacement, copy/delete, target-changing retry, deletion, rename-back, scavenger, PowerShell, or C2/C3 behavior.
+**Historical boundary:** commit `864bb14` completed the native C1b quarantine transition after verified C1b0. Its existing checked marks remain historical and are not rewritten. They prove the native commit boundary only; they do **not** prove the newly amended `CommittedChildEvidence/v1` transfer. C2 attempt 58 failed before code with evidence `sha256:0f78dfff7797e09d12bcdb10d06ee7ed50f1c448cabd0a708a6c4ca80460ecde`, so no C2 behavior is inferred from that attempt.
 
-- [x] **RED:** Add tests before production code for the explicit external-root, cleanup-ownership, and native-security threat cases: final identity/reparse/share/containment/same-volume/complete-child-set gates, source/parent substitution, invalid leaf, collision, unsupported/native failures, child transition/disposal, and post-success uncertainty (`CLEANUP_PARTIAL`); preserve every C1b0 refusal case.
-- [x] **GREEN:** After C1b0 passes, implement one `NtSetInformationFile(FileRenameInformation)` call on retained source with the retained quarantine-parent relative target, `ReplaceIfExists=FALSE`, bounded native buffer, and closed `NTSTATUS` handling; use `CLEANUP_REFUSED` pre-commit and retained `CLEANUP_PARTIAL` after issued-call uncertainty.
-- [x] **TRIANGULATE/GATE:** Run focused supervisor tests, one bounded Windows 10/11 x64 runtime proof, `dotnet test AIBar.sln --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, `git diff --check`, and zero-helper inspection. Prove identity continuity, collision refusal, no Win32/path/shell/helper fallback, no deletion, and no rename-back.
+**Preserved scope:** `tools/AIBar.Packaging.Supervisor/Cleanup.cs`, `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`, and this ledger. The historical unit forbids `SetFileInformationByHandle`, Win32/path/absolute-target move, reopen-by-source-path, shell, subprocess/helper fallback, replacement, copy/delete, target-changing retry, deletion, rename-back, scavenger, PowerShell, and C2/C3 behavior. The new producer amendment below is a separate unit.
 
-**Rollback:** remove only `Cleanup.cs`, C1b1 tests, and C1b1 task marks; C1b0 remains usable.
+- [x] **RED:** Preserve the historical pre-production tests for identity/reparse/share/containment/same-volume/complete-child-set gates, source/parent substitution, invalid leaf, collision, unsupported/native failures, child transition/disposal, and post-success uncertainty. <!-- sdd-owner: implementation -->
+- [x] **GREEN:** Preserve the historical single native relative rename, bounded buffer, closed `NTSTATUS` handling, `CLEANUP_REFUSED` pre-commit classification, and retained `CLEANUP_PARTIAL` post-issue boundary. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE/GATE:** Preserve the historical focused/full/build/runtime evidence and no-fallback/no-deletion/no-rename-back boundary; do not reinterpret it as C1b→C2 child-evidence authority. <!-- sdd-owner: implementation -->
 
-#### C1b Review Workload Forecast
+**Historical rollback:** reverting `864bb14` is not part of this amendment. Any rollback involving the new consumer must disable/remove C2 before removing the producer amendment; the historical C1b capability remains the predecessor boundary.
 
-| Unit | Estimated changed lines | 400-line risk | Chained PR | Base boundary |
-|---|---:|---|---|---|
-| C1b0 | 120–190 | Low | Pending | reviewed C1a |
-| C1b1 | 220–320 | Medium | Pending | reviewed C1b0 |
-| Combined C1b / overall review impact | 340–510; two focused reviews, ~25–45 min/unit | High | Yes | pending strategy |
+##### b2c-C1b-evidence — Immutable child-evidence producer and capability transfer (~260–360 authored lines)
 
-Decision needed before apply: Yes
+**Dependency/base:** reviewed/committed `864bb14` and verified C1b0; native attempt 58 is terminal failed with `decision_required` and is not retryable. **Allowed paths:** `tools/AIBar.Packaging.Supervisor/DirectoryCapability.cs`, `tools/AIBar.Packaging.Supervisor/Cleanup.cs`, `tools/AIBar.Packaging.Supervisor/CommittedChildEvidence.cs` (new if needed), `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`, and this task ledger. **Start:** C1b can commit a retained quarantine but has no immutable child-evidence transfer. **End:** C1b freezes and transfers `CommittedChildEvidence/v1` exactly once with the live retained source/parent capability. **Forbidden:** changes to `.gitignore` or `.git/gentle-ai`; Win32 rename projections, path fallback, arbitrary-root selection, deletion, rename-back, scavenging, PowerShell, shell/helper fallback, C2 consumer deletion, and C3 behavior.
+
+- [x] **RED:** Add failing fake and Windows-contract tests for the closed v1 shape: retained root and quarantine-parent `FILE_ID_INFO`, one 32-byte evidence digest, one 32-byte per-operation correlation key, at most 16 ordinal-ignore-case collision-checked direct-child records, simple leaves of at most 255 UTF-16 code units, HMAC-SHA-256 leaf tags, object kind, volume/file ID, and expected non-reparse state. Reject missing/duplicate/unknown/overflow/larger records before any native call. <!-- sdd-owner: implementation -->
+- [x] **GREEN:** Implement immutable capture while root, parent, and all admitted child handles remain live; derive records only from handles, compute tags/digest, freeze the value before child-handle release and before the native rename, and transfer evidence plus correlation key and live source/parent handles exactly once on success. No plaintext leaf, absolute path, nonce, handle value, credential, command text, or mutable caller replacement may be stored or emitted. <!-- sdd-owner: implementation -->
+- [x] **TRIANGULATE:** Prove capture-before-release/call ordering, one-way ownership transfer, idempotent refusal disposal, immutable post-freeze behavior, exact digest/key binding, source/parent identity continuity, collision and invalid-leaf no-call behavior, and the documented non-atomic child-release window. Preserve every historical C1b0/C1b1 refusal case and prove no C2 deletion is reachable from this producer-only unit. <!-- sdd-owner: implementation -->
+- [x] **GATE:** Run focused `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor|FullyQualifiedName~CommittedChildEvidence" --no-restore -m:1 --nologo`, full `dotnet test AIBar.sln --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, `git diff --check`, and the bounded Windows 10/11 x64 native C1b runtime proof. Record zero helper/process and zero temporary-root residue; do not claim C2 deletion, C3, packaging, or release. <!-- sdd-owner: implementation -->
+
+**Acceptance evidence:** immutable v1 schema/serialization inspection, fake ordering/disposal matrix, focused/full test results, clean build, native runtime identity/collision/no-residue proof, and source inspection showing no path or secret leakage. **Review boundary:** one feature-branch-chain PR targeting the reviewed `864bb14` line; maintainer-approved hard cap 800, forecast 260–360, risk Medium. The larger ceiling covers planning/evidence and bounded corrections only; it does not authorize C2, C3, or unrelated scope. **Native attempt handoff:** before apply, the parent must run `gentle-ai sdd-attempt status --cwd <repo> --change aibar-foundation`; it must not reset, retry, begin, or finish attempt 58. If native status remains `decision_required`, use only the maintainer-authorized reset for this distinct producer objective before any actor launch. **Rollback:** if C2 has not landed, remove only the producer amendment and its tests/evidence, retaining `864bb14`; if C2 has landed, disable/remove the C2 consumer first, then remove this producer. Never leave an enabled consumer without its producer contract.
+
+##### b2c-C2 — Exact direct-child evidence bijection and guarded cleanup (~300–390 authored lines)
+
+**Dependency/base:** independently verified and reviewed/committed `b2c-C1b-evidence`; C2 consumes only the directly transferred live committed capability and its frozen `CommittedChildEvidence/v1`. **Allowed paths:** `tools/AIBar.Packaging.Supervisor/Cleanup.cs`, `tools/AIBar.Packaging.Supervisor/ScavengerMetadata.cs`, `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`, and this task ledger. **Start:** retained quarantine exists with immutable producer evidence; attempt 58 remains terminal and is never retried. **End:** truthful guarded deletion or retained quarantine with `CLEANUP_PARTIAL`; no rename-back, arbitrary-root deletion, path-based enumeration, or PowerShell wiring. **Forbidden:** `.gitignore`, `.git/gentle-ai` authority changes, producer weakening/removal, evidence synthesis, caller-selected roots, legacy path-only cleanup, C3 discovery/scavenging, shell/helper fallback, copy-delete, target-changing retry, or original-path preservation claims after commit.
+
+- [ ] **RED:** Add tests that prove zero deletions before a complete retained-root-relative direct-child bijection: missing, extra, renamed, substituted, duplicate, reparse, cross-volume, inaccessible, unknown-kind, identity/tag/digest mismatch, cancellation, timeout, and enumeration/reopen faults. Add DPAPI `CurrentUser` cases for missing, legacy, corrupt, wrong-version, wrong-digest, wrong-correlation-key, wrong-root, unprotectable, retry-exhausted, and unbound metadata; cover failures before the first deletion and during recursive deletion. <!-- sdd-owner: implementation -->
+- [ ] **GREEN:** Implement bounded retained-root-relative enumeration and reopen of every observed direct child; derive in-memory HMAC tag, volume/file ID, object kind, and non-reparse evidence; require exact count/tag/identity/kind/volume/non-reparse/digest bijection before the first deletion. Seal bounded retry metadata with DPAPI `CurrentUser`, bind it to v1 evidence/digest/correlation key/root identity/phase/retry/next-eligible time, zero plaintext buffers and temporary records, then perform only handle-anchored recursive deletion with bounded revalidation. Legacy/missing/corrupt/unbound evidence fails closed. <!-- sdd-owner: implementation -->
+- [ ] **TRIANGULATE:** Prove exact one-to-one correlation, no tag-only/path/order authority, no deletion on any pre-first-deletion uncertainty, retained quarantine and `CLEANUP_PARTIAL` after every post-commit fault, idempotent disposal, no plaintext/path/secret leakage, safe retry without rename-back, and no arbitrary root selection. Confirm recursive descendants remain governed by handle-anchored identity/reparse checks. <!-- sdd-owner: implementation -->
+- [ ] **GATE:** Run focused `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor|FullyQualifiedName~CommittedChildEvidence|FullyQualifiedName~Cleanup" --no-restore -m:1 --nologo`, full `dotnet test AIBar.sln --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, `git diff --check`, and a bounded Windows 10/11 x64 runtime matrix for successful bijection/deletion plus retained-partial faults. Record zero helper/process residue and no C3/PowerShell execution. <!-- sdd-owner: implementation -->
+
+**Acceptance evidence:** direct-child bijection matrix with deletion counters, DPAPI-bound metadata bytes/statuses, pre-first-deletion zero-mutation proofs, post-commit partial-retention evidence, focused/full/build/whitespace/runtime results, and path/secret-free diagnostics. **Review boundary:** one feature-branch-chain PR targeting the reviewed producer branch; hard cap 400, forecast 300–390, risk High. **Native attempt handoff:** before apply, the parent must run `gentle-ai sdd-attempt status --cwd <repo> --change aibar-foundation`, consume a distinct new ordinal only if native status allows it, and never reset, retry, or finish attempt 58. Its failed evidence `sha256:0f78dfff7797e09d12bcdb10d06ee7ed50f1c448cabd0a708a6c4ca80460ecde` remains historical and is not C2 proof. **Rollback ordering:** disable/remove C2 deletion and metadata consumption first; verify retained quarantines are non-destructive; only then remove the C1b producer amendment. C1b/C2 rollback never migrates legacy path-only state or synthesizes evidence.
+
+##### b2c-C3 — Explicitly excluded from this amendment
+
+C3 is not authorized by the amended C1b→C2 contract. Do not implement or plan checkboxes for scavenger discovery, age/owner/ACL admission, canonical temporary-base selection, retry scheduling, arbitrary-root selection, metadata-based root discovery, PowerShell integration, or any other C3 behavior. A future C3 proposal/spec/design/tasks sequence must define a separate capability contract and approval boundary. No C3 path may be touched by the producer or C2 units.
+
+#### C1b→C2 Review Workload and Delivery Forecast
+
+| Unit | Estimated changed lines | Review risk | Hard cap | Feature-branch-chain boundary |
+|---|---:|---|---:|---|
+| Historical C1b commit `864bb14` | Complete, unchanged | Historical only | N/A | Base |
+| C1b immutable-evidence producer | 260–360 | Medium | 800 (maintainer-approved ceiling) | PR 1: targets `864bb14` |
+| C2 evidence consumer/cleanup | 300–390 | High | 400 | PR 2: targets producer PR |
+| Amendment total | 560–750 | High | Separate per-unit caps; no combined scope | No single combined PR |
+
+Decision needed before producer apply: No — 800-line producer cap explicitly approved
+Decision needed before C2 apply: Yes
 Chained PRs recommended: Yes
-Chain strategy: pending
-400-line budget risk: High
-Delivery strategy: ask-on-risk
-Session 800-line review threshold exceeded: No
-Receipt-driven review: disabled
+Chain strategy: feature-branch-chain
+Producer budget risk: Low against 800; C2 remains High against 400
+Delivery strategy: auto-forecast
 
-##### b2c-C2 — Post-commit bounded cleanup and truthful partial state (~240–330 lines)
+#### Remaining Work Forecast for the Parent
 
-**Dependency:** reviewed/committed C1b1; C2 consumes only its retained-quarantine capability. **Paths:** `tools/AIBar.Packaging.Supervisor/{Cleanup,ScavengerMetadata}.cs`; focused supervisor tests. **End:** guarded deletion or retained quarantine; no rename-back, arbitrary-root deletion, or PowerShell wiring.
+1. **Immediate b2c cleanup chain after C1b:** C1b native quarantine commit is complete at `864bb14`, and C1b0 is independently verified. Two implementation/review units remain: immutable producer capture/transfer (260–360 authored lines), then C2 exact-bijection/DPAPI-guarded cleanup (300–390). Attempt 58 contributes diagnosis only and must not be retried. C3 is excluded, not a remaining unit in this chain.
+2. **Packaging, distribution, lifecycle, and release:** after the b2c dependency is resolved, the unchecked downstream units are 8C2B1a2 live-policy/external acquisition, 8C2B1b legal/provenance/promotion, 8C2B2 MakeAppx/SignTool truthfulness, 8D install/upgrade/startup/uninstall smoke, 8E Windows/release gates, and the cross-slice completion gates. Each remains a separate review unit; the current plan supplies ranges of roughly 260–398 authored lines per unit, not calendar dates.
+3. **What “functioning” can mean:** today it is truthful to claim a checked developer foundation and local tray/analytics behavior, with private integration disabled by default and no release/package/lifecycle approval. An MVP claim requires the remaining product and distribution dependencies to pass their own acceptance gates; a release-ready claim additionally requires 8D/8E, policy/legal/dependency evidence, supported Windows validation, and the cross-slice gates. The artifacts do not support a calendar date; progress should be reported as completed review units and these rough ranges.
 
-- [ ] **RED:** Test reopen/identity/reparse/enumeration/delete/unknown failures before first deletion and mid-delete; DPAPI metadata corruption, retry exhaustion, and cancellation must retain quarantine as `CLEANUP_PARTIAL`.
-- [ ] **GREEN:** Reopen and revalidate the committed quarantine, delete only handle-anchored bounded recursive entries, and write protected metadata containing retained identity, phase, bounded retry count, and next eligible time.
-- [ ] **TRIANGULATE:** Prove successful removal only after quiescence, every post-commit failure stays `CLEANUP_PARTIAL`, retries never rename back, no path/secret leakage occurs, and no arbitrary root can be selected.
-- [ ] **GATE:** Focused fault matrix, build, diff check, and retained-quarantine receipt. C2 rollback removes only post-commit cleanup/metadata/tests; C1 remains usable.
+#### Parent-owned lifecycle gates
 
-##### b2c-C3 — Opt-in scavenger and approved PowerShell boundary (~220–320 lines)
-
-**Paths:** `tools/AIBar.Packaging.Supervisor/{Scavenger,Program}.cs`; `scripts/Publish-Deterministic.ps1`; focused supervisor/recovery tests. **End:** opt-in aged-quarantine recovery plus closed-request integration, only because explicitly approved by this b2c scope.
-
-- [ ] **RED:** Test aged/current-user/ACL/DPAPI/identity/reparse/lock admission, skip/refusal behavior, closed PowerShell request, no caller roots/PIDs/shell text, and no repository `obj/bin` changes.
-- [ ] **GREEN:** Implement bounded scavenger retry from validated supervisor quarantines and invoke the fixed worker through the typed protocol without shell composition or path/secret output.
-- [ ] **TRIANGULATE:** Run two external Unicode/space roots and injected unknown failures; prove refused scavenging retains quarantine, successful cleanup is truthful, and all statuses/evidence are path/secret-free.
-- [ ] **GATE:** Focused supervisor/recovery tests, build, diff check, external-root runtime gate, and zero-helper check. C3 rollback removes only scavenger/PowerShell integration/tests.
-
-**Total b2c forecast:** 980–1,420 authored lines across C1a/C1b0/C1b1/C2/C3; each unit <=350, review workload ~25–45 minutes/unit. Dependency chain: b2a → b2b Units 1–3 → C1a → C1b0 → C1b1 → C2 → C3. <!-- sdd-owner: parent -->
+- [ ] Start or reuse the bounded review for the C1b immutable-evidence producer only after its new native attempt is authorized; preserve the exact candidate and receipt boundary. <!-- sdd-owner: parent -->
+- [ ] Start or reuse the bounded review for C2 only after the producer is independently verified, reviewed, committed, and the consumer candidate is frozen. <!-- sdd-owner: parent -->
+- [ ] Enforce feature-branch-chain ordering, the 400-line cap, and rollback ordering at each apply/review/commit gate; do not reopen attempt 58. <!-- sdd-owner: parent -->
+- [ ] Keep C3 excluded and route any future scavenger or PowerShell request through a separately approved SDD contract. <!-- sdd-owner: parent -->
 
 #### Slice 8C2B1a2 — Versioned live-policy authority, external acquisition, and two-root proof (~390 authored lines)
 

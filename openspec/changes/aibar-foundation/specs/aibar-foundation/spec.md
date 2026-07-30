@@ -255,6 +255,7 @@ The MVP MUST NOT claim support for other providers, multiple accounts or roots, 
 The packaging supervisor MUST accept only a length-bounded closed-schema operation selected from a fixed allowlist, with operation-specific typed arguments and caller-selected ownership authority. It MUST NOT accept generic shell text, arbitrary roots, caller-supplied identity/nonce/cleanup markers, arbitrary environment, or echo paths, secrets, command text, PIDs, or capability material.
 
 #### Scenario: Invalid or sensitive request
+
 - GIVEN a request contains shell text, an arbitrary root, an identity claim, or an unknown field
 - WHEN the supervisor validates it
 - THEN it rejects with `INVALID_REQUEST` and emits no sensitive value
@@ -264,6 +265,7 @@ The packaging supervisor MUST accept only a length-bounded closed-schema operati
 The supervisor MUST create a fresh Job Object with `KILL_ON_JOB_CLOSE` and no breakaway, create the root worker suspended, assign it before resume, and retain safe process/thread handles through assignment, resume, and exit-code retrieval. Any start or assignment failure MUST terminate the retained process safely before returning failure.
 
 #### Scenario: Assignment failure
+
 - GIVEN a suspended root cannot be assigned to the fresh Job Object
 - WHEN assignment fails
 - THEN the supervisor terminates and closes the retained process safely and returns `JOB_ASSIGN_FAILED` without cleanup success
@@ -273,6 +275,7 @@ The supervisor MUST create a fresh Job Object with `KILL_ON_JOB_CLOSE` and no br
 The supervisor MUST drain stdout and stderr concurrently from launch into bounded diagnostic tails, discard excess bytes with counts, retrieve the root exit code, and enforce one overall deadline plus bounded post-quiescence EOF grace. Timeout and production cancellation MUST terminate the Job and use the same bounded lifecycle proof.
 
 #### Scenario: Saturation, timeout, or cancellation
+
 - GIVEN either stream saturates or the worker exceeds its deadline or is cancelled
 - WHEN the supervisor handles the condition
 - THEN drains remain bounded, the Job is terminated, and it returns `OUTPUT_DRAIN_FAILED`, `TIMEOUT`, or `CANCELLED` without hanging
@@ -282,6 +285,7 @@ The supervisor MUST drain stdout and stderr concurrently from launch into bounde
 Completion notifications MUST be advisory wake-ups only. Success MUST require a signaled root handle, zero root exit code, and two successful bounded `ActiveProcesses == 0` queries separated by the observation interval while live Job and root handles remain open. Unknown or nonzero query results MUST fail closed; closing the Job MUST NOT be completion evidence.
 
 #### Scenario: Lost, duplicate, or reordered notifications
+
 - GIVEN completion packets are lost, duplicated, delayed, or out of order
 - WHEN the supervisor evaluates completion
 - THEN packets cannot decide success or failure; only the bounded repeated live-handle queries can do so
@@ -291,6 +295,7 @@ Completion notifications MUST be advisory wake-ups only. Success MUST require a 
 The supervisor MUST document that processes created through pre-existing build servers, brokers, or services are outside Job membership and MUST NOT claim to own them. Worker configuration MUST disable supported build-server delegation where possible; inability to disable it MUST produce a conservative non-success outcome.
 
 #### Scenario: Active-process uncertainty
+
 - GIVEN a query fails, remains uncertain, or a delegated process may be outside the Job
 - WHEN quiescence is evaluated
 - THEN the supervisor returns `QUIESCENCE_UNPROVED` and does not clean up
@@ -300,6 +305,7 @@ The supervisor MUST document that processes created through pre-existing build s
 For C1b, capability preparation MUST retain the admitted source capability and a distinct non-reparse quarantine-parent capability, including their identities, share state, and same-volume relationship. C1b0 MUST prove on supported Windows 10/11 x64 the approved user-mode `NtSetInformationFile(FileRenameInformation)` relative-rename contract: the retained source handle identifies the source, the retained quarantine-parent handle identifies the relative target root, the target is one validated simple leaf, replacement is disabled, and every non-success `NTSTATUS` fails closed. C1b1 MUST NOT start without that proof. Source-path reopen, destination-path resolution, Win32 rename projections, and unknown, substituted, extra, missing, or raced identity MUST fail closed. Malicious same-user or administrator interference is outside the threat-model guarantee.
 
 #### Scenario: C1b0 is a prerequisite
+
 - GIVEN C1a admission exists but C1b0 rename-ready capability preparation is not separately verified
 - WHEN C1b1 commit is requested
 - THEN no native call or namespace mutation is attempted and the source remains admitted but uncommitted
@@ -317,11 +323,13 @@ For C1b, capability preparation MUST retain the admitted source capability and a
 - THEN it refuses the proof, does not admit C1b1, and performs no fallback mutation
 
 #### Scenario: Source-path substitution
+
 - GIVEN the retained source or quarantine-parent handle remains bound while its path spelling is substituted
 - WHEN C1b1 attempts the quarantine commit
 - THEN the substituted path cannot redirect the mutation; the commit uses the admitted identities or fails closed without path resolution
 
 #### Scenario: Admission identity drift
+
 - GIVEN the source, parent, or complete observed child set changes, becomes reparse-tainted, loses required share compatibility, or becomes unprovable before commit
 - WHEN the final admission gate runs
 - THEN it returns `CLEANUP_REFUSED` before the native call and preserves the source namespace
@@ -331,6 +339,7 @@ For C1b, capability preparation MUST retain the admitted source capability and a
 C1b1 MUST perform last-moment identity, reparse, share, containment, same-volume, and complete-child-set checks, make an explicit one-way child-observation transition, and then issue exactly one approved native relative rename using the retained admitted source and quarantine-parent capabilities. The target MUST be one validated simple leaf with replacement disabled. Every non-success `NTSTATUS` MUST fail closed. The checks and rename are not one atomic multi-object transaction: C1b1 MUST NOT claim atomic parent-ID or child-set validation with the rename. Pre-commit uncertainty MUST return `CLEANUP_REFUSED` with ownership and source-path state safely classified; success followed by uncertain observation MUST return `CLEANUP_PARTIAL` with quarantine retained and MUST NOT rename back. Win32 `FileRenameInfo`, absolute/path-based move or rename, shell, helper process, child deletion, copy-delete emulation, and target-changing retries are forbidden.
 
 #### Scenario: Child-handle transition
+
 - GIVEN the final gate validates the retained source, parent, and exact child set
 - WHEN C1b1 crosses the commit boundary
 - THEN child observation handles are disposed exactly once in an explicit one-way transition, while source and parent capabilities remain retained for the single native commit
@@ -342,6 +351,7 @@ C1b1 MUST perform last-moment identity, reparse, share, containment, same-volume
 - THEN the quarantine contains the admitted source identity under the retained parent and no source pathname was reopened
 
 #### Scenario: Destination collision
+
 - GIVEN a fresh simple target leaf is selected and another entry appears at that destination
 - WHEN the single namespace commit is attempted
 - THEN it fails without replacement, retry, or source mutation and returns `CLEANUP_REFUSED`
@@ -353,6 +363,7 @@ C1b1 MUST perform last-moment identity, reparse, share, containment, same-volume
 - THEN it returns `CLEANUP_REFUSED` before mutation and never emulates the operation with copy-delete
 
 #### Scenario: Unsupported rename
+
 - GIVEN the filesystem, filter, access/share state, or volume relationship cannot support the rename
 - WHEN C1b1 evaluates or attempts the commit
 - THEN it fails closed, preserves the source, and does not emulate the operation with copy-delete
@@ -370,11 +381,13 @@ C1b1 MUST perform last-moment identity, reparse, share, containment, same-volume
 - THEN it returns `CLEANUP_REFUSED`, performs no retry or fallback, and safely classifies the source as still owned at its original namespace
 
 #### Scenario: Ownership and disposal
+
 - GIVEN C1b1 has either refused before commit or committed successfully
 - WHEN the operation releases resources
 - THEN every temporary buffer and handle is disposed exactly once, with root and parent ownership transferred only after success
 
 #### Scenario: Post-success observation failure
+
 - GIVEN the identity-bound namespace commit returned success
 - WHEN immediate observation of the retained source and parent is uncertain
 - THEN the result is `CLEANUP_PARTIAL`, the quarantine is retained, and no rename-back is attempted
@@ -384,6 +397,7 @@ C1b1 MUST perform last-moment identity, reparse, share, containment, same-volume
 Supervisor status and structured events MUST use only path/secret-free stable codes, including `INVALID_REQUEST`, `ROOT_CREATE_FAILED`, `JOB_CREATE_FAILED`, `JOB_CONFIG_FAILED`, `PROCESS_START_FAILED`, `JOB_ASSIGN_FAILED`, `PROCESS_RESUME_FAILED`, `TIMEOUT`, `CANCELLED`, `PROCESS_FAILED`, `OUTPUT_DRAIN_FAILED`, `QUIESCENCE_UNPROVED`, `CLEANUP_REFUSED`, `CLEANUP_PARTIAL`, and `INTERNAL_UNKNOWN`. Events MAY expose phase, coarse duration, active count, exit code, byte counts, truncation, and retry metadata, but MUST NOT expose paths, PIDs, commands, environment, nonce, handles, secrets, or exception text.
 
 #### Scenario: Status emission
+
 - GIVEN any success or fault transition
 - WHEN status is serialized or logged
 - THEN it contains only the closed response fields and permitted coarse observability values
@@ -393,6 +407,110 @@ Supervisor status and structured events MUST use only path/secret-free stable co
 C1b MUST stop at the retained quarantine capability and its immediate observation result. It MUST NOT perform deletion, scavenging, rename-back, PowerShell integration, or C2/C3 behavior; those are separate future scopes.
 
 #### Scenario: Commit-only boundary
+
 - GIVEN C1b has committed a quarantine or returned a fail-closed refusal
 - WHEN the C1b operation completes
 - THEN it performs no deletion, scavenging, rename-back, PowerShell, C2, or C3 action
+
+### Requirement: C1b immutable committed-child evidence production
+
+C1b MUST produce and transfer a bounded, immutable `CommittedChildEvidence/v1` value with the retained quarantine capability. Until the final gate, the admission capability owns the live observation handles; after successful rename, the committed capability owns the evidence buffers, correlation key, and retained source/parent handles until C2 completes or transfers them to a retained partial-cleanup owner. The value MUST contain the admitted root and quarantine-parent `FILE_ID_INFO`, one 32-byte evidence digest covering the version, root/parent identities, count, and records, one 32-byte per-operation correlation key, and an ordinal-ignore-case collision-checked array of no more than 16 direct-child records. Each record MUST contain a 32-byte HMAC-SHA-256 leaf tag over the exact bounded UTF-16 leaf bytes, the child's volume serial and 128-bit file ID, object kind, and expected non-reparse state. Leaf components MUST be simple and no longer than 255 UTF-16 code units. Invalid counts, lengths, duplicate identities or tags, unknown kinds, overflow, or larger inputs MUST refuse before the native rename. Plaintext leaves, absolute paths, nonces, handle values, credentials, and command text MUST NOT be stored or emitted as evidence.
+
+#### Scenario: Evidence is frozen before child-handle release and rename
+
+- GIVEN the final C1b read-only gate has validated the retained source, quarantine parent, and complete direct-child allowlist while all admitted child handles remain live
+- WHEN C1b captures handle-derived child identity, type, and reparse evidence
+- THEN it computes and freezes `CommittedChildEvidence/v1` and its digest before releasing any child handle and before issuing the single native rename
+- AND the successful rename transfers the frozen evidence, correlation key, and still-live source/parent handles exactly once into the committed capability
+- AND no caller, path, or later enumeration can replace or amend the frozen evidence
+
+#### Scenario: Evidence bounds or identity records are invalid
+
+- GIVEN a child count, leaf length, record kind, identity, tag, digest input, or buffer size is missing, duplicated, unknown, overflowing, or outside the stated bounds
+- WHEN C1b prepares the evidence
+- THEN it returns `CLEANUP_REFUSED` before the native call, releases the uncommitted capability exactly once, and performs no namespace mutation
+
+#### Scenario: Evidence capture and rename are not one transaction
+
+- GIVEN evidence has been frozen while child handles are live
+- WHEN C1b releases child handles and performs the single native rename
+- THEN the specification treats the release, evidence snapshot, and rename as a residual non-atomic sequence
+- AND the frozen evidence is correlation evidence rather than proof that the child set cannot change during that sequence
+- AND any uncertainty before the rename remains `CLEANUP_REFUSED`, while any uncertainty after a successful rename is handled as `CLEANUP_PARTIAL` with the quarantine retained
+
+### Requirement: C2 exact direct-child evidence bijection before deletion
+
+C2 MUST consume only the transferred live committed capability and its `CommittedChildEvidence/v1`. Before the first deletion, C2 MUST enumerate exactly one bounded direct-child set from the retained root, reopen every observed child relative to that retained root, derive each leaf tag, volume, file ID, object kind, and non-reparse state from the reopened handle, and prove a complete one-to-one bijection with the frozen records and evidence digest. Leaf spelling, enumeration order, a tag-only match, a caller-selected root, or a fresh path-based enumeration MUST NOT authorize deletion. Recursive descendants remain subject to handle-anchored identity and reparse checks before each mutation.
+
+#### Scenario: Exact bijection authorizes the first deletion
+
+- GIVEN the retained root can enumerate one bounded direct-child set and every observed child can be reopened relative to that root
+- WHEN C2 observes the count, tags, volume serials, file IDs, object kinds, expected non-reparse states, and evidence digest
+- THEN every observed child matches exactly one frozen record and every frozen record matches exactly one observed child
+- AND C2 may continue to its guarded deletion phase only after the protected retry metadata is verified
+
+#### Scenario: Missing, extra, renamed, or substituted child
+
+- GIVEN the current direct-child set is missing a frozen record, contains an extra entry, has a renamed leaf, or has a different object substituted under an expected leaf
+- WHEN C2 performs the retained-root-relative correlation
+- THEN it proves that the bijection is incomplete or mismatched, performs zero deletions, retains the quarantine, and reports `CLEANUP_PARTIAL`
+
+#### Scenario: Duplicate, reparse, cross-volume, inaccessible, or unclassifiable child
+
+- GIVEN a current or frozen set contains duplicate tags or identities, an observed reparse object, a child on a different volume, an inaccessible child, or a child whose type or identity cannot be classified
+- WHEN C2 evaluates the correlation gate
+- THEN it refuses the gate, performs zero deletions, retains the quarantine, and reports `CLEANUP_PARTIAL`
+
+#### Scenario: Cancellation or unknown correlation outcome
+
+- GIVEN enumeration, retained-root-relative reopen, handle observation, or bijection validation is cancelled, faults, times out, or returns an unknown result
+- WHEN C2 reaches the corresponding bounded cancellation or fault boundary
+- THEN it stops mutation, performs zero deletions if the first deletion has not started, retains the quarantine, and reports `CLEANUP_PARTIAL`
+- AND it never converts the uncertainty into a successful cleanup result
+
+### Requirement: Protected C2 retry metadata and retained-quarantine failure handling
+
+Before the first C2 deletion, the system MUST protect and verify bounded retry metadata with DPAPI `CurrentUser` protection. The protected record MUST bind the same evidence version, evidence digest, correlation key, retained-root identity, phase, bounded retry count, and next-eligible time to the committed capability. Plaintext serialization buffers, DPAPI plaintext, correlation keys, leaf tags, digests, and temporary enumeration records MUST be bounded, zeroized, and disposed exactly once; capability disposal MUST be idempotent. Failure to create, protect, unprotect, verify, or bind this metadata after commit MUST leave the quarantine retained, perform zero deletions, and report `CLEANUP_PARTIAL`.
+
+#### Scenario: Protected metadata is valid
+
+- GIVEN the transferred evidence digest and retained-root identity are unchanged
+- WHEN C2 creates and verifies the DPAPI `CurrentUser`-protected record with its bounded phase, retry count, and next-eligible time
+- THEN the record is bound to that digest and C2 may enter the guarded deletion phase without exposing a path, secret, nonce, or handle value
+
+#### Scenario: Metadata is missing, legacy, corrupt, or unbound
+
+- GIVEN the protected record is missing, legacy, corrupt, cannot be decrypted for the current user, has the wrong evidence version or digest, or is not bound to the retained root
+- WHEN C2 or a retry path evaluates it
+- THEN it refuses deletion, retains the quarantine, and reports `CLEANUP_PARTIAL` with zero deletions
+- AND it MUST NOT synthesize evidence from a pathname, a post-commit enumeration, legacy path-only data, or a caller-supplied root
+
+#### Scenario: Failure occurs after the native commit
+
+- GIVEN the single native rename has succeeded
+- WHEN any subsequent reopen, identity, parent, reparse, enumeration, metadata, deletion, cancellation, or otherwise unknown operation fails
+- THEN the result is always `CLEANUP_PARTIAL`, the retained quarantine is the only cleanup boundary, and no rename-back, path fallback, copy-delete fallback, target-changing retry, arbitrary-root selection, or original-path preservation claim is made
+- AND if deletion has started, C2 stops at the next bounded cancellation point and never reports complete cleanup
+
+### Requirement: C1b and C2 roll-forward, rollback, and C3 boundary
+
+The `CommittedChildEvidence/v1` producer and C2 consumer MUST roll forward as one versioned capability contract. C2 MUST reject any legacy, missing, corrupt, or otherwise unbound evidence rather than weakening the deletion gate. A rollback MUST disable C2 deletion before removing or disabling the new C1b producer; no migration may synthesize child evidence. This contract MUST authorize only the directly handed-off retained root for its guarded C2 operation and MUST NOT authorize C3 discovery, age or owner admission, ACL selection, canonical temporary-base selection, retry scheduling, or arbitrary root selection. C3 remains explicitly out of scope and requires a separately approved contract.
+
+#### Scenario: Roll-forward compatibility
+
+- GIVEN C1b and C2 are deployed with `CommittedChildEvidence/v1`
+- WHEN C2 receives a committed capability
+- THEN it consumes only the transferred versioned evidence and protected digest binding, and refuses any legacy or differently shaped capability without deletion
+
+#### Scenario: Safe rollback ordering
+
+- GIVEN a rollback must remove or disable the new evidence producer or consumer
+- WHEN rollback is applied
+- THEN C2 deletion is disabled first, the new producer is removed only afterward, and retained quarantines remain non-destructive rather than being migrated from paths or fresh enumeration
+
+#### Scenario: C3 is not authorized
+
+- GIVEN a caller, retry process, or future scavenger has only a protected record or metadata reference
+- WHEN it attempts to discover, select, or consume a quarantine root outside the directly handed-off capability
+- THEN it performs no deletion or cleanup and reports the stable non-success state
+- AND no C3 discovery, scavenging, arbitrary-root selection, or other C3 behavior is performed by this contract

@@ -900,4 +900,29 @@ Only this report and `review-ledger.md` were updated for final closure. Code, te
 
 ### Final recommendation and residual risk
 
-Preserve this bounded integrated b2a+b2b result as the terminal scoped verification record. Do not represent it as b2c or full-change verification. Slice b2c and the unfinished full `aibar-foundation` change remain unverified and require separately authorized implementation and verification. The historical committed-range `AIBar.sln` whitespace warning and `JD-B2-INT-INFO-001` remain informational.
+Preserve this bounded integrated b2a+b2b result as the terminal scoped verification record. Do not represent it as b2c or full-change verification. Slice b2c and the unfinished full `aibar-foundation` change remain unverified and require separately authorized implementation and verification.
+
+---
+
+# C2 Pre-implementation Verification Note — BLOCKED
+
+C2 was not implemented or verified. The committed C1b API does not expose immutable direct-child identity evidence after the one-way child-handle release, while C2 requires exact post-commit identity admission before deletion. The C2 scope forbids changing `DirectoryCapability.cs`; therefore a C2-only implementation would need an unsafe path-only or unbound-enumeration fallback. No tests, build, or runtime cleanup command was run and no C2 completion is claimed. A narrowly authorized C1/C2 capability-transfer amendment is required before a new C2 verification attempt. The historical committed-range `AIBar.sln` whitespace warning and `JD-B2-INT-INFO-001` remain informational.
+
+---
+
+# Scoped Verification Note — b2c-C1b-evidence producer
+
+**Verdict: PASS for the immutable producer only; whole-change verification remains blocked by unchecked C2 and later work.**
+
+| Gate | Result |
+| --- | --- |
+| RED | Compile failure for the absent evidence capture/kind API was observed before production implementation. |
+| Focused | `PackagingSupervisor\|CommittedChildEvidence` filter — exit 0; 63/63. |
+| Windows x64 native proof | `Windows_native_rename_readiness_proves_relative_success_collision_and_no_residue` — exit 0; 1/1. |
+| Full suite | `dotnet test AIBar.sln --no-restore -m:1 --nologo` — exit 0; 290/290. |
+| Build | `dotnet build AIBar.sln --no-restore --nologo` — exit 0; 0 warnings, 0 errors. |
+| Whitespace | `git diff --check` — exit 0; only existing line-ending advisories. |
+
+The producer freezes bounded root/parent/child handle evidence before child release and native rename, binds tags to a per-operation HMAC key and the digest to versioned identities/records, transfers the live committed capability once on success, and zeroes/disposes owned buffers. The native commit remains explicitly non-atomic across capture, child release, and rename; this result does not authorize C2 correlation or deletion.
+
+Recovery found no surviving named attempt-59 processes and no C1b test root. Shared compiler/MSBuild workers were left untouched. The `NUL` Git-Bash redirection artifact was safely removed; `.gitignore` bytes remain unchanged. Evidence revision: `sha256:1306f56b3f9cef7c1b3f3c04bef03b918eae543f2d06cd14576a7591a7022069`.

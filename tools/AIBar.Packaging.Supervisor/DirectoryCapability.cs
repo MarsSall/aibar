@@ -1,5 +1,6 @@
 using Microsoft.Win32.SafeHandles;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("AIBar.Domain.Tests")]
@@ -25,15 +26,16 @@ public sealed class DirectoryCapability : IDisposable
     private readonly DirectoryObservation _root, _parent;
     private readonly Dictionary<string, DirectoryObservation> _children;
     private readonly Dictionary<string, SafeFileHandle> _childHandles;
-    private bool _childrenReleased, _disposed;
-    internal SafeFileHandle RootHandle { get; }
-    internal SafeFileHandle? QuarantineParentHandle { get; }
+    private SafeFileHandle? _rootHandle, _quarantineParentHandle;
+    private bool _childrenReleased, _disposed, _transferred;
+    internal SafeFileHandle RootHandle => _rootHandle ?? throw new ObjectDisposedException(nameof(DirectoryCapability));
+    internal SafeFileHandle? QuarantineParentHandle => _quarantineParentHandle;
     public DirectoryObservation Source => _root;
-    public DirectoryObservation? QuarantineParent => QuarantineParentHandle is null ? null : _parent;
+    public DirectoryObservation? QuarantineParent => _quarantineParentHandle is null ? null : _parent;
     internal IReadOnlyDictionary<string, SafeFileHandle> ChildHandles => _childHandles;
 
     private DirectoryCapability(IDirectoryCapabilityFileSystem fileSystem, SafeFileHandle rootHandle, DirectoryObservation root, Dictionary<string, SafeFileHandle> childHandles, Dictionary<string, DirectoryObservation> children, SafeFileHandle? parent = null, DirectoryObservation? parentObservation = null)
-    { _fileSystem = fileSystem; RootHandle = rootHandle; _root = root; _childHandles = childHandles; _children = children; QuarantineParentHandle = parent; _parent = parentObservation ?? default!; }
+    { _fileSystem = fileSystem; _rootHandle = rootHandle; _root = root; _childHandles = childHandles; _children = children; _quarantineParentHandle = parent; _parent = parentObservation ?? default!; }
 
     public static bool TryCreate(IDirectoryCapabilityFileSystem fileSystem, string parent, string leaf, IReadOnlyCollection<string> children, out DirectoryCapability? capability, out SupervisorStatus status)
         => TryCreateCore(fileSystem, parent, leaf, children, ObservationAccess, null, out capability, out status);
@@ -44,7 +46,7 @@ public sealed class DirectoryCapability : IDisposable
     private static bool TryCreateCore(IDirectoryCapabilityFileSystem fileSystem, string parent, string leaf, IReadOnlyCollection<string> children, uint sourceAccess, string? quarantineParent, out DirectoryCapability? capability, out SupervisorStatus status)
     {
         capability = null; status = SupervisorStatus.RootCreateFailed;
-        if (string.IsNullOrWhiteSpace(parent) || !IsSimpleLeaf(leaf) || children.Any(child => !IsSimpleLeaf(child)) || children.Distinct(StringComparer.OrdinalIgnoreCase).Count() != children.Count) return false;
+        if (string.IsNullOrWhiteSpace(parent) || !IsSimpleLeaf(leaf) || children.Any(child => !IsEvidenceLeaf(child)) || children.Distinct(StringComparer.OrdinalIgnoreCase).Count() != children.Count) return false;
         SafeFileHandle? rootHandle = null, parentHandle = null; var childHandles = new Dictionary<string, SafeFileHandle>(StringComparer.OrdinalIgnoreCase);
         try
         {
@@ -91,15 +93,34 @@ public sealed class DirectoryCapability : IDisposable
         status = SupervisorStatus.CleanupRefused;
         return QuarantineParentHandle is not null && !_childrenReleased && TryValidate(out _) && Observe(QuarantineParentHandle, _parent, out _) && _parent.Identity.VolumeSerialNumber == _root.Identity.VolumeSerialNumber && _fileSystem.HasRequiredRenameShare(RootHandle, QuarantineParentHandle);
     }
-    internal bool ReleaseChildHandles() { if (_childrenReleased) return false; foreach (var handle in _childHandles.Values) handle.Dispose(); _childHandles.Clear(); return _childrenReleased = true; }
+    internal bool ReleaseChildHandles() { if (_childrenReleased || _disposed || _transferred) return false; foreach (var handle in _childHandles.Values) handle.Dispose(); _childHandles.Clear(); return _childrenReleased = true; }
+    internal bool TryFreezeChildEvidence(out CommittedChildEvidence? evidence)
+    {
+        evidence = null;
+        if (_disposed || _transferred || _childrenReleased || !TryValidateRenameReady(out _)) return false;
+        var observations = new List<(string Leaf, DirectoryObservation Observation)>(_children.Count);
+        foreach (var child in _children)
+        {
+            if (!_childHandles.TryGetValue(child.Key, out var handle) || !_fileSystem.TryObserve(handle, out var observed) || observed != child.Value || observed.IsReparsePoint || observed.Identity.VolumeSerialNumber != _root.Identity.VolumeSerialNumber || !IsContained(_root.FinalPath, observed.FinalPath)) return false;
+            observations.Add((child.Key, observed));
+        }
+        return CommittedChildEvidence.TryCreate(_root, _parent, observations, out evidence);
+    }
+    internal CommittedQuarantineCapability? TransferCommitted(CommittedChildEvidence evidence)
+    {
+        if (_disposed || _transferred || !_childrenReleased || _rootHandle is null || _quarantineParentHandle is null) return null;
+        _transferred = true;
+        return new CommittedQuarantineCapability(this, _root, _parent, evidence);
+    }
     public static bool IsSimpleLeaf(string value) => !string.IsNullOrWhiteSpace(value) && value is not "." and not ".." && value.IndexOfAny(['\\', '/', ':', '\0']) < 0 && !Path.IsPathRooted(value) && !IsReserved(value);
+    internal static bool IsEvidenceLeaf(string value) => IsSimpleLeaf(value) && value.Length <= 255;
     private static bool IsReserved(string value) => new[] { "CON", "PRN", "AUX", "NUL", "COM1", "LPT1" }.Contains(Path.GetFileNameWithoutExtension(value), StringComparer.OrdinalIgnoreCase);
     private bool Observe(SafeFileHandle handle, DirectoryObservation expected, out SupervisorStatus status) { status = SupervisorStatus.RootIdentityChanged; if (!_fileSystem.TryObserve(handle, out var actual)) return false; if (actual.IsReparsePoint) { status = SupervisorStatus.ReparseDetected; return false; } return actual == expected; }
     internal static bool IsContained(string root, string child) => child.StartsWith(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-    public void Dispose() { if (_disposed) return; _disposed = true; foreach (var handle in _childHandles.Values) handle.Dispose(); _childHandles.Clear(); QuarantineParentHandle?.Dispose(); RootHandle.Dispose(); }
+    public void Dispose() { if (_disposed) return; _disposed = true; foreach (var handle in _childHandles.Values) handle.Dispose(); _childHandles.Clear(); _quarantineParentHandle?.Dispose(); _quarantineParentHandle = null; _rootHandle?.Dispose(); _rootHandle = null; }
 }
 
-public sealed record NativeReadinessResult(SupervisorStatus Status, int NativeCallCount, bool ChildrenReleased, DirectoryObservation? Source);
+public sealed record NativeReadinessResult(SupervisorStatus Status, int NativeCallCount, bool ChildrenReleased, DirectoryObservation? Source, CommittedQuarantineCapability? Capability = null);
 public static class NativeRenameReadiness
 {
     private const int FileRenameInformation = 10, StatusSuccess = 0;
@@ -108,19 +129,35 @@ public static class NativeRenameReadiness
     public static NativeReadinessResult Prove(DirectoryCapability capability, string leaf) => Prove(capability, leaf, IsCompatibleForCurrentProcess);
     internal static NativeReadinessResult Prove(DirectoryCapability capability, string leaf, Func<bool> isCompatible)
     {
-        if (!isCompatible() || !capability.TryValidateRenameReady(out _) || !DirectoryCapability.IsSimpleLeaf(leaf)) return new(SupervisorStatus.CleanupRefused, 0, false, null);
-        if (!capability.ReleaseChildHandles()) return new(SupervisorStatus.CleanupRefused, 0, false, null);
-        var bytes = Encoding.Unicode.GetBytes(leaf); var length = checked(20 + bytes.Length); IntPtr buffer = IntPtr.Zero;
+        if (!isCompatible() || !capability.TryValidateRenameReady(out _) || !DirectoryCapability.IsEvidenceLeaf(leaf) || !capability.TryFreezeChildEvidence(out var evidence) || evidence is null)
+            return new(SupervisorStatus.CleanupRefused, 0, false, null);
+
+        var released = false; var issued = false; var bytes = Encoding.Unicode.GetBytes(leaf); var length = checked(20 + bytes.Length); IntPtr buffer = IntPtr.Zero;
         try
         {
+            if (!capability.ReleaseChildHandles()) { evidence.Dispose(); return new(SupervisorStatus.CleanupRefused, 0, false, null); }
+            released = true;
             buffer = Marshal.AllocHGlobal(length); Marshal.Copy(new byte[length], 0, buffer, length); Marshal.WriteByte(buffer, 0, 0); Marshal.WriteIntPtr(buffer, 8, capability.QuarantineParentHandle!.DangerousGetHandle()); Marshal.WriteInt32(buffer, 16, bytes.Length); Marshal.Copy(bytes, 0, IntPtr.Add(buffer, 20), bytes.Length);
+            issued = true;
             var status = NtSetInformationFile(capability.RootHandle, out var ioStatus, buffer, (uint)length, FileRenameInformation);
-            if (!IsSuccessfulStatus(status, ioStatus.Status)) return new(SupervisorStatus.CleanupRefused, 1, true, null);
-            if (!Observe(capability.RootHandle, out var source) || !Observe(capability.QuarantineParentHandle, out var parent) || source.Identity != capability.Source.Identity || parent != capability.QuarantineParent || !DirectoryCapability.IsContained(parent.FinalPath, source.FinalPath)) return new(SupervisorStatus.CleanupPartial, 1, true, source);
-            return new(SupervisorStatus.Success, 1, true, source);
+            if (!IsSuccessfulStatus(status, ioStatus.Status)) { evidence.Dispose(); return new(SupervisorStatus.CleanupRefused, 1, true, null); }
+            var sourceObserved = Observe(capability.RootHandle, out var source); var parentObserved = Observe(capability.QuarantineParentHandle, out var parent);
+            var committed = capability.TransferCommitted(evidence);
+            if (committed is null) { evidence.Dispose(); return new(SupervisorStatus.CleanupPartial, 1, true, sourceObserved ? source : null); }
+            if (!sourceObserved || !parentObserved || source.Identity != capability.Source.Identity || parent != capability.QuarantineParent || !DirectoryCapability.IsContained(parent.FinalPath, source.FinalPath))
+                return new(SupervisorStatus.CleanupPartial, 1, true, sourceObserved ? source : null, committed);
+            return new(SupervisorStatus.Success, 1, true, source, committed);
         }
-        catch { return new(SupervisorStatus.CleanupRefused, 1, true, null); }
-        finally { if (buffer != IntPtr.Zero) { Marshal.Copy(new byte[length], 0, buffer, length); Marshal.FreeHGlobal(buffer); } }
+        catch
+        {
+            evidence.Dispose();
+            return new(issued ? SupervisorStatus.CleanupPartial : SupervisorStatus.CleanupRefused, issued ? 1 : 0, released, null);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+            if (buffer != IntPtr.Zero) { Marshal.Copy(new byte[length], 0, buffer, length); Marshal.FreeHGlobal(buffer); }
+        }
     }
     public static bool IsSuccessfulStatus(int callStatus, int ioStatus) => callStatus == StatusSuccess && ioStatus == StatusSuccess;
     public static bool IsCompatibleForCurrentProcess() => IsCompatible(OperatingSystem.IsWindowsVersionAtLeast(10), IntPtr.Size, HasExpectedLayouts(), HasNtSetInformationFile(), FileRenameInformation);
