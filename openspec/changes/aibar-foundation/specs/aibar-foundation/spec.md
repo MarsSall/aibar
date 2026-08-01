@@ -438,79 +438,276 @@ C1b MUST produce and transfer a bounded, immutable `CommittedChildEvidence/v1` v
 - AND the frozen evidence is correlation evidence rather than proof that the child set cannot change during that sequence
 - AND any uncertainty before the rename remains `CLEANUP_REFUSED`, while any uncertainty after a successful rename is handled as `CLEANUP_PARTIAL` with the quarantine retained
 
-### Requirement: C2 exact direct-child evidence bijection before deletion
+### Requirement: b2c-C1c atomic capability-facet transfer prerequisite
 
-C2 MUST consume only the transferred live committed capability and its `CommittedChildEvidence/v1`. Before the first deletion, C2 MUST enumerate exactly one bounded direct-child set from the retained root, reopen every observed child relative to that retained root, derive each leaf tag, volume, file ID, object kind, and non-reparse state from the reopened handle, and prove a complete one-to-one bijection with the frozen records and evidence digest. Leaf spelling, enumeration order, a tag-only match, a caller-selected root, or a fresh path-based enumeration MUST NOT authorize deletion. Recursive descendants remain subject to handle-anchored identity and reparse checks before each mutation.
+The committed producer at `03ee654` MUST expose exactly one producer-side split operation that consumes exactly one `CommittedQuarantineCapability` exactly once and produces one indivisible paired handoff. The handoff MUST contain both facets together: a non-cloneable `RetainedTreeCapabilityFacet` owning only the exact transferred `DirectoryCapability` root and quarantine-parent handles and their already captured observations for C2a, and a non-cloneable immutable `CommittedEvidenceCapabilityFacet` owning only the exact `CommittedChildEvidence/v1`, its digest, correlation key, child-record sensitive buffers, and zeroization duty for C2b. C1c MUST provide no tree-only or evidence-only overload.
 
-#### Scenario: Exact bijection authorizes the first deletion
+Neither facet, the paired handoff, or its shared binding MAY be constructed, duplicated, serialized, reconstructed, substituted, or mixed across handoffs from a path, final-path string, handle value, caller-created safe handle, observation, evidence record, digest, correlation key, nonce, token, or another facet. Each facet MUST be releasable at most once to its fixed consumer role and MUST NOT be reinterpreted as the other facet.
 
-- GIVEN the retained root can enumerate one bounded direct-child set and every observed child can be reopened relative to that root
-- WHEN C2 observes the count, tags, volume serials, file IDs, object kinds, expected non-reparse states, and evidence digest
-- THEN every observed child matches exactly one frozen record and every frozen record matches exactly one observed child
-- AND C2 may continue to its guarded deletion phase only after the protected retry metadata is verified
+The original capability MUST expose exactly the states `Whole`, `Splitting`, `Split`, and `Disposed`. One synchronized linearization gate MUST select exactly one winner for split/dispose races. Only the `Whole` to `Splitting` winner may stage a pair; concurrent or repeated split/dispose losers MUST obtain no facet and MUST NOT touch staged or transferred resources. A losing dispose MUST wait for the winner's terminal publication or disposal decision as needed and then observe only the final state. Validation, immutable binding creation, facet allocation, and all potentially failing factory work MUST occur before ownership detaches. Publication MUST be one commit in which both facets become visible together and the original becomes `Split` and permanently inert. A pre-publication failure MUST dispose every staged resource and leave the original in `Whole` with both ownership bundles intact. If an unexpected failure occurs after ownership detaches but before paired publication, the unpublished facets and staged resources MUST be deterministically disposed and the original MUST become inert or `Disposed`; ownership MUST NOT be restored by duplicating a handle or sensitive buffer.
 
-#### Scenario: Missing, extra, renamed, or substituted child
+The split MUST create one immutable, non-exported, opaque `HandoffIdentity` reference held by both facets. Its representation MUST be authority-internal, non-loggable, non-serializable, and not caller-comparable by supplied bytes. C2a MUST preserve that exact identity when it consumes the tree facet into a `RetainedTreeSession`. C2b MUST accept the evidence facet only when an internal binding check proves that it and the C2a session hold the identical identity from the same C1c handoff. An absent, disposed, legacy, reconstructed, or cross-handoff pair MUST fail before enumeration, metadata work, authorization, or deletion.
 
-- GIVEN the current direct-child set is missing a frozen record, contains an extra entry, has a renamed leaf, or has a different object substituted under an expected leaf
-- WHEN C2 performs the retained-root-relative correlation
-- THEN it proves that the bijection is incomplete or mismatched, performs zero deletions, retains the quarantine, and reports `CLEANUP_PARTIAL`
+After successful publication, the original capability MUST be inert and MUST NOT dispose transferred resources. The tree and evidence facets MUST have independent idempotent exact-once disposal. The tree facet MUST close only the retained root and quarantine-parent handles; the evidence facet MUST zero and dispose only evidence, identity, tag, digest, correlation-key, and other child-sensitive buffers. Disposal in either order MUST NOT affect the peer facet. The coordinator or retained-partial owner MUST preserve the evidence facet before transferring the tree facet to C2a; if C2a construction, runtime gating, session creation, cancellation, timeout, or execution fails, the evidence MUST remain owned and preserved for fail-closed retry or retention. An orphaned facet MUST fail closed and MUST NOT cause the surviving peer to be implicitly disposed or reconstructed.
 
-#### Scenario: Duplicate, reparse, cross-volume, inaccessible, or unclassifiable child
+C1c MUST exclude directory enumeration, relative reopen, observation refresh, deletion, exact-bijection proof, HMAC recomputation, DPAPI protection, cleanup or retry policy, native API additions, C2a or C2b mechanism or policy behavior, C3 discovery or scavenging, PowerShell, shell or subprocess execution, path fallback, and path-based substitution proof. It MUST NOT change the C1b rename or evidence contract.
 
-- GIVEN a current or frozen set contains duplicate tags or identities, an observed reparse object, a child on a different volume, an inaccessible child, or a child whose type or identity cannot be classified
-- WHEN C2 evaluates the correlation gate
-- THEN it refuses the gate, performs zero deletions, retains the quarantine, and reports `CLEANUP_PARTIAL`
+C1c unit proof MUST cover every state transition, repeated and concurrent split/dispose races, injected failure before each allocation/factory/publication boundary, paired-only visibility, same-handoff binding, cross-handoff rejection, original inertness, independent disposal in both orders, exact handle-close and evidence-zeroization counts, and absence of leaked or double-owned resources. Runtime proof MAY use only a bounded fresh test-owned sandbox capability transferred through the real producer seam; it MUST prove ownership and lifetime mechanics only, not C2a native operations, C2b policy, cleanup authorization, or cleanup completion. C1c implementation MUST retain its 220–320 authored-line forecast, High risk, historical hard cap of 400 authored lines, and no exception; completed apply Attempt 62 remains historical at 347/400 with evidence `sha256:d7d8bd1cae69d55c820c2c06dd1c2e137fee47e8fd9a3a7930d806b778dddec8`. Independent C1c verification MUST be a distinct native objective with max attempts 1 and native changed-line ceiling 1000, MUST verify that exact Attempt 62 candidate/evidence, MUST make no functional code edits by default, and MUST write only verification evidence/report unless a separate correction decision authorizes otherwise. The verification objective requires fresh native reset/begin authorization and MUST NOT reset or reuse Attempt 62. Its 1000 ceiling is evidence/correction headroom only and MUST NOT expand behavior, allowed paths, dependencies, absorb C2a/C2b, merge units, authorize C3, or authorize stage/commit/push/PR/review. Rollback MUST occur in the order C2b → C2a → C1c → producer, and MUST remove or disable consumers before the split seam. Attempts 60 and 61 are failed historical evidence only and MUST NOT be used as completion, implementation, runtime, review, or verification authority. C3 remains excluded.
 
-#### Scenario: Cancellation or unknown correlation outcome
+#### Scenario: Successful paired split
 
-- GIVEN enumeration, retained-root-relative reopen, handle observation, or bijection validation is cancelled, faults, times out, or returns an unknown result
-- WHEN C2 reaches the corresponding bounded cancellation or fault boundary
-- THEN it stops mutation, performs zero deletions if the first deletion has not started, retains the quarantine, and reports `CLEANUP_PARTIAL`
-- AND it never converts the uncertainty into a successful cleanup result
+- GIVEN one valid `Whole` `CommittedQuarantineCapability` from committed producer `03ee654` owns the retained root/parent handles and immutable child evidence
+- WHEN the single split operation wins its ownership gate and publishes
+- THEN exactly one indivisible handoff becomes visible containing exactly one tree facet and exactly one evidence facet with the same internal binding, and the original enters `Split`
 
-### Requirement: Protected C2 retry metadata and retained-quarantine failure handling
+#### Scenario: Repeated or concurrent split
 
-Before the first C2 deletion, the system MUST protect and verify bounded retry metadata with DPAPI `CurrentUser` protection. The protected record MUST bind the same evidence version, evidence digest, correlation key, retained-root identity, phase, bounded retry count, and next-eligible time to the committed capability. Plaintext serialization buffers, DPAPI plaintext, correlation keys, leaf tags, digests, and temporary enumeration records MUST be bounded, zeroized, and disposed exactly once; capability disposal MUST be idempotent. Failure to create, protect, unprotect, verify, or bind this metadata after commit MUST leave the quarantine retained, perform zero deletions, and report `CLEANUP_PARTIAL`.
+- GIVEN multiple split calls race or a split is requested again after a winner has published
+- WHEN the calls compete for the capability's ownership gate
+- THEN exactly one call may win, every other call obtains no facet, and no handle, evidence buffer, or binding is duplicated or exposed
 
-#### Scenario: Protected metadata is valid
+#### Scenario: Split versus dispose
 
-- GIVEN the transferred evidence digest and retained-root identity are unchanged
-- WHEN C2 creates and verifies the DPAPI `CurrentUser`-protected record with its bounded phase, retry count, and next-eligible time
-- THEN the record is bound to that digest and C2 may enter the guarded deletion phase without exposing a path, secret, nonce, or handle value
+- GIVEN split and dispose are invoked concurrently on one `Whole` capability
+- WHEN the synchronized linearization gate selects a winner
+- THEN exactly one transition wins, the loser obtains no facet and does not touch staged resources, and the result is either a published pair with an inert original or a disposed original with no published facet
 
-#### Scenario: Metadata is missing, legacy, corrupt, or unbound
+#### Scenario: Injected pre-publication failure
 
-- GIVEN the protected record is missing, legacy, corrupt, cannot be decrypted for the current user, has the wrong evidence version or digest, or is not bound to the retained root
-- WHEN C2 or a retry path evaluates it
-- THEN it refuses deletion, retains the quarantine, and reports `CLEANUP_PARTIAL` with zero deletions
-- AND it MUST NOT synthesize evidence from a pathname, a post-commit enumeration, legacy path-only data, or a caller-supplied root
+- GIVEN validation, binding creation, facet allocation, or factory work fails before paired publication
+- WHEN the split operation handles the failure
+- THEN all staged resources are disposed exactly once and the original remains `Whole` with both original ownership bundles intact
 
-#### Scenario: Failure occurs after the native commit
+#### Scenario: Paired-only visibility
 
-- GIVEN the single native rename has succeeded
-- WHEN any subsequent reopen, identity, parent, reparse, enumeration, metadata, deletion, cancellation, or otherwise unknown operation fails
-- THEN the result is always `CLEANUP_PARTIAL`, the retained quarantine is the only cleanup boundary, and no rename-back, path fallback, copy-delete fallback, target-changing retry, arbitrary-root selection, or original-path preservation claim is made
-- AND if deletion has started, C2 stops at the next bounded cancellation point and never reports complete cleanup
+- GIVEN one facet allocation succeeds but the other facet or publication step has not completed
+- WHEN any consumer observes the split result
+- THEN neither facet is visible, and no tree-only or evidence-only handoff can be returned
 
-### Requirement: C1b and C2 roll-forward, rollback, and C3 boundary
+#### Scenario: Original inertness
 
-The `CommittedChildEvidence/v1` producer and C2 consumer MUST roll forward as one versioned capability contract. C2 MUST reject any legacy, missing, corrupt, or otherwise unbound evidence rather than weakening the deletion gate. A rollback MUST disable C2 deletion before removing or disabling the new C1b producer; no migration may synthesize child evidence. This contract MUST authorize only the directly handed-off retained root for its guarded C2 operation and MUST NOT authorize C3 discovery, age or owner admission, ACL selection, canonical temporary-base selection, retry scheduling, or arbitrary root selection. C3 remains explicitly out of scope and requires a separately approved contract.
+- GIVEN a paired split has published successfully
+- WHEN the original wrapper is disposed, split again, or otherwise used as an owner
+- THEN it performs no transferred-resource disposal and yields no capability, while the two published facets remain independently owned
 
-#### Scenario: Roll-forward compatibility
+#### Scenario: Disposal in both orders
 
-- GIVEN C1b and C2 are deployed with `CommittedChildEvidence/v1`
-- WHEN C2 receives a committed capability
-- THEN it consumes only the transferred versioned evidence and protected digest binding, and refuses any legacy or differently shaped capability without deletion
+- GIVEN both facets have been published and remain live
+- WHEN the tree facet is disposed before the evidence facet, or the evidence facet is disposed before the tree facet
+- THEN each facet disposes exactly once and only its own handles or sensitive buffers, and the peer remains valid until its own terminal disposal
 
-#### Scenario: Safe rollback ordering
+#### Scenario: Same-handoff binding acceptance
 
-- GIVEN a rollback must remove or disable the new evidence producer or consumer
-- WHEN rollback is applied
-- THEN C2 deletion is disabled first, the new producer is removed only afterward, and retained quarantines remain non-destructive rather than being migrated from paths or fresh enumeration
+- GIVEN C2a holds a session created from the tree facet and C2b holds the evidence facet from that same C1c handoff
+- WHEN C2b checks their internal binding
+- THEN the pair is accepted for the existing C2b gates, without exposing or comparing caller-supplied binding bytes
 
-#### Scenario: C3 is not authorized
+#### Scenario: Cross-handoff rejection
 
-- GIVEN a caller, retry process, or future scavenger has only a protected record or metadata reference
-- WHEN it attempts to discover, select, or consume a quarantine root outside the directly handed-off capability
-- THEN it performs no deletion or cleanup and reports the stable non-success state
-- AND no C3 discovery, scavenging, arbitrary-root selection, or other C3 behavior is performed by this contract
+- GIVEN a C2a session and evidence facet originate from different C1c handoffs, or either binding is absent, legacy, disposed, or reconstructed
+- WHEN C2b checks the pair
+- THEN it rejects the pair before enumeration, metadata, authorization, or deletion and retains the quarantine without reconstructing authority
+
+#### Scenario: Tree-facet orphan
+
+- GIVEN the evidence facet is unavailable or terminally disposed while the tree facet remains live
+- WHEN the tree facet is orphaned or its consumer cannot proceed
+- THEN the system fails closed, closes only the tree facet's handles at its explicit disposal boundary, and never synthesizes evidence or performs cleanup
+
+#### Scenario: Evidence-facet orphan
+
+- GIVEN the tree facet or C2a session is unavailable while the evidence facet remains live
+- WHEN the evidence facet is orphaned
+- THEN the evidence remains preserved for retention or fail-closed retry until explicit terminal disposal, and no root is selected or cleanup is authorized
+
+#### Scenario: C2a failure preserves evidence
+
+- GIVEN the tree facet is transferred to C2a but construction, runtime gating, session creation, cancellation, timeout, or execution fails
+- WHEN C2a reports the failure
+- THEN the evidence facet remains owned by the coordinator or retained-partial owner with its buffers preserved, while no C2a or C2b cleanup authority is created
+
+#### Scenario: Unsupported, legacy, or direct-producer input
+
+- GIVEN C2a receives the combined producer capability directly, a pre-C1c legacy capability, a tree-only/evidence-only object, a reconstructed facet, or any path, handle value, caller safe handle, or other substituted input
+- WHEN C2a attempts to create a session
+- THEN it rejects the input before enumeration or mutation, remains blocked until C1c is independently verified and committed, and emits no sensitive value
+
+#### Scenario: No sensitive values in diagnostics
+
+- GIVEN any C1c success, refusal, race, failure, orphan, or disposal transition occurs
+- WHEN status or structured diagnostics are emitted
+- THEN they contain only stable non-sensitive phase/error information and MUST NOT contain paths, final-path strings, handle values, evidence, digests, keys, nonces, tokens, leaf names, credentials, buffers, exception text, or binding representation
+
+### Requirement: C2a transferred retained-capability facet and session boundary
+
+C2a MUST accept exactly one one-way transferred `RetainedTreeCapabilityFacet` produced by independently verified and committed C1c from producer `03ee654`; it MUST reject direct producer `03ee654` combined-capability input, any legacy pre-C1c capability, and any path-selected root, reconstructed root, arbitrary handle, caller-created safe handle, final-path string, root selector, evidence record, retry request, or deletion policy. C2a MUST remain blocked until C1c is independently verified and committed. The handoff MUST consume the live root/parent-handle facet exactly once, preserve the same internal C1c handoff identity in the resulting session, bind the session to the retained root identity and volume, and leave the immutable `CommittedEvidenceCapabilityFacet` for C2b. C2a MUST keep all relative leaf names as bounded transient lookup material only.
+
+#### Scenario: Approved C1c one-way handoff
+
+- GIVEN C1c is independently verified and committed and the producer transfers one still-live retained-tree facet with its root identity, volume, and internal handoff identity
+- WHEN C2a creates a session
+- THEN the facet moves once into a session-bound `RetainedTreeSession`, the same internal identity is preserved, the root handle remains live for the session, and no caller can replace or duplicate that authority
+
+#### Scenario: Direct producer or legacy request
+
+- GIVEN C1c is not independently verified and committed, or a caller supplies the combined producer capability, a legacy capability, a path, final-path string, reconstructed root, arbitrary handle, or caller-selected root instead of the transferred facet
+- WHEN C2a is asked to create or use a session
+- THEN it rejects the request with a stable mechanism error, remains blocked before enumeration or mutation, and emits no path, handle value, evidence, binding, or secret
+
+### Requirement: C2a bounded native retained-handle operations
+
+On supported Windows 10/11 x64, C2a MUST provide bounded handle-relative direct-child enumeration, relative reopen, handle observation, disposable observation leases, recursive post-order enumeration, re-observation, disposal, and handle-only delete primitives. Enumeration MUST use `NtQueryDirectoryFile` against the retained directory handle with an asserted `FILE_NAMES_INFORMATION` layout and at most one bounded restart; reopen MUST use `NtCreateFile` with `OBJECT_ATTRIBUTES.RootDirectory` bound to the retained root handle and a bounded relative `UNICODE_STRING`; deletion MUST use `NtSetInformationFile(FileDispositionInformation)` on a same-session handle with the required delete and synchronize rights. No operation MAY resolve or reconstruct a filesystem path.
+
+Direct enumeration MUST reject malformed offsets or lengths, embedded NUL, `.` or `..`, non-simple leaves, ordinal-ignore-case duplicates, more than 16 direct children, configured recursive entry/depth/byte bounds, buffer truncation, and uncertain nonterminal status. Every reopened object MUST be observed from its live handle for volume, file identity, kind, size facts, and reparse state. Reparse objects, cross-volume objects, unsupported kinds, identity ambiguity, and observation failure MUST close the affected lease and fail closed. Recursive deletion primitives MUST enumerate descendants relative to live parent handles, reopen with reparse-point semantics, re-observe before mutation, delete leaf-first, and delete the retained root last through its transferred handle.
+
+#### Scenario: Valid bounded handle-relative operation
+
+- GIVEN a transferred retained root on a supported Windows 10/11 x64 volume and a bounded direct-child set of simple non-reparse entries
+- WHEN C2a enumerates, reopens, observes, and leases the entries
+- THEN every result is derived from retained handles, leases are bound to the originating session and generation, and no filesystem path is used as authority
+
+#### Scenario: Malformed or duplicate native enumeration
+
+- GIVEN `NtQueryDirectoryFile` returns malformed record offsets/lengths, embedded NUL, `.`/`..`, duplicate simple leaves, more than 16 entries, or truncated data
+- WHEN C2a parses the bounded result
+- THEN it rejects the enumeration with a stable mechanism error, returns no authoritative lease set, and performs no deletion
+
+#### Scenario: Reordered native enumeration
+
+- GIVEN `NtQueryDirectoryFile` returns the same valid bounded direct-child records in a different order
+- WHEN C2a parses the result and C2b correlates the leases
+- THEN C2a returns only session-bound transient leases, C2b matches the complete sets by their required evidence rather than order, and enumeration order cannot authorize or deny deletion
+
+#### Scenario: Reopen substitution or identity refusal
+
+- GIVEN a relative reopen resolves to a different file identity, volume, kind, or reparse state than the observed entry, or the entry cannot be observed
+- WHEN C2a validates the reopened handle
+- THEN it closes that lease, refuses the operation, and does not promote the leaf spelling or substituted object to authority
+
+### Requirement: C2a mechanism-only authorization and test boundary
+
+C2a MUST NOT evaluate authorization policy, `CommittedChildEvidence/v1`, HMAC tags, evidence digests, DPAPI bytes, retry state, or evidence bijection. C2a MUST expose no unguarded deletion operation: every delete primitive MUST require an unforgeable session-bound one-use authorization minted only by C2b after its policy gates. The authorization MUST be invalidated by session disposal, cancellation, deadline expiry, lease mismatch, or observation fault. A bounded deletion proof MAY run only in a test-owned sandbox transferred through the real producer capability; it MUST grant no production authority and MUST NOT be treated as C2b cleanup evidence.
+
+#### Scenario: Mechanism cannot arm itself
+
+- GIVEN C2a has a valid retained session but no C2b authorization token
+- WHEN a caller requests recursive deletion or attempts to mint a token through C2a
+- THEN C2a performs no deletion and returns a stable mechanism error without inspecting or synthesizing evidence
+
+#### Scenario: Test-owned sandbox proof
+
+- GIVEN a bounded test-owned sandbox is transferred through the producer capability for a native primitive proof
+- WHEN C2a exercises the primitive under the test bounds
+- THEN the proof may demonstrate native behavior only, grants no production authorization, and cannot be reused as C2b cleanup evidence
+
+### Requirement: C2a ownership, deadlines, native safety, and diagnostics
+
+C2a MUST own the transferred capability, root and parent handles, every child and descendant lease handle, transient leaf records, and native buffers through one-way ownership transitions. Child leases MUST be disposed before parent handles, root and parent handles MUST close last, disposal MUST be idempotent, and no handle value MAY leave the interop layer. One monotonic deadline and linked cancellation MUST be checked before and after every native call and between entries; no new operation may begin after cancellation or deadline. C2a MUST NOT claim that a synchronous kernel call is cancellable in flight. If such a call does not return within the enclosing deadline, success is impossible and the operation is indeterminate/partial for C2b's classification, with no background continuation.
+
+Native compatibility MUST be gated before any production delete primitive is armed: the process MUST be 64-bit on maintained Windows 10/11 x64, selected exports and information classes MUST exist, pointer and native structure layouts MUST match, synchronous completion and disposition semantics MUST be supported, and filesystem/filter/access/share behavior MUST be verified. Checked zero-initialized buffers MUST bound all directory records, `OBJECT_ATTRIBUTES`, `UNICODE_STRING`, identity records, and transient UTF-16 data; buffers and managed copies MUST be zeroed before release. C2a MUST emit only stable path/secret-free mechanism classes such as `UNSUPPORTED_RUNTIME`, `INVALID_CAPABILITY`, `BOUND_EXCEEDED`, `CANCELLED`, `TIMEOUT`, `ENUMERATION_FAILED`, `REOPEN_FAILED`, `OBSERVATION_FAILED`, `REPARSE_DETECTED`, `CROSS_VOLUME`, `IDENTITY_CHANGED`, `DELETE_FAILED`, and `INTERNAL_UNKNOWN`. There MUST be no compatibility fallback, path-based operation, Win32/managed delete fallback, shell, PowerShell, subprocess, copy-delete, or rename-back.
+
+#### Scenario: Unsupported runtime, API, layout, filesystem, or filter
+
+- GIVEN architecture, Windows version, native export or information class, checked layout, synchronous completion, filesystem/filter behavior, access/share state, or volume relationship is unsupported or unprovable
+- WHEN C2a evaluates its runtime gate
+- THEN it returns `UNSUPPORTED_RUNTIME` or the applicable stable mechanism class, performs no production deletion, and uses no compatibility fallback
+
+#### Scenario: Cancellation or timeout at a boundary
+
+- GIVEN cancellation or the monotonic deadline occurs before or after enumeration, reopen, observation, or deletion, or a synchronous call does not return before the enclosing deadline
+- WHEN C2a reaches the next bounded boundary
+- THEN it starts no new native operation, invalidates any authorization and leases, reports `CANCELLED` or `TIMEOUT`/indeterminate mechanism state, and does not report cleanup success
+
+#### Scenario: Native deletion fault and zero residue
+
+- GIVEN an authorized test-owned primitive encounters a deletion fault or any unknown native result
+- WHEN C2a disposes the session
+- THEN it stops at the next bounded point, reports only a stable mechanism class, zeroes transient buffers, closes every handle exactly once, and leaves no helper process, test root, lease, or buffer residue attributable to the session
+
+### Requirement: C2b exact producer-evidence and C2a-session consumption
+
+C2b MUST consume exactly one independently committed `CommittedEvidenceCapabilityFacet` containing `CommittedChildEvidence/v1` and exactly one C2a session created from the matching `RetainedTreeCapabilityFacet` of the same C1c handoff. It MUST first prove the shared immutable authority-internal C1c binding by reference/identity, not by caller-supplied bytes; it MUST reject direct producer evidence, replacement, reconstruction, path selection, fresh-root selection, mixed producer versions, cross-handoff facets, and any evidence/session pair whose root or correlation binding differs. Before the first deletion, while the complete direct-child lease set remains live, C2b MUST verify the evidence version and digest, root and parent identity, and an exact bijection of count, HMAC tag, volume serial, 128-bit file ID, object kind, expected non-reparse state, and evidence digest. Enumeration order, leaf spelling, a tag-only match, or a fresh path-based enumeration MUST never authorize deletion.
+
+#### Scenario: Exact bijection before first deletion
+
+- GIVEN one C2a session returns one bounded direct-child lease set and one matching `CommittedChildEvidence/v1`
+- WHEN C2b derives each tag in memory and compares both sets
+- THEN every observed lease matches exactly one frozen record, every frozen record is consumed exactly once, all count/tag/identity/kind/volume/non-reparse/digest checks pass, leases remain live, and no deletion begins until the metadata gate also passes
+
+#### Scenario: Every pre-first-deletion uncertainty fails closed
+
+- GIVEN a missing, extra, renamed, substituted, duplicate, reparse, cross-volume, inaccessible, unknown-kind, tag-mismatched, identity-mismatched, digest-mismatched, cancelled, timed-out, faulted, or otherwise unknown enumeration/reopen/observation result occurs
+- WHEN C2b evaluates the correlation gate
+- THEN it performs zero deletions, retains the quarantine, reports truthful `CLEANUP_PARTIAL`, and never repairs the mismatch from a path, fresh enumeration, or synthesized evidence
+
+### Requirement: C2b DPAPI retry metadata binding and zeroization
+
+Before the first deletion, C2b MUST serialize only bounded retry metadata containing the evidence schema version, evidence digest, correlation binding, retained-root identity, phase, retry count, and next-eligible time. It MUST protect the record with DPAPI `CurrentUser`, immediately unprotect it, and verify the binding in constant time before durably recording only the protected bytes. Plaintext serialization, DPAPI plaintext, correlation key, leaf tags, digests, and temporary lease/enumeration records MUST be bounded, zeroized, and disposed exactly once. Missing, legacy, corrupt, wrong-version, wrong-user, unprotectable, wrong-correlation, wrong-root, unbound, non-durable, or retry-exhausted metadata MUST fail closed with zero deletion. Protected metadata MUST never discover or select a root.
+
+#### Scenario: Valid current-user metadata
+
+- GIVEN the evidence version, digest, correlation binding, retained-root identity, phase, retry count, and next-eligible time are current and within bounds
+- WHEN C2b protects, immediately unprotects, and constant-time verifies the record for the current user
+- THEN only the protected bytes are retained, the metadata gate succeeds, and no path, secret, nonce, handle value, or plaintext record is exposed
+
+#### Scenario: Missing, legacy, corrupt, unbound, or exhausted metadata
+
+- GIVEN metadata is missing, legacy, corrupt, bound to another user/evidence/key/root, not durably recorded, unverifiable, or retry-exhausted
+- WHEN C2b evaluates the retry gate
+- THEN it performs zero deletions, retains the quarantine, reports `CLEANUP_PARTIAL`, and does not synthesize or select replacement authority
+
+#### Scenario: Crash in the metadata window
+
+- GIVEN the process crashes before protected metadata is durably recorded, after recording it but before deletion, or after deletion has started
+- WHEN the retained capability is later disposed or observed
+- THEN missing metadata is non-actionable, durable verified metadata remains bound only to the same live capability, and every uncertain post-commit state retains the quarantine as `CLEANUP_PARTIAL` without a success claim
+
+### Requirement: C2b one-use authorization and guarded post-order cleanup
+
+Only after both the exact-bijection and DPAPI metadata gates pass may C2b mint one session-bound, one-use authorization for C2a. C2b MUST use that authorization for bounded post-order, handle-anchored deletion; it MUST immediately re-observe every live direct-child and descendant handle before each mutation and MUST stop at the next bounded cancellation/deadline point. Any reparse, identity, kind, volume, extra-descendant, reopen, enumeration, deletion, metadata, disposal, or unknown fault after the producer commit MUST retain the quarantine and report `CLEANUP_PARTIAL`, whether or not the first deletion has started. C2b MUST NOT rename back, retry from a path, choose an arbitrary root, copy-delete, change the target, or claim original-path preservation. Complete cleanup requires verified deletion of every descendant, direct child, and retained root plus verified handle disposal.
+
+#### Scenario: One-use authorization and immediate revalidation
+
+- GIVEN the two gates passed and the complete direct-child leases remain live
+- WHEN C2b mints the authorization and begins post-order cleanup
+- THEN the token is accepted only by its originating C2a session, is consumed once, and each live handle is re-observed immediately before its delete operation
+
+#### Scenario: Fault before the first deletion
+
+- GIVEN a post-commit metadata, lease, revalidation, descendant enumeration, reopen, identity, reparse, cancellation, timeout, or authorization fault occurs before the first delete
+- WHEN C2b reaches the fault boundary
+- THEN it performs zero deletions, transfers or retains ownership safely, retains the quarantine, and reports `CLEANUP_PARTIAL`
+
+#### Scenario: Fault after deletion starts
+
+- GIVEN one or more bounded post-order deletions have completed and a later deletion, revalidation, disposal, cancellation, timeout, or unknown operation fails
+- WHEN C2b handles the fault
+- THEN it stops further mutation at the next bounded point, retains the remaining quarantine, reports `CLEANUP_PARTIAL`, and never renames back or retries from an arbitrary root
+
+#### Scenario: Idempotent disposal and no leakage
+
+- GIVEN C2b completes, fails, or is disposed more than once
+- WHEN ownership and sensitive buffers are released
+- THEN disposal is idempotent, handles close exactly once, plaintext and transient records are zeroed, and status/diagnostics contain no path, leaf, secret, credential, nonce, raw native status, exception text, or handle value
+
+### Requirement: C2 dependency, rollback, compatibility, and excluded capabilities
+
+The only forward dependency for this contract MUST be committed producer `03ee654` → `b2c-C1c` → `b2c-C2a` → `b2c-C2b`. C1c MUST be independently verified and committed before C2a may begin; C2a MUST reject direct producer and legacy input and MUST remain blocked otherwise. C2a and C2b MUST remain separate feature-branch-chain review units with their own boundaries. C1c retains its 220–320 authored-line implementation forecast, High risk, historical hard cap of 400, and no exception; its distinct independent-verification objective has max attempts 1 and native changed-line ceiling 1000 under the constraints above. C2a and C2b each retain their 300–390 authored-line forecast and High risk with a maintainer-approved native changed-line ceiling of 1000. For both future units, authored changes above 400 trigger mandatory workload visibility and review-splitting pressure; the additional ceiling covers only bounded evidence/correction headroom and MUST NOT expand behavior, allowed paths, dependency scope, absorb another unit or C3, merge C1c/C2a/C2b, or authorize stage/commit/push/PR/review. Rollback MUST occur in reverse order: disable/remove C2b first, then C2a, then C1c, then the producer amendment. No mixed-version reinterpretation, legacy migration, post-commit evidence synthesis, or evidence bijection inferred from historical attempts is allowed. Attempts 60 and 61 remain failed historical evidence and MUST NOT serve as completion or verification authority. Completed apply Attempt 62 remains historical at 347/400 and MUST NOT be reset or reused as verification. C3 scavenging, retry scheduling/discovery, PowerShell integration, arbitrary-root discovery, age/owner/ACL admission, and other discovery behavior remain out of scope.
+
+#### Scenario: Forward and rollback ordering
+
+- GIVEN committed producer `03ee654`, C1c, C2a, and C2b are being advanced or rolled back
+- WHEN a unit boundary is crossed
+- THEN forward use is only producer `03ee654` → C1c → C2a → C2b, rollback is only C2b → C2a → C1c → producer, and no consumer remains active without its immediate predecessor
+
+#### Scenario: Mixed-version or historical evidence
+
+- GIVEN C2b receives a legacy capability, missing or differently shaped evidence, a mismatched C2a session, or Attempt 60 evidence revision `sha256:b75015c735c059de4720f6eb5705d3e21e0f98811e1acd138842d1f3602e011f` / tree `a8fcdab1d34fcfbdd171a81643f58b7cb34b0533`
+- WHEN it evaluates the input
+- THEN it rejects it without deletion, evidence synthesis, or completion claim; the failed candidate is historical only and the rolled-back functional candidate is not reused
+
+#### Scenario: C3 and discovery are excluded
+
+- GIVEN a retry process, scavenger, PowerShell caller, metadata reference, or future component has no directly handed-off live capability
+- WHEN it attempts to discover, select, schedule, or clean a retained root
+- THEN it performs no cleanup under this contract and reports only a stable non-success state; C3 requires a separately approved specification

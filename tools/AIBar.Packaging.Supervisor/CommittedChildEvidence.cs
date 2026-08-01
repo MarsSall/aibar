@@ -128,6 +128,8 @@ public sealed class CommittedChildEvidence : IDisposable
         }
     }
 
+    internal int DisposeCount { get; private set; }
+
     public bool HasValidDigest()
     {
         if (_disposed) return false;
@@ -170,6 +172,7 @@ public sealed class CommittedChildEvidence : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        DisposeCount++;
         CryptographicOperations.ZeroMemory(_digest);
         CryptographicOperations.ZeroMemory(_correlationKey);
         Root.Zero(); QuarantineParent.Zero();
@@ -177,32 +180,197 @@ public sealed class CommittedChildEvidence : IDisposable
     }
 }
 
+public enum CommittedQuarantineCapabilityState : byte { Whole, Splitting, Split, Disposed }
+internal enum CapabilityFacetFailurePoint : byte { Validation, Binding, TreeFacet, EvidenceFacet, Handoff, PostDetach }
+
+internal interface ICommittedCapabilityFacetHandoff : IDisposable
+{
+    bool TryTakeBoth(out IRetainedTreeCapabilityFacet? tree, out ICommittedEvidenceCapabilityFacet? evidence);
+}
+
+internal interface IRetainedTreeCapabilityFacet : IDisposable
+{
+    DirectoryObservation Source { get; }
+    DirectoryObservation QuarantineParent { get; }
+    SafeFileHandle RootHandle { get; }
+    SafeFileHandle QuarantineParentHandle { get; }
+    bool IsDisposed { get; }
+}
+
+internal interface ICommittedEvidenceCapabilityFacet : IDisposable
+{
+    CommittedChildEvidence Evidence { get; }
+    bool IsDisposed { get; }
+}
+
 public sealed class CommittedQuarantineCapability : IDisposable
 {
+    private readonly object _gate = new();
+    private Func<CapabilityFacetFailurePoint, bool>? _failureInjection;
     private DirectoryCapability? _owner;
-    private bool _disposed;
+    private CommittedChildEvidence? _evidence;
+    private CommittedQuarantineCapabilityState _state = CommittedQuarantineCapabilityState.Whole;
 
-    internal CommittedQuarantineCapability(DirectoryCapability owner, DirectoryObservation root, DirectoryObservation parent, CommittedChildEvidence evidence)
+    internal CommittedQuarantineCapability(DirectoryCapability owner, DirectoryObservation root, DirectoryObservation parent, CommittedChildEvidence evidence, Func<CapabilityFacetFailurePoint, bool>? failureInjection = null)
     {
         _owner = owner;
+        _evidence = evidence;
+        _failureInjection = failureInjection;
         Source = root;
         QuarantineParent = parent;
-        Evidence = evidence;
     }
 
     public DirectoryObservation Source { get; }
     public DirectoryObservation QuarantineParent { get; }
-    public CommittedChildEvidence Evidence { get; }
+    public CommittedChildEvidence Evidence => _evidence ?? throw new ObjectDisposedException(nameof(CommittedQuarantineCapability));
+    internal CommittedQuarantineCapabilityState State { get { lock (_gate) return _state; } }
     internal SafeFileHandle RootHandle => _owner?.RootHandle ?? throw new ObjectDisposedException(nameof(CommittedQuarantineCapability));
     internal SafeFileHandle QuarantineParentHandle => _owner?.QuarantineParentHandle ?? throw new ObjectDisposedException(nameof(CommittedQuarantineCapability));
     internal bool HandlesReleased => _owner is null;
 
+    internal bool TrySplit(out ICommittedCapabilityFacetHandoff? handoff)
+    {
+        handoff = null;
+        lock (_gate)
+        {
+            if (_state != CommittedQuarantineCapabilityState.Whole) return false;
+            _state = CommittedQuarantineCapabilityState.Splitting;
+            ICommittedCapabilityFacetHandoff? candidate = null;
+            var detached = false;
+            try
+            {
+                if (ShouldFail(CapabilityFacetFailurePoint.Validation) || _owner is null || _evidence is null) return false;
+                if (ShouldFail(CapabilityFacetFailurePoint.Binding)) return false;
+                var identity = new HandoffIdentity();
+                if (ShouldFail(CapabilityFacetFailurePoint.TreeFacet)) return false;
+                var tree = new RetainedTreeCapabilityFacet(identity, Source, QuarantineParent);
+                if (ShouldFail(CapabilityFacetFailurePoint.EvidenceFacet)) return false;
+                var evidence = new CommittedEvidenceCapabilityFacet(identity);
+                if (ShouldFail(CapabilityFacetFailurePoint.Handoff)) return false;
+                candidate = new CommittedCapabilityFacetHandoff(tree, evidence);
+
+                if (!_owner.TryDetachCommittedHandles(out var root, out var parent) || root is null || parent is null) return false;
+                var transferredEvidence = _evidence;
+                _owner = null;
+                _evidence = null;
+                detached = true;
+                tree.Attach(root, parent);
+                evidence.Attach(transferredEvidence);
+                if (ShouldFail(CapabilityFacetFailurePoint.PostDetach)) throw new InvalidOperationException();
+
+                _state = CommittedQuarantineCapabilityState.Split;
+                handoff = candidate;
+                candidate = null;
+                return true;
+            }
+            catch
+            {
+                candidate?.Dispose();
+                _state = detached ? CommittedQuarantineCapabilityState.Disposed : CommittedQuarantineCapabilityState.Whole;
+                return false;
+            }
+            finally
+            {
+                candidate?.Dispose();
+                if (_state == CommittedQuarantineCapabilityState.Splitting) _state = CommittedQuarantineCapabilityState.Whole;
+            }
+        }
+    }
+
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
-        Evidence.Dispose();
-        _owner?.Dispose();
-        _owner = null;
+        lock (_gate)
+        {
+            if (_state is CommittedQuarantineCapabilityState.Disposed or CommittedQuarantineCapabilityState.Split) return;
+            _state = CommittedQuarantineCapabilityState.Disposed;
+            Interlocked.Exchange(ref _evidence, null)?.Dispose();
+            _owner?.Dispose();
+            _owner = null;
+        }
     }
+
+    internal void SetFailureInjectionForTests(Func<CapabilityFacetFailurePoint, bool>? failureInjection) => _failureInjection = failureInjection;
+    private bool ShouldFail(CapabilityFacetFailurePoint point) => _failureInjection?.Invoke(point) == true;
+
+    private sealed class CommittedCapabilityFacetHandoff : ICommittedCapabilityFacetHandoff
+    {
+        private readonly object _gate = new();
+        private RetainedTreeCapabilityFacet? _tree;
+        private CommittedEvidenceCapabilityFacet? _evidence;
+
+        internal CommittedCapabilityFacetHandoff(RetainedTreeCapabilityFacet tree, CommittedEvidenceCapabilityFacet evidence) => (_tree, _evidence) = (tree, evidence);
+        public bool TryTakeBoth(out IRetainedTreeCapabilityFacet? tree, out ICommittedEvidenceCapabilityFacet? evidence)
+        {
+            lock (_gate)
+            {
+                tree = _tree;
+                evidence = _evidence;
+                if (tree is null || evidence is null) return false;
+                _tree = null;
+                _evidence = null;
+                return true;
+            }
+        }
+        public void Dispose()
+        {
+            RetainedTreeCapabilityFacet? tree;
+            CommittedEvidenceCapabilityFacet? evidence;
+            lock (_gate) { tree = _tree; evidence = _evidence; _tree = null; _evidence = null; }
+            tree?.Dispose();
+            evidence?.Dispose();
+        }
+    }
+
+    private sealed class RetainedTreeCapabilityFacet : IRetainedTreeCapabilityFacet
+    {
+        internal readonly HandoffIdentity _identity;
+        private SafeFileHandle? _root, _parent;
+        private int _disposed;
+
+        internal RetainedTreeCapabilityFacet(HandoffIdentity identity, DirectoryObservation source, DirectoryObservation parent) => (_identity, Source, QuarantineParent) = (identity, source, parent);
+        public DirectoryObservation Source { get; }
+        public DirectoryObservation QuarantineParent { get; }
+        public SafeFileHandle RootHandle => _root ?? throw new ObjectDisposedException(nameof(RetainedTreeCapabilityFacet));
+        public SafeFileHandle QuarantineParentHandle => _parent ?? throw new ObjectDisposedException(nameof(RetainedTreeCapabilityFacet));
+        public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+        internal void Attach(SafeFileHandle root, SafeFileHandle parent) => (_root, _parent) = (root, parent);
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            Interlocked.Exchange(ref _parent, null)?.Dispose();
+            Interlocked.Exchange(ref _root, null)?.Dispose();
+        }
+    }
+
+    private sealed class CommittedEvidenceCapabilityFacet : ICommittedEvidenceCapabilityFacet
+    {
+        internal readonly HandoffIdentity _identity;
+        private CommittedChildEvidence? _evidence;
+        private int _disposed;
+
+        internal CommittedEvidenceCapabilityFacet(HandoffIdentity identity) => _identity = identity;
+        public CommittedChildEvidence Evidence => _evidence ?? throw new ObjectDisposedException(nameof(CommittedEvidenceCapabilityFacet));
+        public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+        internal void Attach(CommittedChildEvidence evidence) => _evidence = evidence;
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            Interlocked.Exchange(ref _evidence, null)?.Dispose();
+        }
+    }
+
+    private sealed class HandoffIdentity { }
+
+    internal static bool Matches(IRetainedTreeCapabilityFacet tree, ICommittedEvidenceCapabilityFacet evidence)
+        => tree is RetainedTreeCapabilityFacet retainedTree
+           && evidence is CommittedEvidenceCapabilityFacet retainedEvidence
+           && !retainedTree.IsDisposed
+           && !retainedEvidence.IsDisposed
+           && ReferenceEquals(retainedTree._identity, retainedEvidence._identity);
+}
+
+internal static class CapabilityFacetBinding
+{
+    internal static bool Matches(IRetainedTreeCapabilityFacet tree, ICommittedEvidenceCapabilityFacet evidence)
+        => CommittedQuarantineCapability.Matches(tree, evidence);
 }

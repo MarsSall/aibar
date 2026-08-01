@@ -562,13 +562,14 @@ public sealed class PackagingSupervisorTests
             var result = NativeRenameReadiness.Prove(retained, "quarantine-source");
             Assert.Equal(SupervisorStatus.Success, result.Status); Assert.Equal(1, result.NativeCallCount); Assert.True(result.ChildrenReleased);
             var committed = Assert.IsType<CommittedQuarantineCapability>(result.Capability);
+            var frozenEvidence = committed.Evidence;
             try
             {
-                Assert.Equal(retained.Source.Identity, result.Source!.Identity); Assert.Equal(retained.Source.Identity, committed.Source.Identity); Assert.True(committed.Evidence.HasValidDigest());
+                Assert.Equal(retained.Source.Identity, result.Source!.Identity); Assert.Equal(retained.Source.Identity, committed.Source.Identity); Assert.True(frozenEvidence.HasValidDigest());
                 Assert.True(Directory.Exists(Path.Combine(parent.Quarantine, "quarantine-source")));
             }
             finally { committed.Dispose(); retained.Dispose(); }
-            Assert.True(committed.HandlesReleased); Assert.False(committed.Evidence.HasValidDigest());
+            Assert.True(committed.HandlesReleased); Assert.False(frozenEvidence.HasValidDigest());
         }
         using (var retained = NativeReadiness(parent.Path, "collision"))
         {
@@ -682,11 +683,170 @@ public sealed class PackagingSupervisorTests
         Assert.True(Directory.Exists(Path.Combine(parent.Path, "collision"))); Assert.Equal("keep", File.ReadAllText(Path.Combine(target, "sentinel")));
     }
 
-    private static DirectoryCapability NativeReadiness(string parent, string leaf)
-    {
-        Assert.True(DirectoryCapability.TryCreateRenameReady(new WindowsDirectoryCapabilityFileSystem(), parent, leaf, ["child"], Path.Combine(parent, "quarantine"), out var capability, out var status));
-        Assert.Equal(SupervisorStatus.Success, status); return Assert.IsType<DirectoryCapability>(capability);
-    }
+        [Fact]
+        public void Red_c1c_atomic_take_keeps_released_peers_owned_when_wrapper_is_abandoned()
+        {
+            using var committed = CreateCommittedCapability();
+
+            Assert.True(committed.TrySplit(out var handoff));
+            Assert.True(handoff!.TryTakeBoth(out var tree, out var evidence));
+            var root = tree!.RootHandle;
+            var frozenEvidence = evidence!.Evidence;
+            handoff.Dispose();
+
+            Assert.False(root.IsClosed);
+            Assert.True(frozenEvidence.HasValidDigest());
+            tree.Dispose();
+            evidence.Dispose();
+        }
+
+        [Fact]
+        public void Red_c1c_post_detach_failure_contains_every_unpublished_resource()
+        {
+            using var committed = CreateCommittedCapability(CapabilityFacetFailurePoint.PostDetach);
+            var root = committed.RootHandle;
+            var parent = committed.QuarantineParentHandle;
+            var frozenEvidence = committed.Evidence;
+
+            Assert.False(committed.TrySplit(out var handoff));
+            Assert.Null(handoff);
+            Assert.Equal(CommittedQuarantineCapabilityState.Disposed, committed.State);
+            Assert.True(root.IsClosed);
+            Assert.True(parent.IsClosed);
+            Assert.False(frozenEvidence.HasValidDigest());
+        }
+
+        [Fact]
+        public void C1c_seeded_sensitive_observation_never_enters_state_diagnostics()
+        {
+            const string seededPath = "C:\\sensitive-account\\private-root";
+            using var committed = CreateCommittedCapability(sourceParent: seededPath);
+
+            Assert.True(committed.TrySplit(out var handoff));
+            Assert.DoesNotContain(seededPath, committed.State.ToString(), StringComparison.OrdinalIgnoreCase);
+            handoff!.Dispose();
+        }
+
+        [Fact]
+        public void C1c_split_publishes_one_paired_handoff_and_leaves_original_inert()
+        {
+            using var committed = CreateCommittedCapability();
+
+            Assert.True(committed.TrySplit(out var handoff));
+            Assert.Equal(CommittedQuarantineCapabilityState.Split, committed.State);
+            Assert.NotNull(handoff);
+            Assert.False(committed.TrySplit(out _));
+            committed.Dispose();
+            Assert.True(handoff!.TryTakeBoth(out var tree, out var evidence));
+            Assert.True(CapabilityFacetBinding.Matches(tree!, evidence!));
+            tree!.Dispose();
+            Assert.True(evidence!.Evidence.HasValidDigest());
+            evidence.Dispose();
+        }
+
+        [Fact]
+        public async Task C1c_repeated_concurrent_split_and_split_dispose_have_one_winner_without_partial_handoff()
+        {
+            for (var schedule = 0; schedule < 16; schedule++)
+            {
+                using var committed = CreateCommittedCapability();
+                var start = new ManualResetEventSlim();
+                var attempts = Enumerable.Range(0, 8).Select(_ => Task.Run(() => { start.Wait(); return committed.TrySplit(out var handoff) ? handoff : null; })).ToArray();
+                start.Set();
+                var results = await Task.WhenAll(attempts);
+
+                var winner = Assert.Single(results.Where(result => result is not null));
+                Assert.True(winner!.TryTakeBoth(out var tree, out var evidence));
+                Assert.NotNull(tree); Assert.NotNull(evidence);
+                tree!.Dispose(); evidence!.Dispose();
+
+                using var raced = CreateCommittedCapability();
+                var split = Task.Run(() => raced.TrySplit(out var pair) ? pair : null);
+                var dispose = Task.Run(raced.Dispose);
+                var racePair = await split;
+                await dispose;
+                Assert.True(racePair is null || raced.State == CommittedQuarantineCapabilityState.Split);
+                Assert.True(racePair is not null || raced.State == CommittedQuarantineCapabilityState.Disposed);
+                racePair?.Dispose();
+            }
+        }
+
+        [Fact]
+        public void C1c_prepublication_failures_preserve_original_ownership_without_visible_partial_pair()
+        {
+            foreach (var point in Enum.GetValues<CapabilityFacetFailurePoint>().Where(point => point != CapabilityFacetFailurePoint.PostDetach))
+            {
+                using var committed = CreateCommittedCapability(point);
+                Assert.False(committed.TrySplit(out var handoff));
+                Assert.Null(handoff);
+                Assert.Equal(CommittedQuarantineCapabilityState.Whole, committed.State);
+                Assert.True(committed.Evidence.HasValidDigest());
+            }
+        }
+
+        [Fact]
+        public void C1c_facets_dispose_independently_reject_cross_handoffs_and_preserve_orphaned_evidence()
+        {
+            using var first = CreateCommittedCapability(); using var second = CreateCommittedCapability();
+            Assert.True(first.TrySplit(out var firstPair)); Assert.True(second.TrySplit(out var secondPair));
+            Assert.True(firstPair!.TryTakeBoth(out var firstTree, out var firstEvidence));
+            Assert.True(secondPair!.TryTakeBoth(out var secondTree, out var secondEvidence));
+            var tree = Assert.IsAssignableFrom<IRetainedTreeCapabilityFacet>(firstTree);
+            var evidence = Assert.IsAssignableFrom<ICommittedEvidenceCapabilityFacet>(firstEvidence);
+            var secondHandoffTree = Assert.IsAssignableFrom<IRetainedTreeCapabilityFacet>(secondTree);
+            var crossHandoffEvidence = Assert.IsAssignableFrom<ICommittedEvidenceCapabilityFacet>(secondEvidence);
+            Assert.True(CapabilityFacetBinding.Matches(tree, evidence));
+            Assert.False(CapabilityFacetBinding.Matches(tree, crossHandoffEvidence));
+
+            var root = tree.RootHandle; var parent = tree.QuarantineParentHandle; var retainedEvidence = evidence.Evidence;
+            tree.Dispose(); tree.Dispose();
+            Assert.True(root.IsClosed); Assert.True(parent.IsClosed);
+            Assert.True(retainedEvidence.HasValidDigest());
+            evidence.Dispose(); evidence.Dispose();
+            Assert.Equal(1, retainedEvidence.DisposeCount);
+            Assert.False(retainedEvidence.HasValidDigest());
+            var secondRoot = secondHandoffTree.RootHandle;
+            crossHandoffEvidence.Dispose();
+            Assert.False(secondRoot.IsClosed);
+            secondHandoffTree.Dispose(); secondHandoffTree.Dispose();
+            Assert.True(secondRoot.IsClosed);
+            Assert.DoesNotContain("C:\\source", first.State.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void Windows_c1c_real_producer_handoff_preserves_evidence_when_tree_is_disposed_first()
+        {
+            if (!OperatingSystem.IsWindows() || IntPtr.Size != 8) return;
+            using var parent = new NativeReadinessRoot();
+            using var retained = NativeReadiness(parent.Path, "source");
+            using var committed = Assert.IsType<CommittedQuarantineCapability>(Cleanup.Commit(retained, "quarantine-source").Capability);
+            Assert.True(committed.TrySplit(out var handoff));
+            Assert.True(handoff!.TryTakeBoth(out var tree, out var evidence));
+            var root = tree!.RootHandle; var frozenEvidence = evidence!.Evidence;
+            tree.Dispose();
+            Assert.True(root.IsClosed);
+            Assert.True(frozenEvidence.HasValidDigest());
+            evidence.Dispose();
+            Assert.False(frozenEvidence.HasValidDigest());
+        }
+
+        private static CommittedQuarantineCapability CreateCommittedCapability(CapabilityFacetFailurePoint? failurePoint = null, string sourceParent = "C:\\source")
+        {
+            var fileSystem = new FakeDirectoryCapabilityFileSystem(); fileSystem.TryCreateDirectory("C:\\quarantine");
+            Assert.True(DirectoryCapability.TryCreateRenameReady(fileSystem, sourceParent, "root", ["child"], "C:\\quarantine", out var capability, out _));
+            var owner = Assert.IsType<DirectoryCapability>(capability);
+            Assert.True(owner.TryFreezeChildEvidence(out var evidence));
+            Assert.True(owner.ReleaseChildHandles());
+            var committed = Assert.IsType<CommittedQuarantineCapability>(owner.TransferCommitted(Assert.IsType<CommittedChildEvidence>(evidence)));
+            committed.SetFailureInjectionForTests(point => point == failurePoint);
+            return committed;
+        }
+
+        private static DirectoryCapability NativeReadiness(string parent, string leaf)
+        {
+            Assert.True(DirectoryCapability.TryCreateRenameReady(new WindowsDirectoryCapabilityFileSystem(), parent, leaf, ["child"], Path.Combine(parent, "quarantine"), out var capability, out var status));
+            Assert.Equal(SupervisorStatus.Success, status); return Assert.IsType<DirectoryCapability>(capability);
+        }
     private sealed class NativeReadinessRoot : IDisposable
     {
         public string Path { get; } = Directory.CreateDirectory(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"aibar-c1b0-{Guid.NewGuid():N}")).FullName;

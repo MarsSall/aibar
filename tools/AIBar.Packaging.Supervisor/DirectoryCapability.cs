@@ -112,6 +112,14 @@ public sealed class DirectoryCapability : IDisposable
         _transferred = true;
         return new CommittedQuarantineCapability(this, _root, _parent, evidence);
     }
+    internal bool TryDetachCommittedHandles(out SafeFileHandle? root, out SafeFileHandle? quarantineParent)
+    {
+        root = null; quarantineParent = null;
+        if (_disposed || !_transferred || _rootHandle is null || _quarantineParentHandle is null) return false;
+        root = _rootHandle; quarantineParent = _quarantineParentHandle;
+        _rootHandle = null; _quarantineParentHandle = null;
+        return true;
+    }
     public static bool IsSimpleLeaf(string value) => !string.IsNullOrWhiteSpace(value) && value is not "." and not ".." && value.IndexOfAny(['\\', '/', ':', '\0']) < 0 && !Path.IsPathRooted(value) && !IsReserved(value);
     internal static bool IsEvidenceLeaf(string value) => IsSimpleLeaf(value) && value.Length <= 255;
     private static bool IsReserved(string value) => new[] { "CON", "PRN", "AUX", "NUL", "COM1", "LPT1" }.Contains(Path.GetFileNameWithoutExtension(value), StringComparer.OrdinalIgnoreCase);

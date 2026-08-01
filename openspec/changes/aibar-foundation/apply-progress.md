@@ -1924,3 +1924,121 @@ All three 6C2A.1 checkboxes are visibly `- [x]` in `tasks.md`. Schema v2 adds pa
 **Rollback boundary:** before C2 lands, remove only `CommittedChildEvidence.cs`, the producer additions in `DirectoryCapability.cs`, producer tests, these four task marks, and this evidence block; retain historical C1b `864bb14`. If C2 later lands, disable/remove C2 first. No C2 deletion path is reachable from this unit.
 
 **Evidence revision:** `sha256:1306f56b3f9cef7c1b3f3c04bef03b918eae543f2d06cd14576a7591a7022069` (canonical final source/test/task hashes plus RED/focused/full/build/native/diff, cleanup, and producer-only scope evidence).
+
+## b2c-C2 — Guarded cleanup continuation (2026-07-30)
+
+**Status:** blocked after RED/GREEN scaffolding; do not treat this as C2 completion. Consumed authoritative OpenSpec state `nextRecommended=apply`, `dependencies.apply=ready`, attempt-60 handoff revision `sha256:90bc8b1908a13b9aa1fce1f59a87df41c62afaa42444b7b5ca65bf0e10747c5e`. The executor did not mutate the native attempt ledger. `actionContext` supplied no unsafe edit-root warning; `.gitignore` remains unrelated and untouched.
+
+| Evidence | Exact result |
+| --- | --- |
+| RED | The exact C2 focused command failed before production code with `CS0246` for the absent `ICommittedCleanupOperations` and `ICleanupMetadataProtector`. |
+| GREEN/TRIANGULATE | `Cleanup` now rejects invalid/frozen evidence, duplicate/missing/extra/renamed/reparse/cross-volume/inaccessible/unknown/identity/cancellation/enumeration cases before an adapter deletion. `ScavengerMetadata` uses `CryptProtectData`/`CryptUnprotectData` for CurrentUser protection and zeroes bounded plaintext/native buffers. The focused filter passed 81/81 after one unrelated `PackagingRecovery` harness cleanup flake; immediate repeat passed. |
+| Full / build / diff | Full solution test failed 5/305 in pre-existing `PackagingRecoveryTests` descendant-harness creation/cleanup (`Harness.dll` access and helper build timing). Build passed with 0 warnings/errors; `git diff --check` passed. |
+
+**Blocking safety diagnosis:** the permitted C2 files contain no trusted production implementation of `ICommittedCleanupOperations` that can bounded-enumerate, reopen, observe, and recursively delete relative to the retained root handle. Adding a path-based adapter would violate C2. Implementing the required native handle-relative enumeration/open/delete primitives safely exceeds the remaining hard-cap scope and conflicts with the existing native interop boundary. The new internal seam has no production caller, so it cannot select an arbitrary root or delete by path; it remains fail-closed.
+
+**Task state:** all four C2 checkboxes remain `[ ]`; no checkbox claim is proven. Remaining exact unchecked lines are the C2 RED, GREEN, TRIANGULATE, and GATE lines in `tasks.md`. C3 and PowerShell remain untouched. The feature-branch-chain PR boundary remains C2 only; current authored count is 281 source/test lines before this evidence record, below 400.
+
+**Cleanup:** handoff PIDs 26192/21932 were absent before any new command. No `aibar-c1b0-*` or `aibar-c2-*` root remains. Shared `dotnet` processes were not killed. The failed full suite left pre-existing/descendant-harness `aibar descendant*` roots (75 observed); this executor did not delete uncertain roots.
+
+**Rollback boundary:** remove only `Cleanup.cs`, `ScavengerMetadata.cs`, and the C2 test additions; leave C1b evidence producer and C3 untouched.
+
+## b2c-C2a — Trusted retained-handle operations (attempt 61, 2026-07-30)
+
+**Status:** blocked / partial implementation; C2a checkboxes deliberately remain unchecked. Consumed authoritative OpenSpec apply authorization for active attempt 61, handoff revision `sha256:6c4d22db1e467d8d6cca2b5f7d728fc1adab169c01867ff25a23183650a5d62c`, feature-branch-chain boundary `b2c-C2a`, and allowed edit roots. No native attempt ledger operation, staging, commit, review, or publication occurred. `strict_tdd: false`; the task-mandated local RED → GREEN → TRIANGULATE/REFACTOR → GATE evidence follows.
+
+| Cycle | Evidence |
+| --- | --- |
+| RED | The exact focused command failed before production implementation with `CS0103`/`CS0246` because `RetainedTreeSession` and `NativeDirectoryStatus` did not exist. |
+| GREEN | Added a bounded `RetainedTreeSession` with x64/export/layout compatibility checks, `NtQueryDirectoryFile` record parsing, root-relative `NtCreateFile`, handle observation leases, `NtSetInformationFile(FileDispositionInformation)` primitives, cancellation/deadline boundaries, buffer zeroing, and stable mechanism-only statuses. The exact focused command passed 67/67. |
+| TRIANGULATE/REFACTOR | Parser tests cover order independence and malformed, duplicate, dot, embedded-NUL, and >16-entry refusal. The Windows test transfers a real producer capability, uses a Unicode/space direct child, enumerates/reopens/observes it, and deletes that test-owned child only through the Debug-only test authorization seam; no production authorization factory is exposed. Exact focused command: passed 67/67. |
+| GATE | `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings/0 errors; `git diff --check` passed (only pre-existing LF→CRLF advisory lines for already-modified design/spec files). Full `dotnet test AIBar.sln --no-restore -m:1 --nologo` failed 1/294: pre-existing `PackagingRecoveryTests.Owned_lifecycle_concurrently_drains_saturated_stdout_and_stderr_within_bound`, during `DescendantHarness.Create` at line 447. It is outside C2a allowed paths and was not changed or retried. |
+
+**Files changed:** `tools/AIBar.Packaging.Supervisor/DirectoryCapability.cs` (+252/-0) and `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs` (+70/-0). Functional delta: 322 authored lines, within the approved 800 hard cap and below the 400-line visibility threshold. `tasks.md` is intentionally unchanged because none of the four C2a claims is fully proven.
+
+**Runtime / cleanup evidence:** scoped C2a runtime proof passed inside the 67 focused tests on this Windows x64 worker. The test-owned producer handoff used a 10-second session deadline, a single Unicode/space direct child, and left `C2A_TEMP_ROOT_RESIDUE=0`. The interrupted earlier full-suite vstest/testhost PIDs 4880/32484 were rechecked and absent; `Harness.exe` was absent. No process was killed and no uncertain root was deleted.
+
+**Blocking safety diagnosis:** the producer's `CommittedQuarantineCapability` exposes root/parent handles only through an owner that also owns and disposes immutable evidence; with `CommittedChildEvidence.cs` forbidden for this work unit, C2a cannot atomically move only the retained-handle facet while leaving the evidence/key facet owned by future C2b as required by the amended spec/design. The present session therefore retains the whole producer capability during its lifetime, which is insufficient proof of the required one-way facet separation. The runtime matrix also lacks a proven path-name-substitution case and the full-suite gate is red. Do not mark C2a complete or advance C2b until the allowed producer-facet contract is amended and the unrelated full-suite failure is independently resolved/reclassified.
+
+**Scope/ownership:** no `Cleanup.cs`, `ScavengerMetadata.cs`, DPAPI, evidence/HMAC policy, C2b, C3, PowerShell, path fallback, rename-back, copy-delete, `.gitignore`, staging, commit, or native-ledger mutation occurred. C2b and C3 task lines remain untouched and unchecked. **Rollback boundary:** remove only the C2a additions in `DirectoryCapability.cs`, `PackagingSupervisorTests.cs`, and this progress record; retain producer commit `03ee654` and all prior history.
+
+## b2c-C1c — Atomic capability-facet transfer (attempt 62, 2026-07-30)
+
+**Status:** blocked at the required final diagnostics gate. The authoritative OpenSpec status consumed `artifactStore=openspec`, `applyState=ready`, `actionContext.mode=repo-local`, workspace root `C:/Users/mjsal/Desarrollos IA/Modificacion de Terminales/aibar`, and active native attempt 62 for `b2c-c1c-atomic-capability-facet-transfer`. The active-attempt blocker is expected for this charged actor; no `sdd-attempt` command was run. Strict TDD is false, but this unit retained RED → GREEN → TRIANGULATE/REFACTOR.
+
+| Evidence | Exact result |
+| --- | --- |
+| RED | Before production edits, `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~C1c" --no-restore -m:1 --nologo` exited 1 with real `CS1061` failures for missing `CommittedQuarantineCapability.TrySplit`/`State` and `CS0103` failures for the absent facet-binding/failure-injection types. |
+| GREEN/TRIANGULATE | The producer now holds a synchronized `Whole`/`Splitting`/`Split`/`Disposed` split gate, stages both facets before detaching the retained handles, publishes one paired handoff, and leaves the original inert. The tree and evidence facets dispose independently; the internal same-handoff binding rejects cross-handoff facets. Tests cover paired-only/repeated/concurrent split, split-versus-dispose, all injected pre-publication boundaries, original inertness, both disposal orders, cross-handoff rejection, orphaned-evidence preservation, stable state diagnostics, and a real Windows producer handoff. |
+| Focused / repeat | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo` passed 68/68 twice, serialized. The narrower C1c filter passed 5/5 after TRIANGULATE. |
+| Windows x64 producer-handoff proof | `Windows_c1c_real_producer_handoff_preserves_evidence_when_tree_is_disposed_first` passed through the real C1b producer seam. It proves only paired ownership/lifetime and tree-first disposal with evidence preserved; it performs no C2a operation, enumeration, reopen, observation refresh, deletion, cleanup authorization, DPAPI, or C2 completion claim. Scoped `aibar-c1b0-*`/`aibar-c1c-*` root inspection found none; `tasklist` found no Harness or PowerShell process. No uncertain/pre-existing root was deleted. |
+| Full / build | `dotnet test AIBar.sln --no-restore -m:1 --nologo` passed 295/295, 0 failed. `dotnet build AIBar.sln --no-restore --nologo` passed with 0 warnings and 0 errors. |
+| Diff / scope | `git diff --check` passed (only existing LF→CRLF advisories for already-modified design/spec files). C1c source/test numstat is `246 additions, 11 deletions` (257 total), below the hard 400 cap: `CommittedChildEvidence.cs` +116/-6, `DirectoryCapability.cs` +8/-0, `PackagingSupervisorTests.cs` +122/-5. No prohibited added production API, DPAPI/HMAC recomputation, path fallback, C2a/C2b/C3 behavior, shell, PowerShell, subprocess, staging, commit, push, PR, or review action was found. |
+| Required LSP/lens gate | **Blocked:** this executor's injected tool surface exposes no `lsp_diagnostics`/`lens_diagnostics` tool, and `pi-lens` plus `lens_diagnostics` CLIs were absent from `PATH`. The edit host reported `C# clean`, but that is not a substitute for the mandated proactive LSP and `lens_diagnostics mode=all` checks. |
+
+**`.gitignore` audit:** HEAD, index, and worktree hashes are all `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; no `.gitignore` bytes or index entry were changed by this unit. Its pre-existing unstaged `M` status was already present before C1c work and remains.
+
+**Task state:** every C1c implementation checkbox remains `[ ]` because the mandatory LSP/lens gate could not be run. No parent-owned lifecycle checkbox was changed. **Workload/PR boundary:** C1c only, 257 source/test authored additions+deletions, hard cap 400, no size exception; no Git delivery action occurred.
+
+**Exact remaining C1c unchecked lines:**
+
+- [ ] Add deterministic failing tests before production edits for paired-only exact-once split, no one-facet overload, repeated/concurrent split, and split-versus-dispose linearization; assert one winner and no visible partial handoff. <!-- sdd-owner: implementation -->
+- [ ] Add deterministic failure-injection tests at validation, binding creation, facet allocation, factory, and pre-publication boundaries; capture original ownership intact on pre-publication failure with no leak, duplication, or double ownership. <!-- sdd-owner: implementation -->
+- [ ] Add tests for original inertness after publication, independent disposal in both orders with exact handle-close and evidence-zeroization counters, same-handoff binding acceptance, cross-handoff/legacy/reconstructed rejection, orphaned tree/evidence facets, C2a failure preserving evidence, and diagnostics free of sensitive values. <!-- sdd-owner: implementation -->
+- [ ] Capture a real RED compile or assertion failure from the deterministic suite and record that no production implementation is permitted during RED. <!-- sdd-owner: implementation -->
+- [ ] Implement the smallest producer-side seam: one atomic exact-once paired handoff consuming one `CommittedQuarantineCapability`, with no tree-only or evidence-only overload and no behavior outside C1c. <!-- sdd-owner: implementation -->
+- [ ] Implement two non-cloneable, non-serializable, non-reconstructible facets with disjoint ownership: `RetainedTreeCapabilityFacet` for only the exact root/quarantine-parent handles and captured observations, and `CommittedEvidenceCapabilityFacet` for only `CommittedChildEvidence/v1`, digest, correlation key, child-record sensitive buffers, and zeroization. <!-- sdd-owner: implementation -->
+- [ ] Implement the synchronized `Whole`/`Splitting`/`Split`/`Disposed` state machine with one linearization gate; only the `Whole` to `Splitting` winner may stage a pair, losers obtain no facet, pre-publication failures deterministically clean staged resources while retaining original ownership, and an unexpected post-detach publication failure disposes unpublished resources without duplicating or restoring ownership. <!-- sdd-owner: implementation -->
+- [ ] Preserve one internal opaque same-handoff `HandoffIdentity` reference in both facets for future C2a/C2b consumers without exposing raw representation; publish both facets together, make the original permanently inert, and never restore ownership by duplicating handles or sensitive buffers. <!-- sdd-owner: implementation -->
+- [ ] Implement independent idempotent disposal and deterministic cleanup for every failure boundary: the tree facet closes only transferred root/parent handles, the evidence facet zeroizes/disposes only evidence-owned buffers, and orphaned peers are never implicitly disposed or reconstructed. <!-- sdd-owner: implementation -->
+- [ ] Run bounded repeated race schedules for concurrent/repeated split and split-versus-dispose; prove exactly one winner, no deadlock, no partial visibility, and no duplicated/restored ownership. <!-- sdd-owner: implementation -->
+- [ ] Exercise every failure-injection boundary and post-publication disposal order; prove paired-only visibility, exact-once cleanup counters, original inertness, and C2a-failure evidence preservation. <!-- sdd-owner: implementation -->
+- [ ] Run a real producer-handoff sandbox using only a fresh test-owned capability through the producer seam; prove handle/evidence lifetime and both disposal orders with no C2a operation, cleanup authorization, enumeration, reopen, observation refresh, delete, DPAPI, HMAC, or C2 completion claim. <!-- sdd-owner: implementation -->
+- [ ] Remove test-only seams that could construct or substitute production facets; retain only the minimum internal injection needed for deterministic failure tests and keep binding identity authority-internal. <!-- sdd-owner: implementation -->
+- [ ] Track authored additions/deletions continuously and stop for replanning at 400; audit that production changes remain limited to the allowed C1c paths and that C2a/C2b/C3 behavior is absent. <!-- sdd-owner: implementation -->
+- [ ] Retain the RED evidence, run the focused C1c/PackagingSupervisor tests and an immediate repeat, execute the bounded real Windows x64 producer-handoff sandbox with exact cleanup/process-residue checks, run the serialized full solution suite, and record a clean zero-warning/zero-error build, `git diff --check`, exact authored-line count, and allowed-path audit. <!-- sdd-owner: implementation -->
+- [ ] Prove there is no scoped helper/process/root residue, `.gitignore` is untouched and unstaged, no sensitive diagnostic value is emitted, and no C2a native operation, C2b policy/cleanup, C3, new native API, DPAPI/HMAC, path fallback, shell, PowerShell, subprocess, stage, commit, push, PR, or review action occurred. <!-- sdd-owner: implementation -->
+- [ ] Keep every C1c checkbox unchecked until its corresponding proof actually passes; do not claim implementation, verification, review, commit, or completion from Attempts 60/61 or the rolled-back C2a candidate. <!-- sdd-owner: implementation -->
+
+### Attempt 62 diagnostics closure
+
+**Status:** passed for the C1c apply work unit. This closure supersedes only the preceding C1c diagnostics-blocked status; it does not finish the parent-owned native attempt, create a review receipt, commit, or advance C2a/C2b/C3.
+
+**Parent-supplied final diagnostics:** primary `lsp_diagnostics` checked the exact three touched C# files with 0 diagnostics; `lens_diagnostics mode=all` reported no issues for those same files. The parent also inspected the complete C1c source/test diff and the ownership/state/disposal symbols and found no blocker. `git diff --check` remains passed. The functional source/test numstat remains 257: `PackagingSupervisorTests.cs` +122/-5, `CommittedChildEvidence.cs` +116/-6, and `DirectoryCapability.cs` +8/-0.
+
+**Reconciled gate result:** the retained real RED failure, focused C1c and repeated PackagingSupervisor passes, Windows x64 real-producer-handoff proof, serialized full-suite 295/295 pass, zero-warning/zero-error build, scope/cleanup audit, `git diff --check`, and now the required LSP/lens diagnostics all passed. All 17 C1c implementation checkboxes are marked `[x]` in `tasks.md`; the two parent-owned lifecycle checkboxes remain `[ ]`.
+
+**Continuation scope:** this closure changed only `openspec/changes/aibar-foundation/apply-progress.md` and C1c checkbox state in `tasks.md`. It made no functional production or test byte change and did not rerun tests, builds, runtime proof, review, delivery, or native-ledger operations; it did not alter `.gitignore`, design, spec, verify-report, or Git state.
+
+### Attempt 62 parent lifecycle closure
+
+After explicit maintainer apply approval, the parent renamed the branch to `feature/aibar-foundation-slice-8c1-1b2c-c1c-facets`, confirmed native `next_action=begin`, and opened attempt 62 with `max_attempts=1` and `max_changed_lines=400`. Attempts 60/61 were not reused. No stage, commit, push, PR, review, C2a, C2b, or C3 action occurred. Both parent-owned C1c lifecycle checkboxes are now complete; native attempt finalization remains the next parent action.
+
+## C1c independent-verification correction — Attempt 64 (2026-07-31)
+
+**Status:** correction applied in Standard mode after the independently verified C1c candidate exposed facet-lifetime, ordinary-API authority, and post-detach containment defects. This is an apply correction only. It does **not** complete independent verification, alter the failed Attempt 63 report, create review/delivery authority, or advance C2a/C2b/C3.
+
+| Cycle | Evidence |
+|---|---|
+| RED | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c1c" --no-restore -m:1 --nologo` failed before production changes with `CS1061` (missing `TryTakeBoth`) and `CS0117` (missing `PostDetach`). |
+| GREEN | The handoff now performs one locked atomic take-both transition. Concrete handoff/facet/identity classes are private; interfaces are non-authoritative views; constructors and attachment are unavailable to ordinary code. The original does not retain an evidence accessor after transfer. |
+| TRIANGULATE | Instance-scoped failure injection covers validation through handoff creation and post-detach containment. Sixteen concurrent split/dispose schedules prove one winner. Wrapper abandonment after paired release and either peer disposal preserve the live peer; cross-handoff binding rejects mismatches; a seeded sensitive path never enters state diagnostics. |
+| REFACTOR | Staging contains no owned handles/evidence before detach. Any post-detach exception disposes both unpublished facets exactly once and moves the original to `Disposed`; pre-detach failures restore `Whole` without touching original bundles. |
+
+### Validation evidence
+
+- `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~C1c" --no-restore -m:1 --nologo` — passed 8/8; immediate repeat passed 8/8.
+- `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Windows_c1c_real_producer_handoff_preserves_evidence_when_tree_is_disposed_first" --no-restore -m:1 --nologo` — passed 1/1 on Windows x64.
+- `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo` — passed 71/71.
+- `dotnet test AIBar.sln --no-restore -m:1 --nologo` — passed 298/298.
+- `dotnet clean AIBar.sln --nologo && dotnet build AIBar.sln --no-restore --nologo` — exit 0; clean/build each reported 0 warnings and 0 errors.
+
+**Files changed:** `tools/AIBar.Packaging.Supervisor/CommittedChildEvidence.cs`, `tests/AIBar.Domain.Tests/PackagingSupervisorTests.cs`, `openspec/changes/aibar-foundation/{tasks.md,apply-progress.md}`. `DirectoryCapability.cs`, design, spec, verify-report, and `.gitignore` were not changed by this correction. No C2a/C2b/C3, cleanup policy, path fallback, shell/PowerShell, rename-back, copy-delete, staging, commit, push, PR, or review work occurred.
+
+**Task reconciliation:** the four `C1c verification correction — Attempt 64 only` RED/GREEN/TRIANGULATE/GATE checkboxes are `[x]`. The parent-owned independent-verification checkbox remains `[ ]`; do not read this correction as a verification result.
+
+**Workload / boundary:** `feature-branch-chain`, correction work unit `b2c-c1c-verification-correction`, native Attempt 64 already running under the parent-owned 1,000-line ceiling. Exact changed-line count against begin candidate `fd56a203de6630fbef8154b0ffc34eb307b1d44d`: 267 additions + 130 deletions = **397**, within the ceiling. Rollback removes only this correction's atomic handoff/facet encapsulation, focused tests, four task marks, and this record; C2 consumers must remain absent before such a rollback.
+
+**Structured status consumed:** authoritative OpenSpec status reported `applyState: ready`, repo-local workspace root and allowed edit root, plus `nextRecommended: resolve-blockers` solely because native Attempt 64 is active. Per parent authorization, this executor performed only that active correction and never acquired, began, reset, or finished an attempt. Action-context warning: no target outside the repository root was edited.
+
+**Remaining:** parent must settle Attempt 64 and run its independent verification/update path. Exact relevant unchecked line: `- [ ] Obtain fresh native reset/begin authorization for one distinct independent-verification objective with max attempts 1 and native changed-line ceiling 1000; verify the exact Attempt 62 candidate/evidence ...` (the active correction is authorized under that parent-owned objective). C2a, C2b, C3, and all later unchecked tasks remain out of scope.

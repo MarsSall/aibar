@@ -926,3 +926,127 @@ C2 was not implemented or verified. The committed C1b API does not expose immuta
 The producer freezes bounded root/parent/child handle evidence before child release and native rename, binds tags to a per-operation HMAC key and the digest to versioned identities/records, transfers the live committed capability once on success, and zeroes/disposes owned buffers. The native commit remains explicitly non-atomic across capture, child release, and rename; this result does not authorize C2 correlation or deletion.
 
 Recovery found no surviving named attempt-59 processes and no C1b test root. Shared compiler/MSBuild workers were left untouched. The `NUL` Git-Bash redirection artifact was safely removed; `.gitignore` bytes remain unchanged. Evidence revision: `sha256:1306f56b3f9cef7c1b3f3c04bef03b918eae543f2d06cd14576a7591a7022069`.
+
+---
+
+# Independent C1c Verification — FAIL
+
+**Scope:** exact functional bytes from completed apply Attempt 62 (`636d659c2923727551544a60f3e156e2488ddce4`, evidence `sha256:d7d8bd1cae69d55c820c2c06dd1c2e137fee47e8fd9a3a7930d806b778dddec8`). This is a scoped C1c result, not whole-change verification.
+
+## Passing evidence
+
+- Functional C1c files have zero diff against the Attempt 62 finish tree.
+- C1c focused tests passed 5/5 twice with zero skips on Windows x64.
+- PackagingSupervisor tests passed 68/68.
+- Full serialized solution passed 295/295.
+- Build passed with 0 warnings and 0 errors; `git diff --check` passed with only existing line-ending advisories.
+- No Harness/testhost/vstest process or `aibar-c1b0-*`/`aibar-c1c-*` root remained.
+- `.gitignore` HEAD/index/worktree hashes remained identical and unstaged.
+
+## Blocking findings
+
+1. **CRITICAL — implicit peer disposal.** `CommittedCapabilityFacetHandoff.Dispose()` disposes any untaken tree or evidence facet. The design explicitly requires the handoff wrapper never to dispose transferred resources and requires an orphaned surviving facet not to be disposed implicitly.
+2. **CRITICAL — reconstructible authority.** Internal `HandoffIdentity.Create`, facet constructors, exposed `Identity`, and `RetainedTreeCapabilityFacet.Attach` allow same-assembly code to mint or rebind facets. The contract forbids constructing, reconstructing, or substituting either facet or its binding and requires C2a to consume only producer-issued authority.
+3. **CRITICAL — incomplete staged/post-detach ownership handling.** `TrySplit` creates armed disposable wrappers before ownership detaches, but pre-publication failures do not dispose staged objects; no deterministic post-detach failure-containment path or proof exists. This contradicts the required no-double-ownership and deterministic staged/unpublished cleanup contract.
+4. **WARNING — incomplete concurrency/diagnostic proof.** The tests exercise one concurrent schedule, use a global mutable static failure injector, and do not provide the required bounded repeated race matrix, post-detach failure proof, or seeded sensitive-diagnostic matrix.
+
+## Verdict and next action
+
+C1c independent verification **fails** despite green runtime gates. The new independent-verification checkbox remains unchecked. Do not review, commit, or advance C2a. Any correction requires a separately authorized correction objective; this verification performed no functional edit, stage, commit, review, push, PR, C2a, C2b, or C3 action.
+
+---
+
+# Corrected C1c Independent Verification — PASS
+
+**Verdict:** PASS for corrected C1c only. The Attempt 63 FAIL section above is preserved. This supersedes failed evidence `sha256:f5ee850b454268844b76d4bf6f0168ccac305395c5d87fb9f670d0fa4a14feb0` only for the exact corrected Attempt 64 candidate; it is not whole-change or archive authority.
+
+## Authority, status, and candidate binding
+
+| Field | Verified result |
+|---|---|
+| Change / store / mode | `aibar-foundation`; OpenSpec; Standard (`strict_tdd: false`) |
+| Action context | `repo-local`; workspace and allowed edit root `C:/Users/mjsal/Desarrollos IA/Modificacion de Terminales/aibar` |
+| Native execution | Parent-owned Attempt 65, work unit `b2c-c1c-corrected-independent-verification`; this verifier did not reset, begin, finish, acquire, or settle it |
+| Corrected candidate | Attempt 64 tree `7e6985758d6d3568f83ccd3a399713832c48cd4e` |
+| Corrected apply evidence | `sha256:70c234cfcea9cb2b6ed03fde60cd62a10404e344fc90e6f48c5c9554bc5367fb`; native accounting 399/1000 |
+| Pre-verification drift | None. The entire worktree had zero Git content diff against the candidate tree before the report/task disposition |
+| Functional blob binding | `CommittedChildEvidence.cs` `4826d20fcfdfea73e063eb58676b6981b5695cfb`; `DirectoryCapability.cs` `97ffdc3ff7d09cbc8ad7344e2f4687be852bf577`; `PackagingSupervisorTests.cs` `70fb6dbd4e61066c864f40b65750a3f6efc03ac0` |
+| Verification-only accounting | 99 changed lines (98 additions, 1 deletion) against tree `7e698575...`, limited to `tasks.md` and `verify-report.md`; no functional drift |
+
+Native OpenSpec status reported `nextRecommended: resolve-blockers` only because parent-owned Attempt 65 is active. That expected active-attempt condition did not authorize another launch. Status also reported 42 pending whole-change tasks before this scoped disposition; later work remains outside corrected C1c.
+
+## Source-level contract verification
+
+| Contract area | Independent evidence | Result |
+|---|---|---|
+| Exact-once paired split | `TrySplit` returns one `ICommittedCapabilityFacetHandoff`; locked `TryTakeBoth` atomically clears/releases both slots. No tree-only/evidence-only extraction exists. | PASS |
+| State machine | One `_gate` protects exact `Whole`, `Splitting`, `Split`, `Disposed` states. Losers cannot touch staged/transferred resources; publication makes the original inert. | PASS |
+| Wrapper ownership | Before take-both, wrapper ownership is all-or-nothing. After atomic release, wrapper disposal is inert. Released facets independently own their resources. | PASS |
+| Disjoint disposal | Tree disposal closes only root/parent handles. Evidence disposal only zeroes/disposes evidence. Both are idempotent; peer and original cannot dispose transferred resources. | PASS |
+| Non-mintable binding | Concrete handoff/facets, `HandoffIdentity`, constructors, and `Attach` are private nested details. Substitute interface implementations cannot pass `Matches`, which requires exact private types and reference-identical private identity. | PASS |
+| Future C2 separation | Internal typed interfaces preserve fixed tree/evidence roles without exposing identity or mint/rebind authority. No direct combined-to-C2a conversion or cleanup mechanism exists. | PASS |
+| Pre-detach ordering | Validation, identity, facet allocations, and handoff allocation precede `TryDetachCommittedHandles`. Every injected pre-detach failure restores `Whole`; staged objects own no transferred resources. | PASS |
+| Post-detach containment | An injected unexpected failure disposes the unpublished pair exactly once, closes handles, zeroes evidence, publishes nothing, and leaves the original `Disposed`/inert without ownership restoration. | PASS |
+| Diagnostics/exclusions | C1c emits no path/secret payload. No C2a/C2b/C3, enumeration, reopen, refresh, deletion, new native API, DPAPI, cleanup policy, path fallback, shell, PowerShell, or subprocess behavior exists. | PASS |
+
+## Requirement and scenario coverage
+
+**Coverage:** 1/1 C1c requirement and 14/14 C1c scenarios compliant.
+
+| Scenario | Evidence | Result |
+|---|---|---|
+| Successful paired split | Paired publication, atomic take-both, same binding, `Split`. | PASS |
+| Repeated/concurrent split | 16 schedules × 8 attempts; exactly one winner. | PASS |
+| Split versus dispose | 16 schedules allow only `Split` with pair or `Disposed` without pair. | PASS |
+| Injected pre-publication failure | Every pre-detach stage restores `Whole` and original evidence. | PASS |
+| Paired-only visibility | `TryTakeBoth` returns both or neither under one lock. | PASS |
+| Original inertness | Repeated split fails; original disposal after publication is a no-op. | PASS |
+| Disposal in both orders | Tree-first/evidence-first prove peer survival, idempotence, handle closure, and evidence dispose count 1. | PASS |
+| Same-handoff acceptance | Private identity reference equality accepts the original pair. | PASS |
+| Cross-handoff rejection | Mixed facets fail binding. | PASS |
+| Tree-facet orphan | Evidence disposal leaves tree handles live until tree disposal. | PASS |
+| Evidence-facet orphan | Tree disposal leaves evidence valid until evidence disposal. | PASS |
+| C2a failure preserves evidence | Tree-first disposal and real-producer proof preserve evidence; C2a remains absent. | PASS |
+| Unsupported/legacy/direct producer | No C2a API exists; private-concrete binding rejects substitutes. Runtime consumer proof remains C2a scope. | PASS for C1c boundary |
+| No sensitive diagnostics | Seeded path cannot enter the closed state diagnostic; source has no other C1c diagnostic/log channel. | PASS |
+
+## Test quality
+
+C1c tests retain real/fake handles and evidence and assert close/validity transitions, exact evidence `DisposeCount`, cross-handoff rejection, atomic release, post-detach containment, and bounded concurrency. They are not type-only, smoke-only, tautological-loop, or implementation-detail UI tests. The seeded-diagnostic assertion is narrow, but source inspection confirms there is no C1c diagnostic serialization/logging channel.
+
+## Commands and exact results
+
+| Gate | Exact command | Result |
+|---|---|---|
+| C1c focused | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~C1c" --no-restore -m:1 --nologo` | exit 0; 8 passed, 0 failed, 0 skipped |
+| Immediate repeat | Same exact C1c command | exit 0; 8 passed, 0 failed, 0 skipped |
+| Windows x64 producer | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Windows_c1c_real_producer_handoff_preserves_evidence_when_tree_is_disposed_first" --no-restore -m:1 --nologo` | exit 0; 1 passed, 0 failed, 0 skipped |
+| PackagingSupervisor | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo` | exit 0; 71 passed, 0 failed, 0 skipped |
+| Full serialized solution | `dotnet test AIBar.sln --no-restore -m:1 --nologo` | exit 0; 298 passed, 0 failed, 0 skipped |
+| Clean compiler/build | `dotnet clean AIBar.sln --nologo && dotnet build AIBar.sln --no-restore -m:1 --nologo` | exit 0; clean and build each 0 warnings/0 errors |
+| Whitespace | `git diff --check` | exit 0; no errors; existing LF→CRLF advisories only |
+| Report validator | `gentle-ai sdd-verify-validate --input openspec/changes/aibar-foundation/verify-report.md --requirements 1 --scenarios 14` | exit 1; not applicable to this append-only historical report because the validator selected the preserved first envelope (`scenarios: 3`) and reported `verify result total 3 does not match actual scenario count 14` |
+
+The clean build is the configured LSP-equivalent compiler proof. No separate LSP command is configured in `openspec/config.yaml`.
+
+## Repository, residue, workload, and tasks
+
+- Staged paths: none.
+- `.gitignore`: no content/index diff; HEAD/index/worktree blob `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; its metadata-only `M` is pre-existing.
+- Residue: `SCOPED_PROCESS_COUNT=0` for Harness/testhost/vstest; `SCOPED_TEMP_ROOT_COUNT=0` for `aibar-c1b0-*`/`aibar-c1c-*`.
+- Shared compiler/MSBuild workers were not killed.
+- Review boundary: corrected C1c only; feature-branch-chain preserved; Attempt 64 accounting 399/1000; no `size:exception`; no delivery/C2 action.
+- All 17 C1c implementation tasks, four Attempt 64 correction tasks, and the corrected independent-verification task are checked. **No unchecked C1c implementation line remains.**
+- Exact remaining unchecked lines are the unchanged later-scope markers in `tasks.md` (41 after this disposition), beginning with `- [ ] Do not touch .git/gentle-ai authority records...`, the four C2a tasks, four C2b tasks, five chain-parent tasks, B1a2/B1b/B2/8D/8E tasks, and final release gates. They are approved remaining scope, not corrected-C1c defects, and keep the whole change **not ready for archive**.
+
+## Findings and residual risks
+
+**CRITICAL:** None for corrected C1c.
+
+**WARNING:** None for corrected C1c.
+
+Residual risks: bounded race schedules are not a formal scheduler proof; private same-assembly authority depends on keeping future consumers inside the reviewed assembly boundary; orphaned facets intentionally retain handles/evidence until explicit disposal. C2a/C2b consumer and cleanup behavior remains unimplemented/unverified.
+
+## Final disposition
+
+**PASS for corrected C1c only.** Attempt 63 FAIL history remains intact. The corrected task is complete and bound to Attempt 64 tree/evidence. The parent may finalize Attempt 65 using this report. C2a remains blocked until corrected C1c is separately committed/authorized. Archive, stage, commit, review, push, PR, C2a, C2b, and C3 are not authorized.
