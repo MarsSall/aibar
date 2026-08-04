@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <AIBarStrongNamePublicKeyFile>$(MSBuildThisFileDirectory)AIBar.PublicKey.snk</AIBarStrongNamePublicKeyFile>
+    <AIBarStrongNameKeyFile Condition="'$(AIBarStrongNameKeyFile)' == ''">$(AIBarStrongNamePublicKeyFile)</AIBarStrongNameKeyFile>
+    <AIBarOfficialSigning Condition="'$(AIBarOfficialSigning)' == ''">false</AIBarOfficialSigning>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(AIBarStrongNameKeyFile)</AssemblyOriginatorKeyFile>
+    <PublicSign Condition="'$(AIBarOfficialSigning)' != 'true'">true</PublicSign>
+    <PublicSign Condition="'$(AIBarOfficialSigning)' == 'true'">false</PublicSign>
+  </PropertyGroup>
+
+  <Target Name="ValidateAIBarOfficialSigning" BeforeTargets="CoreCompile" Condition="'$(AIBarOfficialSigning)' == 'true'">
+    <Error Condition="'$(AIBarStrongNameKeyFile)' == '$(AIBarStrongNamePublicKeyFile)'" Text="Official signing requires externally supplied private key material." />
+    <Error Condition="!Exists('$(AIBarStrongNameKeyFile)')" Text="Official signing private key material is unavailable." />
+  </Target>
+</Project>

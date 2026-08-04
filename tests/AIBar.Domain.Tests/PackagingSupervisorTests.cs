@@ -602,7 +602,7 @@ public sealed class PackagingSupervisorTests
     public void C1b0_readiness_refusal_preserves_the_unissued_commit_boundary()
     {
         var assembly = typeof(DirectoryCapability).Assembly;
-        Assert.Equal("AIBar.Packaging.Supervisor.Program", assembly.EntryPoint!.DeclaringType!.FullName);
+        Assert.Null(assembly.EntryPoint);
         var fileSystem = new FakeDirectoryCapabilityFileSystem(); fileSystem.TryCreateDirectory("C:\\quarantine");
         Assert.True(DirectoryCapability.TryCreateRenameReady(fileSystem, "C:\\source", "root", ["child"], "C:\\quarantine", out var capability, out _));
         using var retained = Assert.IsType<DirectoryCapability>(capability);
@@ -830,6 +830,300 @@ public sealed class PackagingSupervisorTests
             Assert.False(frozenEvidence.HasValidDigest());
         }
 
+        [Fact]
+        public void Red_c2a_consumes_only_one_producer_tree_facet_preserves_binding_and_leaves_evidence_owned()
+        {
+            using var committed = CreateCommittedCapability();
+            Assert.True(committed.TrySplit(out var handoff));
+            Assert.True(handoff!.TryTakeBoth(out var tree, out var evidence));
+            using var retainedEvidence = Assert.IsAssignableFrom<ICommittedEvidenceCapabilityFacet>(evidence);
+            var retainedTree = Assert.IsAssignableFrom<IRetainedTreeCapabilityFacet>(tree);
+
+            Assert.True(RetainedTreeSession.TryCreate(retainedTree, TimeSpan.FromSeconds(1), CancellationToken.None, out var session, out var status));
+            using var live = Assert.IsType<RetainedTreeSession>(session);
+            Assert.Equal(RetainedTreeMechanismStatus.Success, status);
+            Assert.Equal(retainedTree.Source.Identity, live.RootIdentity);
+            Assert.Equal(retainedTree.Source.Identity.VolumeSerialNumber, live.VolumeSerialNumber);
+            Assert.True(live.Matches(retainedEvidence));
+            Assert.False(RetainedTreeSession.TryCreate(retainedTree, TimeSpan.FromSeconds(1), CancellationToken.None, out _, out status));
+            Assert.Equal(RetainedTreeMechanismStatus.InvalidCapability, status);
+            Assert.True(retainedEvidence.Evidence.HasValidDigest());
+        }
+
+        [Theory]
+        [InlineData(".child")]
+        [InlineData("..child")]
+        [InlineData("bad/name")]
+        [InlineData("bad\u0000name")]
+        public void Red_c2a_parser_rejects_non_authoritative_names_without_leases(string name)
+        {
+            var bytes = NativeDirectory.BuildNamesBufferForTests([name]);
+            Assert.False(NativeDirectory.TryParseDirectChildren(bytes, out var names, out var status));
+            Assert.Empty(names);
+            Assert.Equal(RetainedTreeMechanismStatus.EnumerationFailed, status);
+        }
+
+        [Fact]
+        public void Native_directory_parser_skips_exact_dot_records_and_returns_evidence_leaf()
+        {
+            var bytes = NativeDirectory.BuildNamesBufferForTests([".", "..", "child"]);
+
+            Assert.True(NativeDirectory.TryParseDirectChildren(bytes, out var names, out var status));
+            Assert.Equal(["child"], names);
+            Assert.Equal(RetainedTreeMechanismStatus.Success, status);
+        }
+
+        [Fact]
+        public void Native_directory_parser_refuses_duplicate_dot_records()
+        {
+            var bytes = NativeDirectory.BuildNamesBufferForTests([".", ".", "child"]);
+
+            Assert.False(NativeDirectory.TryParseDirectChildren(bytes, out var names, out var status));
+            Assert.Empty(names);
+            Assert.Equal(RetainedTreeMechanismStatus.EnumerationFailed, status);
+        }
+
+        [Fact]
+        public void Red_c2a_parser_is_order_independent_and_rejects_duplicate_truncated_or_oversized_records()
+        {
+            Assert.True(NativeDirectory.TryParseDirectChildren(NativeDirectory.BuildNamesBufferForTests(["publish", "restore"]), out var first, out var firstStatus));
+            Assert.True(NativeDirectory.TryParseDirectChildren(NativeDirectory.BuildNamesBufferForTests(["restore", "publish"]), out var second, out var secondStatus));
+            Assert.Equal(RetainedTreeMechanismStatus.Success, firstStatus);
+            Assert.Equal(RetainedTreeMechanismStatus.Success, secondStatus);
+            Assert.Equal(first.OrderBy(name => name, StringComparer.OrdinalIgnoreCase), second.OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
+            Assert.False(NativeDirectory.TryParseDirectChildren(NativeDirectory.BuildNamesBufferForTests(["restore", "RESTORE"]), out _, out var duplicateStatus));
+            Assert.Equal(RetainedTreeMechanismStatus.EnumerationFailed, duplicateStatus);
+            Assert.False(NativeDirectory.TryParseDirectChildren(new byte[3], out _, out var truncatedStatus));
+            Assert.Equal(RetainedTreeMechanismStatus.EnumerationFailed, truncatedStatus);
+            Assert.False(NativeDirectory.TryParseDirectChildren(NativeDirectory.BuildNamesBufferForTests(Enumerable.Range(0, 17).Select(index => $"child{index}").ToArray()), out _, out var boundStatus));
+            Assert.Equal(RetainedTreeMechanismStatus.BoundExceeded, boundStatus);
+        }
+
+        [Fact]
+        public void Red_c2a_unsupported_runtime_cancellation_or_expired_deadline_starts_no_native_operation()
+        {
+            using var committed = CreateCommittedCapability();
+            Assert.True(committed.TrySplit(out var handoff));
+            Assert.True(handoff!.TryTakeBoth(out var tree, out var evidence));
+            using var retainedEvidence = Assert.IsAssignableFrom<ICommittedEvidenceCapabilityFacet>(evidence);
+            var retainedTree = Assert.IsAssignableFrom<IRetainedTreeCapabilityFacet>(tree);
+            using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+
+            Assert.False(RetainedTreeSession.TryCreate(retainedTree, TimeSpan.FromSeconds(1), cancellation.Token, out _, out var cancelled));
+            Assert.Equal(RetainedTreeMechanismStatus.Cancelled, cancelled);
+            Assert.True(RetainedTreeSession.TryCreate(retainedTree, TimeSpan.FromSeconds(1), CancellationToken.None, out var session, out var created));
+            using var live = Assert.IsType<RetainedTreeSession>(session);
+            Assert.Equal(RetainedTreeMechanismStatus.Success, created);
+            Assert.False(NativeDirectory.IsCompatible(false, 8, true, true, true, true));
+            Assert.False(NativeDirectory.IsCompatible(true, 4, true, true, true, true));
+        }
+
+        [Fact]
+        public void Red_c2a_native_query_releases_the_owned_quarantine_for_cleanup()
+        {
+            if (!OperatingSystem.IsWindows() || IntPtr.Size != 8) return;
+            using var parent = new NativeReadinessRoot();
+            using var retained = NativeReadiness(parent.Path, "query source");
+            using var committed = Assert.IsType<CommittedQuarantineCapability>(Cleanup.Commit(retained, "query quarantine").Capability);
+            Assert.True(committed.TrySplit(out var handoff));
+            Assert.True(handoff!.TryTakeBoth(out var tree, out var evidence));
+            using var retainedEvidence = Assert.IsAssignableFrom<ICommittedEvidenceCapabilityFacet>(evidence);
+            var retainedTree = Assert.IsAssignableFrom<IRetainedTreeCapabilityFacet>(tree);
+            Assert.True(NativeDirectory.TryQueryNames(retainedTree.RootHandle, out var bytes, out _));
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(bytes);
+            retainedTree.Dispose(); committed.Dispose(); retained.Dispose();
+            Directory.Delete(Path.Combine(parent.Quarantine, "query quarantine"), true);
+        }
+
+        [Fact]
+        public void Native_directory_real_query_skips_exact_dot_records_and_returns_synthetic_child()
+        {
+            if (!OperatingSystem.IsWindows() || IntPtr.Size != 8) return;
+            var parent = new NativeReadinessRoot { CaptureDisposeFailure = true };
+            DirectoryCapability? retained = null;
+            CommittedQuarantineCapability? committed = null;
+            IRetainedTreeCapabilityFacet? retainedTree = null;
+            byte[]? bytes = null;
+            try
+            {
+                retained = NativeReadiness(parent.Path, "layout source");
+                committed = Assert.IsType<CommittedQuarantineCapability>(Cleanup.Commit(retained, "layout quarantine").Capability);
+                Assert.True(committed.TrySplit(out var handoff));
+                Assert.True(handoff!.TryTakeBoth(out var tree, out var evidence));
+                using var retainedEvidence = Assert.IsAssignableFrom<ICommittedEvidenceCapabilityFacet>(evidence);
+                retainedTree = Assert.IsAssignableFrom<IRetainedTreeCapabilityFacet>(tree);
+                Assert.True(NativeDirectory.TryQueryNames(retainedTree.RootHandle, out bytes, out var queryStatus));
+                Assert.Equal(RetainedTreeMechanismStatus.Success, queryStatus);
+                var offsets = new List<uint>(); var lengths = new List<uint>(); var records = new List<int>(); var leafKinds = new List<string>();
+                for (var offset = 0; ; )
+                {
+                    Assert.True(bytes.Length - offset >= 12);
+                    var nextOffset = BitConverter.ToUInt32(bytes, offset);
+                    var nameLength = BitConverter.ToUInt32(bytes, offset + 8);
+                    var recordLength = checked(12 + (int)nameLength);
+                    Assert.True(recordLength <= bytes.Length - offset);
+                    var leaf = Encoding.Unicode.GetString(bytes, offset + 12, (int)nameLength);
+                    offsets.Add(nextOffset); lengths.Add(nameLength); records.Add(recordLength);
+                    leafKinds.Add(leaf == "." ? "dot" : leaf == ".." ? "dotdot" : leaf == "child" ? "synthetic-child" : "other");
+                    if (nextOffset == 0) { Assert.Equal(bytes.Length, offset + recordLength); break; }
+                    Assert.True(nextOffset >= recordLength && nextOffset <= bytes.Length - offset);
+                    offset = checked(offset + (int)nextOffset);
+                }
+
+                var parserAccepted = NativeDirectory.TryParseDirectChildren(bytes, out var names, out var parserStatus);
+                Assert.Equal([16u, 16u, 0u], offsets);
+                Assert.Equal([2u, 4u, 10u], lengths);
+                Assert.Equal([14, 16, 22], records);
+                Assert.Equal(["dot", "dotdot", "synthetic-child"], leafKinds);
+                Assert.True(parserAccepted);
+                Assert.Equal(["child"], names);
+                Assert.Equal(RetainedTreeMechanismStatus.Success, parserStatus);
+            }
+            finally
+            {
+                if (bytes is not null) System.Security.Cryptography.CryptographicOperations.ZeroMemory(bytes);
+                retainedTree?.Dispose();
+                committed?.Dispose();
+                retained?.Dispose();
+                try { Directory.Delete(Path.Combine(parent.Quarantine, "layout quarantine"), true); }
+                finally { parent.Dispose(); }
+            }
+            Assert.Null(parent.DisposeFailure);
+        }
+
+        [Fact]
+        public void RetainedTreeSession_windows_real_handoff_enumerates_and_reopens_with_retained_handle_authority()
+        {
+            if (!OperatingSystem.IsWindows() || IntPtr.Size != 8) return;
+            using var parent = new NativeReadinessRoot();
+            using var retained = NativeReadiness(parent.Path, "source Ω");
+            using var committed = Assert.IsType<CommittedQuarantineCapability>(Cleanup.Commit(retained, "quarantine Ω").Capability);
+            Assert.True(committed.TrySplit(out var handoff));
+            Assert.True(handoff!.TryTakeBoth(out var tree, out var evidence));
+            using var retainedEvidence = Assert.IsAssignableFrom<ICommittedEvidenceCapabilityFacet>(evidence);
+            var retainedTree = Assert.IsAssignableFrom<IRetainedTreeCapabilityFacet>(tree);
+            var rootHandle = retainedTree.RootHandle; var parentHandle = retainedTree.QuarantineParentHandle;
+            var rawRoot = rootHandle.DangerousGetHandle(); var rawParent = parentHandle.DangerousGetHandle();
+            Assert.True(NativeDirectory.TryQueryNames(rootHandle, out var bytes, out var queryStatus));
+            try
+            {
+                Assert.Equal(RetainedTreeMechanismStatus.Success, queryStatus);
+                Assert.True(NativeDirectory.TryParseDirectChildren(bytes, out var names, out var parseStatus));
+                Assert.Equal(RetainedTreeMechanismStatus.Success, parseStatus);
+                Assert.True(NativeDirectory.TryReopenAndObserve(rootHandle, Assert.Single(names), out var reopened, out var observation, out var reopenStatus));
+                var rawReopened = reopened.DangerousGetHandle();
+                Assert.Equal(RetainedTreeMechanismStatus.Success, reopenStatus);
+                Assert.False(rootHandle.IsInvalid);
+                Assert.Equal(retainedTree.Source.Identity.VolumeSerialNumber, observation.Identity.VolumeSerialNumber);
+                reopened.Dispose();
+                Assert.True(WindowsHandleLifetime.IsClosed(rawReopened));
+            }
+            finally { System.Security.Cryptography.CryptographicOperations.ZeroMemory(bytes); }
+            Assert.True(RetainedTreeSession.TryCreate(retainedTree, TimeSpan.FromSeconds(10), CancellationToken.None, out var session, out var status));
+            var live = Assert.IsType<RetainedTreeSession>(session);
+            Assert.True(live.TryEnumerateDirectChildren(out var leases, out status));
+            Assert.Equal(RetainedTreeMechanismStatus.Success, status);
+            Assert.Single(leases);
+            var childHandle = leases[0].Handle;
+            var rawChild = childHandle.DangerousGetHandle();
+            Assert.Equal(live.VolumeSerialNumber, leases[0].Observation.Identity.VolumeSerialNumber);
+            Assert.False(leases[0].Observation.IsReparsePoint);
+            Assert.True(leases[0].Observation.IsDirectory);
+            Assert.True(live.Matches(retainedEvidence));
+            live.Dispose();
+            Assert.True(childHandle.IsClosed); Assert.True(rootHandle.IsClosed); Assert.True(parentHandle.IsClosed);
+            Assert.True(WindowsHandleLifetime.IsClosed(rawChild)); Assert.True(WindowsHandleLifetime.IsClosed(rawRoot)); Assert.True(WindowsHandleLifetime.IsClosed(rawParent));
+            committed.Dispose(); retained.Dispose();
+            var quarantine = Path.Combine(parent.Quarantine, "quarantine Ω");
+            Directory.Delete(Path.Combine(quarantine, "child"));
+            Directory.Delete(quarantine);
+            Directory.Delete(parent.Quarantine);
+            Directory.Delete(parent.Path);
+            Assert.False(Directory.Exists(parent.Path));
+        }
+
+        [Fact]
+        public void C2a_authorization_session_has_no_self_mint_or_evidence_input()
+        {
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+            Assert.DoesNotContain(typeof(RetainedTreeSession).GetMethods(flags), method => method.Name.Contains("Mint", StringComparison.Ordinal) || method.ReturnType == typeof(RetainedTreeAuthorizationIssuer));
+            Assert.DoesNotContain(typeof(RetainedTreeSession).GetFields(flags), field => field.FieldType == typeof(ICommittedEvidenceCapabilityFacet));
+        }
+
+        [Fact]
+        public void C2a_authorization_transfers_one_opaque_issuer_once_to_test_owned_sandbox()
+        {
+            using var first = CreateAuthorizationSession(out var firstEvidence, out var sandbox);
+            using var retainedEvidence = firstEvidence;
+            Assert.True(sandbox.HasIssuer);
+            using var committed = CreateCommittedCapability();
+            Assert.True(committed.TrySplit(out var handoff));
+            Assert.True(handoff!.TryTakeBoth(out var tree, out var evidence));
+            using var secondEvidence = Assert.IsAssignableFrom<ICommittedEvidenceCapabilityFacet>(evidence);
+            using var secondTree = Assert.IsAssignableFrom<IRetainedTreeCapabilityFacet>(tree);
+            Assert.False(RetainedTreeSession.TryCreateForTestSandbox(secondTree, TimeSpan.FromSeconds(1), CancellationToken.None, sandbox, out _, out var status));
+            Assert.Equal(RetainedTreeMechanismStatus.InvalidCapability, status);
+        }
+
+        [Fact]
+        public void C2a_authorization_issues_and_verifies_exactly_one_session_bound_token()
+        {
+            using var session = CreateAuthorizationSession(out var evidence, out var sandbox);
+            using var retainedEvidence = evidence;
+            using var lease = CreateAuthorizationLease(session);
+            Assert.True(sandbox.TryIssue(session, lease, out var token));
+            Assert.NotNull(token);
+            Assert.False(sandbox.TryIssue(session, lease, out _));
+            Assert.True(session.TryVerifyAuthorization(lease, token, out var accepted));
+            Assert.Equal(RetainedTreeMechanismStatus.Success, accepted);
+            Assert.False(session.TryVerifyAuthorization(lease, token, out var reused));
+            Assert.Equal(RetainedTreeMechanismStatus.InvalidCapability, reused);
+        }
+
+        [Fact]
+        public void C2a_authorization_refuses_wrong_session_and_lease_mismatch()
+        {
+            using var first = CreateAuthorizationSession(out var firstEvidence, out var firstSandbox);
+            using var second = CreateAuthorizationSession(out var secondEvidence, out _);
+            using var retainedFirstEvidence = firstEvidence; using var retainedSecondEvidence = secondEvidence;
+            using var firstLease = CreateAuthorizationLease(first); using var secondLease = CreateAuthorizationLease(first);
+            Assert.True(firstSandbox.TryIssue(first, firstLease, out var token));
+            Assert.False(second.TryVerifyAuthorization(firstLease, token, out var wrongSession));
+            Assert.Equal(RetainedTreeMechanismStatus.InvalidCapability, wrongSession);
+            Assert.False(first.TryVerifyAuthorization(secondLease, token, out var mismatch));
+            Assert.Equal(RetainedTreeMechanismStatus.InvalidCapability, mismatch);
+        }
+
+        [Fact]
+        public void C2a_authorization_refuses_cancellation_expiration_disposal_and_observation_fault()
+        {
+            using var cancellation = new CancellationTokenSource();
+            using var cancelled = CreateAuthorizationSession(out var cancelledEvidence, out var cancelledSandbox, cancellation.Token);
+            using var retainedCancelledEvidence = cancelledEvidence; using var cancelledLease = CreateAuthorizationLease(cancelled);
+            Assert.True(cancelledSandbox.TryIssue(cancelled, cancelledLease, out var cancelledToken)); cancellation.Cancel();
+            Assert.False(cancelled.TryVerifyAuthorization(cancelledLease, cancelledToken, out var cancelledStatus)); Assert.Equal(RetainedTreeMechanismStatus.Cancelled, cancelledStatus);
+            using var expired = CreateAuthorizationSession(out var expiredEvidence, out var expiredSandbox, CancellationToken.None, TimeSpan.FromMilliseconds(1));
+            using var retainedExpiredEvidence = expiredEvidence; using var expiredLease = CreateAuthorizationLease(expired);
+            Assert.True(expiredSandbox.TryIssue(expired, expiredLease, out var expiredToken)); Thread.Sleep(20);
+            Assert.False(expired.TryVerifyAuthorization(expiredLease, expiredToken, out var expiredStatus)); Assert.Equal(RetainedTreeMechanismStatus.Timeout, expiredStatus);
+            using var faulted = CreateAuthorizationSession(out var faultedEvidence, out var faultedSandbox);
+            using var retainedFaultedEvidence = faultedEvidence; using var faultedLease = CreateAuthorizationLease(faulted);
+            Assert.True(faultedSandbox.TryIssue(faulted, faultedLease, out var faultedToken)); faultedLease.InvalidateObservation();
+            Assert.False(faulted.TryVerifyAuthorization(faultedLease, faultedToken, out var faultStatus)); Assert.Equal(RetainedTreeMechanismStatus.InvalidCapability, faultStatus);
+            using var disposed = CreateAuthorizationSession(out var disposedEvidence, out var disposedSandbox);
+            using var retainedDisposedEvidence = disposedEvidence; using var disposedLease = CreateAuthorizationLease(disposed);
+            Assert.True(disposedSandbox.TryIssue(disposed, disposedLease, out var disposedToken)); disposed.Dispose();
+            Assert.False(disposed.TryVerifyAuthorization(disposedLease, disposedToken, out var disposedStatus)); Assert.Equal(RetainedTreeMechanismStatus.InvalidCapability, disposedStatus);
+        }
+
+        [Fact]
+        public void C2a_authorization_test_sandbox_is_internal_and_cannot_be_production_or_c2b_evidence()
+        {
+            Assert.False(typeof(RetainedTreeAuthorizationSandbox).IsPublic);
+            Assert.Empty(typeof(RetainedTreeAuthorizationSandbox).GetConstructors(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance));
+            Assert.Null(typeof(RetainedTreeSession).GetMethod("TryCreateForTestSandbox", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static));
+        }
+
         private static CommittedQuarantineCapability CreateCommittedCapability(CapabilityFacetFailurePoint? failurePoint = null, string sourceParent = "C:\\source")
         {
             var fileSystem = new FakeDirectoryCapabilityFileSystem(); fileSystem.TryCreateDirectory("C:\\quarantine");
@@ -842,6 +1136,21 @@ public sealed class PackagingSupervisorTests
             return committed;
         }
 
+        private static RetainedTreeSession CreateAuthorizationSession(out ICommittedEvidenceCapabilityFacet evidence, out RetainedTreeAuthorizationSandbox sandbox, CancellationToken cancellation = default, TimeSpan? timeout = null)
+        {
+            var committed = CreateCommittedCapability();
+            Assert.True(committed.TrySplit(out var handoff));
+            Assert.True(handoff!.TryTakeBoth(out var tree, out var splitEvidence));
+            evidence = Assert.IsAssignableFrom<ICommittedEvidenceCapabilityFacet>(splitEvidence);
+            sandbox = RetainedTreeAuthorizationSandbox.CreateForTests();
+            Assert.True(RetainedTreeSession.TryCreateForTestSandbox(Assert.IsAssignableFrom<IRetainedTreeCapabilityFacet>(tree), timeout ?? TimeSpan.FromSeconds(1), cancellation, sandbox, out var session, out var status));
+            Assert.Equal(RetainedTreeMechanismStatus.Success, status);
+            return Assert.IsType<RetainedTreeSession>(session);
+        }
+
+        private static RetainedTreeLease CreateAuthorizationLease(RetainedTreeSession session)
+            => new(session, session.Generation, [], new NativeSafeFileHandle(new IntPtr(1), false), new(new(1, new string('0', 32)), false, true, 0));
+
         private static DirectoryCapability NativeReadiness(string parent, string leaf)
         {
             Assert.True(DirectoryCapability.TryCreateRenameReady(new WindowsDirectoryCapabilityFileSystem(), parent, leaf, ["child"], Path.Combine(parent, "quarantine"), out var capability, out var status));
@@ -851,8 +1160,27 @@ public sealed class PackagingSupervisorTests
     {
         public string Path { get; } = Directory.CreateDirectory(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"aibar-c1b0-{Guid.NewGuid():N}")).FullName;
         public string Quarantine { get; }
+        public bool CaptureDisposeFailure { get; init; }
+        public Exception? DisposeFailure { get; private set; }
+        private bool _disposed;
         public NativeReadinessRoot() => Quarantine = Directory.CreateDirectory(System.IO.Path.Combine(Path, "quarantine")).FullName;
-        public void Dispose() { if (Directory.Exists(Path)) Directory.Delete(Path, true); }
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            try { if (Directory.Exists(Path)) Directory.Delete(Path, true); }
+            catch (Exception exception) when (CaptureDisposeFailure) { DisposeFailure = exception; }
+        }
+    }
+
+    private static class WindowsHandleLifetime
+    {
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetHandleInformation(IntPtr handle, out uint flags);
+
+        internal static bool IsClosed(IntPtr handle)
+            => !GetHandleInformation(handle, out _) && Marshal.GetLastWin32Error() == 6;
     }
 
     private sealed class FakeClock : ISupervisorClock { public long ElapsedMilliseconds => 0; }

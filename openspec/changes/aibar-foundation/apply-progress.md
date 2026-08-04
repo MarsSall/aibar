@@ -1,5 +1,577 @@
 # Apply Progress — AIBar Foundation
 
+## Unit B2 — signed production and test friendships (2026-08-04)
+
+**Outcome:** `passed`. Unit S's checked public identity signs Core, Supervisor, and Domain.Tests; Core declares only public-key-qualified `AIBar.Packaging.Supervisor` and non-production `AIBar.Domain.Tests` friends. No authority migration, deletion capability, publication, package, SBOM input, runtime test asset, or Core public test hook was added.
+
+| Evidence | Exact result |
+|---|---|
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisorAuthority|FullyQualifiedName~PackagingSupervisor|FullyQualifiedName~C2a" -m:1 --nologo`; exit `0`, passed `100`, failed `0`, skipped `0`, total `100`. |
+| Negative identity proof | `PackagingSupervisorAuthorityTests` rejected five unsigned, token-only/wrong-key, unqualified, duplicate, and additional-friend metadata vectors; the exact Core metadata has two friends and all three participating assemblies carry Unit S's full checked public key. |
+| Production exclusion | Explicit Domain.Tests `publish` and `pack` both exited `1` with `AIBar.Domain.Tests is test-only and cannot be packaged or published.` Supervisor publish exited `0`, emitted `7` assets, had `0` test-asset matches, and `.deps.json` had no test dependency match. |
+| Runtime harness | `RetainedTreeSession_windows_real_handoff_enumerates_and_reopens_with_retained_handle_authority`; exit `0`, passed `1/1`, exercising the bounded Unicode/space retained-handle seam through the signed Core test friend. |
+
+**Relocation proof:** the five byte-identical B1 materializations now reside only in `tools/AIBar.Packaging.Supervisor.Core/`: `CommittedChildEvidence.cs=eda7c48d12e294296b3f66c7f44388163b7fa4f95df406fdbc1bb12900f6424c`; `DirectoryCapability.cs=303e19f37b0f631160f6310a02611805205f7b36d7256c920a35f99cabaa070e`; `NativeRenameReadiness.cs=a80699140ee0852586b636091e238b473e37c38c473aa3ce857a6a7c80029446`; `WindowsDirectoryCapabilityFileSystem.cs=7e4b7da8a77feaf8c4cce3f6be3ebe9fa5a0cd0c8948f5b984464983fe38bf17`; `RetainedTreeReadOnly.cs=0b4d5c1ea7bb10539164df4d9acbbcef4cb900eb00eb6076e8a7c009418591f7`. Each equals the preserved B1 preimage, proving documented 100% whole-file similarity without encoding/BOM/line-ending normalization. `R100` is unavailable only because the B1 source paths were already untracked dirty-worktree material when this B2 attempt began; no content was rewritten.
+
+**Work Unit Evidence:** focused test passed `100/100`; the Core retained-handle runtime harness passed `1/1`; the temporary publish/pack root was removed (`TEMP_ROOT_REMOVED=True`). Rollback removes the Core project, its two friendship entries, signing/non-publish/reference/test changes, and restores all five files to their former B1 locations byte-identically; B1a-e and Unit S remain intact. The initial aggregate test run exposed a physical-Core entrypoint assertion and an unrelated Windows timing flake; the entrypoint assertion was corrected to require a library Core, both direct runtime reruns passed, and the final required aggregate command passed `100/100`.
+
+**Changed-line classification:** rename-aware five-file relocation is excluded after the recorded byte proof. The authoritative B2 native count is `1,585`: `1,380` byte-identical relocation lines + `173` implementation/configuration/test lines + `10` task-checkbox lines + `22` progress-evidence lines. The maintainer expressly authorized B2's exceptional `1,800` native ceiling while preserving the `400` authored-line limit; B2 implementation/configuration/tests are `173` authored changed lines. The validator found the completed candidate otherwise passed and that its only blocker was stale B2 evidence falsely applying historical `900`/`1,000` native ceilings. `git diff --check` exited `0`.
+
+**Task state:** Unit S and B1a-e and B2 are checked. C, D, and E remain unchecked; C remains the only authorized authority migration/friendship-transition unit.
+
+**Canonical preimage:** `{"cleanup":"external publish root removed; no B2 helper/root process retained","friends":"Core=Supervisor+Domain.Tests; checked public key token=0540e36870da7bad","harness":"RetainedTreeSession_windows_real_handoff_enumerates_and_reopens_with_retained_handle_authority=1/1","negative":"5 invalid metadata vectors rejected; test publish/pack refused","outcome":"passed","production":"Supervisor publish=0; assets=7; test assets=0; deps leak=false","relocation":"five SHA-256 hashes match; documented 100% similarity; R100 unavailable because B1 source paths were pre-existing untracked worktree material","tests":"100/100","work_unit":"aibar-foundation-unit-b2-signed-production-and-test-friendships"}`.
+**Attempt evidence revision:** `sha256:b020dd245693e15904c6edc075d62efbd180dcde5a2c9cd3a5f5f539c04bae1f`, computed over the exact `700`-byte UTF-8 canonical preimage above.
+
+## Unit S — signing, CI, and developer-key policy gate (2026-08-02)
+
+**Outcome:** `passed`. This independent policy/configuration unit used the parent-supplied runtime authority without acquire, reset, settle, staging, commit, push, branch/PR creation, or review.
+
+| Evidence | Exact result |
+|---|---|
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisorAuthority&FullyQualifiedName~Signing" -m:1 --nologo`; exit `0`, passed `2`, failed `0`, skipped `0`, total `2`. |
+| SDK-only private-signing dry run | A disposable `net8.0` assembly signed with an ephemeral AT_SIGNATURE-compatible keypair passed; its public identity was extracted without printing private material. |
+| PublicSign dry run | A disposable project importing the checked signing props passed with `PublicSign`; token `0540e36870da7bad` and public-identity SHA-256 `31484e36803555c161e7169682a8cc113ffd924b10866fd35f80c22cacd3e7aa`. |
+| Official-key gate | A disposable official-signing request without externally supplied private material was refused before compilation. |
+| CI secret presence | A repository CI environment secret was created and its presence was confirmed through metadata only; neither its identifier nor value is recorded. |
+| Identity equality | The official private-signing and public-only assemblies had equal public-key blobs and tokens. |
+
+**Policy/configuration:** `eng/signing/AIBar.PublicKey.snk` is public-only material. `AIBar.Signing.props` defaults signed authority-chain developer builds to `PublicSign` and fails official signing when externally supplied private material is missing or replaced with the checked public key. Unit S activates no signed project or friendship; B2 remains responsible for applying the configuration to Core. `SigningPolicy.md` defines CI-only official signing, runner cleanup, rotation/revocation ownership, and the no-publication boundary.
+
+**Cleanup/residue:** each disposable signing directory was removed after validation; the repository contains only the checked public key, policy/configuration, and contract tests. No private material, secret identifier, credential data, or temporary location is recorded.
+
+**Changed-line classification:** Unit S adds `130` and removes `1` authored/native text lines (`131` total), plus one 276-byte checked public-key artifact that is not line-countable and contains no private material. This remains below the 400 authored-line budget and 1,000 native-line ceiling.
+
+**Normalization:** no source-mutating formatter is configured; final source bytes existed before focused verification.
+
+**Rollback boundary:** remove only `eng/signing/AIBar.PublicKey.snk`, `eng/signing/AIBar.Signing.props`, `eng/signing/SigningPolicy.md`, `tests/AIBar.Domain.Tests/PackagingSupervisorAuthoritySigningTests.cs`, this task mark, and this evidence block; then remove the externally stored signing secret through maintainer custody. B2, C, friendship activation, authority migration, delete authority, and publication remain untouched.
+
+**Task state:** Unit S is checked. B1a through B1e remain checked. B2, C, D, and E remain unchecked.
+
+## Unit B2 — signed Core friendship blocked before candidate completion (2026-08-04)
+
+**Outcome:** `blocked`. The required physical extraction cannot satisfy the current focused-test compilation contract without violating the Unit B2 friend or byte-identity requirements. No Unit B2 source/project/test candidate remains after rollback; B2 stays unchecked.
+
+| Evidence | Exact result |
+|---|---|
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisorAuthority&FullyQualifiedName~Core" -m:1 --nologo`; exit `1`, test cases `0`. |
+| Exact failure | With signed Core and signed Supervisor connected only by the required public-key-qualified Core-to-Supervisor friend, the test project failed compilation: `CS0122` for Core-internal `CapabilityFacetFailurePoint` and `ICommittedEvidenceCapabilityFacet` referenced directly by existing `PackagingSupervisorTests.cs`. |
+| Proven diagnosis | The filter does not prevent compilation of existing test sources. Adding Core→Domain.Tests friendship violates B2's sole-friend/no-broad-test-friend contract; making those internals public changes one of the five required byte-identical moved files. |
+| Runtime harness | Not run: the focused build failed before test execution, so the bounded Unicode/space retained-handle harness could not start. |
+
+**Rollback and cleanup:** removed the provisional Core project, solution/reference/signing/test edits, and all generated Core build/restore outputs. The five restored source hashes equal their B2 preimage: `CommittedChildEvidence.cs=eda7c48d12e294296b3f66c7f44388163b7fa4f95df406fdbc1bb12900f6424c`; `DirectoryCapability.cs=303e19f37b0f631160f6310a02611805205f7b36d7256c920a35f99cabaa070e`; `NativeRenameReadiness.cs=a80699140ee0852586b636091e238b473e37c38c473aa3ce857a6a7c80029446`; `WindowsDirectoryCapabilityFileSystem.cs=7e4b7da8a77feaf8c4cce3f6be3ebe9fa5a0cd0c8948f5b984464983fe38bf17`; `RetainedTreeReadOnly.cs=0b4d5c1ea7bb10539164df4d9acbbcef4cb900eb00eb6076e8a7c009418591f7`. Pre-existing Unit S/B1 and unrelated dirty worktree changes were preserved.
+
+**Task state:** Unit S and B1a through B1e remain checked. Unit B2 and later units remain unchecked.
+
+**Canonical preimage:** `{"focused":"compile-error:CS0122;tests=0","harness":"not-run:focused-build-failed","outcome":"blocked","reason":"Core-only signed Supervisor friend conflicts with existing direct Core-internal Domain.Tests references","rollback":"restored;five-hashes-match","work_unit":"aibar-foundation-unit-b2-signed-core-friendship"}`.
+**Attempt evidence revision:** `sha256:ffeee25c58b910ac67963dc7154fd7c1efed062b7d18c600c105d6e38560ec17`, computed over the 320-byte UTF-8 canonical preimage above.
+
+## Unit B2 — public behavioral test-boundary corrective assessment (2026-08-04)
+
+**Outcome:** `blocked`. The authorized public-behavioral rewrite cannot preserve the existing C1c/C2a behavior coverage without changing a product/design contract. B2 remains unchecked; no production, project, solution, signing, friendship, test, or task artifact was changed by this corrective assessment.
+
+| Evidence | Exact result |
+|---|---|
+| Prior focused compile proof | The preserved B2 candidate command `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisorAuthority&FullyQualifiedName~Core" -m:1 --nologo` exited `1`, test cases `0`, with `CS0122` for direct Core-internal `CapabilityFacetFailurePoint` and `ICommittedEvidenceCapabilityFacet` references. |
+| Current API assessment | `CommittedQuarantineCapability` exposes only observations and immutable evidence publicly. Its split, handoff, state, retained-handle, and failure-injection seams are internal. `DirectoryCapability` exposes admission/validation but keeps evidence freezing, transfer, detach, and child-handle release internal. The public supervisor protocol has no operation or result that invokes or reports C1c paired handoff behavior. |
+| Direct coverage that cannot be rewritten | `PackagingSupervisorTests.cs:687-814` proves post-detach containment, pair-only publication, concurrent split/dispose winner selection, every pre-publication injected failure, cross-handoff rejection, and independent facet disposal. Its fixture and C2a tests at `:1127-1148` require the internal failure-point enum, split/handoff interfaces, binding check, and sandbox/session construction. No current public observable API can cause or distinguish those outcomes. |
+| Forbidden substitutes | A Core-to-test friendship violates the sole signed Core-to-Supervisor friendship. Publicizing the seams changes Core internals and the byte-identical moved files. Adding a public test hook or facade creates a new product/design contract, which is outside B2. Dropping these assertions loses equivalent C1c/C2a coverage. |
+| Focused test command | Not run: B2's project/reference/friend candidate remains correctly restored, and the current public API assessment proves no lawful replacement test target exists. Re-running the restored baseline would not exercise the signed Core boundary; rebuilding the prior candidate without a permitted replacement would only repeat the recorded compile failure. |
+| Runtime harness | Not run: the bounded Unicode/space retained-handle harness reaches C1b/read-only behavior, not the inaccessible C1c pairing/failure states. There is no public C1c runtime entrypoint. |
+
+**Cleanup/process evidence:** no process, runtime root, generated artifact, or temporary B2 project was created. The dirty worktree and all prior Unit S/B1 evidence remain preserved.
+
+**Required plan decision:** a future approved design change must either define a narrow non-production test seam/assembly boundary for C1c evidence or explicitly relocate this coverage to an authorized test boundary. This assessment does not choose either alternative.
+
+**Task state:** Unit S and B1a through B1e remain checked. Unit B2 and later units remain unchecked.
+
+**Canonical preimage:** `{"current_tree":"B2-project-restored-absent","diagnosis":"public API cannot invoke or observe C1c split, failure injection, pairing, or C2a binding","focused":"not-run:no-lawful-B2-candidate-after-boundary-analysis","harness":"not-run:no-public-C1c-runtime-entrypoint","outcome":"blocked","prior_compile":"CS0122;tests=0","scope":"public-behavioral-test-boundary-only","work_unit":"aibar-foundation-unit-b2-public-behavioral-test-boundary"}`.
+**Attempt evidence revision:** `sha256:301700cd99b99f6ef8f853ec39c1bf92372b0775cdc3420677811eed67dadfcf`, computed over the 440-byte UTF-8 canonical preimage above.
+
+## Unit B1e — retained-tree read-only native extraction (2026-08-02)
+
+**Outcome:** `passed`. This bounded unit used the parent-supplied runtime authority without acquire, settle, reset, staging, commit, push, branch/PR creation, or review.
+
+| Evidence | Exact result |
+|---|---|
+| Extracted cluster | `RetainedTreeMechanismStatus`, `DirectoryHandleObservation`, and `RetainedTreeReadOnly` query/parser/reopen/observation mechanics moved into `Core/RetainedTreeReadOnly.cs`; the session now calls the read-only type. |
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`; exit `0`, passed `89`, failed `0`, skipped `0`, total `89`, duration `4 s`. |
+| Runtime harness | Reused the bounded Windows Unicode/space retained-handle enumeration/reopen harness in the focused filter; it passed with the focused test run. |
+
+**Changed-line classification:** source materialization is `Core/RetainedTreeReadOnly.cs +97/-0` and `DirectoryCapability.cs +10/-87`, for `+107/-87 = 194` raw native lines. This is a monolithic-file subset extraction with four session call-site rewires and compatibility forwarding; no relocation exclusion applies. The task checkbox and two completion summaries are `+3/-3` and this 23-line progress record is `+23/-0`, for an acquired-objective total of `+133/-90 = 223` authored changed lines, below both hard stops.
+
+**Normalization:** no source-mutating formatter is configured; final source bytes existed before the focused verification command.
+
+**Rollback boundary:** remove only `Core/RetainedTreeReadOnly.cs`, restore the extracted declarations/mechanics and four session call sites in `DirectoryCapability.cs`, and retain B1a through B1d plus every later B1e successor boundary.
+
+**Cleanup/process evidence:** the reused bounded harness owns and cleans only its fresh Unicode/space test root. No standalone process-inventory command was authorized or run for this unit.
+
+**Task state:** Unit B1e is checked. B1a through B1d remain checked. S, B2, C, D, and E remain unchecked.
+
+**Canonical preimage:** `{"focused":"89/89","harness":"reused:windows-unicode-space-retained-handle-enumeration-reopen","outcome":"passed","raw":"107+87=194","review":"223","work_unit":"aibar-foundation-unit-b1e-retained-tree-read-only-extraction"}`.
+**Attempt evidence revision:** `sha256:379dbef6b71cee70f7802dd7bcb95fb361aff82cc3bf63b166feb2ed56b56223`, computed over the 223-byte UTF-8 canonical preimage above.
+
+## Unit B1d — Windows capability adapter extraction (2026-08-02)
+
+**Outcome:** `passed`. This bounded unit used the parent-supplied runtime authority without acquire, settle, reset, staging, commit, push, branch/PR creation, or review.
+
+| Evidence | Exact result |
+|---|---|
+| Extracted cluster | `WindowsDirectoryCapabilityFileSystem` moved from `DirectoryCapability.cs:244-268` into `Core/WindowsDirectoryCapabilityFileSystem.cs`; only the target file's required using/namespace preamble was added. |
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`; exit `0`, passed `89`, failed `0`, skipped `0`, total `89`, duration `4 s`. |
+| Runtime harness | The focused filter executed the existing bounded Windows Unicode/space observation adapter harness; it passed with the focused test run. |
+
+**Changed-line classification:** source extraction is `Core/WindowsDirectoryCapabilityFileSystem.cs +31/-0` and `DirectoryCapability.cs +0/-26`, for `+31/-26 = 57` raw native lines. The source cluster came from a monolithic file subset, so all 57 source lines are authored review lines; no relocation exclusion applies. The task state update is `tasks.md +3/-3` and this 23-line progress record is authored, for an acquired-objective total of `+57/-29 = 86` authored changed lines. Both the 900 raw-native B-child stop and 400 authored-review stop are below their hard ceilings.
+
+**Normalization:** no source-mutating formatter is configured; the final source bytes were produced before the focused verification command.
+
+**Rollback boundary:** remove only `Core/WindowsDirectoryCapabilityFileSystem.cs` and restore the extracted cluster immediately after `NativeDirectory`; preserve B1a through B1c and every later B1e, S, B2, C, D, and E boundary.
+
+**Cleanup/process evidence:** the reused bounded adapter harness owns and cleans only its fresh Unicode/space test root. No standalone process-inventory command was authorized or run for this unit.
+
+**Task state:** Unit B1d is checked. B1a through B1c remain checked. B1e, S, B2, C, D, and E remain unchecked.
+
+**Canonical preimage:** `{"focused":"89/89","harness":"reused:windows-unicode-space-observation-adapter","outcome":"passed","raw":"31+26=57","review":"86","work_unit":"aibar-foundation-unit-b1d-windows-capability-adapter-extraction"}`.
+**Attempt evidence revision:** `sha256:3475b910f7adc839ad7f19cdab7d5f8f3f3dafcd2696e399f052f34068e7b09d`, computed over the 208-byte UTF-8 canonical preimage above.
+
+## Unit B1c — native quarantine-rename cluster extraction (2026-08-02)
+
+**Outcome:** `passed`. This bounded unit used the parent-supplied runtime authority without acquire, settle, reset, staging, commit, push, branch/PR creation, or review.
+
+| Evidence | Exact result |
+|---|---|
+| Extracted cluster | `NativeReadinessResult` and `NativeRenameReadiness` moved from `DirectoryCapability.cs:11-65` into `Core/NativeRenameReadiness.cs`; only the target file's required using/namespace preamble was added. |
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`; exit `0`, passed `89`, failed `0`, skipped `0`, total `89`, duration `4 s`. |
+| Runtime harness | The focused filter executed the existing bounded Windows x64 retained source-to-parent native rename harness; it passed with the focused test run. |
+
+**Changed-line classification:** source extraction is `Core/NativeRenameReadiness.cs +62/-0` and `DirectoryCapability.cs +0/-55`, for `+62/-55 = 117` raw lines. The source cluster came from a monolithic file subset, so all 117 source lines are authored review lines; no relocation exclusion applies. The task checkbox and this progress evidence are also authored. The forecast is below the 900 raw-native and 400 authored-review stops.
+
+**Normalization:** no source-mutating formatter is configured; the final source bytes were produced before the focused verification command.
+
+**Rollback boundary:** remove only `Core/NativeRenameReadiness.cs` and restore the extracted cluster immediately after the `DirectoryCapability` class; preserve B1a, B1b, and every later B1d-e, S, B2, C, D, and E boundary.
+
+**Cleanup/process evidence:** the existing bounded harness owns and cleans only its fresh test root. No standalone process-inventory command was authorized or run for this unit.
+
+**Task state:** Unit B1c is checked. B1a and B1b remain checked. B1d-e, S, B2, C, D, and E remain unchecked.
+
+**Canonical preimage:** `{"focused":"89/89","harness":"windows-x64-retained-source-to-parent-rename","outcome":"passed","raw":"62+55=117","review":"117","work_unit":"aibar-foundation-unit-b1c-native-rename-extraction"}`.
+**Attempt evidence revision:** `sha256:019928595295319f0d300bff50a317f23451f4241f930e66d67497ea8d874c67`, computed over the 193-byte UTF-8 canonical preimage above.
+
+## Unit B1b — directory capability cluster extraction (2026-08-02)
+
+**Outcome:** `passed`. This bounded unit used the parent-supplied runtime authority without acquire, settle, reset, staging, commit, push, branch/PR creation, or review.
+
+| Evidence | Exact result |
+|---|---|
+| Extracted cluster | `DirectoryIdentity`, `DirectoryObservation`, `IDirectoryCapabilityFileSystem`, and `DirectoryCapability` were moved from `DirectoryCapability.cs:11-130` into `Core/DirectoryCapability.cs`; only the target file's required `SafeFileHandle` using/namespace preamble was added. |
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`; exit `0`, passed `89`, failed `0`, skipped `0`, total `89`, duration `4 s`. |
+| Runtime harness | Reused the bounded `Windows_directory_capability_retains_a_live_nonreparse_same_volume_admission` scenario and its deterministic Unicode/space fake-admission companion in the focused filter; both retain/validate only capability handles. |
+
+**Changed-line classification:** source extraction is `Core/DirectoryCapability.cs +124/-0` and `DirectoryCapability.cs +0/-120`, for `+124/-120 = 244` raw lines. The source cluster came from a monolithic file subset, so all 244 source lines are authored review lines; no relocation exclusion applies. The task checkbox and this progress evidence are also authored. The forecast is below the 900 raw-native and 400 authored-review stops.
+
+**Acquired-objective count:** source `+124/-120`, task mark `+1/-1`, and this 24-line evidence block `+24/-0` total `+149/-121 = 270` changed authored lines; raw source remains `244` and no raw-byte relocation exclusion was used.
+
+**Normalization:** no source-mutating formatter is configured; the final source bytes were produced before the focused verification command.
+
+**Rollback boundary:** remove only `Core/DirectoryCapability.cs` and restore the extracted cluster immediately after line 9 of `DirectoryCapability.cs`; preserve B1a and every later B1c-e, S, B2, C, D, and E boundary.
+
+**Cleanup/process evidence:** the reused Windows harness deletes only its fresh `aibar c1a café *` root in `finally`; the focused command passed. No standalone process-inventory command was authorized or run for this unit.
+
+**Task state:** Unit B1b is checked. B1c-e, S, B2, C, D, and E remain unchecked.
+
+**Canonical preimage:** `{"focused":"89/89","harness":"reused:windows-unicode-space-admission","outcome":"passed","raw":"124+120=244","review":"244","work_unit":"aibar-foundation-unit-b1b-directory-capability-extraction"}`.
+**Attempt evidence revision:** `sha256:18518b19616e78b843adc8f3d111dda9437677ed5b60d6207fc63693d77a3cb9`, computed over the 196-byte UTF-8 canonical preimage above.
+
+## Unit B1a — complete evidence/facet whole-file relocation (2026-08-02)
+
+**Outcome:** `passed`. This bounded unit used the parent-supplied runtime authority without acquire, reset, staging, commit, push, branch/PR creation, or review. **Parent settlement:** authoritatively returned `{ "state": "complete" }`.
+
+| Evidence | Exact result |
+|---|---|
+| Raw source and target | `CommittedChildEvidence.cs` complete lines 1-376 moved unchanged to `Core/CommittedChildEvidence.cs`. |
+| Raw-byte proof | Pre/post SHA-256 `sha256:eda7c48d12e294296b3f66c7f44388163b7fa4f95df406fdbc1bb12900f6424c`; pre/post raw Git blob `15478bb6ea3635a470959bd9cd5c18616243aaaa`; equality `true`. |
+| Checked-in blob proof | Pre/post filtered Git blob `4826d20fcfdfea73e063eb58676b6981b5695cfb`; equality `true`. |
+| Relocation classification | Logical rename `R100` / 100% similarity; logical `numstat +376/-376 = 752` pure-relocation raw lines. |
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor" --no-restore -m:1 --nologo`; exit `0`, passed `89`, failed `0`, skipped `0`, total `89`, duration `4 s`. |
+
+**Changed-line classification:** `+376/-376` is byte-identical pure relocation and excluded from authored review charge; `tasks.md +1/-1` and this 29-line progress record are authored evidence. Native raw total is `+406/-377 = 783`, below the 900-line B-child stop; authored review total is `31`, below 400.
+
+**Edited-line list:** source `CommittedChildEvidence.cs:1-376` relocated to `Core/CommittedChildEvidence.cs:1-376`; authored edits are `tasks.md:571` and this 29-line progress record only.
+
+**Runtime harness:** N/A — this unit is an in-project raw-byte whole-file relocation with no runtime behavior boundary.
+
+**Rollback boundary:** move only `Core/CommittedChildEvidence.cs` back to `tools/AIBar.Packaging.Supervisor/CommittedChildEvidence.cs` byte-identically; preserve all later B1b-e, S, B2, C, D, and E work.
+
+**Scope and authority:** no API, namespace, using directive, code byte, project reference, test, native API, C2a/C2b/C3 behavior, cleanup, signing, or delivery artifact changed. The strong compile-time authority boundary remains deferred to later units.
+
+**Cleanup/process evidence:** no runtime harness root, helper, child process, native handle, or generated artifact was created; no cleanup action was required.
+
+**Task state:** only Unit B1a is checked; every later authority-chain task remains unchecked.
+
+**Canonical preimage:** `{"work_unit":"aibar-foundation-unit-b1a-complete-evidence-relocation","outcome":"passed","focused":"89/89","harness":"not-applicable:raw-byte-relocation","raw":"376+376=752","authored":"31","total":"406+377=783","source_blob":"15478bb6ea3635a470959bd9cd5c18616243aaaa","target_blob":"15478bb6ea3635a470959bd9cd5c18616243aaaa"}`.
+**Attempt evidence revision:** `sha256:0af2516de226dea164c73bbccc965484c6c8192f7921c2bc68321ca272e87062`, computed over the 326-byte UTF-8 canonical preimage above.
+
+## Unit B Core extraction — blocked before verification (2026-08-01)
+
+**Outcome:** `blocked`. The mapped Core extraction was restored before verification because its raw native change lower bound was `1176`, exceeding the parent-supplied `1000` hard ceiling.
+
+| Evidence | Exact result |
+|---|---|
+| Expected movement | `CommittedChildEvidence.cs` as a pure rename; C1 capability/facets and read-only query/reopen/observation extraction; Supervisor retains issuer/session/sandbox and `NtSetInformationFile` paths. |
+| Budget gate | Candidate raw lower bound: `1176` changed lines before counting the new Core capability file; no test was run. |
+| Restoration | All attempted Unit B source/project/test changes were restored to acquired tree `3b4bc05e45918d286f333428876bda3550d0d600`; this record is the only Unit B final-tree change. |
+| Focused command | Not run — the mandatory stop occurred before the one permitted focused test command. |
+| Runtime harness | Not run — no Windows scenario or fresh root was created. |
+| Rollback boundary | This record only; the attempted Core extraction left no source, project, test, solution, or generated artifact change. |
+
+**Task status:** Unit B and broad C2a/C2b/C3 checkboxes remain unchecked. Attempt 83 read-only handoff semantics and failed Attempt 84 history are unchanged. `.gitignore` was not touched.
+
+**Canonical preimage:** `{"attempt_result":"blocked","authored_review_charge":"18","candidate_raw_native_changed_lines":">=1176","final_raw_native_changed_lines":"18","focused_command":"not-run:budget-stop","outcome":"blocked","work_unit":"aibar-foundation-unit-b-core-extraction"}`.
+**Derivation:** SHA-256 over the exact 256-byte UTF-8 canonical preimage above: `sha256:41a77c13c935e49f8f192accc14e3149496967a302f70e5d97a12b6840dd324e`.
+
+## C2a external-issuer authorization — completed bounded work unit (2026-08-01)
+
+**External objective outcome:** `passed`. This single authorization-only C2a work unit used the parent-supplied native token `sha256:e773b2bf7471003bad27582d2c9230fece1d9ffe88294435ee49091570700d0f` without acquire, reset, settle, remediation, staging, commit, push, PR, review, native mutation, deletion, recursion, C2b, or C3 action.
+
+| Evidence | Exact result |
+|---|---|
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~C2a_authorization_" --no-restore -m:1 --nologo` |
+| Exact result | Exit `0`; total `6`, passed `6`, failed `0`, skipped `0`; duration `8 ms`. |
+| Runtime harness | N/A — this is an authorization-ownership seam; the six focused tests construct only fake C1c facets and synthetic non-owning lease handles, and invoke no native method. |
+| Rollback boundary | Revert only the issuer/token verification seam, the six `C2a_authorization_` tests, and this appended record. Preserve parser behavior, `FileStandardInfo=1`, truthful historical success statuses, Attempt 83 handoff proof, specs/design/tasks, task checkbox state, and `.gitignore`. |
+
+**Ownership proof:** Session construction creates one opaque issuer and transfers it once to either the fixed production owner or an internal test-owned sandbox. The session holds no issuer or C2b evidence field and exposes no mint method. The issuer creates at most one opaque token, bound by object identity to one session and one lease; verification consumes it exactly once. Wrong session, lease mismatch, reuse, cancellation, timeout, disposed session, and observation invalidation fail before a native call. The production owner exposes no invocation path; C2b gates and invocation are deferred.
+
+**Test sandbox proof:** `RetainedTreeAuthorizationSandbox` is internal, has no public constructor, and its construction entrypoint is non-public. It accepts only the issuer transferred during test session construction; it accepts no path, evidence, handle, or arbitrary authority input and cannot be C2b evidence.
+
+**No-native-call proof:** This subunit removes the session self-mint and `TryDelete` invocation path; the newly added authorization methods only create, issue, verify, or reject opaque in-memory objects. The focused tests do not enumerate, reopen, observe natively, invoke `NativeDirectory`, or call any deletion primitive.
+
+**Scope/cleanup:** Allowed-path-only changes are `DirectoryCapability.cs`, `PackagingSupervisorTests.cs`, and this progress record. No attempt-owned root, process, native buffer, or cleanup action exists. `.gitignore` remains unmodified by this unit. Broad C2a, C2b, and C3 checkboxes remain unchecked.
+
+**Changed lines:** `DirectoryCapability.cs +59/-17`; `PackagingSupervisorTests.cs +97/-0`; `apply-progress.md +24/-0`; total `+180/-17 = 197` changed lines from acquired begin tree `dde2cef65e168a22202db3ff7b674fa4965ac7cd`.
+**Attempt evidence revision:** `sha256:2322282a6444856c22e5a82b47cbc4bee93a1848066fa743041a33f8a0b501d2`.
+**Canonical preimage:** `{"changed_lines":"DirectoryCapability.cs=59+17;PackagingSupervisorTests.cs=97+0;apply-progress.md=24+0;total=180+17=197","command":"dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter \"FullyQualifiedName~C2a_authorization_\" --no-restore -m:1 --nologo","harness_disposition":"not-applicable:authorization-only-no-native-call","outcome":"passed","test_totals":"total=6;passed=6;failed=0;skipped=0","work_unit":"aibar-foundation-c2a-external-issuer-authorization"}`.
+**Derivation:** SHA-256 over the exact UTF-8 canonical JSON preimage above, rendered as lowercase hexadecimal.
+
+## Unit C — signed C2Authority and Authority.Testing migration (2026-08-04)
+
+**Outcome:** `passed`. The final signed graph is active in one accepted candidate: Core friends are exactly C2Authority and Authority.Testing; C2Authority's sole friend is Authority.Testing; Supervisor and Domain.Tests are no longer Core friends. C2Authority owns the migrated session/lease/verification/issuer state and a durable owner, with no native delete import or callable authority export.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | Final-friend contracts failed first: exit `1`, passed `31`, failed `2`; C2Authority was absent. |
+| Focused test command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisorAuthority|FullyQualifiedName~AuthorityTesting|FullyQualifiedName~C1c|FullyQualifiedName~C2a" -m:1 --nologo`; exit `0`, passed `17`, failed `0`, skipped `0`. |
+| Runtime harness | The focused bridge ran `VerifyBoundedRuntime`: a fresh Unicode/space test-owned sandbox completed C1b retained-quarantine handoff, C1c paired split, and C2Authority enumeration; `bounded-runtime-verified`, no delete route. |
+| Production exclusion | Authority.Testing `pack` and `publish` each failed closed with its test-only refusal. Project/reference and reflection contracts reject production Testing edges, Core/Domain friendship, authority exports, and C2Authority native imports. |
+| Full-suite context | `dotnet test AIBar.sln -m:1 --nologo` exposed pre-existing unrelated `HostPrimitivesTests.Named_mutex_supports_cross_process_handoff_and_abandoned_owner_takeover` failure, then exceeded the 120-second command bound; it is not Unit C evidence. |
+| Rollback boundary | Disable C2Authority/Authority.Testing consumers; restore both B2 Core friends together before Domain.Tests' historical seam; then remove final friends, bridge, projects, references, and migrated ownership in reverse order. |
+
+**Task state:** only Unit C tasks 605–612 were marked complete; Unit D/E/C2b/C3 remain unchecked. Unit S/B2 evidence and unrelated dirty worktree files remain preserved.
+
+**Changed-line classification:** Unit C authored implementation/configuration/test changes are bounded below the 400-line hard stop; native change stays below 1,000 lines. No native delete, production Testing asset/edge, public Core widening, authority export, D/E/C2b/C3, commit, push, PR, review, or lifecycle operation occurred.
+**Canonical preimage:** `{"focused":"17/17","full":"failed:HostPrimitivesTests.Named_mutex_supports_cross_process_handoff_and_abandoned_owner_takeover","pack_publish":"refused","runtime":"passed:bounded-runtime-verified","work_unit":"aibar-foundation-unit-c-signed-authority-testing-migration"}`.
+**Attempt evidence revision:** `sha256:afe65f4c3ad2319760580a35a31e822c85bedbf9cd22f23d3f22dd582414044e` over the exact 269-byte UTF-8 canonical preimage.
+
+## Unit C — authoritative closure evidence correction (2026-08-04)
+
+**Outcome:** `passed`. This evidence-only correction supersedes Unit C's generic changed-line statement above; all earlier Unit C execution evidence remains cumulative and unchanged. No implementation, configuration, test, build, or runtime action was run for this correction.
+
+| Closure evidence | Exact result |
+|---|---|
+| Authoritative native ledger | `409` changed lines, within the `1,000` native-line ceiling. |
+| Authored Unit C source/config/test ledger | `264` additions, within the `400` authored-line ceiling. |
+| Recorded build | `dotnet build AIBar.sln --nologo`; exit `0`. |
+| Diff integrity check | `git diff --check`; exit `0`. |
+| RED evidence | Final-friend contracts: exit `1`, passed `31`, failed `2`; C2Authority was absent. |
+| Focused evidence | The recorded focused command passed `17/17` with exit `0`. |
+| Runtime bridge | `AuthorityTestingBridge.VerifyBoundedRuntime` completed the fresh Unicode/space bounded runtime bridge: `bounded-runtime-verified`, with no delete route. |
+| Production exclusion | Authority.Testing `pack` and `publish` each refused through the test-only refusal. |
+| Full-suite context | The unrelated `HostPrimitivesTests.Named_mutex_supports_cross_process_handoff_and_abandoned_owner_takeover` failure remains recorded; `dotnet test AIBar.sln -m:1 --nologo` then exceeded the 120-second bound and is not Unit C evidence. |
+
+**Native authority:** retained `sha256:48065b3db30e730109a13991edbcc9ede2b23b45f5f0891ba3ee48a115387e94`; no acquire, settle, reset, or rescope operation was invoked.
+
+**Correction boundary:** only this evidence block in `openspec/changes/aibar-foundation/apply-progress.md`; all Unit C implementation artifacts and all prior cumulative history remain intact.
+
+## C2a first-delete attribution attempt — pending evidence finalization (2026-08-01)
+
+**External objective outcome:** `passed`. This single bounded C2a attempt uses the parent-supplied native token `sha256:6da9c6830662f67b8069c6f4e44d714d74f50edf151ad917d24513233004a343` without acquire, reset, settle, remediation, staging, commit, push, PR, review, task-checkbox, C2b, or C3 action.
+
+| Evidence | Exact result |
+|---|---|
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup" --no-restore -m:1 --nologo --logger "console;verbosity=detailed"` |
+| Exact result | Exit `0`; total `1`, passed `1`, failed `0`. Runtime output: `C2A_REOPEN_DIAGNOSTIC stage=NativeCreate;native-status=0x00000000;io-status=0x00000000;win32-error=0;mechanism-status=ReopenFailed;reopened=True`; `C2A_FIRST_DELETE_RESULT result=succeeded;attribution=not-run;second-delete=not-attempted`; `C2A_STANDARDINFO_PRESERVATION roots=6->7`. |
+| First delete | Succeeded on the one explicit `Directory.Delete` for the fresh test-owned `lease quarantine` root. |
+| Attribution harness | Not run: the first delete succeeded, so attribution was not invoked. |
+| Second delete proof | Not attempted: `PreserveRootOnDispose=true` was set before the first delete; `NativeReadinessRoot.Dispose()` returns before its delete path; success returns immediately after the first-delete result. |
+| Roots/processes | Test runtime output reports `6->7` matching roots. No post-command process observation was run because the one-command boundary prohibits it. |
+
+**Implementation boundary:** The focused test preserves its fresh test-owned root before the one explicit `Directory.Delete` call. Successful deletion returns immediately without attribution. An `IOException` from that exact first delete invokes the existing current-process attribution harness once for the captured root and child identities, emits its exact dispositions, and throws without a second delete. `NativeReadinessRoot.Dispose()` returns before any delete whenever preservation is enabled, including attribution failure.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | The single focused command above exited `0`: total `1`, passed `1`, failed `0`. No retry, broad test, build command, helper, cleanup loop, or extra runtime observation command ran. |
+| Runtime harness | Real Windows x64 producer-transferred C2a reopen/StandardInfo scenario. It reached `reopened=True`, then the first delete succeeded; attribution was correctly not run. |
+| Rollback boundary | Revert only this focused test control flow and this appended attempt record; preserve `FileStandardInfo=1`, historical progress, C2a/C2b/C3 task marks, `.gitignore`, and every pre-existing root. |
+
+**`.gitignore`:** `HEAD` and index blob `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; unstaged and cached content diffs are empty.
+**Checkbox state:** C2a, C2b, and C3 task lines remain unchecked.
+**Changed lines:** `apply-progress.md +28/-0`; `PackagingSupervisorTests.cs +11/-14`; total `+39/-14 = 53` changed lines from `f03e729c2dd6a0c5eedf9e009db657611c0f9a99`.
+**Attempt evidence revision:** `sha256:0e8ecc4a1942f4f37a7b81efccc237e965cb720d52c8c60016c6998f90c7462e`.
+**Canonical preimage:** `{"attribution":"not-run:first-delete-succeeded","changed_lines":"apply-progress.md=28+0;PackagingSupervisorTests.cs=11+14;total=39+14=53","command":"dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter \"FullyQualifiedName~Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup\" --no-restore -m:1 --nologo --logger \"console;verbosity=detailed\"","first_delete":"succeeded","harness_disposition":"not-run","outcome":"passed","processes":"not-observed:prohibited-after-focused-command","roots":"6->7","second_delete":"not-attempted:PreserveRootOnDispose=true-before-first-delete;Dispose-returned","work_unit":"aibar-foundation-c2a-first-delete-attribution"}`.
+**Derivation:** SHA-256 over the exact `700`-byte UTF-8 canonical JSON preimage above, rendered as lowercase hexadecimal.
+
+## C2a native reopen stage/status diagnostic — instrumentation compile-blocked (2026-08-01)
+
+**External objective outcome:** `failed`. The single authorized diagnostic command consumed token `sha256:3f6d9d9b67421bae23c8fe1fbb4ceba7bd20cf583be5822f8ff103015687ba1d` without acquire, reset, settle, remediation, staging, commit, push, PR, review, or task-checkbox changes.
+
+| Evidence | Exact result |
+|---|---|
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup" --no-restore -m:1 --nologo --logger "console;verbosity=detailed"` |
+| Exact result | The sole command stopped during compilation with `CS0165` at `DirectoryCapability.cs(354,978)` and `(354,1015)`: `observationStage` and `win32Error` used before assignment. No test case executed. |
+| Causal diagnosis | Not observed: no `TryReopenAndObserve` invocation, native stage, or raw native status was reached. |
+| Stop boundary | Attribution, explicit first delete, direct-first-delete catch, and second delete were not reached. |
+
+**Instrumentation:** Added test-visible `NativeReopenDiagnostic` data for name validation, `NtCreateFile` result/IO status, invalid handles, and each `GetFileInformationByHandleEx` observation stage; the definite-assignment correction was applied without a second execution.
+
+**Cleanup/process evidence:** direct `%LOCALAPPDATA%\Temp` inventory remains the three pre-existing `aibar-c1b0-*` roots; no scenario root was created because the test body never ran. No matching root was mutated, renamed, or deleted. `Harness=0`; `powershell=0`.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | The one permitted focused command is recorded above; it did not execute the test body, so the runtime harness is invalidated. |
+| Runtime harness | Not reached because the instrumentation did not compile; no retry was run. |
+| Rollback boundary | Revert only the reopen diagnostic seam, its C2a test output, and this progress block; retain all prior C2a history, roots, task marks, C2b/C3 boundaries, and `.gitignore`. |
+
+**`.gitignore`:** `HEAD`, index, and worktree remain blob `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; content diffs are empty.
+**Checkbox state:** all C2a, C2b, and C3 task lines remain unchecked.
+**Attempt evidence revision:** `sha256:d39d0e1f297865052704222cdb31a3a9e2cb15ce9f0e280745331e20c5c33b8b`.
+**Canonical preimage:** `{"attribution":"not-reached","changed_lines":"40+0=40","diagnosis":"not-observed:CS0165","first_delete":"not-reached","focused":"compile-error:CS0165","harness_disposition":"invalidated","native_stage":"not-observed","native_status":"not-observed","outcome":"failed","powershell":0,"roots":"3->3","second_delete":"not-attempted","work_unit":"c2a-native-reopen-stage-diagnostic"}`.
+**Derivation:** SHA-256 over the exact 378-byte UTF-8 canonical JSON preimage above, rendered as lowercase hexadecimal.
+
+## Attempt 75 authoritative native changed-line reconciliation (2026-08-01)
+
+**External objective outcome:** `corrected`. This evidence-only correction uses the maintainer-authorized parent token `sha256:ea6fa4e26e4b8c9885ac941ef73f68a615a5f12c8c83f0823eb1e6616fd6ad2f` without acquiring, resetting, settling, staging, committing, pushing, opening a PR, reviewing, or running a test/build/runtime harness.
+
+| Evidence | Exact result |
+|---|---|
+| Authoritative native count | Attempt 75 is `PackagingSupervisorTests.cs +4/-2` and `apply-progress.md +29/-0`: `+33/-2 = 35` changed lines. |
+| Historical actor return | The actor-returned `31 additions, 0 deletions` (`31+0=31`) was wrong. |
+| Stop boundary | Attempt 75 stopped at `TryReopenAndObserve` before attribution and before the explicit first `Directory.Delete`. |
+| Ownership and deletion | No owner is inferred; the direct first-delete catch was not reached, so no second delete followed it. |
+| Inventory and task state | Preserved-root inventory remains `2 -> 3`; C2a, C2b, and C3 remain unchecked. |
+
+**Historical settlement preservation:** Attempt 75's original failed settlement and its historical evidence revision `sha256:24a581e96f5fc7cd12f861b32255356655ed0530fa046e7817784c33990fb4a2` remain unchanged; this correction does not claim that prior revision changed.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | N/A — evidence-only correction; no test command was run. |
+| Runtime harness | N/A — no runtime boundary was rerun or reclassified. |
+| Rollback boundary | Revert only this correction block in `openspec/changes/aibar-foundation/apply-progress.md`; retain Attempt 75 history and all unrelated candidate bytes. |
+
+**Lifecycle:** no acquire, begin, reset, finish, or settle operation was invoked.
+**Process evidence:** no test/build/runtime process was launched; only read-only Git evidence and deterministic in-memory SHA-256 derivation were used.
+
+**Correction changed-line calculation:** from this correction attempt's acquired begin tree, only this progress block changed: `apply-progress.md +29/-0 = 29` changed lines, separately measured from Attempt 75's corrected `+33/-2 = 35`.
+
+**Correction evidence revision:** `sha256:e1fa40598241ccc6061aa518e6ee092905a4cf25ba080860c0b590e611c54455`.
+**Canonical preimage:** `{"attempt75_authoritative_changed_lines":"PackagingSupervisorTests.cs=4+2;apply-progress.md=29+0;total=33+2=35","attempt75_historical_revision":"sha256:24a581e96f5fc7cd12f861b32255356655ed0530fa046e7817784c33990fb4a2","attempt75_reported_changed_lines":"31+0=31","boundary":"TryReopenAndObserve=false","correction_changed_lines":"29+0=29","correction_work_unit":"attempt-75-authoritative-native-count-reconciliation","first_attribution":"not-reached","harness":0,"inventory":"2->3","outcome":"corrected","powershell":0,"second_delete":"not-attempted"}`.
+**Derivation:** SHA-256 over the exact 551-byte UTF-8 canonical JSON preimage above, rendered as lowercase hexadecimal.
+
+## b2c-C2a first current-process attribution preservation — blocked before child reopen (2026-08-01)
+
+**External objective outcome:** `failed`. This bounded C2a-only diagnostic used parent-owned token `sha256:e75438654dbe2b0b94360c5e6546264993781ecb7c8fac190d5e9e67c2415bab` without acquiring, resetting, settling, staging, committing, pushing, opening a PR, or running review. C2a/C2b/C3 task checkboxes remain unchanged.
+
+| Evidence | Exact result |
+|---|---|
+| Focused runtime command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup" --no-restore -m:1 --nologo --logger "console;verbosity=detailed"` exited `1`: passed `0/1`, failed `1/1`. |
+| Exact stop boundary | `NativeDirectory.TryReopenAndObserve(retainedTree.RootHandle, Assert.Single(names), out var child, out _, out _)` returned `false` at `PackagingSupervisorTests.cs:1015`. The run stopped before child attribution, the explicit first `Directory.Delete` call, and the attribution catch. |
+| First attribution | **Not reached or preserved.** No owner identity is inferred from this result. |
+| Second delete | **Not attempted.** The direct first delete was not reached, so its catch did not execute; no second delete could follow it. The normal final root-disposal attempt failed closed and retained the new scenario root. |
+
+**Instrumentation:** the existing test-only `NativeReadinessRoot` now has opt-in `PreserveRootOnDispose`. Only the C2a direct-first-delete failure catch sets it, before throwing the path-free attribution result with `second-delete=not-attempted`; default disposal behavior for every other test remains unchanged. That catch was not reached in this run.
+
+**Cleanup/process evidence:** point-in-time direct inventory changed from `2` to `3` `aibar-c1b0-*` roots. No pre-existing matching root was deleted, renamed, or otherwise mutated; the one new failed-scenario root remains. `Harness=0`; `powershell=0`.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | The single focused runtime command above exited `1`, passed `0/1`, failed `1/1` at the root-relative reopen boundary. No broader suite, build, cleanup retry, or deletion probe ran. |
+| Runtime harness | Windows x64 real producer-transferred C2a reopen scenario; it reached native query/parser and failed closed at root-relative reopen before the target attribution boundary. |
+| Rollback boundary | Revert only the opt-in `PreserveRootOnDispose` test harness branch, its C2a failure-catch wiring, and this progress block. Preserve all pre-existing candidate bytes, roots, task marks, C2b/C3 boundaries, and `.gitignore`. |
+
+**`.gitignore`:** `HEAD`, index, and worktree remain blob `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; unstaged and cached content diffs are empty. Existing metadata/stat dirtiness remains unmodified.
+
+**Checkbox state:** all C2a/C2b/C3 task lines remain unchecked.
+
+**Attempt evidence revision:** `sha256:24a581e96f5fc7cd12f861b32255356655ed0530fa046e7817784c33990fb4a2`, computed over the 275-byte UTF-8 canonical JSON preimage `{"work_unit":"b2c-c2a-first-current-process-attribution-preservation","outcome":"failed","focused":"0/1","boundary":"TryReopenAndObserve=false","first_attribution":"not-reached","second_delete":"not-attempted","changed_lines":"31+0","roots":"2->3","harness":0,"powershell":0}`.
+
+**Changed-line calculation:** from the acquired begin snapshot, this attempt adds `2` test-harness lines and `29` progress-evidence lines, with `0` deletions: `31` total authored lines, within the `1000`-line ceiling. The scoped diff counts changed from `354/1` to `356/1` for `PackagingSupervisorTests.cs` and from `168/0` to `197/0` for `apply-progress.md`.
+
+## b2c-C2a native dot-record parser correction — parser proof passed (2026-08-01)
+
+**External objective outcome:** `passed`. This correction used parent-owned Attempt 74 token `sha256:62dabba87ac92cb1cb86d701f7bf5db3464907615d84b6de18ffc7009ad4b9c9` without acquiring, beginning, finishing, resetting, or settling it. It changed only `DirectoryCapability.cs`, `PackagingSupervisorTests.cs`, and this cumulative progress record; no C2a/C2b/C3 task checkbox changed.
+
+| Evidence | Exact result |
+|---|---|
+| RED first | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Native_directory_parser_skips_exact_dot_records_and_returns_evidence_leaf" --no-restore -m:1 --nologo` exited `1`: passed `0/1`, failed `1/1`; the valid `.`/`..`/synthetic-child buffer was rejected before the child could be returned. |
+| GREEN synthetic parser proof | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c2a_parser_rejects_non_authoritative_names_without_leases|FullyQualifiedName~Red_c2a_parser_is_order_independent_and_rejects_duplicate_truncated_or_oversized_records|FullyQualifiedName~Native_directory_parser_" --no-restore -m:1 --nologo` exited `0`: passed `7/7`, failed `0`. |
+| Real native-query diagnostic | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Native_directory_real_query_skips_exact_dot_records_and_returns_synthetic_child" --no-restore -m:1 --nologo --logger "console;verbosity=detailed"` exited `0`: passed `1/1`, failed `0`; the 54-byte query had offsets `[16,16,0]`, name bytes `[2,4,10]`, record bytes `[14,16,22]`, classifications `[dot,dotdot,synthetic-child]`, `parser-accepted=True`, `parser-status=Success`, and parsed count `1`. |
+| Fail-closed coverage | Exact `.` and `..` are skipped once each; duplicate exact-dot records fail. Dot-like extra-character names `.child` and `..child`, slash/NUL names, duplicate evidence names, truncated buffers, malformed/undersized layouts, and more than 16 evidence leaves fail closed. |
+
+**Production correction:** `NativeDirectory.TryParseDirectChildren` preserves every existing structural bound, skips only one exact `.` and one exact `..` record before evidence-leaf validation, rejects duplicate dot records, and rejects every other leading-dot name. The remaining valid evidence leaf is returned unchanged; no reopen, attribution, authorization, or delete code changed.
+
+**Stop boundary:** The C2a reopen/attribution/delete scenario was not run or resumed. No first-delete capture, second-delete evaluation, cleanup completion claim, C2b, C3, PowerShell, staging, commit, push, PR, review, root mutation, or uncertain-root deletion occurred.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | The 7/7 synthetic parser command above exited `0`; it is the smallest combined synthetic proof for exact-dot skip plus fail-closed cases. |
+| Runtime harness | The real Windows x64 native-query diagnostic above exited `0`, reached the parser, and returned its synthetic child. |
+| Rollback boundary | Revert only this parser branch in `DirectoryCapability.cs`, the parser/real-query tests in `PackagingSupervisorTests.cs`, and this Attempt 74 block; retain prior C2a candidate history, task marks, C2b/C3 boundaries, and preserved roots. |
+
+**Cleanup/process evidence:** point-in-time direct inventory observed `2` preserved `aibar-c1b0-*` roots; none was deleted, renamed, or otherwise mutated. `Harness=0`; `powershell=0` after the diagnostic.
+
+**Changed-line calculation:** Attempt 74 adds `9` production lines, `20` test lines, and `29` progress-evidence lines, with `0` deletions: `58` total authored lines. This is the before/after delta from `180/0` → `189/0` for `DirectoryCapability.cs`, `334/1` → `354/1` for `PackagingSupervisorTests.cs`, and `139/0` → `168/0` for `apply-progress.md`; it is within the `1000`-line ceiling.
+
+**Attempt evidence revision:** `sha256:0f6ec422020d2a9fe2adfd3986a6ca1da81eed82a29fbd44fc5534e13f3dc8e9`, computed over the 330-byte UTF-8 canonical JSON preimage `{"attempt":74,"work_unit":"b2c-c2a-native-dot-record-parser-correction","outcome":"passed","red":"0/1","synthetic":"7/7","native":"54|16,16,0|2,4,10|14,16,22|dot,dotdot,synthetic-child|true|Success|1","fail_closed":"duplicate-dot,dot-like,malformed,duplicate,oversized","changed_lines":"58+0","roots":2,"harness":0,"powershell":0}`.
+
+**`.gitignore`:** `HEAD` and worktree blobs remain `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; unstaged and cached content diffs are empty. Pre-existing metadata/stat dirtiness remains unmodified. All C2a task lines remain unchecked.
+
+## b2c-C2a native-name parser diagnostic — blocked at real `FILE_NAMES_INFORMATION` boundary (2026-08-01)
+
+**External objective outcome:** `blocked`. This bounded diagnostic used the parent-owned Attempt 73 token `sha256:dff5a35fa180b6680664143aad4461adeff19b3e3b0c991811de6220a0285cd2` without acquiring, beginning, finishing, resetting, or settling it. It changed only `PackagingSupervisorTests.cs` and this cumulative progress record; no production code, C2a task mark, C2b/C3 behavior, attribution lookup, deletion evaluation, root mutation, `.gitignore`, staging, commit, push, PR, or review action occurred.
+
+| Parser-boundary evidence | Exact result |
+|---|---|
+| Focused native layout proof | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Native_directory_real_query_reports_privacy_safe_file_names_layout_before_parser_boundary" --no-restore -m:1 --nologo --logger "console;verbosity=detailed"` exited `0`: passed `1/1`, failed `0`. |
+| Captured native layout | The test-owned one-child query returned `54` bytes in three `FILE_NAMES_INFORMATION` records: `NextEntryOffset=[16,16,0]`, `FileNameLength=[2,4,10]`, and record sizes `[14,16,22]`. Privacy-safe leaf classification was `[dot,dotdot,synthetic-child]`; no absolute path, environment value, or raw leaf was persisted. |
+| Exact parser boundary | The same raw native bytes made `NativeDirectory.TryParseDirectChildren` return `false`, `EnumerationFailed`, and zero names. The first `.` record is rejected by `DirectoryCapability.IsEvidenceLeaf` before the synthetic child can be reopened. This explains the current C2a reopen failure before reopen, first delete, attribution, or second-delete evaluation. |
+| Harness-defect disposition | **Not proven.** The evidence proves a parser mismatch in the current C2a candidate's production `NativeDirectory.TryParseDirectChildren` path, not a test-harness-only defect. The hard production-change exclusion therefore forbids a parser correction in this attempt. |
+| Cleanup and processes | The new diagnostic's own known root was disposed successfully. Point-in-time direct inventory observed `2` preserved `aibar-c1b0-*` roots; none was deleted, renamed, or otherwise mutated. `Harness=0`; `powershell=0`. |
+
+**Disposition:** Stop at parser proof. The original C2a reopen/attribution test was not rerun because the direct raw-query proof deterministically establishes its earlier parser boundary and a rerun could create another preserved root without reaching attribution. Attribution, first-delete capture, second-delete evaluation, C2b, and C3 remain explicitly unresumed. No C2a checkbox is complete.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | The single native layout command above: exit `0`, passed `1/1`, failed `0`; it both captures the native layout and proves the current parser refusal. |
+| Runtime harness | Windows x64, real producer-transferred, test-owned one-child quarantine query; parser boundary reached before reopen or mutation. |
+| Rollback boundary | Revert only `Native_directory_real_query_reports_privacy_safe_file_names_layout_before_parser_boundary` in `PackagingSupervisorTests.cs` and this progress block. Preserve all existing candidate bytes, C2a task marks, C2b/C3 boundaries, preserved roots, and `.gitignore`. |
+
+**Attempt evidence revision:** `sha256:c5cbbd6eb7af4481e725ff980104cadf67495fa7cda5388f7910c2062ff23632`, computed over the 286-byte UTF-8 canonical JSON preimage `{"attempt":73,"work_unit":"b2c-c2a-native-name-parser-diagnostic","outcome":"blocked","focused":"1/1","layout":"54|16,16,0|2,4,10|14,16,22|dot,dotdot,synthetic-child|false|EnumerationFailed","test_harness_defect":"not-proven","changed_lines":"82+0","roots":2,"harness":0,"powershell":0}`.
+
+**Changed-line calculation:** Attempt 73 adds `56` test lines and `26` progress-evidence lines, with `0` deletions: `82` total authored lines. This is calculated from the before/after diff counts of `278/1` → `334/1` for `PackagingSupervisorTests.cs` and `113/0` → `139/0` for `apply-progress.md`; no production file was changed by this attempt. It is within the `1000`-line ceiling.
+
+**`.gitignore`:** `HEAD` and worktree blobs remain `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; unstaged and cached content diffs are empty. Pre-existing metadata/stat dirtiness remains unmodified. All C2a task lines remain unchecked.
+
+## b2c-C2a first-attribution unmask diagnostic — blocked before child attribution (2026-08-01)
+
+**External objective outcome:** `failed`. This bounded continuation used parent-owned Attempt 72 token `sha256:d258690519dd659d10caa221c33705f951125759d29612a883a7915c8b69f819` without acquiring, beginning, finishing, resetting, or settling it. It changed only the existing test diagnostic so an explicit C2a first-delete failure captures root/child attribution before a test-root disposal can mask it; production cleanup, task marks, C2b, C3, roots, `.gitignore`, staging, commits, pushes, PRs, and review remain untouched.
+
+| Diagnostic evidence | Exact result |
+|---|---|
+| Attempt 71 harness revalidation | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Native_handle_attribution_harness_proves_unique_current_process_file_owner_and_refuses_path_only_input" --no-restore -m:1 --nologo` exited `0`: passed `1/1`, failed `0`. The retained test still captures trusted `FILE_ID_INFO`, restricts extended handles to the current process and captured type, duplicates candidates, identity-matches them, and refuses absent trusted identity. Its positive, distinct-negative, and path-only-refusal result is reusable for this attempt. |
+| First-attribution preservation seam | `NativeReadinessRoot` has an opt-in test-only disposal-failure capture. The C2a reopen test now performs the first quarantine `Directory.Delete`, computes root/child attribution in that catch, invokes the captured disposal boundary, and includes the second-delete outcome in the original failure. The default test-root cleanup behavior is unchanged. |
+| C2a reopen application | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup" --no-restore -m:1 --nologo` exited `1`: passed `0/1`, failed `1`. It failed at `TryParseDirectChildren` before child reopen, the first explicit delete, or either attribution lookup. Therefore no current C2a owner disposition was observable, and the prior masked-cleanup application result does not reproduce against the current bytes. |
+| Cleanup and processes | The failed test's scoped root disposal completed without an observed `aibar-c1b0-*` directory residue; `Harness=0` and `powershell=0` afterward. No existing matching root was deleted, renamed, or mutated. |
+
+**Disposition:** The independent attribution harness is retained and reused, but C2a application is blocked earlier at native-name parsing. The new unmasking seam was not reached in this run, so it establishes no ownership inference and does not establish whether a second-delete mask would occur after a first delete. No C2a checkbox is complete.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | Harness command above: exit `0`, passed `1/1`; C2a reopen command above: exit `1`, failed `1/1` at the parser assertion. |
+| Runtime harness | Windows x64 controlled attribution harness passed; the bounded C2a producer-handoff reopen scenario failed before the ownership-attribution boundary. |
+| Rollback boundary | Revert only the opt-in test-root failure capture, C2a test diagnostic ordering/message, and this progress block. Preserve all pre-existing C2a candidate bytes, task marks, C2b/C3 boundaries, and `.gitignore`. |
+
+**`.gitignore`:** `HEAD` and worktree blobs remain `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; unstaged and cached content diffs are empty. Pre-existing metadata/stat dirtiness remains unmodified. All C2a task lines remain unchecked.
+
+## b2c-C2a independent native-handle attribution harness — controlled validation passed; C2a diagnosis remains blocked (2026-08-01)
+
+**External objective outcome:** `blocked`. This diagnostic used the parent-acquired token `sha256:eb1ba60c12b31a58cc9f503f2c8f5c08a84f8c45109a1027173fe9bf9f1c1469` without acquiring, resetting, or settling it. It added isolated test-only attribution code; it did not advance any C2a checkbox, alter production cleanup, enter C2b/C3, or stage, commit, push, open a PR, or run review.
+
+| Diagnostic evidence | Exact result |
+|---|---|
+| Independent external harness | The bounded external .NET 8 x64 harness passed: `PASS: positive=1 negative-distinct=1 path-only=refused parser=checked`. It acquired a trusted `FILE_ID_INFO` from a live marked file handle, restricted `SystemExtendedHandleInformation` to current-process handles of the captured native type, duplicated candidates, and compared native volume/file identity. It rejected absent trusted identity and all query/count/length/overflow/retry ambiguity; it did not infer ownership from a pathname. |
+| Test-only controlled proof | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Native_handle_attribution_harness_proves_unique_current_process_file_owner_and_refuses_path_only_input" --no-restore -m:1 --nologo` passed `1/1`. The positive file has exactly its live raw handle, the distinct marked negative file has only its own handle, and a missing trusted identity is refused. |
+| C2a reopen application | After the control passed, `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup" --no-restore -m:1 --nologo` failed `1/1` with `IOException` removing the test-owned `lease quarantine`. The test captured root/child trusted native identities and invoked attribution in the local cleanup-failure branch, but `NativeReadinessRoot.Dispose()` issued a second failing delete during exception unwind and masked that branch's diagnostic message. Therefore this attempt proves neither `no-owner` nor an owner handle for the C2a residue. |
+| Residue and processes | The point-in-time direct-root inventory is now `24` `aibar-c1b0-*` directories under `%LOCALAPPDATA%\Temp`; the pre-existing 23 were not mutated and the one new failed scenario root was retained fail-closed. `Harness=0` and `powershell=0`. The external diagnostic project was removed only after exact owned-source proof; its root no longer exists. |
+
+**Harness disposition:** controlled positive/negative validation is green and the test-only harness is retained for a future separately authorized diagnostic. The first C2a application is inconclusive because teardown masked the attribution result; no ownership inference, cleanup fallback, root deletion, sharing change, delayed/GC cleanup, raw-handle redesign, C2b policy, or C3 behavior is authorized by this evidence.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | Controlled harness command above: exit `0`, passed `1/1`; C2a reopen command above: exit `1`, failed `1/1`. No broader focused/full suite, build, or Windows matrix was run after the required C2a runtime proof remained blocked. |
+| Runtime harness | Native Windows x64 external controlled positive/negative/path-only run passed; the C2a real producer-handoff reopen scenario failed with retained residue and no attributable result. |
+| Rollback boundary | Revert only the test-only `NativeHandleAttribution` helper, its controlled proof, the C2a failure-branch capture, and this progress block. Retain production code, all C2a task marks, C2b/C3 boundaries, preserved roots, and `.gitignore`. |
+
+**`.gitignore`:** untouched by this objective. All C2a task lines remain unchecked.
+
+## b2c-C2a evidence reconciliation — external outcome failed; ledger settlement is blocked (2026-08-01)
+
+**External objective outcome:** `failed`. **Native-ledger disposition:** this evidence-only continuation did not acquire, reset, or settle the parent-acquired token `sha256:caa7855761db859c917203b11ef151fde76b48e57c0037181309fbafcf289c7e`. The parent-owned settlement must record `blocked` with reason `maintainer_decision`; `blocked` is ledger state, not a successful or ambiguous external outcome. No C2a checkbox changed, and C2b/C3 remain untouched.
+
+| Reconciliation item | Exact observed evidence |
+|---|---|
+| Current preserved-root inventory | At `2026-08-01T04:04:39.1807374Z`, a non-recursive enumeration of direct directories matching `aibar-c1b0-*` under `C:\Users\mjsal\AppData\Local\Temp\` observed **23** roots. This is a point-in-time, name-and-scope inventory only; it makes no ownership, liveness, or system-wide claim. No root was deleted or otherwise mutated. The earlier `14` count is stale. |
+| Original admission-child raw-handle closure | **Withdrawn as unproven.** Current source directly proves only the reopened `NtCreateFile` child raw handle closes (`child.Dispose()`, `child.IsClosed`, and `WindowsHandleLifetime.IsClosed(rawChild)`) and then the retained root/parent raw handles close. It does not capture or directly assert closure of the original C1b admission-child raw handle. No new proof was added because this bounded evidence objective does not safely establish that separate native lifetime claim. |
+| Residual owner attribution | The exact residual lock owner remains unproven. The reverted `SystemExtendedHandleInformation` probe did not establish attribution and is not retained as evidence. No cleanup behavior, path fallback, sharing change, delayed/GC cleanup, raw-handle redesign, C2b policy, or C3 behavior was introduced. |
+| `.gitignore` state | `HEAD`, index, and worktree all resolve to blob `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; unstaged and cached content diffs both exit `0`. Git still reports pre-existing ` M .gitignore` metadata/stat dirtiness. This continuation did not modify the file. |
+| Process evidence | At the same inventory point, `Harness=0` and `powershell=0`; no attempt-owned process was observed. |
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | N/A — documentation/evidence reconciliation only; no source or test behavior changed, and the unsupported admission-child claim was withdrawn rather than replaced with a new native proof. |
+| Runtime harness | N/A — no runtime boundary was changed or rerun; the existing native cleanup proof remains failed/inconclusive and is not reclassified. |
+| Rollback boundary | Revert only this reconciliation record in `openspec/changes/aibar-foundation/apply-progress.md`; no production/test behavior, preserved root, or `.gitignore` byte is part of this work unit. |
+
+**Residue/process disposition:** all observed roots remain preserved. No focused/full suite, build, deletion sandbox, or Windows matrix was run because no implementation or test proof was added. Scoped `git diff --check -- openspec/changes/aibar-foundation/apply-progress.md` passed (line-ending advisories only). All C2a task lines remain unchecked.
+
+## b2c-C2a native handle-lifetime continuation — unsettled and blocked (2026-07-31)
+
+**Status:** `blocked`. This is the single bounded continuation from Attempts 66/67 under the parent-acquired native token `sha256:328b26a5ac263d8bd1aff10ba17d940459e3df14cd1ec442251e875f13af291b`. It did not acquire, reset, or settle the native attempt, mark any C2a task complete, stage, commit, push, open a PR, run review, change `.gitignore`, or enter C2b/C3.
+
+| Lifetime evidence | Exact result |
+|---|---|
+| Smallest Windows control | `Red_c2a_native_query_releases_the_owned_quarantine_for_cleanup` passed 1/1, confirming `NtQueryDirectoryFile` alone does not retain the root. |
+| Reopen repro | `Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup` failed 1/1 before and after the bounded experiment: cleanup reported the committed quarantine in use after `NtCreateFile` reopen and explicit child/root/parent disposal. |
+| Native-handle instrumentation | The retained root, retained quarantine-parent, and reopened child raw handle values each returned `ERROR_INVALID_HANDLE` after their explicit `SafeFileHandle.Dispose()` calls. The cleanup lock still remained. This rules out those three tracked wrappers as the residual owner but does not safely identify an untracked owner. |
+| Rejected redesign | Replacing the `NtCreateFile` `out SafeFileHandle` marshal with a raw `IntPtr` immediately wrapped in an owning `SafeFileHandle` did not release the root. It was reverted; no ownership claim is based on it. |
+| Safe outcome | The exact lock owner remains unproven. No path fallback, delayed/GC-based cleanup, sharing relaxation, root deletion, C2b policy, or C3 discovery was introduced. The C2a candidate remains unaccepted and all C2a checkboxes remain unchecked. |
+
+**Residue/process evidence:** the original nine historical `aibar-c1b0-*` roots were not mutated. Five continuation probes also retained their own roots after their fail-closed cleanup boundary, for 14 roots total; they remain untouched because the lock ownership is unproven. `Get-Process -Name Harness,powershell` returned 0 after every probe. This continuation therefore cannot provide the required zero-attempt-root proof and must be settled `failed`, not passed.
+
+**Work-unit evidence:** runtime command was `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup" --no-restore -m:1 --nologo`; it failed at test-owned-root cleanup as above. Focused gate, full suite, build, `git diff --check`, deletion sandbox, and Windows matrix remain intentionally unrun because the smallest runtime cleanup proof is not green. **Rollback boundary:** remove only the lifetime assertions/helper in `PackagingSupervisorTests.cs` and this continuation record; preserve the C2a candidate and all historical records.
+
+## b2c-C2a retained-handle cleanup correction — Attempt 67 blocked (2026-08-01)
+
+**Status:** `blocked`; this parent-authorized correction attempted to diagnose the preserved Attempt 66 Windows test-root cleanup failure without widening C2a. No native-ledger operation, stage, commit, branch, push, PR, review, `.gitignore`, C2b/C3, DPAPI, cleanup-policy, or production-root deletion occurred. The existing C2a candidate remains preserved; no C2a checkbox is checked.
+
+| Correction evidence | Exact result |
+|---|---|
+| RED diagnosis | `Red_c2a_native_query_releases_the_owned_quarantine_for_cleanup` passed 1/1: retained C1c root disposal after `NtQueryDirectoryFile` alone permits owned-root cleanup. `Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup` failed: after `NtCreateFile` reopen and explicit child disposal, cleanup still reports the quarantine in use. |
+| Rejected correction | Changing the reopened native handle to an explicit raw `NtCreateFile` result with an `NtClose`-owning safe handle did not change the failure; that unproven change was reverted. The remaining failure is narrowed to the reopened-handle lifetime, but its exact native ownership cause is not proven. |
+| Runtime repeat | The original real producer-handoff/session enumeration/reopen test still failed at owned-root cleanup. The zero-root-residue gate is therefore not satisfied and the correction does not qualify for GREEN/TRIANGULATE/GATE completion. |
+| Not run | The complete focused gate, full serialized suite, build, `git diff --check`, deletion sandbox, and Windows matrix were not run after the correction remained inconclusive. |
+
+**Candidate/process state:** the source candidate is retained without the rejected ownership-wrapper experiment. The test-owned `aibar-c1b0-*` root count is now 9 because each deterministic diagnostic test left its root when cleanup correctly failed closed; no matching helper/PowerShell process remains. These roots were not manually deleted because their ownership/lifetime admission remains unproven. A further correction requires a new bounded maintainer decision with native-handle lifetime instrumentation or an independently justified interop ownership design.
+
+## b2c-C2a trusted retained-handle operations — Attempt 66 interrupted/failed gate (2026-08-01)
+
+**Status:** `blocked` before C2a completion. The authoritative parent context reported OpenSpec apply ready for the immediate `b2c-c2a-trusted-retained-handle-operations` feature-branch-chain work unit, with parent-owned native Attempt 66 already acquired. Standard mode is configured, but a task-mandated RED was executed before production code. No native-ledger, stage, commit, branch, push, PR, review, `.gitignore`, `Cleanup.cs`, `ScavengerMetadata.cs`, C2b, or C3 action was taken.
+
+| Evidence | Exact result |
+|---|---|
+| RED | Before production code, `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~RetainedTreeSession|FullyQualifiedName~NativeDirectory" --no-restore -m:1 --nologo` failed with `CS0103`/`CS0246`: missing`RetainedTreeSession`,`RetainedTreeMechanismStatus`, and`NativeDirectory`. |
+| Partial GREEN | Added a C1c-facet-consuming retained-tree session, bounded native-name parser, root-relative native reopen/observation, session/lease disposal, deadline/cancellation checks, and a one-use matching-evidence authorization seam in the allowed source/test files. The required focused filter passed 78/78 before the Windows runtime test was added. |
+| Windows x64 runtime proof | `RetainedTreeSession_windows_real_handoff_enumerates_and_reopens_with_retained_handle_authority` failed during test-owned-root cleanup. Its source/assertion path reached C1b→C1c producer transfer, session enumeration/reopen, lease observation, and explicit child/root/parent `SafeFileHandle.IsClosed` assertions, but `Directory.Delete` still received an in-use error for the committed quarantine. The required zero-root-residue proof is therefore **not** satisfied. Four `aibar-c1b0-*` test-owned temporary roots remain; no scoped helper/PowerShell process remains (`0`). |
+| Not run | Full serialized suite, solution build, `git diff --check`, deletion-sandbox proof, and the requested Windows 10/11 matrix were not run after the required runtime-cleanup proof failed. This preserves the single parent-owned attempt for a safe diagnosis. |
+
+**Candidate state:** the worktree has 276 source/test additions (180 `DirectoryCapability.cs`, 96 `PackagingSupervisorTests.cs`) at this checkpoint; this is below 400, so no workload split was triggered. The candidate is not accepted: its retained-handle runtime test has a cleanup/residue failure, so no C2a checkbox is marked complete and no claim is made for handle-only delete, C2b authorization policy, evidence bijection, DPAPI, production cleanup, or C3.
+
+**Remaining C2a task lines (all persistently unchecked):**
+
+- [ ] **RED:** Add failing fake and Windows-contract tests for consuming exactly one committed C1c `RetainedTreeCapabilityFacet` that C2a cannot self-mint, preserving the same handoff identity/session-root-volume binding, `NtQueryDirectoryFile` direct-child parsing, `NtCreateFile` root-relative reopen, handle-derived observation leases, and bounded handle-only post-order delete primitives. Cover native layout/parser/buffer bounds, malformed offsets/lengths, embedded NUL, `.`/`..`, non-simple leaves, duplicate names, more than 16 children, truncation/nonterminal status, unsupported runtime/export/class/layout, reparse/cross-volume/identity/kind/observation faults, ownership/disposal/deadline/cancellation, rejection of direct/legacy combined producer input, and the absence of any evidence/DPAPI input or unguarded authorization seam. <!-- sdd-owner: implementation -->
+- [ ] **GREEN:** Implement the minimum production mechanism in `DirectoryCapability.cs`: consume the producer's retained root/parent facet exactly once, bind a `RetainedTreeSession` to the live root identity and volume, use checked `NtQueryDirectoryFile`/`NtCreateFile`/`NtSetInformationFile(FileDispositionInformation)` handle-relative operations, return only bounded session-generation leases, and require an unforgeable one-use authorization minted outside C2a. Add zero-initialized/zeroed native buffers, explicit x64 layout and Windows 10/11 compatibility gates, monotonic deadline checks around every native boundary, post-order disposal, stable path/secret-free mechanism errors, and no compatibility fallback. <!-- sdd-owner: implementation -->
+- [ ] **TRIANGULATE/REFACTOR:** Prove the real producer-transferred capability cannot be replaced by a path, arbitrary handle, caller-created safe handle, evidence record, or reconstructed root; prove reordered valid enumeration is equivalent but malformed/duplicate/truncated input returns no authoritative leases; prove leases and handles close exactly once in child-before-parent order, buffers and transient UTF-16 names are zeroed, cancellation/deadline prevents new operations, and a test-owned sandbox is the only permitted native deletion proof. Keep C2a mechanism-only: no evidence bijection, DPAPI, policy decision, cleanup classification, or self-minted authorization. <!-- sdd-owner: implementation -->
+- [ ] **GATE:** Run focused `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisor|FullyQualifiedName~RetainedTreeSession|FullyQualifiedName~NativeDirectory" --no-restore -m:1 --nologo`, full `dotnet test AIBar.sln --no-restore -m:1 --nologo`, `dotnet build AIBar.sln --no-restore --nologo`, and `git diff --check`. Execute the bounded Windows 10/11 x64 runtime matrix using the real producer handoff: read-only Unicode/space direct-child enumeration/reopen/observation under path-name substitution, plus the test-owned sandbox primitive proof with the stated entry/depth/byte/deadline bounds. Record zero helper/process residue, zero leaked handles/buffers, zero temporary-root residue, and no C2b/C3/PowerShell execution. Authored changes above 400 require mandatory workload visibility and review-splitting pressure but do not authorize broader behavior, paths, dependencies, another unit, or C3; stop and replan before unsafe behavior or above the native changed-line ceiling of 1000. <!-- sdd-owner: implementation -->
+
+**Scope/process evidence:** only the two allowed source/test paths plus this progress record are modified. `.gitignore` index blob remained `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; its worktree SHA-256 remained `52cd59787c41ea1be2db05a31eed93c079c868690c83d1c9ce77ac37d1d307f3`; `git diff -- .gitignore` remained 0 bytes. The parent must decide whether to retain this diagnostic candidate and direct a bounded cleanup/ownership correction; do not settle this attempt as passed.
+
 ## Slice 8C1.1b2c C1b0 — Native API readiness proof (2026-07-30)
 
 **Status:** Standard mode (`strict_tdd: false`), maintainer-approved `size:exception`, C1b0 only. `DirectoryCapability` now has a separate rename-ready constructor that retains a source handle opened with `DELETE|SYNCHRONIZE`, a distinct same-volume non-reparse quarantine-parent handle opened with `FILE_TRAVERSE|FILE_READ_ATTRIBUTES|SYNCHRONIZE`, and no `FILE_SHARE_DELETE`. `NativeRenameReadiness` is a test-only readiness/proof seam called only from tests: it validates one strict simple leaf, closes child observation handles once, manually builds and zeroes the x64 native buffer, and makes one `ntdll!NtSetInformationFile(FileRenameInformation=10)` call. No production quarantine commit is wired.
@@ -2042,3 +2614,244 @@ After explicit maintainer apply approval, the parent renamed the branch to `feat
 **Structured status consumed:** authoritative OpenSpec status reported `applyState: ready`, repo-local workspace root and allowed edit root, plus `nextRecommended: resolve-blockers` solely because native Attempt 64 is active. Per parent authorization, this executor performed only that active correction and never acquired, began, reset, or finished an attempt. Action-context warning: no target outside the repository root was edited.
 
 **Remaining:** parent must settle Attempt 64 and run its independent verification/update path. Exact relevant unchecked line: `- [ ] Obtain fresh native reset/begin authorization for one distinct independent-verification objective with max attempts 1 and native changed-line ceiling 1000; verify the exact Attempt 62 candidate/evidence ...` (the active correction is authorized under that parent-owned objective). C2a, C2b, C3, and all later unchecked tasks remain out of scope.
+
+## Attempt 77 authoritative-count correction and native reopen diagnostic (2026-08-01)
+
+**External objective outcome:** `passed`. Maintainer-authorized token `sha256:1e51de6debd4a15fffacec02cd46f840bc69931ec9da91c10b77a22649d14268` was used without acquire, reset, settle, staging, commit, push, PR, or review.
+
+| Evidence | Exact result |
+|---|---|
+| Authoritative Attempt 77 count | `DirectoryCapability.cs +16/-5`, `PackagingSupervisorTests.cs +3/-1`, and historical `apply-progress.md +27/-0`: total `+46/-6 = 52`. |
+| Historical actor count | Superseded only the false actor-reported `+40/-0`; the failed settlement and historical revision remain preserved. |
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup" --no-restore -m:1 --nologo --logger "console;verbosity=detailed"` |
+| Exact result | Exit `1`; compilation succeeded; `1/1` test failed at `PackagingSupervisorTests.cs:1017` after diagnostic emission. |
+| Diagnostic stage/status | `stage=StandardInfo`; native status `0x00000000`; IO status `0x00000000`; Win32 error `87`; mechanism status `ReopenFailed`; `reopened=False`. |
+| Stop boundary | Stopped immediately after this evidence; no attribution, explicit first delete, direct-first-delete catch, or second delete was reached. |
+
+**Root inventory:** bounded direct `%LOCALAPPDATA%\Temp` observation was `3 -> 4` `aibar-c1b0-*` roots; the new `aibar-c1b0-b3801e5880424a6ba5a1445949e4fbc5` root is retained. No observed root was mutated, renamed, or deleted.
+**Process evidence:** the single `dotnet test` process exited `1`; no helper or PowerShell enumeration was run, avoiding an additional runtime command.
+**Boundaries:** no functional remediation occurred; C2b/C3 remain excluded, and attribution/delete ownership remains unproven.
+**`.gitignore`:** unchanged by this objective; its seven observed lines remain identical before and after.
+**Checkbox state:** all C2a, C2b, and C3 task lines remain unchecked.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | The single command above compiled and executed once, then emitted the native diagnostic before the behavioral assertion failed. |
+| Runtime harness | Reused: the existing Windows x64 producer-handoff scenario reached `TryReopenAndObserve=false` and emitted stage/raw status. |
+| Rollback boundary | Revert only this correction/verification block; retain Attempt 77 history, the already-intended definite-assignment correction, roots, task marks, C2b/C3 boundaries, and `.gitignore`. |
+
+**Objective changed-line calculation:** from this objective's acquired begin snapshot, only this progress block changed: `apply-progress.md +30/-0 = 30`, measured separately from corrected Attempt 77's `+46/-6 = 52`.
+**Attempt evidence revision:** `sha256:2ebd7b8bfcf4de8035283893eb062540c2781c19940c19b17f965c4d480aa2da`.
+**Canonical preimage:** `{"attempt77_authoritative_changed_lines":"DirectoryCapability.cs=16+5;PackagingSupervisorTests.cs=3+1;apply-progress.md=27+0;total=46+6=52","attempt77_false_actor_count":"40+0=40","attempt77_historical_revision":"sha256:d39d0e1f297865052704222cdb31a3a9e2cb15ce9f0e280745331e20c5c33b8b","attribution":"not-reached","diagnostic":"StandardInfo|0x00000000|0x00000000|87|ReopenFailed|false","first_delete":"not-reached","harness_disposition":"reused","objective_changed_lines":"30+0=30","outcome":"passed","powershell":"not-observed:no-extra-runtime-command","roots":"3->4","second_delete":"not-attempted","work_unit":"attempt-77-correction-and-native-reopen-diagnostic"}`.
+**Derivation:** SHA-256 over the exact 666-byte UTF-8 canonical JSON preimage above, rendered as lowercase hexadecimal.
+
+## C2a StandardInfo observation contract correction (2026-08-01)
+
+**External objective outcome:** `passed`. The single authorized command consumed token `sha256:18d570531f740346c175eaa49f0839dc1647457a571bb1620685395e7987819d` without acquire, reset, settle, staging, commit, push, PR, review, C2b, or C3 work.
+
+| Evidence | Exact result |
+|---|---|
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup" --no-restore -m:1 --nologo --logger "console;verbosity=detailed"` |
+| Exact result | Exit `0`; passed `1/1`, failed `0/1`. |
+| Corrected contract/root cause | `GetFileInformationByHandleEx` requires `FileInfoByHandleClass.FileStandardInfo = 1`; the prior class `5` is `FileAllocationInfo` and rejected the 24-byte `StandardInfo` buffer with Win32 `87`. |
+| Diagnostic statuses | `stage=NativeCreate`; native status `0x00000000`; IO status `0x00000000`; Win32 error `0`; mechanism status `ReopenFailed`; `reopened=True`. |
+| Observation | The post-reopen `FileStandardInfo` query completed, so the prior `StandardInfo`/Win32-87 observation failure is corrected. |
+| Stop boundary | The test set root preservation before observation and returned immediately after the successful observation; it did not run owner attribution, an explicit first delete, the attribution catch, or a second delete. |
+
+**Boundary and cleanup evidence:** one fresh test-owned root was intentionally preserved; known preserved-root count is `3 -> 4`. No pre-existing root was mutated, renamed, or deleted, no delete was attempted by the success path, and no cleanup success is claimed. The only launched workload process was the focused `dotnet test`; no helper or PowerShell observation command was run.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | The single focused command above passed `1/1`; no broad test/build, retry, cleanup loop, or second runtime command ran. |
+| Runtime harness | `reused` — Windows x64 real producer-transferred C2a scenario reached and proved the corrected handle observation. |
+| Rollback boundary | Revert only the `FileStandardInfo` class correction, the C2a test-only preservation/early-return boundary, and this appended record; retain all earlier progress history, roots, task marks, C2b/C3 boundaries, and `.gitignore`. |
+
+**`.gitignore`:** unchanged; `HEAD` and worktree blob are `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`.
+**Checkbox state:** all C2a, C2b, and C3 task lines remain unchecked.
+**Attempt evidence revision:** `sha256:1b17442b4aade046930913e82217ce55a61679f4929a01ae192e357d9e6be2ca`.
+**Canonical preimage:** `{"attribution":"not-reached","changed_lines":"34+3=37","corrected_contract":"FileStandardInfo=1","diagnosis":"FileInfoByHandleClass=5(FileAllocationInfo) rejected the 24-byte StandardInfo buffer with ERROR_INVALID_PARAMETER","first_delete":"not-attempted","focused":"1/1","harness_disposition":"reused","native":"NativeCreate|0x00000000|0x00000000|0|ReopenFailed|true","outcome":"passed","powershell":"not-run","roots":"3->4","second_delete":"not-attempted","work_unit":"c2a-standardinfo-observation-correction"}`.
+**Derivation:** SHA-256 over the exact UTF-8 canonical JSON preimage above, rendered as lowercase hexadecimal.
+
+## C2a read-only handoff proof normalization (2026-08-01)
+
+**External objective outcome:** `passed`. This one bounded C2a normalization used the parent-supplied native token `sha256:85b65981705f4a2bc7303af12c27f099b7824910ae75eb08b7b8e2b2d073c37a` and acquired begin tree `11bc96ba58d5f84525233e892c8a2388663238d0`; it performed no acquire, reset, settle, native deletion, recursive traversal, C2b/C3 work, PowerShell/helper command, staging, commit, push, PR, or review.
+
+| Evidence | Exact result |
+|---|---|
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c2a_parser_|FullyQualifiedName~Native_directory_parser_|FullyQualifiedName~Native_directory_real_query_skips_exact_dot_records_and_returns_synthetic_child|FullyQualifiedName~RetainedTreeSession_windows_real_handoff_enumerates_and_reopens_with_retained_handle_authority" --no-restore -m:1 --nologo --logger "console;verbosity=detailed"` |
+| Exact result | Exit `0`; total `9`, passed `9`, failed `0`. |
+| Runtime harness | The real Windows x64 producer-transferred retained-tree handoff enumerated, reopened, observed, and disposed the read-only child/root/parent handles. |
+| Cleanup evidence | After exact child/root/parent close assertions, the test removed only its known fresh `child`, quarantine, quarantine parent, and enclosing parent root with non-recursive exact deletes, then asserted `Directory.Exists(parent.Path) == false`. |
+
+**Status normalization:** successful `NtQueryDirectoryFile` now returns `RetainedTreeMechanismStatus.Success`; successful root-relative `NtCreateFile` plus `FileIdInfo`, `AttributeTagInfo`, and retained `FileStandardInfo=1` observation now returns `RetainedTreeMechanismStatus.Success`. The acceptance test asserts both truthful statuses.
+
+**Removed seams:** `NativeReopenStage`, `NativeReopenDiagnostic`, raw native/IO/Win32 diagnostic outputs and `TryReopenAndObserve` overload, `NativeHandleAttribution`, its controlled harness, `NtQuerySystemInformation`, console diagnostic labels, and `PreserveRootOnDispose` are absent. Parser exact-dot/dotdot handling, fail-closed invalid cases, `FileStandardInfo=1`, and `WindowsHandleLifetime` exact-close evidence remain.
+
+**Fresh-root and pre-existing-root boundary:** the acceptance test operates on a generated fresh root and only exact descendants derived from that root. It neither enumerates nor mutates any pre-existing `aibar-c1b0-*` root; no wildcard root cleanup exists. The focused pass includes the zero fresh-root-residue assertion.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | The one command above exited `0`: total `9`, passed `9`, failed `0`; no retry, full suite, broad build, or additional runtime command ran. |
+| Runtime harness | Real Windows producer-transferred read-only handoff/reopen/observation/disposal proof passed with no native delete call. |
+| Rollback boundary | Revert only the normalization/removal changes in `DirectoryCapability.cs`, the focused parser/read-only handoff tests in `PackagingSupervisorTests.cs`, and this appended record; preserve historical progress, `.gitignore`, task checkboxes, C2b/C3 boundaries, and `FileStandardInfo=1`. |
+
+**Process evidence:** the focused `dotnet test` process exited `0`; no helper or PowerShell command/process observation was run.
+**`.gitignore`:** untouched; existing metadata/stat dirtiness was not modified.
+**Checkbox state:** C2a, C2b, and C3 task lines remain unchanged and unchecked.
+**Final changed lines:** `apply-progress.md +31/-0; PackagingSupervisorTests.cs +26/-156; DirectoryCapability.cs +9/-17; total +66/-173 = 239`.
+**Attempt evidence revision:** `sha256:4f8b9051a9da011a44cc0f189eaa78fe4abaff230a401e2aa5cef7c2d5592851`.
+**Canonical preimage:** `{"acquired_begin_tree":"11bc96ba58d5f84525233e892c8a2388663238d0","changed_lines":"apply-progress.md=31+0;PackagingSupervisorTests.cs=26+156;DirectoryCapability.cs=9+17;total=66+173=239","cleanup":"fresh-root-zero-residue;pre-existing-aibar-c1b0-not-touched","command":"dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter \"FullyQualifiedName~Red_c2a_parser_|FullyQualifiedName~Native_directory_parser_|FullyQualifiedName~Native_directory_real_query_skips_exact_dot_records_and_returns_synthetic_child|FullyQualifiedName~RetainedTreeSession_windows_real_handoff_enumerates_and_reopens_with_retained_handle_authority\" --no-restore -m:1 --nologo --logger \"console;verbosity=detailed\"","diagnosis":"stale-failure-statuses-and-diagnostic-only-seams-removed","harness_disposition":"acceptance-grade-read-only-handoff","native_token":"sha256:85b65981705f4a2bc7303af12c27f099b7824910ae75eb08b7b8e2b2d073c37a","outcome":"passed","processes":"dotnet-test-exited-0;no-helper-or-powershell-command","status_normalization":"query=Success;reopen=Success","tests":"9/9","work_unit":"aibar-foundation-c2a-read-only-handoff-normalization"}`.
+**Derivation:** SHA-256 over the exact UTF-8 canonical JSON preimage above, rendered as lowercase hexadecimal.
+
+## Attempt 79 preservation-placement and evidence correction (2026-08-01)
+
+**External objective outcome:** `passed`. Native token `sha256:73a35ac558980b43787e56a590c3bfcc3f0f5af2c19d6f8dad98017e3e4bf405` was used without acquire, reset, settle, staging, commit, push, PR, review, C2b, or C3 work.
+
+| Evidence | Exact result |
+|---|---|
+| Authoritative Attempt 79 count | `DirectoryCapability.cs +2/-2`, `PackagingSupervisorTests.cs +6/-1`, and historical `apply-progress.md +27/-0`: total `+35/-3 = 38`. |
+| Historical settlement and revision | The settled Attempt 79 record and revision `sha256:1b17442b4aade046930913e82217ce55a61679f4929a01ae192e357d9e6be2ca` remain preserved. This correction supersedes only the false `+34/-3 = 37` evidence. |
+| Preservation placement | Removed `PreserveRootOnDispose=true` from `Native_directory_real_query_skips_exact_dot_records_and_returns_synthetic_child`; set it in the focused reopen success branch before child disposal and return. |
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Red_c2a_native_reopen_lease_disposal_releases_the_owned_quarantine_for_cleanup" --no-restore -m:1 --nologo --logger "console;verbosity=detailed"` |
+| Exact result | Exit `0`; passed `1/1`, failed `0/1`; emitted `C2A_STANDARDINFO_PRESERVATION roots=5->6`. |
+| Diagnostic values | `stage=NativeCreate`; native status `0x00000000`; IO status `0x00000000`; Win32 error `0`; mechanism status `ReopenFailed`; `reopened=True`. |
+| Stop boundary | Stopped after successful StandardInfo observation. Owner attribution, explicit first delete, attribution catch, disposal delete, and second delete were not reached. |
+
+**Root inventory and process evidence:** bounded direct test-owned inventory was exactly `5 -> 6`; the fresh preserved root is allowed. No pre-existing root was mutated, renamed, or deleted. The focused `dotnet test` was the sole test/runtime harness; no helper or root-observation process ran.
+**Boundaries:** `FileStandardInfo=1` remains unchanged; no functional remediation occurred beyond preservation placement and evidence correction.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | The single focused reopen command above passed once; no retry, broad test, build, or additional runtime harness ran. |
+| Runtime harness | Reused Windows x64 real producer-transferred C2a scenario; it proved the StandardInfo observation and intentional early-return boundary. |
+| Rollback boundary | Revert only this preservation placement/inventory evidence in `PackagingSupervisorTests.cs` and this appended block; retain Attempt 79 history, `FileStandardInfo=1`, roots, task marks, C2b/C3 boundaries, and `.gitignore`. |
+
+**`.gitignore`:** preserved; no content change was made by this correction.
+**Checkbox state:** all C2a, C2b, and C3 task lines remain unchecked.
+**Correction evidence revision:** `sha256:0cf92c0d46709b1d2ac979d0212b91d3229dde9501533a3cef41544b26c5bb70`.
+**Canonical preimage:** `{"attempt79_authoritative_changed_lines":"DirectoryCapability.cs=2+2;PackagingSupervisorTests.cs=6+1;apply-progress.md=27+0;total=35+3=38","attempt79_false_evidence":"34+3=37","attempt79_historical_revision":"sha256:1b17442b4aade046930913e82217ce55a61679f4929a01ae192e357d9e6be2ca","correction_changed_lines":"PackagingSupervisorTests.cs=3+2;apply-progress.md=27+0;total=30+2=32","diagnostic":"NativeCreate|0x00000000|0x00000000|0|ReopenFailed|true","first_delete":"not-attempted","focused":"1/1","harness_disposition":"reused","outcome":"passed","roots":"5->6","second_delete":"not-attempted","work_unit":"attempt-79-preservation-placement-and-evidence-correction"}`.
+**Derivation:** SHA-256 over the exact 666-byte UTF-8 canonical JSON preimage above, rendered as lowercase hexadecimal.
+
+## Attempt 80 authoritative changed-line evidence correction (2026-08-01)
+
+**External objective outcome:** `passed`. This evidence-only correction preserves Attempt 80's historical passed settlement and revision `sha256:0cf92c0d46709b1d2ac979d0212b91d3229dde9501533a3cef41544b26c5bb70`; it corrects only the false local changed-line count.
+
+| Evidence | Exact result |
+|---|---|
+| Authoritative Attempt 80 count | `PackagingSupervisorTests.cs +4/-2` and historical `apply-progress.md +29/-0`: total `+33/-2 = 35`. |
+| Historical false local count | `PackagingSupervisorTests.cs +3/-2` and `apply-progress.md +27/-0`: total `+30/-2 = 32`. |
+| Functional evidence preserved | `FileStandardInfo=1`; the focused reopen test passed `1/1`; preservation placement is correct; roots are `5 -> 6`; no attribution or delete path was reached. |
+| Stop boundary | No code, test, task, spec, design, root, `.gitignore`, lifecycle, delivery, review, or runtime action was performed by this correction. |
+
+**Boundary and cleanup evidence:** no roots were observed, created, mutated, renamed, or deleted by this evidence-only correction. The historical no-attribution/no-delete result remains preserved.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused test command | N/A — no test was run; the historical focused result remains `1/1`. |
+| Runtime harness | Reused — no runtime boundary was rerun or reclassified. |
+| Rollback boundary | Revert only this appended correction block in `openspec/changes/aibar-foundation/apply-progress.md`; retain Attempt 80 history, functional evidence, roots, task marks, C2b/C3 boundaries, and `.gitignore`. |
+
+**Lifecycle:** no acquire, begin, reset, finish, or settle operation was invoked.
+**Process evidence:** no test, build, or runtime process was launched; only read-only Git evidence and deterministic UTF-8 SHA-256 computation were used.
+**Correction changed-line calculation:** from this correction objective's acquired begin tree, only this progress record changed: `26+0=26`.
+**Correction evidence revision:** `sha256:062618b9cd5380f5d3606dee67ffc3daa163559c589af9a8db490b80e144cbf4`.
+**Canonical preimage:** `{"attempt80_authoritative_changed_lines":"PackagingSupervisorTests.cs=4+2;apply-progress.md=29+0;total=33+2=35","attempt80_false_local_count":"PackagingSupervisorTests.cs=3+2;apply-progress.md=27+0;total=30+2=32","attempt80_historical_revision":"sha256:0cf92c0d46709b1d2ac979d0212b91d3229dde9501533a3cef41544b26c5bb70","correction_changed_lines":"26+0=26","first_attribution":"not-reached","focused":"1/1","harness_disposition":"reused","outcome":"passed","powershell":"not-run","roots":"5->6","second_delete":"not-attempted","work_unit":"attempt-80-authoritative-native-count-correction"}`.
+**Derivation:** SHA-256 over the exact UTF-8 canonical JSON preimage above, rendered as lowercase hexadecimal.
+
+## Unit D — private token-gated native delete route (2026-08-04)
+
+**Outcome:** `passed`. `NativeDelete` is an internal C2Authority-only owner of `NtSetInformationFile(FileDispositionInformation)`; its only caller is the internal session route after session/lease/token verification and immediate retained-handle re-observation. Tokens are consumed even on session/lease mismatch and invalidated when the session is cancelled; observation faults invalidate the lease before the private call.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | Before implementation, the prescribed focused command exited `1` during compilation because `AuthorityTestingBridge.VerifyNativeDeleteRejections` and `VerifyNativeDeleteRuntime` did not exist. |
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisorAuthority&FullyQualifiedName~NativeDelete" --no-restore -m:1 --nologo`; exit `0`, passed `3`, failed `0`, skipped `0`. |
+| Runtime harness | The focused test ran the fresh Unicode/space Windows x64 Authority.Testing sandbox. It completed `native-delete-gated-runtime-verified`; the bridge exposes only an outcome, disposes leases/session/facets, and asserts its root is absent in `finally`. |
+| Containment/rejection | The focused tests prove arbitrary-lease rejection, wrong-session rejection, token reuse refusal after mismatch, observation-fault refusal, cancellation invalidation, exactly one private non-public C2Authority P/Invoke, no `FileDispositionInformation` residual in Core or the excluded Supervisor source, and no authority-object return from the public bridge. |
+| Production exclusion | `dotnet publish tools/AIBar.Packaging.Supervisor/AIBar.Packaging.Supervisor.csproj --no-restore --nologo` exited `0`; its publish directory had `0` Authority.Testing runtime-asset matches and its `.deps.json` had `0` Authority.Testing/Domain.Tests matches. No production package or SBOM was created or changed. |
+| Build and integrity | `dotnet build AIBar.sln --no-restore --nologo` exited `0` with `0` warnings and `0` errors; `git diff --check` exited `0`. |
+
+**Task state:** Unit D tasks 616–617 are checked. Unit E, broad C2a/C2b, C3, packaging, MIT licensing, delivery, and unrelated tasks remain unchecked.
+
+**Workload / rollback:** Unit-scoped authored accounting is `+215/-20 = 235`, within the 160–300 forecast and 400 hard stop. Rollback removes `NativeDelete.cs`, the session gate, bridge/test proof, Core observation visibility, and the stale Supervisor raw-delete residue; it leaves Core with no disposition delete route and preserves the completed Unit C graph and Authority.Testing signing route.
+
+**Native token settle evidence:** retained `sha256:eef11e20582a6404d3fd263dccd0da761ea21e2d3d19057300db23d11c8028a5`; no acquire, settle, reset, rescope, review, commit, push, PR, GitHub, or native-token lifecycle operation was invoked.
+
+## Unit E — future C2b guarded integration (2026-08-04)
+
+**Outcome:** `passed`. C2Authority now consumes only a same-handoff session/evidence pair through an internal factory and exposes only `GuardedCleanupFacade` to the Supervisor host. The facade verifies the frozen evidence digest, root/parent identity, full HMAC-tag/identity/kind/non-reparse bijection, and DPAPI CurrentUser protect→unprotect constant-time verification before it invokes the durable owner. It never exports an issuer, token, session, lease, sandbox, handle, or raw delete route.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | The prescribed focused command exited `1` before production work because `AuthorityTestingBridge.VerifyGuardedCleanupBoundary` and `VerifyGuardedCleanupFaultMatrix` were absent. |
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisorAuthority|FullyQualifiedName~Cleanup" --no-restore -m:1 --nologo`; exit `0`, passed `23`, failed `0`, skipped `0`. |
+| Runtime harness | The focused Windows x64 bridge performed a real producer handoff and exact-bijection/DPAPI gate. Its bounded matrix proved a pre-first-delete fault retains the child with zero mutation; delete-route attempts and injected post-start faults retain the quarantine and return `CLEANUP_PARTIAL`. The existing private D route refused the attempted delete because the retained child lease lacks delete access, so no cleanup-success claim is made. |
+| Production exclusion | `dotnet publish tools/AIBar.Packaging.Supervisor/AIBar.Packaging.Supervisor.csproj --no-restore --nologo` exited `0`; disposable publish output had `9` assets, `0` Authority.Testing/Domain.Tests asset matches, and `0` matching `.deps.json` entries; temporary root removal was `True`. No package or SBOM was created or changed. |
+| Build and integrity | `dotnet build tools/AIBar.Packaging.Supervisor/AIBar.Packaging.Supervisor.csproj --no-restore --nologo` exited `0` with `0` warnings and `0` errors. |
+
+**Graph and containment:** production source accepts only `GuardedCleanupFacade`; the test verifies Core has no C2Authority edge, C2Authority references Core, Authority.Testing references C2Authority, Domain.Tests references Authority.Testing, and no production project references Authority.Testing. DPAPI imports are private C2Authority-only imports; the pre-existing private `NtSetInformationFile` remains private. No C3 discovery, scavenging, scheduling, arbitrary-root selection, PowerShell, packaging/release, or public/raw authority was added.
+
+**Workload / rollback:** Unit-local authored accounting is `+330/-6 = 336`, within the 300–390 forecast, 400 authored hard stop, and 1,000 native ceiling. Rollback removes `CleanupPolicy.cs`, `ScavengerMetadata.cs`, the C2b session/facade additions, host facade injection, and their bridge/contract tests; then reverses D, C, B2, and B1 in order. The injected `IDurableProtectedMetadataStore` is the only metadata sink accepted by the internal factory; C2b selects no root or persistence location.
+
+**Task state:** Unit E tasks 621–622 are checked. Broad C2a/C2b and C3 completion gates, packaging, MIT licensing, delivery, and unrelated tasks remain unchecked.
+
+**Native token settle evidence:** retained `sha256:9737ea4d1b233d4d9c92e0234143cd292cc19cfada1d9ad633c9209bdfec8e67`; no acquire, settle, reset, rescope, review, commit, push, PR, GitHub, or native-token lifecycle operation was invoked.
+
+## Unit E — corrective APPLY rerun (2026-08-04)
+
+**Outcome:** `passed`. This cumulative correction retains the prior Unit E evidence and closes only its fresh phase-contract blockers. C2Authority seals a fixed bounded DPAPI CurrentUser record containing the schema marker, digest, correlation binding, retained-root identity, `RetainedQuarantine` phase, retry count `0`, and a bounded UTC next-eligible time; the immediate unprotect path checks every field and rejects invalid phase, exhausted retry count, or invalid time before durable write and zeroizes temporary bytes.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisorAuthority|FullyQualifiedName~Cleanup" --no-restore -m:1 --nologo`; exit `0`, passed `24`, failed `0`, skipped `0`. The build emitted the pre-existing three `CS8002` unsigned-reference warnings for Domain/Application/Desktop. |
+| Runtime harness | The Windows x64 bridge created a fresh two-child producer handoff. Normal cleanup completed both bounded child deletions. The before-first-delete fault completed `0`; the after-first-delete fault completed exactly `1`, retained the second direct child/quarantine, and returned `CLEANUP_PARTIAL` at `Deleted`—not merely `DeleteAttempted`. |
+| Exactly once | A process-wide weak session claim makes a second facade factory call for the same matching session/evidence pair fail closed, including across facade instances; one authority-internal cleanup authorization is restricted to the exact live lease set and consumes each member once. |
+| Integrity command | `git diff --check`; exit `0` (no whitespace errors). |
+| Rollback boundary | Revert only Unit E C2Authority cleanup/metadata/session changes, Authority.Testing guarded-cleanup proof, this contract test, and this cumulative correction; then reverse D, C, B2, and B1 in the established order. |
+
+**Boundary preservation:** the producer/session binding remains reference-bound; DPAPI runs before durable authorization and every delete; the C2Authority-only relative re-open is rooted in the live retained handle and exposes neither a path nor a raw operation. Core predecessor bytes remain unchanged. The host still receives only `GuardedCleanupFacade`; no C3 discovery/scheduling/scavenger, arbitrary root, PowerShell, public authority, raw export, packaging, SBOM, or delivery behavior was added. Unit E tasks `621–622` remain checked; broad C2a/C2b/C3 gates remain unchecked.
+
+**Native token settle evidence:** retained `sha256:68381a77790ddafa79cadc7ed3aabefb414d97cd7ef0992758c92e75f31108a7`; no acquire, settle, reset, rescope, review, commit, push, PR, GitHub, or native-token lifecycle operation was invoked.
+
+## Unit E-C1 — bounded descendant post-order correction (2026-08-04)
+
+**Outcome:** `passed`. This is the only Unit E closure correction. The checked Unit E direct-child evidence remains historical/partial; E-C1 adds bounded retained-handle descendant traversal and deletes descendants in child-before-parent post-order without adding C3, discovery, path fallback, public authority, a production Testing edge, packaging, or delivery work.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | After the nested-tree assertion was added and before the C2Authority production correction, the prescribed focused command exited `1`: passed `23`, failed `1`, skipped `0`, total `24`. The direct-child implementation stopped at the nonempty `first` directory, proving no descendant post-order behavior. |
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisorAuthority|FullyQualifiedName~Cleanup" --no-restore -m:1 --nologo`; exit `0`, passed `25`, failed `0`, skipped `0`, total `25`. The known pre-existing unsigned-reference `CS8002` warnings remain non-failing compiler warnings. |
+| Nested runtime harness | A fresh test-owned Unicode/space retained quarantine contained `first/leaf` and `second`. Success completed `4` deletes in post-order: leaf, `first`, `second`, then the retained root. The after-first-delete fault completed exactly `1` deletion—the leaf—while its `first` ancestor, `second`, and quarantine remained, and returned `CLEANUP_PARTIAL` at `Deleted`. |
+| Bounds and fail-closed behavior | The same real Windows x64 bridge proved depth overflow, bounded-entry overflow, and cancellation complete `0` deletes, retain the quarantine, and return `CLEANUP_PARTIAL`. Production re-observes each root-bound generation lease before enumeration and immediately again before mutation; reparse, identity, kind, volume, reopen, deadline, native-delete, and unknown faults retain the quarantine. |
+| Residue and integrity | Each bridge case uses no helper process, asserts its fresh test-owned root is absent after disposal, and leaves no temporary root; `git diff --check` exited `0`. |
+
+**Implementation boundary:** `RetainedTreeLease` now carries only a live parent-lease relationship, never a path. C2Authority derives all descendant opens and relative deletes from retained handles, keeps the producer evidence cap at `16` direct children, and enforces `64` total descendant entries, depth `8`, UTF-16 leaf bytes `<=510`, generation/identity/volume/non-reparse checks, cancellation, and one deadline. The durable authorization consumes each bounded descendant lease once and consumes the retained root only after the post-order set is empty; all lease names and temporary native buffers follow existing zeroization/disposal paths.
+
+**Changed-line classification:** task-local authored patch ledger is `+167/-29 = 196` changed lines, below the `280–360` forecast and hard `400` authored/`1,000` native ceilings. The E-C1 source mechanism is `+82/-11 = 93` native lines; bridge/tests/tasks/progress comprise the remainder. This ledger excludes the pre-existing untracked Unit C/D/E candidate content and preserves it as cumulative predecessor evidence.
+
+**Rollback boundary:** revert only E-C1's `CleanupPolicy.cs` and `RetainedTreeAuthority.cs` descendant mechanics, the bounded Authority.Testing bridge/tests, and these E-C1 task/progress edits. Preserve Unit E 621–622 as historical/partial direct-child evidence, plus D, C, B2, B1, every predecessor record, and unrelated dirty worktree content.
+
+**Task state:** Unit E-C1 tasks 632–635 are checked. Unit E descendant closure is now implemented; broad C2a/C2b/C3 gates remain unchecked, and C3 remains excluded.
+
+**Native token settle evidence:** retained `sha256:1823cc0a3dfbdef0ffbc51aab1162d17256cdd19e572dc3cb66ff7067e1e6547`; no acquire, settle, reset, rescope, review, commit, push, PR, GitHub, or native-token lifecycle operation was invoked.
+
+## Unit E-C1 — phase-contract fail-closed proof correction (2026-08-04)
+
+**Outcome:** `passed`. This correction adds only the missing dedicated E-C1 fail-closed proofs; existing nested success, post-first-delete partial retention, depth/entry/cancellation, and zero-residue proofs remain intact.
+
+| Work Unit Evidence | Exact result |
+|---|---|
+| RED | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisorAuthority|FullyQualifiedName~Cleanup" --no-restore -m:1 --nologo`; exit `1` during compilation: the eight dedicated `AuthorityTestingBridge.VerifyGuardedCleanup*` proof methods were absent. |
+| Focused command | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PackagingSupervisorAuthority|FullyQualifiedName~Cleanup" --no-restore -m:1 --nologo`; exit `0`, passed `33`, failed `0`, skipped `0`, total `33`. The build emitted the pre-existing three non-failing `CS8002` unsigned-reference warnings for Domain/Application/Desktop. |
+| Runtime harness | The Windows x64 Authority.Testing bridge used a fresh Unicode/space test-owned quarantine with `first/leaf` plus `second` for every dedicated proof; each fault retained the quarantine with `0` completed deletions. Deadline exhaustion uses a one-tick live-session deadline; native-delete failure reaches `DeleteAttempted` before refusing; unknown faults map to `CLEANUP_PARTIAL`. |
+| Integrity command | `git diff --check`; exit `0` (no whitespace errors). |
+
+**Dedicated proofs:** descendant identity mismatch, kind mismatch, volume mismatch, reparse detection, reopen/re-observation failure, deadline exhaustion, native-delete failure, and unknown-fault mapping all fail closed before a completed deletion. Nested post-order success, after-first-delete partial retention, depth/entry overflow, and cancellation proofs remain passing.
+
+**Task state:** Unit E is complete only in this scoped bounded-cleanup sense: E-C1 tasks `632–635` are checked after the `33/33` focused proofs pass. Unit E `621–622` remains historical/partial direct-child evidence. Broad C2a, C2b, and C3 remain unchecked; C3 remains excluded.
+
+**Scoped accounting:** cumulative E-C1 ledger is `+273/-36 = 309` authored changed lines, within the `280–360` forecast and `400` hard stop. It consists of the prior `+167/-29 = 196` correction ledger plus this proof correction's `+82/-4` source/test delta, `+3/-3` live-summary reconciliation, and `+21/-0` cumulative evidence. The native C2Authority mechanism subtotal is `+99/-13 = 112`; no allowed path outside E-C1 was changed.
+
+**Rollback boundary:** revert only the E-C1 descendant correction, its dedicated Authority.Testing/Domain.Tests proofs, and E-C1 task/progress evidence; preserve Unit E 621–622 historical/partial evidence, D, C, B2, B1, predecessor records, and unrelated dirty worktree content.
+
+**Native token settle evidence:** retained `sha256:3befea4a9df36f72847579e4d36ce8e78644b0e9d7579e1cf396babe5e35573b`; no acquire, settle, reset, rescope, review, commit, push, PR, GitHub, or native-token lifecycle operation was invoked.

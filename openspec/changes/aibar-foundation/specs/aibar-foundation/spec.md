@@ -538,91 +538,127 @@ C1c unit proof MUST cover every state transition, repeated and concurrent split/
 - WHEN status or structured diagnostics are emitted
 - THEN they contain only stable non-sensitive phase/error information and MUST NOT contain paths, final-path strings, handle values, evidence, digests, keys, nonces, tokens, leaf names, credentials, buffers, exception text, or binding representation
 
-### Requirement: C2a transferred retained-capability facet and session boundary
+### Requirement: Unit B2 signed Core relocation and bounded test seam
 
-C2a MUST accept exactly one one-way transferred `RetainedTreeCapabilityFacet` produced by independently verified and committed C1c from producer `03ee654`; it MUST reject direct producer `03ee654` combined-capability input, any legacy pre-C1c capability, and any path-selected root, reconstructed root, arbitrary handle, caller-created safe handle, final-path string, root selector, evidence record, retry request, or deletion policy. C2a MUST remain blocked until C1c is independently verified and committed. The handoff MUST consume the live root/parent-handle facet exactly once, preserve the same internal C1c handoff identity in the resulting session, bind the session to the retained root identity and volume, and leave the immutable `CommittedEvidenceCapabilityFacet` for C2b. C2a MUST keep all relative leaf names as bounded transient lookup material only.
+After the validated Unit S signing/key gate, Unit B2 MUST sign the relocated Core and grant exactly two public-key-qualified signed friendships from Core: the production `AIBar.Packaging.Supervisor` assembly and the existing `AIBar.Domain.Tests` assembly. The test friend MUST be non-production and limited to preserving existing C1c/C2a internal-seam coverage; it MUST never be published, shipped, packaged, or included in production SBOM, dependency, or runtime assets. This exception MUST NOT make Core internals public, add a public test hook, widen production APIs, or change any other B2 byte-identical relocation, signing, custody, authority-ownership, scope, or rollback constraint.
 
-#### Scenario: Approved C1c one-way handoff
+#### Scenario: Signed production and test friendships are admitted
 
-- GIVEN C1c is independently verified and committed and the producer transfers one still-live retained-tree facet with its root identity, volume, and internal handoff identity
-- WHEN C2a creates a session
-- THEN the facet moves once into a session-bound `RetainedTreeSession`, the same internal identity is preserved, the root handle remains live for the session, and no caller can replace or duplicate that authority
+- GIVEN Unit S has validated the checked public signing identity and B2 has the five materialized relocation files
+- WHEN Core friendship metadata and the affected project/test boundaries are evaluated
+- THEN exactly the signed Supervisor and signed `AIBar.Domain.Tests` identities are admitted, Supervisor retains its production internal seam, and the test assembly retains the existing C1c/C2a internal-seam coverage without a public API widening
 
-#### Scenario: Direct producer or legacy request
+#### Scenario: Unsigned, wrong-identity, or extra friend is refused
 
-- GIVEN C1c is not independently verified and committed, or a caller supplies the combined producer capability, a legacy capability, a path, final-path string, reconstructed root, arbitrary handle, or caller-selected root instead of the transferred facet
-- WHEN C2a is asked to create or use a session
-- THEN it rejects the request with a stable mechanism error, remains blocked before enumeration or mutation, and emits no path, handle value, evidence, binding, or secret
+- GIVEN the proposed test friend is unsigned, uses a public identity different from the checked identity, or Core declares any additional friend
+- WHEN B2 friendship activation is evaluated
+- THEN activation is refused before the B2 candidate is accepted, and no public test hook, broad friendship, or substitute production API is created
 
-### Requirement: C2a bounded native retained-handle operations
+#### Scenario: Test friend is not publishable
 
-On supported Windows 10/11 x64, C2a MUST provide bounded handle-relative direct-child enumeration, relative reopen, handle observation, disposable observation leases, recursive post-order enumeration, re-observation, disposal, and handle-only delete primitives. Enumeration MUST use `NtQueryDirectoryFile` against the retained directory handle with an asserted `FILE_NAMES_INFORMATION` layout and at most one bounded restart; reopen MUST use `NtCreateFile` with `OBJECT_ATTRIBUTES.RootDirectory` bound to the retained root handle and a bounded relative `UNICODE_STRING`; deletion MUST use `NtSetInformationFile(FileDispositionInformation)` on a same-session handle with the required delete and synchronize rights. No operation MAY resolve or reconstruct a filesystem path.
+- GIVEN production publish, packaging, shipping, SBOM, dependency, and runtime-asset outputs are inspected
+- WHEN the B2 exclusion boundary is checked
+- THEN `AIBar.Domain.Tests` and its test-only dependencies are absent from every production artifact, while the signed test friendship remains usable only in the test scope
 
-Direct enumeration MUST reject malformed offsets or lengths, embedded NUL, `.` or `..`, non-simple leaves, ordinal-ignore-case duplicates, more than 16 direct children, configured recursive entry/depth/byte bounds, buffer truncation, and uncertain nonterminal status. Every reopened object MUST be observed from its live handle for volume, file identity, kind, size facts, and reparse state. Reparse objects, cross-volume objects, unsupported kinds, identity ambiguity, and observation failure MUST close the affected lease and fail closed. Recursive deletion primitives MUST enumerate descendants relative to live parent handles, reopen with reparse-point semantics, re-observe before mutation, delete leaf-first, and delete the retained root last through its transferred handle.
+### Requirement: Strong physical C1 and C2 authority boundary
 
-#### Scenario: Valid bounded handle-relative operation
+Production authority MUST be split across physical assemblies. `AIBar.Packaging.Supervisor.Core` MUST own C1 capabilities, committed evidence, atomic facets, and read-only enumeration/reopen/observation interop; it MUST own no issuer, token, session, sandbox, or delete primitive. `AIBar.Packaging.Supervisor.C2Authority` MUST reference Core and exclusively own C2a sessions/leases, token-verification state, the exactly-once issuer, its durable production owner, and private `NtSetInformationFile(FileDispositionInformation)` delete interop; future C2b policy and its guarded facade MUST live there. `AIBar.Packaging.Supervisor` MUST remain the host/orchestrator, reference Core and C2Authority, and MUST receive only the future high-level guarded facade, never a raw issuer, token, session, sandbox, or delete primitive.
 
-- GIVEN a transferred retained root on a supported Windows 10/11 x64 volume and a bounded direct-child set of simple non-reparse entries
-- WHEN C2a enumerates, reopens, observes, and leases the entries
-- THEN every result is derived from retained handles, leases are bound to the originating session and generation, and no filesystem path is used as authority
+No issuer, token, session, sandbox, verification state, or delete primitive MAY have a public constructor, public factory, public export, serialization form, or handle-based reconstruction route. The production reference graph MUST be exactly `C2Authority -> Core` and `Supervisor -> Core + C2Authority`; Core MUST NOT reference C2Authority, and no production project MAY reference testing support.
 
-#### Scenario: Malformed or duplicate native enumeration
+#### Scenario: Ordinary production reference cannot construct authority
 
-- GIVEN `NtQueryDirectoryFile` returns malformed record offsets/lengths, embedded NUL, `.`/`..`, duplicate simple leaves, more than 16 entries, or truncated data
-- WHEN C2a parses the bounded result
-- THEN it rejects the enumeration with a stable mechanism error, returns no authoritative lease set, and performs no deletion
+- GIVEN any production source has only its declared compile-time project references
+- WHEN it attempts to construct, obtain, or invoke an issuer, token, session, sandbox, or raw delete primitive
+- THEN compilation or API-surface inspection proves no such public route exists, and the host can receive only the guarded facade
 
-#### Scenario: Reordered native enumeration
+#### Scenario: Graph is acyclic
 
-- GIVEN `NtQueryDirectoryFile` returns the same valid bounded direct-child records in a different order
-- WHEN C2a parses the result and C2b correlates the leases
-- THEN C2a returns only session-bound transient leases, C2b matches the complete sets by their required evidence rather than order, and enumeration order cannot authorize or deny deletion
+- GIVEN the project and solution references are inspected
+- WHEN their topological order is evaluated as `Core -> C2Authority -> Supervisor` with test support after C2Authority and Domain.Tests after test support
+- THEN no Core-to-Authority, production-to-Testing, Domain.Tests-to-C2Authority, or other reverse edge exists
 
-#### Scenario: Reopen substitution or identity refusal
+### Requirement: Core read-only retained-capability operations
 
-- GIVEN a relative reopen resolves to a different file identity, volume, kind, or reparse state than the observed entry, or the entry cannot be observed
-- WHEN C2a validates the reopened handle
-- THEN it closes that lease, refuses the operation, and does not promote the leaf spelling or substituted object to authority
+Core MUST accept the independently verified C1c handoff and own only C1 capability/evidence/facet state plus bounded read-only direct-child enumeration, relative reopen, and handle observation. `NtQueryDirectoryFile` MUST accept up to 16 distinct valid simple leaves, ignore at most one exact `.` and one exact `..` structural record without counting them, and reject duplicates, other dot-like names, separators, embedded NUL, malformed/truncated offsets or lengths, record-traversal faults, ambiguity, bounds, truncation, and uncertain nonterminal status. `NtCreateFile` reopen and observation MUST remain retained-root-relative, preserve `FileStandardInfo = 1`, and normalize successful enumeration and successful reopen plus `FileIdInfo`/`FileAttributeTagInfo`/`FileStandardInfo` observation to `RetainedTreeMechanismStatus.Success`. Core MUST contain no `FileDispositionInformation`, delete API, issuer, token, session, or sandbox.
 
-### Requirement: C2a mechanism-only authorization and test boundary
+#### Scenario: Valid read-only enumeration and observation
 
-C2a MUST NOT evaluate authorization policy, `CommittedChildEvidence/v1`, HMAC tags, evidence digests, DPAPI bytes, retry state, or evidence bijection. C2a MUST expose no unguarded deletion operation: every delete primitive MUST require an unforgeable session-bound one-use authorization minted only by C2b after its policy gates. The authorization MUST be invalidated by session disposal, cancellation, deadline expiry, lease mismatch, or observation fault. A bounded deletion proof MAY run only in a test-owned sandbox transferred through the real producer capability; it MUST grant no production authority and MUST NOT be treated as C2b cleanup evidence.
+- GIVEN zero or one exact dot record of each kind and up to 16 valid simple leaves, including reordered `publish` and `restore`
+- WHEN Core enumerates, reopens, and observes through retained handles
+- THEN structural records are ignored, all valid leaves are returned without order authority, `FileStandardInfo = 1` is used, and successful statuses normalize to `Success`
 
-#### Scenario: Mechanism cannot arm itself
+#### Scenario: Core cannot delete
 
-- GIVEN C2a has a valid retained session but no C2b authorization token
-- WHEN a caller requests recursive deletion or attempts to mint a token through C2a
-- THEN C2a performs no deletion and returns a stable mechanism error without inspecting or synthesizing evidence
+- GIVEN a Core consumer has a valid capability, evidence, facet, or observation result
+- WHEN it seeks a raw or guarded deletion operation
+- THEN no Core API or native import permits deletion and no reference to C2Authority exists
 
-#### Scenario: Test-owned sandbox proof
+### Requirement: C2Authority owner lifetime and private delete containment
 
-- GIVEN a bounded test-owned sandbox is transferred through the producer capability for a native primitive proof
-- WHEN C2a exercises the primitive under the test bounds
-- THEN the proof may demonstrate native behavior only, grants no production authorization, and cannot be reused as C2b cleanup evidence
+C2Authority MUST consume exactly one retained-tree facet into one session, preserve the C1c handoff identity, and transfer exactly one issuer to one durable production owner whose lifetime spans the session and future C2b guarded operation. C2Authority/session MUST retain only verification state and MUST NOT retain, reacquire, clone, reconstruct, or expose the issuer. The durable owner MUST neither release nor invoke the issuer except through the future C2b guarded facade after exact-bijection and durable-metadata gates pass.
 
-### Requirement: C2a ownership, deadlines, native safety, and diagnostics
+Every delete MUST route through private `FileDispositionInformation` interop on a same-session lease and MUST require successful session/lease/token verification immediately before mutation. The token MUST be session-bound, one-use, non-cloneable, non-reconstructible, and invalidated by cancellation, timeout, disposal, lease mismatch, observation fault, wrong session, or reuse. No arbitrary-handle delete method, delete API, native delete import, or compatibility fallback MAY remain in Core or be callable from the host.
 
-C2a MUST own the transferred capability, root and parent handles, every child and descendant lease handle, transient leaf records, and native buffers through one-way ownership transitions. Child leases MUST be disposed before parent handles, root and parent handles MUST close last, disposal MUST be idempotent, and no handle value MAY leave the interop layer. One monotonic deadline and linked cancellation MUST be checked before and after every native call and between entries; no new operation may begin after cancellation or deadline. C2a MUST NOT claim that a synchronous kernel call is cancellable in flight. If such a call does not return within the enclosing deadline, success is impossible and the operation is indeterminate/partial for C2b's classification, with no background continuation.
+#### Scenario: Issuer and durable owner transfer exactly once
 
-Native compatibility MUST be gated before any production delete primitive is armed: the process MUST be 64-bit on maintained Windows 10/11 x64, selected exports and information classes MUST exist, pointer and native structure layouts MUST match, synchronous completion and disposition semantics MUST be supported, and filesystem/filter/access/share behavior MUST be verified. Checked zero-initialized buffers MUST bound all directory records, `OBJECT_ATTRIBUTES`, `UNICODE_STRING`, identity records, and transient UTF-16 data; buffers and managed copies MUST be zeroed before release. C2a MUST emit only stable path/secret-free mechanism classes such as `UNSUPPORTED_RUNTIME`, `INVALID_CAPABILITY`, `BOUND_EXCEEDED`, `CANCELLED`, `TIMEOUT`, `ENUMERATION_FAILED`, `REOPEN_FAILED`, `OBSERVATION_FAILED`, `REPARSE_DETECTED`, `CROSS_VOLUME`, `IDENTITY_CHANGED`, `DELETE_FAILED`, and `INTERNAL_UNKNOWN`. There MUST be no compatibility fallback, path-based operation, Win32/managed delete fallback, shell, PowerShell, subprocess, copy-delete, or rename-back.
+- GIVEN C2Authority creates one retained-tree session
+- WHEN production ownership is established
+- THEN one issuer transfers once to one durable production owner, repeated transfer fails closed, and neither the host nor the session can obtain the issuer or a token
 
-#### Scenario: Unsupported runtime, API, layout, filesystem, or filter
+#### Scenario: Raw arbitrary-handle deletion is unreachable
 
-- GIVEN architecture, Windows version, native export or information class, checked layout, synchronous completion, filesystem/filter behavior, access/share state, or volume relationship is unsupported or unprovable
-- WHEN C2a evaluates its runtime gate
-- THEN it returns `UNSUPPORTED_RUNTIME` or the applicable stable mechanism class, performs no production deletion, and uses no compatibility fallback
+- GIVEN a caller has an arbitrary handle, Core observation, mismatched lease, missing/reused token, or wrong session
+- WHEN it attempts deletion
+- THEN the private route rejects before `NtSetInformationFile`, performs no mutation, and exposes no callable raw-delete surface
 
-#### Scenario: Cancellation or timeout at a boundary
+#### Scenario: Verified private deletion route
 
-- GIVEN cancellation or the monotonic deadline occurs before or after enumeration, reopen, observation, or deletion, or a synchronous call does not return before the enclosing deadline
-- WHEN C2a reaches the next bounded boundary
-- THEN it starts no new native operation, invalidates any authorization and leases, reports `CANCELLED` or `TIMEOUT`/indeterminate mechanism state, and does not report cleanup success
+- GIVEN one live C2Authority session, matching lease, valid one-use token, supported Windows 10/11 x64 layout, and successful immediate re-observation
+- WHEN the private delete route runs
+- THEN it calls only private `NtSetInformationFile(FileDispositionInformation)` for that lease, consumes the token once, and maps every uncertain result to a stable path/secret-free mechanism status
 
-#### Scenario: Native deletion fault and zero residue
+### Requirement: Signed bounded test-support facade and production exclusion
 
-- GIVEN an authorized test-owned primitive encounters a deletion fault or any unknown native result
-- WHEN C2a disposes the session
-- THEN it stops at the next bounded point, reports only a stable mechanism class, zeroes transient buffers, closes every handle exactly once, and leaves no helper process, test root, lease, or buffer residue attributable to the session
+`AIBar.Packaging.Supervisor.Authority.Testing` MUST be a non-production, checked-public-key-signed assembly with that exact simple name and the sole public-key-qualified signed friendship of C2Authority. It MUST own the concrete bounded sandbox and the only bounded bridge for migrated C1c/C2a internal-seam coverage; it MAY expose test outcomes and bounded verification operations only. It MUST NOT export an issuer, token, raw session, arbitrary-handle delete, sandbox constructor, or native delete route. `AIBar.Domain.Tests` MUST reference Authority.Testing, MUST lose its direct Core friendship, and MUST consume migrated or bridged C1c/C2a seams through Authority.Testing rather than compiling against Core internals.
+
+When Unit C removes the temporary B2 Core friendships, Core MUST retain only the exact checked-public-key-qualified `AIBar.Packaging.Supervisor.C2Authority` and `AIBar.Packaging.Supervisor.Authority.Testing` friends required by the final boundary; Supervisor and Domain.Tests MUST no longer be Core friends. Authority.Testing's Core friendship MUST exist solely to preserve or migrate the existing C1c/C2a internal-seam coverage. This transition MUST NOT widen Core's public API, create a production authority edge, or authorize native deletion. Authority.Testing MUST be absent from every production project reference, publish or ship output, production SBOM/package component and asset set, `.deps.json`, runtime assets, and distribution metadata. Strong names establish assembly identity for narrow friendship; they MUST NOT be described as a hostile-code sandbox. Unit S's checked identity and custody policy remain prerequisites and are not redefined here. Completed B2 relocation and its evidence remain intact and MUST NOT be reopened, rewritten, or treated as Unit C authority.
+
+#### Scenario: Bounded test support without authority export
+
+- GIVEN Domain.Tests invokes Authority.Testing for a fresh test-owned sandbox within entry/depth/volume/deadline bounds
+- WHEN the facade exercises bounded authority-verification behavior
+- THEN the sandbox remains owned by Authority.Testing, no issuer/token/session/raw handle or native-delete capability is exposed, and the result grants no production or C2b evidence
+
+#### Scenario: Exact final signed friend identity
+
+- GIVEN Unit S has validated the checked full public key and Unit C has signed Core, C2Authority, Authority.Testing, and Domain.Tests
+- WHEN final Core and C2Authority friendship metadata is evaluated
+- THEN Core admits exactly the signed C2Authority and exact signed Authority.Testing identities, each with its required simple name and Unit S's checked full public key, C2Authority admits exactly signed Authority.Testing, and Supervisor and Domain.Tests are absent from Core friendship
+
+#### Scenario: Existing internal seams survive through the test route
+
+- GIVEN the existing C1c/C2a seam tests require internal Core behavior
+- WHEN those tests are migrated or bridged through Authority.Testing
+- THEN the focused seam coverage remains executable, Domain.Tests has no direct Core-internal access or friendship, and no Core public API or production reference is widened
+
+#### Scenario: Wrong, unsigned, or extra friend is refused
+
+- GIVEN Authority.Testing or any proposed Core/C2Authority friend is unsigned, token-only, unqualified, signed with the wrong public key, duplicated, renamed, or additional
+- WHEN Unit C activates the final friendship boundary
+- THEN activation fails closed before acceptance, no B2 temporary friend is retained as a fallback, and no public hook, broad friendship, authority edge, or native delete route is added
+
+#### Scenario: Friend and publish boundary
+
+- GIVEN assembly metadata, project references, publish output, production SBOM/package metadata, `.deps.json`, and runtime assets are inspected
+- WHEN the authority boundary contract tests run
+- THEN only the exact checked-public-key-qualified Authority.Testing identity is a C2Authority friend, Domain.Tests is not a Core friend or direct Core-internal consumer, and Authority.Testing, Domain.Tests, and test-only dependencies appear in none of those production artifacts
+
+#### Scenario: Public surface and native boundary remain closed
+
+- GIVEN a Unit C candidate exposes a new Core public type/hook, adds a production reference to Authority.Testing, or activates native delete
+- WHEN public API, reference-graph, and native-import checks run
+- THEN the candidate is refused before acceptance, Core's public surface remains unchanged, no production authority edge exists, and no native deletion is authorized
 
 ### Requirement: C2b exact producer-evidence and C2a-session consumption
 
@@ -664,13 +700,13 @@ Before the first deletion, C2b MUST serialize only bounded retry metadata contai
 
 ### Requirement: C2b one-use authorization and guarded post-order cleanup
 
-Only after both the exact-bijection and DPAPI metadata gates pass may C2b mint one session-bound, one-use authorization for C2a. C2b MUST use that authorization for bounded post-order, handle-anchored deletion; it MUST immediately re-observe every live direct-child and descendant handle before each mutation and MUST stop at the next bounded cancellation/deadline point. Any reparse, identity, kind, volume, extra-descendant, reopen, enumeration, deletion, metadata, disposal, or unknown fault after the producer commit MUST retain the quarantine and report `CLEANUP_PARTIAL`, whether or not the first deletion has started. C2b MUST NOT rename back, retry from a path, choose an arbitrary root, copy-delete, change the target, or claim original-path preservation. Complete cleanup requires verified deletion of every descendant, direct child, and retained root plus verified handle disposal.
+Only after both the exact-bijection and DPAPI metadata gates pass may future C2b invoke the durable production owner's guarded facade exactly once to obtain and consume one session-bound authorization inside C2Authority. C2b MUST use only that facade for bounded post-order, handle-anchored deletion; it MUST immediately re-observe every live direct-child and descendant lease before each mutation and MUST stop at the next bounded cancellation/deadline point. The facade MUST NOT return the issuer, token, session, lease handle, sandbox, or raw delete operation. Any reparse, identity, kind, volume, extra-descendant, reopen, enumeration, deletion, metadata, disposal, or unknown fault after the producer commit MUST retain the quarantine and report `CLEANUP_PARTIAL`, whether or not the first deletion has started.
 
 #### Scenario: One-use authorization and immediate revalidation
 
 - GIVEN the two gates passed and the complete direct-child leases remain live
-- WHEN C2b mints the authorization and begins post-order cleanup
-- THEN the token is accepted only by its originating C2a session, is consumed once, and each live handle is re-observed immediately before its delete operation
+- WHEN C2b invokes the guarded facade and begins post-order cleanup
+- THEN the token remains authority-internal, is accepted only by its originating session and consumed once, and each live lease is re-observed immediately before its private delete operation
 
 #### Scenario: Fault before the first deletion
 
@@ -690,21 +726,23 @@ Only after both the exact-bijection and DPAPI metadata gates pass may C2b mint o
 - WHEN ownership and sensitive buffers are released
 - THEN disposal is idempotent, handles close exactly once, plaintext and transient records are zeroed, and status/diagnostics contain no path, leaf, secret, credential, nonce, raw native status, exception text, or handle value
 
-### Requirement: C2 dependency, rollback, compatibility, and excluded capabilities
+### Requirement: C2 dependency, rollback, threat model, and excluded capabilities
 
-The only forward dependency for this contract MUST be committed producer `03ee654` → `b2c-C1c` → `b2c-C2a` → `b2c-C2b`. C1c MUST be independently verified and committed before C2a may begin; C2a MUST reject direct producer and legacy input and MUST remain blocked otherwise. C2a and C2b MUST remain separate feature-branch-chain review units with their own boundaries. C1c retains its 220–320 authored-line implementation forecast, High risk, historical hard cap of 400, and no exception; its distinct independent-verification objective has max attempts 1 and native changed-line ceiling 1000 under the constraints above. C2a and C2b each retain their 300–390 authored-line forecast and High risk with a maintainer-approved native changed-line ceiling of 1000. For both future units, authored changes above 400 trigger mandatory workload visibility and review-splitting pressure; the additional ceiling covers only bounded evidence/correction headroom and MUST NOT expand behavior, allowed paths, dependency scope, absorb another unit or C3, merge C1c/C2a/C2b, or authorize stage/commit/push/PR/review. Rollback MUST occur in reverse order: disable/remove C2b first, then C2a, then C1c, then the producer amendment. No mixed-version reinterpretation, legacy migration, post-commit evidence synthesis, or evidence bijection inferred from historical attempts is allowed. Attempts 60 and 61 remain failed historical evidence and MUST NOT serve as completion or verification authority. Completed apply Attempt 62 remains historical at 347/400 and MUST NOT be reset or reused as verification. C3 scavenging, retry scheduling/discovery, PowerShell integration, arbitrary-root discovery, age/owner/ACL admission, and other discovery behavior remain out of scope.
+The assembly DAG MUST be `Core -> C2Authority -> Supervisor` for production and `C2Authority -> Authority.Testing -> Domain.Tests` for test access, where arrows denote referenced-before-dependent topological order; the actual project-reference edges are `C2Authority -> Core`, `Supervisor -> Core + C2Authority`, `Authority.Testing -> C2Authority`, and `Domain.Tests -> Authority.Testing`. Unit C MUST remove both temporary B2 Core friendships and establish only the exact final signed Core/C2Authority friend identities defined above; no Domain.Tests direct Core-internal route may remain. Source migration MUST follow read-only, non-authority Core extraction, the validated signing/key gate, Authority/Testing introduction, seam migration/bridging, and friendship transition. Native deletion remains outside Unit C and requires a later separately authorized unit. Rollback MUST reverse that order without leaving a production-to-Testing edge, a broad friend, or a partial friendship transition. No consumer may remain active without its predecessor.
+
+This boundary MUST defend against ordinary compile-time production references and accidental authority exposure. Privileged same-process reflection, runtime patching, debugger access, and `unsafe` memory attacks are explicitly out of scope; process isolation would be required for that hostile-code model. Strong names MUST be treated as assembly identity for public-key-qualified friendship, not as a security sandbox. Historical Attempt 84 MUST remain failed and insufficient because same-assembly internals and raw arbitrary-handle deletion did not establish this physical boundary; its history MUST NOT be rewritten or used as completion evidence. C2a, future C2b, and C3 remain unchecked until their independent gates pass.
 
 #### Scenario: Forward and rollback ordering
 
-- GIVEN committed producer `03ee654`, C1c, C2a, and C2b are being advanced or rolled back
+- GIVEN Core, C2Authority, Authority.Testing, the Supervisor host, Domain.Tests, and future C2b are being advanced or rolled back
 - WHEN a unit boundary is crossed
-- THEN forward use is only producer `03ee654` → C1c → C2a → C2b, rollback is only C2b → C2a → C1c → producer, and no consumer remains active without its immediate predecessor
+- THEN references follow the acyclic graph, and migrated/bridged seam verification, complete final signed Core/C2Authority friend-set installation, and removal of both temporary B2 Core friends occur atomically in the same accepted Unit C transition; no intermediate graph is accepted, rollback is exactly reversed, no production-to-Testing or Core-to-Authority project edge appears, and native deletion remains deferred
 
 #### Scenario: Mixed-version or historical evidence
 
-- GIVEN C2b receives a legacy capability, missing or differently shaped evidence, a mismatched C2a session, or Attempt 60 evidence revision `sha256:b75015c735c059de4720f6eb5705d3e21e0f98811e1acd138842d1f3602e011f` / tree `a8fcdab1d34fcfbdd171a81643f58b7cb34b0533`
+- GIVEN C2b receives a legacy capability, mismatched authority input, or historical evidence from Attempts 60, 61, or 84
 - WHEN it evaluates the input
-- THEN it rejects it without deletion, evidence synthesis, or completion claim; the failed candidate is historical only and the rolled-back functional candidate is not reused
+- THEN it rejects it without deletion, evidence synthesis, or completion claim, and every failed candidate remains historical only
 
 #### Scenario: C3 and discovery are excluded
 

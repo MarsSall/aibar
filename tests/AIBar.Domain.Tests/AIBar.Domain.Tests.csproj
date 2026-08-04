@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
 
     <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
@@ -24,7 +25,17 @@
     <ProjectReference Include="..\..\src\AIBar.Domain\AIBar.Domain.csproj" />
     <ProjectReference Include="..\..\src\AIBar.Application\AIBar.Application.csproj" />
     <ProjectReference Include="..\..\src\AIBar.Desktop\AIBar.Desktop.csproj" />
-    <ProjectReference Include="..\..\tools\AIBar.Packaging.Supervisor\AIBar.Packaging.Supervisor.csproj" />
+    <ProjectReference Include="..\AIBar.Packaging.Supervisor.Authority.Testing\AIBar.Packaging.Supervisor.Authority.Testing.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="PackagingSupervisorTests.cs" />
+  </ItemGroup>
+
+  <Import Project="..\..\eng\signing\AIBar.Signing.props" />
+
+  <Target Name="RefuseTestDistribution" BeforeTargets="Pack;Publish">
+    <Error Text="AIBar.Domain.Tests is test-only and cannot be packaged or published." />
+  </Target>
 
 </Project>

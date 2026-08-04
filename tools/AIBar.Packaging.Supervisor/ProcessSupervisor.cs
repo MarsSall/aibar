@@ -46,7 +46,16 @@ public sealed class ProcessSupervisor(IProcessSupervisorInterop interop, TimePro
 {
     private readonly IProcessSupervisorInterop _interop = interop;
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+    private readonly GuardedCleanupFacade? _guardedCleanup;
     private ProcessLaunch? _launch;
+
+    public ProcessSupervisor(IProcessSupervisorInterop interop, GuardedCleanupFacade guardedCleanup, TimeProvider? timeProvider = null) : this(interop, timeProvider) => _guardedCleanup = guardedCleanup;
+
+    public bool TryRunGuardedCleanup(out SupervisorStatus status)
+    {
+        if (_guardedCleanup is null) { status = SupervisorStatus.CleanupPartial; return false; }
+        return _guardedCleanup.TryCleanup(out status);
+    }
 
     public ProcessLaunchResult Launch(ProcessLaunchRequest request)
     {

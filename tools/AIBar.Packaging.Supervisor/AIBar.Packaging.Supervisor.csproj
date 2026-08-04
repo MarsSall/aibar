@@ -7,4 +7,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <Import Project="..\..\eng\signing\AIBar.Signing.props" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\AIBar.Packaging.Supervisor.Core\AIBar.Packaging.Supervisor.Core.csproj" />
+    <ProjectReference Include="..\AIBar.Packaging.Supervisor.C2Authority\AIBar.Packaging.Supervisor.C2Authority.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="DirectoryCapability.cs" />
+  </ItemGroup>
 </Project>
