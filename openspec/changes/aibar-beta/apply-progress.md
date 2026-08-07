@@ -70,9 +70,42 @@ None. Unit 3 analytics, Unit 4 distribution, packaging authority, cost/trend/ETA
 
 **Changed-line accounting:** Unit 2 is a focused presentation slice well below the 1,000 authored-line limit. New behavior is limited to shared state, WPF/tray/lifecycle wiring, and behavior-first coverage.
 
-### Remaining tasks
+## Planning Amendment — Documentation Only
 
+**Mode:** Standard documentation review (`strict_tdd: false`)
+
+### Completed task
+
+- [x] P.1 The six planning artifacts now split the future analytics work into 3A and 3B, preserve Unit 1/2 history, and make the Planning Amendment the exact parent of 3A. This checkbox was set only after structural readback, exact six-file accounting, whitespace validation, status, and checkbox/word coherence review.
+
+### Historical, blocked combined Unit 3 attempts
+
+The former combined Unit 3 records are historical and non-authoritative. They are blocked because a single unit cannot truthfully claim both deterministic analytics core and production lifecycle ownership under the bounded shutdown contract. They do not complete 3A or 3B, and their prior evidence must not be used for either successor.
+
+On a non-cooperative timeout or failure, the normative retained-on-timeout semantics apply: publication is suppressed, the owner does not re-await or dispose the potentially active analytics view/store, those process-owned resources remain until process exit, and independent resources continue reverse disposal without masking the typed first outcome. Dependent analytics disposal occurs only after cooperative completion within the bound.
+
+### Work Unit Evidence
+
+| Evidence | Result |
+|---|---|
+| Structural readback | All six in-scope artifacts were read against the Planning Amendment boundary; Unit 1/2 remain completed, Planning is complete, and 3A/3B/4 remain unchecked. |
+| Focused validation | `git diff --check` — passed with no whitespace errors. |
+| Runtime harness | N/A: this is documentation-only and changes no product, test, or runtime boundary. No tests, builds, runtime/native attempts, staging, commits, or review were run. |
+| Rollback boundary | Revert the exact future Planning Amendment commit affecting only the six planning artifacts; Unit 1/2 product behavior and the later preserved product/test work remain untouched. |
+
+### Scope and preservation
+
+The current diff contains only `proposal.md`, `specs/local-usage-analytics/spec.md`, `specs/private-beta-distribution/spec.md`, `design.md`, `tasks.md`, and this `apply-progress.md`; no code or test path is in scope. Product/test changes are explicitly excluded and preserved, without application or inspection, in selective `stash@{0}` named `aibar-beta-unit3-product-split` for later branch restoration.
+
+### Cumulative task state
+
+- [x] 1.1 Consent/quota
+- [x] 1.2 Consent/quota refresh and failure behavior
 - [x] 2.1 Shared presentation
-- [ ] 3.1 Local analytics
+- [x] P.1 Planning Amendment
+- [ ] 3A.1 Analytics-core RED tests
+- [ ] 3A.2 Analytics-core GREEN implementation
+- [ ] 3B.1 Production lifecycle RED tests
+- [ ] 3B.2 Production lifecycle GREEN implementation
 - [ ] 4.1 Distribution RED tests
 - [ ] 4.2 Distribution GREEN and smoke evidence

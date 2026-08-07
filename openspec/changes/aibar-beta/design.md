@@ -2,75 +2,68 @@
 
 ## Technical Approach
 
-Compose the existing .NET 8/WPF services into one private-beta runtime. Preserve exact parent `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97`, shared tray/popup state, explicit consent, analytics loading, and a manually distributed unsigned Windows x64 ZIP. Packaging authority remains unauthorized.
+Split Unit 3 into a deterministic analytics core (3A) and production lifecycle/presentation integration (3B). A documentation-only Planning Amendment follows completed Unit 2 and becomes 3A's exact parent. Unit 4 publishes the committed 3B successor; `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97` remains ancestry baseline only.
 
 ## Architecture Decisions
 
-| Decision | Choice | Alternative / tradeoff | Rationale |
-|---|---|---|---|
-| Consent | Per-user atomic `settings.json` stores only schema and `privateCodexConsent`; adjacent disclosure and acceptance precede enablement | Registry duplication, implicit enable, stored credentials | Default-off, informed, revocable, secret-free consent |
-| Runtime | `App` owns one `BetaRuntime` graph and `BetaPresentationHost` | A second shell duplicates services | Deterministic initialization and reverse disposal |
-| State and time | One immutable `BetaPresentationState`; reset instants are remapped through `IClock` | Independent view models and refresh-only strings drift | Tray and popup remain consistent and countdowns remain current |
-| Distribution | Reuse deterministic self-contained publishing for one ZIP; verification is external to product behavior | MSIX, installer, signing, or a product smoke CLI expands scope | Meets private manual distribution without new packaging authority |
+| Decision | Choice | Tradeoff / rationale |
+|---|---|---|
+| Core boundary | 3A owns discovery, access/mutation classification, scanning, checkpoints, aggregation, immutable factual results, coverage/warnings, and core tests | Keeps WPF and shutdown out of deterministic logic |
+| Lifecycle | 3B introduces one `AnalyticsLifecycleOwner` | Central ownership is more explicit but prevents competing cancellation, awaits, and disposal |
+| Delivery | Feature Branch Chain, strict 400 changed-line limit | Preserve five implementation slices and insert one independently revertible planning review because the measured planning delta (257 changed lines) plus 3A (298) exceeds 400 |
+| Distribution | Build from exact final Unit 4 commit after 3B | Baseline SHA remains provenance, never source bytes |
 
 ## Data and Lifecycle Flow
 
 ```text
-settings -> consent policy -> credential reader -> quota provider/coordinator -> quota.db
-Codex sessions -> discovery -> scanner -> analytics store/query -> coverage
-                                      \-> BetaPresentationHost -> tray + popup
-exact parent -> deterministic win-x64 publish -> ZIP + inventory + manifest -> test-owned launch harness
+Codex files -> scanner/core -> analytics store -> immutable result
+                       production CreateComposition
+BetaRuntime trigger -> AnalyticsLifecycleOwner -> generation gate -> WPF
+TrayHostRuntime.ExitAsync -> QuotaRuntimeResource -> owner shutdown
 ```
 
-Startup loads consent and cached quota. Acceptance persists before credential lookup; revoke persists false, cancels work, and rejects late results. Popup-open, manual refresh, five-minute poll, resume, and clock-change share the coordinator. Exit cancels and awaits work before reverse disposal. External failures use safe codes and `SafeRedactor`.
+The owner creates one scan CTS/task generation. Shutdown closes publication first, cancels once, and performs one bounded await. `AnalyticsShutdownOutcome` records `Completed`, `TimedOut`, or `Failed`, a safe code, and the first failure. Cooperative completion disposes the view then analytics store. Timeout/failure never re-awaits the scan or disposes those dependent resources; repeated shutdown returns the recorded outcome. Generation checks suppress late publication, retained process-owned resources remain until process exit, and independent quota/lifecycle resources continue reverse disposal. Later failures are collected without replacing the typed first outcome.
 
-## File Changes
+## Exact Unit 3 Inventory and Forecast
 
-| File | Action | Purpose |
-|---|---|---|
-| `src/AIBar.Application/ConsentSettings.cs` | Create | Consent store |
-| `src/AIBar.Application/CredentialBoundary.cs`, `BetaRuntime.cs` | Modify/Create | Credentials, quota, analytics, cancellation |
-| `src/AIBar.Desktop/App.xaml.cs`, `QuotaPresentation.cs`, `HostRuntime.cs`, `MainWindow.xaml` | Modify | Composition and shared presentation |
-| `src/AIBar.Desktop/WindowsLifecycleEvents.cs` | Create | Lifecycle events |
-| `scripts/Publish-Deterministic.ps1`, `docs/private-beta.md` | Modify/Create | ZIP evidence and guidance |
-| `tests/AIBar.Domain.Tests/*Beta*Tests.cs` | Create | Vertical-path evidence |
-| `tests/AIBar.Domain.Tests/Invoke-PrivateBetaLaunchSmoke.ps1` | Create | External launch harness |
+Forecasts count authored additions plus deletions.
 
-## Contracts and Testing
+| Unit | File | Action / owned seam | Forecast |
+|---|---|---|---:|
+| 3A | `src/AIBar.Application/LocalCodexAnalytics.cs` | Create core contracts/adapter/result classification | 100 |
+| 3A | `src/AIBar.Application/SessionJsonlScanner.cs` | Modify only injectable stream-open/pre-stability seams and unreadable/mutation classification | 18 |
+| 3A | `tests/AIBar.Domain.Tests/BetaAnalyticsTests.cs` | Create complete/empty/partial/unavailable/mutation/access/factual-result tests | 180 |
+|  | **3A total** |  | **298** |
+| 3B | `src/AIBar.Application/BetaRuntime.cs` | Modify analytics start/revoke delegation only; no scan-task ownership | 28 |
+| 3B | `src/AIBar.Desktop/LocalCodexAnalyticsView.cs` | Create view, combined presentation, owner, typed outcome | 150 |
+| 3B | `src/AIBar.Desktop/App.xaml.cs` | Modify only `CreateComposition` analytics construction/test seams and `QuotaRuntimeResource.DisposeAsync` ownership/order | 60 |
+| 3B | `src/AIBar.Desktop/MainWindow.xaml` | Add Local Codex binding group only | 8 |
+| 3B | `tests/AIBar.Domain.Tests/AnalyticsLifecycleTests.cs` | Create production-composite/application-exit lifecycle tests | 150 |
+|  | **3B total** |  | **396** |
 
-`CredentialAvailability = Disabled | Available | Missing | Unusable`; `AnalyticsCoverage = Complete | Partial | Unavailable`; `AnalyticsScanStatus = Idle | Loading | Complete | Failed`. Loading is explicit. Success atomically publishes totals, coverage, warning, and scan time; failure is unavailable with a safe warning. Empty records are unavailable; skipped, unreadable, or mutating sources are partial.
+No file is shared between 3A and 3B. Reverting 3A deletes its created files and restores the named scanner seams. Reverting 3B deletes its created files, restores BetaRuntime delegation, removes the named `CreateComposition`/`QuotaRuntimeResource` hunks and XAML group; 3A remains intact.
 
-xUnit fakes cover consent disclosure/acceptance, quota triggers, shared state, countdowns, redaction, analytics transitions, coverage, disposal, and late-result rejection. WPF STA tests cover disclosure and loading bindings.
+## Production-Path Testing Contract
 
-Distribution tasks own this deterministic release procedure from the repository root:
+Make the existing `CreateComposition` internally callable with optional `CompositionSeams`; production calls it with defaults. Seams may set an isolated data root, deterministic shutdown bound, scanner stream/pre-stability gate, and no-op lifecycle observations. They MUST NOT replace `AnalyticsLifecycleOwner`, `LocalCodexAnalyticsView`, `BetaRuntime`, or `QuotaRuntimeResource`.
 
-```powershell
-$parent = 'cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97'
-$version = '0.1.0-beta.1'
-$run = Join-Path ([IO.Path]::GetTempPath()) "aibar-beta-$([guid]::NewGuid())"
-$source = New-Item -ItemType Directory -Path (Join-Path $run source)
-$output = Join-Path $run output
-git archive --format=tar --output (Join-Path $run source.tar) $parent
-tar -xf (Join-Path $run source.tar) -C $source
-pwsh -NoProfile -File "$source/scripts/Publish-Deterministic.ps1" -OutputDirectory $output -SourceDateEpoch 1767225600 -ParentCommit $parent -Version $version
-pwsh -NoProfile -File tests/AIBar.Domain.Tests/Invoke-PrivateBetaLaunchSmoke.ps1 -ZipPath "$output/AIBar-win-x64-recovery.zip" -InventoryPath "$output/recovery-inventory.json" -ManifestPath "$output/artifact-manifest.json" -ExpectedParent $parent -ExpectedVersion $version
-```
-
-The publisher records the full parent SHA and version, then emits the ZIP, sorted path/length/SHA-256 inventory, and ZIP SHA-256 manifest. The test-owned harness verifies all evidence, extracts to its fresh directory, starts extracted `AIBar.exe` with existing no-argument behavior, fails on early exit, then terminates only its PID and removes its directory. Final smoke runs on clean Windows x64 without .NET; product command-line behavior remains unchanged.
+Tests call actual `CreateComposition(seams)`, start the scan, and invoke actual `TrayHostRuntime.ExitAsync`, which disposes the returned `QuotaRuntimeResource`. A cooperative gate proves one cancel/await, late-publication suppression, and disposal of every resource. A cancellation-ignoring gate proves bounded return, no re-await, retained view/store, independent reverse disposal, typed first outcome, and no publication after release. Direct owner/resource surrogates do not satisfy coverage.
 
 ## Threat Matrix
 
-| Boundary / adversarial cases | Applicability | Safe/failure behavior | Planned RED tests |
-|---|---|---|---|
-| Documentation-like executable paths | N/A: no executable-file classification | — | — |
-| Git repository selection | Applicable: fixed parent materialization | Run from the intended repository; unknown parent or archive failure produces no eligible ZIP | Missing-parent and archive-failure command tests |
-| Commit state | N/A: archive reads the fixed commit directly; index and worktree state are irrelevant | — | — |
-| Push state | N/A: no push boundary | — | — |
-| PR commands | N/A: no PR automation | — | — |
-| Extracted executable launch | Applicable: external process boundary | Launch only the extracted `AIBar.exe`; timeout/early exit fails and cleanup targets only the captured process/directory | Successful persistence, early-exit, timeout, and cleanup tests |
+| Boundary | Applicability | Threat, mitigation, evidence |
+|---|---|---|
+| Documentation-like paths | N/A | No executable-file classification; `requirements.txt`, `CMakeLists.txt`, Markdown/MDX, and `README.sh` are never inferred as commands |
+| Git repository selection | Applicable | Wrong `git -C`/relative/absolute cwd: canonical repository root and exact SHA are authoritative; reject mismatch before output; RED selector tests |
+| Commit state | Applicable | Staged, `commit -a`, or empty index cannot alter archived committed bytes; reject missing/uncommitted Unit 4 source; RED state tests |
+| Push state | N/A | No push or remote destination boundary |
+| PR commands | N/A | No `gh`/PR command composition or `--head` ownership |
+| Application process exit | Applicable | Non-cooperative scan could outlive cleanup; exclusive bounded owner retains dependents and suppresses publication; production-path RED tests above |
 
-## Delivery and Deferrals
+## Delivery, Distribution, and Rollback
 
-Auto-chain four independently revertible slices, each under 1000 authored lines: **1** consent/credentials/runtime/quota; **2** tray/WPF state and countdown; **3** analytics and coverage; **4** ZIP evidence, guidance, and external smoke harness. Each owns tests, focused command, runtime evidence, files, and rollback boundary.
+Chain: Unit 2 `fab8ca0b5f588319926141a3cad276317319de99` (377 lines) → Planning Amendment (measured 257 changed lines, forecast ≤300, hard ≤400) → 3A (≤298) → 3B (≤396) → Unit 4 (≤400). The future Planning Amendment commit is 3A's exact parent. Implementation commits contain their tests; every child targets its immediate parent and is independently reversible, while polluted child diffs require rebase/retarget.
 
-No migration is required; absent or invalid consent fails closed. Excluded: packaging authority and `aibar-foundation` packaging completion; MSIX/installer; signing; automatic update/uninstall; SBOM/compliance; public-release/store distribution; and cost/trend/ETA/forecasting polish.
+The Planning Amendment owns only corrected `proposal.md`, delta specs, `design.md`, `tasks.md`, and the truthful `apply-progress.md` replan. It contains no product code or tests; excluded Unit 3 product/test work remains preserved in the named selective stash `aibar-beta-unit3-product-split` for later branch restoration. Reverting it restores the Unit 2 planning state without reverting Unit 2 product behavior; reverting any implementation slice removes only that slice.
+
+Unit 4 archives its own exact final commit after 3B, whose ancestry includes the Planning Amendment and all five implementation slices, then publishes the self-contained ZIP and records in manifest/instructions: baseline SHA, final Unit 4 source SHA, version, complete sorted path/length/file-SHA-256 inventory, and exact ZIP SHA-256. Missing/mismatched provenance emits no eligible artifact. No migration is required; packaging authority, installer/signing/update, SBOM/compliance, and public/store distribution remain deferred.
