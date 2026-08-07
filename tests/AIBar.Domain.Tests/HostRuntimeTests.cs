@@ -149,6 +149,7 @@ public sealed class HostRuntimeTests
         public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationDisableRequested; public event Action? Recreated;
         public int Shows { get; private set; } public int Disposals { get; private set; } public bool RefreshAvailable { get; private set; }
         public void SetRefreshAvailable(bool available) => RefreshAvailable = available;
+        public void SetPresentation(BetaPresentationState state) { }
         public void SetSettingsAvailable(bool available) { }
         public bool StartupEnabled { get; private set; }
         public void SetStartupEnabled(bool enabled) => StartupEnabled = enabled;

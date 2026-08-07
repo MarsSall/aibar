@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using AIBar.Application;
+using AIBar.Domain;
 using Forms = System.Windows.Forms;
 
 namespace AIBar.Desktop;
@@ -17,6 +18,7 @@ public interface ITrayRuntime : IAsyncDisposable
     event Action? ClearAiBarDataRequested;
     event Action? PrivateIntegrationDisableRequested;
     void SetRefreshAvailable(bool available);
+    void SetPresentation(BetaPresentationState state);
     void SetSettingsAvailable(bool available);
     void SetStartupEnabled(bool enabled);
     void Show();
@@ -47,17 +49,20 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private readonly IManualRefreshCommand? _refreshCommand;
     private readonly NativeSettingsCommands? _settings;
     private readonly Action? _reportSettingsFailure;
+    private readonly Func<RefreshTrigger, CancellationToken, ValueTask>? _reevaluate;
+    private readonly QuotaPresentationHost? _presentation;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly DispatcherTimer _activationTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private Task? _cleanupTask;
     private Task? _exitTask;
     private bool _disposed;
 
-    public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess, IManualRefreshCommand? refreshCommand = null, NativeSettingsCommands? settings = null, Action? reportSettingsFailure = null)
+    public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess, IManualRefreshCommand? refreshCommand = null, NativeSettingsCommands? settings = null, Action? reportSettingsFailure = null, Func<RefreshTrigger, CancellationToken, ValueTask>? reevaluate = null, QuotaPresentationHost? presentation = null)
     {
-        _instance = instance; _tray = tray; _popover = popover; _taskbar = taskbar; _awaitCancelledWork = awaitCancelledWork; _persistence = persistence; _exitProcess = exitProcess; _refreshCommand = refreshCommand; _settings = settings; _reportSettingsFailure = reportSettingsFailure;
+        _instance = instance; _tray = tray; _popover = popover; _taskbar = taskbar; _awaitCancelledWork = awaitCancelledWork; _persistence = persistence; _exitProcess = exitProcess; _refreshCommand = refreshCommand; _settings = settings; _reportSettingsFailure = reportSettingsFailure; _reevaluate = reevaluate; _presentation = presentation;
         if (_refreshCommand is not null) _refreshCommand.CanExecuteChanged += OnRefreshAvailabilityChanged;
         _tray.SetRefreshAvailable(_refreshCommand?.CanExecute == true);
+        if (_presentation is not null) { _presentation.PropertyChanged += OnPresentationChanged; _tray.SetPresentation(_presentation.State); }
         _tray.SetSettingsAvailable(settings is not null);
         _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _tray.RefreshRequested += OnRefreshRequested; _tray.StartupToggleRequested += OnStartupToggleRequested; _tray.ClearAiBarDataRequested += OnClearAiBarDataRequested; _tray.PrivateIntegrationDisableRequested += OnPrivateIntegrationDisableRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += ShowPopover;
         _activationTimer.Tick += DispatchPendingActivation;
@@ -102,6 +107,8 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private void ShowPopover()
     {
         if (_disposed) return;
+        _presentation?.RecalculateFromClock();
+        _ = ReevaluateSafelyAsync(RefreshTrigger.PopoverOpened);
         RunSafely(() => { _popover.Show(); _popover.Activate(); });
     }
     private void OnDeactivated()
@@ -118,12 +125,20 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     {
         if (!_disposed) _tray.SetRefreshAvailable(_refreshCommand?.CanExecute == true);
     }
+    private void OnPresentationChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
+    {
+        if (!_disposed && (string.IsNullOrEmpty(args.PropertyName) || args.PropertyName == nameof(QuotaPresentationHost.State))) _tray.SetPresentation(_presentation!.State);
+    }
     private void OnStartupToggleRequested() => _ = ToggleStartupSafelyAsync();
     private void OnClearAiBarDataRequested() => _ = ClearAiBarDataSafelyAsync();
     private void OnPrivateIntegrationDisableRequested() => _ = SettingsSafelyAsync(settings => settings.DisablePrivateIntegrationAsync(_shutdown.Token));
     private async Task RefreshSafelyAsync()
     {
         if (_refreshCommand?.CanExecute == true) try { await _refreshCommand.ExecuteAsync(_shutdown.Token); } catch (Exception) { }
+    }
+    private async Task ReevaluateSafelyAsync(RefreshTrigger trigger)
+    {
+        if (_reevaluate is not null) try { await _reevaluate(trigger, _shutdown.Token); } catch (Exception) { }
     }
     private async Task SettingsSafelyAsync(Func<NativeSettingsCommands, ValueTask> operation)
     {
@@ -142,6 +157,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     {
         _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _tray.RefreshRequested -= OnRefreshRequested; _tray.StartupToggleRequested -= OnStartupToggleRequested; _tray.ClearAiBarDataRequested -= OnClearAiBarDataRequested; _tray.PrivateIntegrationDisableRequested -= OnPrivateIntegrationDisableRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= ShowPopover;
         if (_refreshCommand is not null) _refreshCommand.CanExecuteChanged -= OnRefreshAvailabilityChanged;
+        if (_presentation is not null) _presentation.PropertyChanged -= OnPresentationChanged;
     }
     private static void RunSafely(Action action) { try { action(); } catch (Exception) { } }
     public ValueTask DisposeAsync() => new(ExitAsync());
@@ -171,6 +187,11 @@ public sealed class WindowsTrayRuntime : ITrayRuntime
     {
         if (available && !_menu.Items.Contains(_refresh)) _menu.Items.Insert(0, _refresh);
         else if (!available) _menu.Items.Remove(_refresh);
+    }
+    public void SetPresentation(BetaPresentationState state)
+    {
+        var percentage = state.Primary.PercentageUsed is { } value ? $" {value:0}%" : string.Empty;
+        _icon.Text = $"AIBar: {state.FreshnessLabel}{percentage}";
     }
     public void SetSettingsAvailable(bool available)
     {

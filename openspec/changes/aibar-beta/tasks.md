@@ -27,7 +27,7 @@ Dependency diagram: `feature/aibar-beta` tracker ← PR #1 📍 ← PR #2 ← PR
 
 ## Phase 2: Shared Presentation
 
-- [ ] 2.1 RED→GREEN immutable `BetaPresentationState`, shared tray/popup values and freshness, reset countdown remapping, disclosure/loading bindings, lifecycle disposal, and safe warnings.
+- [x] 2.1 RED→GREEN immutable `BetaPresentationState`, shared tray/popup values and freshness, reset countdown remapping, disclosure/loading bindings, lifecycle disposal, and safe warnings.
 
 ## Phase 3: Local Analytics
 

@@ -11,6 +11,14 @@
         <StackPanel Margin="16">
             <TextBlock Text="Quota" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,8" />
             <TextBlock Text="{Binding FreshnessLabel}" Foreground="{DynamicResource MutedTextBrush}" />
+            <TextBlock Text="{Binding State.CachedAgeLabel}" Foreground="{DynamicResource MutedTextBrush}" />
+            <TextBlock Text="{Binding State.WarningLabel}" Foreground="{DynamicResource MutedTextBrush}" />
+            <TextBlock Text="Loading quota" Visibility="{Binding State.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
+            <TextBlock Text="Credential unavailable" Visibility="{Binding State.IsMissingCredential, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
+            <TextBlock Text="Offline cached quota" Visibility="{Binding State.IsOffline, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
+            <TextBlock Text="Cached quota is degraded" Visibility="{Binding State.IsDegraded, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
+            <TextBlock Text="Quota unavailable" Visibility="{Binding State.IsUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
+            <TextBlock Text="Quota error" Visibility="{Binding State.IsSafeError, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
 
             <GroupBox automation:AutomationProperties.Name="5-hour quota card" Margin="0,16,0,0">
                 <Border Style="{StaticResource QuotaCardStyle}">
@@ -36,7 +44,8 @@
                 </Border>
             </GroupBox>
 
-            <TextBlock Text="{Binding PrivateEndpointDisclosure}" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,16,0,8" />
+            <TextBlock Text="{Binding State.Disclosure}" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,16,0,8" />
+            <TextBlock Text="{Binding PrivateEndpointDisclosure}" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,0,8" />
             <Button Content="Refresh" Command="{Binding RefreshCommand}" Visibility="{Binding IsRefreshAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" automation:AutomationProperties.Name="Refresh quota" IsTabStop="True" HorizontalAlignment="Left" />
         </StackPanel>
     </ScrollViewer>

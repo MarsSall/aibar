@@ -53,10 +53,12 @@ public partial class App : System.Windows.Application
         var credentials = new ConsentCredentialSource(policy, new CodexCredentialReader(new ReadOnlyCredentialFileReader()), CodexRootResolver.Resolve(Environment.GetEnvironmentVariable("CODEX_HOME"), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
         var coordinator = new QuotaRefreshCoordinator(store, new QuotaHttpProvider(policy, credentials), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
         var betaRuntime = new BetaRuntime(new ConsentSettings(Path.Combine(dataDirectory, "settings.json")), policy, coordinator, clock, credentials);
-        var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault);
+        var lifecycleEvents = new WindowsLifecycleEvents();
+        var lifecycleAdapter = new QuotaRefreshLifecycleAdapter(lifecycleEvents, coordinator);
+        var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents);
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
         var clear = new ClearAiBarDataService(dataDirectory, [coordinator], CreateEmptyStateFactory(coordinator));
-        return new(presentation, presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy, async token => { await betaRuntime.RevokeConsentAsync(token); presentation.RefreshAvailabilityChanged(); }), new QuotaRuntimeResource(presentation, betaRuntime, store), () => InitializeCompositionAsync(betaRuntime, presentation, default), presentation.ReportUnavailable);
+        return new(presentation, presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy, async token => { await betaRuntime.RevokeConsentAsync(token); presentation.RefreshAvailabilityChanged(); }), new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, store), () => InitializeCompositionAsync(betaRuntime, presentation, default), presentation.ReportUnavailable, coordinator.ReevaluateAsync);
     }
     internal static async Task InitializeCompositionAsync(BetaRuntime runtime, QuotaPresentationHost presentation, CancellationToken cancellationToken)
     {
@@ -69,11 +71,11 @@ public partial class App : System.Windows.Application
         var window = new MainWindow { DataContext = composition.Presentation, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
         _taskbar = new TaskbarRecreationMonitor(window);
         _runtime = new TrayHostRuntime(_instance!, new WindowsTrayRuntime(), new WpfPopoverRuntime(window), _taskbar,
-            _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable);
+            _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, composition.Presentation as QuotaPresentationHost);
         _runtime.Start();
     }
     private static void ReportFault(Exception exception) => Trace.TraceError("AIBar unavailable: {0}", exception.GetType().Name);
-    internal sealed record StartupComposition(object Presentation, IManualRefreshCommand? RefreshCommand, NativeSettingsCommands? Settings, IAsyncDisposable Resource, Func<Task> Initialize, Action ReportUnavailable)
+    internal sealed record StartupComposition(object Presentation, IManualRefreshCommand? RefreshCommand, NativeSettingsCommands? Settings, IAsyncDisposable Resource, Func<Task> Initialize, Action ReportUnavailable, Func<RefreshTrigger, CancellationToken, ValueTask>? Reevaluate = null)
     {
         internal StartupComposition(object presentation, IManualRefreshCommand? refreshCommand, IAsyncDisposable resource, Func<Task> initialize, Action reportUnavailable)
             : this(presentation, refreshCommand, null, resource, initialize, reportUnavailable) { }
@@ -81,9 +83,16 @@ public partial class App : System.Windows.Application
     }
 
     private sealed class SystemClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.UtcNow; }
-    private sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, BetaRuntime runtime, IAsyncDisposable store) : IAsyncDisposable
+    private sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, QuotaRefreshLifecycleAdapter lifecycleAdapter, WindowsLifecycleEvents lifecycleEvents, BetaRuntime runtime, IAsyncDisposable store) : IAsyncDisposable
     {
-        public async ValueTask DisposeAsync() { await presentation.DisposeAsync(); await runtime.DisposeAsync(); await store.DisposeAsync(); }
+        public async ValueTask DisposeAsync()
+        {
+            await lifecycleAdapter.DisposeAsync();
+            await presentation.DisposeAsync();
+            lifecycleEvents.Dispose();
+            await runtime.DisposeAsync();
+            await store.DisposeAsync();
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

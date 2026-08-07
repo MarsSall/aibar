@@ -6,7 +6,7 @@ using AIBar.Domain;
 namespace AIBar.Desktop;
 public sealed record QuotaWindowPresentation(string Label, decimal? PercentageUsed, string? ResetCountdown);
 
-public sealed record QuotaPresentationState(
+public sealed record BetaPresentationState(
     QuotaWindowPresentation Primary,
     QuotaWindowPresentation Weekly,
     bool IsCurrent,
@@ -16,27 +16,60 @@ public sealed record QuotaPresentationState(
     string QuotaDisclosure,
     string AnalyticsDisclosure,
     string CostDisclosure,
-    string PrivateEndpointDisclosure);
+    string PrivateEndpointDisclosure,
+    bool IsLoading,
+    bool IsFresh,
+    bool IsCached,
+    bool IsDegraded,
+    bool IsMissingCredential,
+    bool IsOffline,
+    bool IsUnavailable,
+    bool IsSafeError,
+    TimeSpan? CachedAge,
+    string? CachedAgeLabel,
+    string? WarningLabel,
+    string Disclosure);
 
 public sealed class QuotaPresentationMapper(IClock clock)
 {
-    public QuotaPresentationState Map(QuotaRefreshState state)
+    public BetaPresentationState Map(QuotaRefreshState state)
     {
         var snapshot = state.Snapshot;
-        var freshness = state.IsLoading
-            ? "Loading"
-            : snapshot is not null && state.Failure is not null ? "Stale" : state.Freshness.ToString();
+        var failure = state.Failure;
+        var isMissingCredential = failure?.SafeCode is "quota_credential_missing" or "quota_credential_unusable" or "quota_credentials_unavailable";
+        var isOffline = failure?.Kind == QuotaErrorKind.Network;
+        var isLoading = state.IsLoading;
+        var isFresh = snapshot is not null && state.Freshness == FreshnessState.Current && !isLoading && failure is null;
+        var isDegraded = snapshot is not null && failure is not null;
+        var isCached = snapshot is not null && !isFresh;
+        var isUnavailable = snapshot is null && !isLoading;
+        var isSafeError = failure is not null && !isMissingCredential && !isOffline && !isDegraded && failure.Kind != QuotaErrorKind.Unavailable;
+        TimeSpan? cachedAge = isCached ? NonNegative(clock.UtcNow - snapshot!.RetrievedAt) : null;
+        var warning = WarningLabel(failure, isMissingCredential, isOffline);
+        var freshness = isLoading ? "Loading" : isFresh ? "Current" : isCached ? "Stale" : isMissingCredential ? "Missing credential" : isOffline ? "Offline" : "Unavailable";
         return new(
             Window("5-hour quota", snapshot?.Primary),
             Window("Weekly quota", snapshot?.Weekly),
-            snapshot is not null && state.Freshness == FreshnessState.Current && !state.IsLoading && state.Failure is null,
+            isFresh,
             freshness,
-            ErrorLabel(state.Failure),
+            warning,
             snapshot?.RetrievedAt,
             ViewModelDisplayLabels.ServiceQuota,
             ViewModelDisplayLabels.LocallyDerivedAnalytics,
             ViewModelDisplayLabels.EstimatedCost,
-            "Quota access uses a private, undocumented, unsupported endpoint.");
+            "Quota access uses a private, undocumented, unsupported endpoint.",
+            isLoading,
+            isFresh,
+            isCached,
+            isDegraded,
+            isMissingCredential,
+            isOffline,
+            isUnavailable,
+            isSafeError,
+            cachedAge,
+            cachedAge is null ? null : $"Cached {FormatCountdown(cachedAge.Value)}",
+            warning,
+            "Private quota access is optional, disabled by default, and can be revoked at any time.");
     }
 
     private QuotaWindowPresentation Window(string label, QuotaWindow? window) => new(
@@ -46,7 +79,9 @@ public sealed class QuotaPresentationMapper(IClock clock)
 
     private static string FormatCountdown(TimeSpan value) => $"{(int)value.TotalHours:00}:{value.Minutes:00}:{value.Seconds:00}";
 
-    private static string? ErrorLabel(QuotaFailure? failure) => failure?.Kind switch
+    private static TimeSpan NonNegative(TimeSpan value) => value < TimeSpan.Zero ? TimeSpan.Zero : value;
+    private static string? WarningLabel(QuotaFailure? failure, bool isMissingCredential, bool isOffline) =>
+        isMissingCredential ? "Credential unavailable" : isOffline ? "Network unavailable" : failure?.Kind switch
     {
         QuotaErrorKind.Authentication => "Authentication required",
         QuotaErrorKind.Permission => "Permission denied",
@@ -104,21 +139,24 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     private readonly Action<Exception>? _report;
     private readonly Func<bool> _refreshAvailable;
     private readonly ManualRefreshCommand _refreshCommand;
-    private QuotaPresentationState _state;
+    private readonly IQuotaRefreshLifecycleEvents? _lifecycleEvents;
+    private BetaPresentationState _state;
     private QuotaFailure? _reportedFailure;
     private bool _disposed;
-    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, bool refreshAvailable = true, Action<Exception>? report = null)
-        : this(coordinator, mapper, () => refreshAvailable, report) { }
-    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, Func<bool> refreshAvailable, Action<Exception>? report = null)
+    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, bool refreshAvailable = true, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null)
+        : this(coordinator, mapper, () => refreshAvailable, report, lifecycleEvents) { }
+    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, Func<bool> refreshAvailable, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null)
     {
         ArgumentNullException.ThrowIfNull(refreshAvailable);
-        _coordinator = coordinator; _mapper = mapper; _dispatcher = Dispatcher.CurrentDispatcher; _state = mapper.Map(coordinator.State); _report = report; _refreshAvailable = refreshAvailable;
+        _coordinator = coordinator; _mapper = mapper; _dispatcher = Dispatcher.CurrentDispatcher; _state = mapper.Map(coordinator.State); _report = report; _refreshAvailable = refreshAvailable; _lifecycleEvents = lifecycleEvents;
         _refreshCommand = new ManualRefreshCommand(token => coordinator.RefreshAsync(RefreshTrigger.Manual, token), () => IsRefreshAvailable, report);
         _coordinator.StateChanged += OnStateChanged;
+        if (_lifecycleEvents is not null) _lifecycleEvents.ClockChanged += OnClockChanged;
     }
     public event PropertyChangedEventHandler? PropertyChanged;
     public bool IsRefreshAvailable => !_disposed && _refreshAvailable();
     public IManualRefreshCommand RefreshCommand => _refreshCommand;
+    public BetaPresentationState State => _state;
     public QuotaWindowPresentation Primary => _state.Primary;
     public QuotaWindowPresentation Weekly => _state.Weekly;
     public string FreshnessLabel => _state.FreshnessLabel;
@@ -131,6 +169,13 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRefreshAvailable)));
     }
     public void ReportUnavailable() => Update(new(null, FreshnessState.Unavailable, false, new(QuotaErrorKind.Unavailable, "quota_initialization_failed"), null));
+    public void RecalculateFromClock()
+    {
+        if (_disposed) return;
+        if (!_dispatcher.CheckAccess()) { _dispatcher.BeginInvoke(RecalculateFromClock); return; }
+        Update(_coordinator.State);
+    }
+    private void OnClockChanged() => RecalculateFromClock();
     private void OnStateChanged(QuotaRefreshState state)
     {
         if (!_dispatcher.CheckAccess()) { _dispatcher.BeginInvoke(() => Update(state)); return; }
@@ -148,7 +193,12 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     }
     public ValueTask DisposeAsync()
     {
-        if (!_disposed) { _disposed = true; _coordinator.StateChanged -= OnStateChanged; }
+        if (!_disposed)
+        {
+            _disposed = true;
+            _coordinator.StateChanged -= OnStateChanged;
+            if (_lifecycleEvents is not null) _lifecycleEvents.ClockChanged -= OnClockChanged;
+        }
         return ValueTask.CompletedTask;
     }
 }
