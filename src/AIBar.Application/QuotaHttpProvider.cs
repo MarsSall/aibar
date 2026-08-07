@@ -18,6 +18,9 @@ public sealed class QuotaHttpProvider : IQuotaProvider
     public QuotaHttpProvider(PrivateIntegrationPolicy policy, Func<CancellationToken, ValueTask<RequestCredential?>> credentials, TimeSpan? connectTimeout = null, TimeSpan? requestTimeout = null)
         : this(new SocketsHttpHandler { AllowAutoRedirect = false, ConnectTimeout = connectTimeout ?? TimeSpan.FromSeconds(5) }, policy, credentials, requestTimeout) { }
 
+    public QuotaHttpProvider(PrivateIntegrationPolicy policy, ConsentCredentialSource credentials, TimeSpan? connectTimeout = null, TimeSpan? requestTimeout = null)
+        : this(new SocketsHttpHandler { AllowAutoRedirect = false, ConnectTimeout = connectTimeout ?? TimeSpan.FromSeconds(5) }, policy, credentials, requestTimeout) { }
+
     public QuotaHttpProvider(HttpMessageHandler handler, PrivateIntegrationPolicy policy, Func<CancellationToken, ValueTask<RequestCredential?>> credentials, TimeSpan? requestTimeout = null, Func<DateTimeOffset>? utcNow = null, Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         _client = new HttpClient(handler, disposeHandler: true) { BaseAddress = Origin, Timeout = Timeout.InfiniteTimeSpan };
@@ -25,12 +28,30 @@ public sealed class QuotaHttpProvider : IQuotaProvider
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow); _delay = delay ?? Task.Delay;
     }
 
+    public QuotaHttpProvider(HttpMessageHandler handler, PrivateIntegrationPolicy policy, ConsentCredentialSource credentials, TimeSpan? requestTimeout = null, Func<DateTimeOffset>? utcNow = null, Func<TimeSpan, CancellationToken, Task>? delay = null)
+        : this(handler, policy, async cancellationToken =>
+        {
+            var result = await credentials.ReadForQuotaAsync(cancellationToken);
+            return result.Credential;
+        }, requestTimeout, utcNow, delay)
+    {
+        _credentialAvailability = credentials;
+    }
+
+    private readonly ConsentCredentialSource? _credentialAvailability;
+
     public async ValueTask<QuotaProviderResult> GetQuotaAsync(CancellationToken cancellationToken)
     {
         if (!_policy.IsEnabled) return Fail(QuotaErrorKind.Unavailable, "quota_disabled");
         cancellationToken.ThrowIfCancellationRequested();
         using var credential = await _credentials(cancellationToken);
-        if (credential is null) return Fail(QuotaErrorKind.Unavailable, "quota_credentials_unavailable");
+        if (credential is null) return Fail(QuotaErrorKind.Unavailable, _credentialAvailability?.LastAvailability switch
+        {
+            CredentialAvailability.Missing => "quota_credential_missing",
+            CredentialAvailability.Unusable => "quota_credential_unusable",
+            CredentialAvailability.Disabled => "quota_disabled",
+            _ => "quota_credentials_unavailable",
+        });
         var primary = await SendAsync("wham/usage", credential, cancellationToken);
         if (primary.Failure is not null) return new(null, primary.Failure);
         if (!TrySnapshot(primary.Body!, out var snapshot)) return Fail(QuotaErrorKind.MalformedResponse, "quota_malformed");

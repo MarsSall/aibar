@@ -25,6 +25,8 @@ public sealed class ReadOnlyCredentialFileReader : ICredentialFileReader
     }
 }
 
+public enum CredentialAvailability { Disabled, Available, Missing, Unusable }
+
 public sealed class CodexCredentialReader(ICredentialFileReader files)
 {
     public async ValueTask<RequestCredential?> ReadAsync(string root, CancellationToken cancellationToken)
@@ -36,13 +38,22 @@ public sealed class CodexCredentialReader(ICredentialFileReader files)
                 FileShare.ReadWrite | FileShare.Delete,
                 cancellationToken);
             var fields = await JsonSerializer.DeserializeAsync<CredentialFields>(stream, cancellationToken: cancellationToken);
-            return string.IsNullOrWhiteSpace(fields?.AccessToken)
-                ? null
-                : new RequestCredential(fields.AccessToken, fields.AccountId);
+            return string.IsNullOrWhiteSpace(fields?.AccessToken) ? null : new RequestCredential(fields.AccessToken, fields.AccountId);
         }
         catch (FileNotFoundException) { return null; }
         catch (DirectoryNotFoundException) { return null; }
         catch (JsonException) { return null; }
+    }
+
+    internal async ValueTask<CredentialReadResult> ReadStatusAsync(string root, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var credential = await ReadAsync(root, cancellationToken);
+            return credential is null ? new(CredentialAvailability.Missing, null) : new(CredentialAvailability.Available, credential);
+        }
+        catch (IOException) { return new(CredentialAvailability.Unusable, null); }
+        catch (UnauthorizedAccessException) { return new(CredentialAvailability.Unusable, null); }
     }
 
     private sealed class CredentialFields
@@ -65,9 +76,36 @@ public sealed class RequestCredential(string accessToken, string? accountId) : I
 public sealed class PrivateIntegrationPolicy(bool enabled = false)
 {
     public bool IsEnabled { get; private set; } = enabled;
+    public void Enable() => IsEnabled = true;
     public void Disable() => IsEnabled = false;
     public string Disclosure => "Quota integration is private, undocumented, and unsupported; it is disabled by default.";
 }
+
+public sealed class ConsentCredentialSource(PrivateIntegrationPolicy policy, CodexCredentialReader reader, string root)
+{
+    private readonly PrivateIntegrationPolicy _policy = policy;
+    private readonly CodexCredentialReader _reader = reader;
+    private readonly string _root = root;
+
+    public CredentialAvailability LastAvailability { get; private set; } = CredentialAvailability.Disabled;
+
+    public async ValueTask<CredentialAvailability> GetAvailabilityAsync(CancellationToken cancellationToken)
+    {
+        var result = await ReadForQuotaAsync(cancellationToken);
+        result.Credential?.Dispose();
+        return result.Availability;
+    }
+
+    internal async ValueTask<CredentialReadResult> ReadForQuotaAsync(CancellationToken cancellationToken)
+    {
+        if (!_policy.IsEnabled) return new(CredentialAvailability.Disabled, null);
+        var result = await _reader.ReadStatusAsync(_root, cancellationToken);
+        LastAvailability = result.Availability;
+        return result;
+    }
+}
+
+internal sealed record CredentialReadResult(CredentialAvailability Availability, RequestCredential? Credential);
 
 public static partial class SafeRedactor
 {

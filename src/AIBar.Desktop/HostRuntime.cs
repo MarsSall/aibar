@@ -56,7 +56,8 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess, IManualRefreshCommand? refreshCommand = null, NativeSettingsCommands? settings = null, Action? reportSettingsFailure = null)
     {
         _instance = instance; _tray = tray; _popover = popover; _taskbar = taskbar; _awaitCancelledWork = awaitCancelledWork; _persistence = persistence; _exitProcess = exitProcess; _refreshCommand = refreshCommand; _settings = settings; _reportSettingsFailure = reportSettingsFailure;
-        _tray.SetRefreshAvailable(refreshCommand is not null);
+        if (_refreshCommand is not null) _refreshCommand.CanExecuteChanged += OnRefreshAvailabilityChanged;
+        _tray.SetRefreshAvailable(_refreshCommand?.CanExecute == true);
         _tray.SetSettingsAvailable(settings is not null);
         _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _tray.RefreshRequested += OnRefreshRequested; _tray.StartupToggleRequested += OnStartupToggleRequested; _tray.ClearAiBarDataRequested += OnClearAiBarDataRequested; _tray.PrivateIntegrationDisableRequested += OnPrivateIntegrationDisableRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += ShowPopover;
         _activationTimer.Tick += DispatchPendingActivation;
@@ -113,6 +114,10 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     }
     private void OnExitRequested() => _ = ExitSafelyAsync();
     private void OnRefreshRequested() => _ = RefreshSafelyAsync();
+    private void OnRefreshAvailabilityChanged(object? sender, EventArgs args)
+    {
+        if (!_disposed) _tray.SetRefreshAvailable(_refreshCommand?.CanExecute == true);
+    }
     private void OnStartupToggleRequested() => _ = ToggleStartupSafelyAsync();
     private void OnClearAiBarDataRequested() => _ = ClearAiBarDataSafelyAsync();
     private void OnPrivateIntegrationDisableRequested() => _ = SettingsSafelyAsync(settings => settings.DisablePrivateIntegrationAsync(_shutdown.Token));
@@ -136,6 +141,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private void Detach()
     {
         _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _tray.RefreshRequested -= OnRefreshRequested; _tray.StartupToggleRequested -= OnStartupToggleRequested; _tray.ClearAiBarDataRequested -= OnClearAiBarDataRequested; _tray.PrivateIntegrationDisableRequested -= OnPrivateIntegrationDisableRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= ShowPopover;
+        if (_refreshCommand is not null) _refreshCommand.CanExecuteChanged -= OnRefreshAvailabilityChanged;
     }
     private static void RunSafely(Action action) { try { action(); } catch (Exception) { } }
     public ValueTask DisposeAsync() => new(ExitAsync());

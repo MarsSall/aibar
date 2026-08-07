@@ -49,11 +49,19 @@ public partial class App : System.Windows.Application
         Directory.CreateDirectory(dataDirectory);
         var store = new SqliteQuotaSnapshotStore(Path.Combine(dataDirectory, "quota.db"));
         var policy = new PrivateIntegrationPolicy();
-        var coordinator = new QuotaRefreshCoordinator(store, new QuotaHttpProvider(policy, _ => ValueTask.FromResult<RequestCredential?>(null)), new SystemClock(), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
-        var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new SystemClock()), policy.IsEnabled, ReportFault);
+        var clock = new SystemClock();
+        var credentials = new ConsentCredentialSource(policy, new CodexCredentialReader(new ReadOnlyCredentialFileReader()), CodexRootResolver.Resolve(Environment.GetEnvironmentVariable("CODEX_HOME"), Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+        var coordinator = new QuotaRefreshCoordinator(store, new QuotaHttpProvider(policy, credentials), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
+        var betaRuntime = new BetaRuntime(new ConsentSettings(Path.Combine(dataDirectory, "settings.json")), policy, coordinator, clock, credentials);
+        var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault);
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
         var clear = new ClearAiBarDataService(dataDirectory, [coordinator], CreateEmptyStateFactory(coordinator));
-        return new(presentation, policy.IsEnabled ? presentation.RefreshCommand : null, new NativeSettingsCommands(startup, clear, policy), new QuotaRuntimeResource(presentation, coordinator, store), () => presentation.InitializeAsync(default).AsTask(), presentation.ReportUnavailable);
+        return new(presentation, presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy, async token => { await betaRuntime.RevokeConsentAsync(token); presentation.RefreshAvailabilityChanged(); }), new QuotaRuntimeResource(presentation, betaRuntime, store), () => InitializeCompositionAsync(betaRuntime, presentation, default), presentation.ReportUnavailable);
+    }
+    internal static async Task InitializeCompositionAsync(BetaRuntime runtime, QuotaPresentationHost presentation, CancellationToken cancellationToken)
+    {
+        await runtime.InitializeAsync(cancellationToken);
+        presentation.RefreshAvailabilityChanged();
     }
     internal static Func<CancellationToken, ValueTask> CreateEmptyStateFactory(QuotaRefreshCoordinator coordinator) => coordinator.ClearAsync;
     private void StartTray(StartupComposition composition)
@@ -73,9 +81,9 @@ public partial class App : System.Windows.Application
     }
 
     private sealed class SystemClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.UtcNow; }
-    private sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, QuotaRefreshCoordinator coordinator, IAsyncDisposable store) : IAsyncDisposable
+    private sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, BetaRuntime runtime, IAsyncDisposable store) : IAsyncDisposable
     {
-        public async ValueTask DisposeAsync() { await presentation.DisposeAsync(); await coordinator.DisposeAsync(); await store.DisposeAsync(); }
+        public async ValueTask DisposeAsync() { await presentation.DisposeAsync(); await runtime.DisposeAsync(); await store.DisposeAsync(); }
     }
 
     protected override void OnExit(ExitEventArgs e)

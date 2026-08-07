@@ -134,7 +134,7 @@ public interface IAiBarDataClearCommand { ValueTask ClearAsync(CancellationToken
 
 public sealed record PrivacyDefaults(bool TelemetryEnabled = false, bool RemoteCrashReportingEnabled = false);
 
-public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarDataClearCommand clear, PrivateIntegrationPolicy privateIntegration)
+public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarDataClearCommand clear, PrivateIntegrationPolicy privateIntegration, Func<CancellationToken, ValueTask>? revokePrivate = null)
 {
     public PrivacyDefaults Privacy { get; } = new();
     public bool PrivateIntegrationEnabled => privateIntegration.IsEnabled;
@@ -145,5 +145,10 @@ public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarD
         return await startup.SetEnabledAsync(!enabled, cancellationToken);
     }
     public ValueTask ClearAiBarDataAsync(CancellationToken cancellationToken) => clear.ClearAsync(cancellationToken);
-    public ValueTask DisablePrivateIntegrationAsync(CancellationToken cancellationToken) { cancellationToken.ThrowIfCancellationRequested(); privateIntegration.Disable(); return ValueTask.CompletedTask; }
+    public ValueTask DisablePrivateIntegrationAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return revokePrivate is null ? DisableAsync() : revokePrivate(cancellationToken);
+    }
+    private ValueTask DisableAsync() { privateIntegration.Disable(); return ValueTask.CompletedTask; }
 }
