@@ -51,7 +51,7 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
                 var host = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)));
                 var window = new MainWindow { DataContext = host }; window.Show();
                 var cards = FindVisualChildren<System.Windows.Controls.GroupBox>(window).ToArray();
-                Assert.Equal(new[] { "5-hour quota card", "Weekly quota card" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
+                Assert.Equal(new[] { "5-hour quota card", "Weekly quota card", "Local Codex data" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
                 var button = FindVisualChildren<System.Windows.Controls.Button>(window).Single();
                 Assert.IsAssignableFrom<System.Windows.Input.ICommand>(button.Command);
                 Assert.True(button.IsEnabled);

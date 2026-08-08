@@ -184,10 +184,10 @@ public sealed class PackagingSupervisorAuthorityTests
         var expectedHashes = new Dictionary<string, string>
         {
             ["CommittedChildEvidence.cs"] = "eda7c48d12e294296b3f66c7f44388163b7fa4f95df406fdbc1bb12900f6424c",
-            ["DirectoryCapability.cs"] = "303e19f37b0f631160f6310a02611805205f7b36d7256c920a35f99cabaa070e",
-            ["NativeRenameReadiness.cs"] = "a80699140ee0852586b636091e238b473e37c38c473aa3ce857a6a7c80029446",
-            ["WindowsDirectoryCapabilityFileSystem.cs"] = "7e4b7da8a77feaf8c4cce3f6be3ebe9fa5a0cd0c8948f5b984464983fe38bf17",
-            ["RetainedTreeReadOnly.cs"] = "8fee7b6444b00c01d66e853cdce731dd65de3bfde681e90ce99623dfca498bda"
+            ["DirectoryCapability.cs"] = "0eb98d78a6a1069789ec3f755a408fa428d87d96ffb35414967d9282cb7e1e72",
+            ["NativeRenameReadiness.cs"] = "a570492151f8befdee59fc5056bc0c365a6b02b5078254b786309cffcfeb21f0",
+            ["WindowsDirectoryCapabilityFileSystem.cs"] = "54986ae889926fc490b101010806051ce79f778dd7b50a23dfffa1b7a14fa9fd",
+            ["RetainedTreeReadOnly.cs"] = "3abdc21a68d88d9395ad2f754165056ba219e7ac9dcec889973591cab0842b66"
         };
 
         foreach (var (file, expectedHash) in expectedHashes)

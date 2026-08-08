@@ -132,7 +132,7 @@ No WPF, `BetaRuntime`, lifecycle/disposal orchestration, distribution, cost/tren
 - [x] 3B.1 Production lifecycle RED tests
 - [x] 3B.2 Production lifecycle GREEN implementation
 - [x] 4.1 Distribution RED tests
-- [ ] 4.2 Distribution GREEN and smoke evidence
+- [x] 4.2 Distribution GREEN and smoke evidence
 
 ## Unit 3B — Production Lifecycle and Presentation
 
@@ -179,9 +179,9 @@ The smallest correction resets `_scan`, `_outcome`, and the completed generation
 
 - [x] 4.1 Added synthetic-repository RED coverage for canonical-repository and final-3B-parent gates, staged, unstaged, and empty-index sources, deterministic ZIP/provenance, launch, early-exit, timeout, and cleanup behavior.
 
-### Commit-gated preparatory task
+### Completed final task
 
-- [ ] 4.2 Implemented the deterministic private-beta publisher, provenance sidecars, tester guidance, version, and synthetic Windows x64 smoke harness; final distribution remains blocked until these Unit-4 bytes are committed.
+- [x] 4.2 Published and smoke-validated the deterministic private-beta ZIP from committed Unit-4 source `058f5bd2fce56c80307af3dafcb494a0c72d8e2f`; the retained artifact is eligible only for manual private-beta distribution.
 
 ### Work Unit Evidence
 
@@ -198,3 +198,46 @@ The smallest correction resets `_scan`, `_outcome`, and the completed generation
 ### Exact continuation
 
 Commit only the six Unit-4 authored paths, then run `pwsh -NoProfile -File .\scripts\Publish-Deterministic.ps1 -PrivateBeta -OutputDirectory "$env:TEMP\aibar-beta-unit4-$([guid]::NewGuid().ToString('N'))" -SourceDateEpoch "1767225600"` from that clean final Unit-4 commit. Confirm its parent is `6e2d8a46d455819c6f30a07a34bf63c9594d5c4c`, smoke-test the produced Windows x64 ZIP without .NET, record the generated manifest/instructions as distribution evidence, and only then mark 4.2 complete.
+
+### Final package and smoke evidence
+
+| Evidence | Result |
+|---|---|
+| Immutable source gate | Branch `feature/aibar-beta-unit-4`; clean `HEAD` and exact final source `058f5bd2fce56c80307af3dafcb494a0c72d8e2f`; exact parent `6e2d8a46d455819c6f30a07a34bf63c9594d5c4c`; baseline ancestor `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97`; `git merge-base --is-ancestor` exited 0. `stash@{0}` remained `3ff43d33cb16573f5d750767269629771867aec5`. |
+| Real deterministic package | Pre-approved parent `C:\Users\mjsal\AppData\Local\Temp\opencode` existed. From the clean commit, `pwsh -NoProfile -File .\scripts\Publish-Deterministic.ps1 -PrivateBeta -OutputDirectory "C:\Users\mjsal\AppData\Local\Temp\opencode\aibar-beta-unit4-f3f465ed17054b74a388d2d0a29531a0" -SourceDateEpoch "1767225600"` exited 0 using a fresh nonexistent output leaf. |
+| Retained artifact and provenance | `C:\Users\mjsal\AppData\Local\Temp\opencode\aibar-beta-unit4-f3f465ed17054b74a388d2d0a29531a0\AIBar-win-x64-private-beta.zip`; version `0.1.0-beta.1`; 471 inventory entries sorted ordinally by path, each matching recorded length and SHA-256; ZIP SHA-256 `b894cd3f665c9a16d74d811ad5c5cdf3ca3bed5ef952d77d64effd543f5946fa`. The manifest's source, baseline, version, inventory, and ZIP hash all matched the produced archive bytes. |
+| Distribution sidecars | `private-beta-manifest.json` and `private-beta-instructions.txt` were retained beside the ZIP. Instructions bind the same version/source/baseline/hash and state unsigned private beta, manual replacement, and no updater or uninstall. |
+| Windows x64 self-contained smoke | The publisher's extracted smoke launch survived its startup interval and cleaned its `smoke` directory. An independent extraction launched `AIBar.Desktop.exe` for 1000 ms with `DOTNET_ROOT` set to an empty directory, `DOTNET_MULTILEVEL_LOOKUP=0`, and a system-only `PATH`; it remained running, was tree-killed, and exited `-1` as expected. |
+| Cleanup and residual process check | Publisher smoke, independent extraction, and temporary empty DOTNET root were removed. The package smoke's pre/post snapshot found 0 new `AIBar.Desktop`, `dotnet`, or `testhost` processes. Focused test/build compilation left `dotnet exec ... VBCSCompiler.dll` PID 21552; it was tree-killed after verification, and the final snapshot found 0 residual `AIBar.Desktop`, `dotnet`, or `testhost` processes. |
+| Focused suite | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PrivateBetaDistribution" --no-restore /m:1` — passed 3/3, 0 failed. |
+| Bounded regression | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~BetaAnalytics|FullyQualifiedName~AnalyticsLifecycle|FullyQualifiedName~BetaPresentation|FullyQualifiedName~BetaConsentOrQuota" --no-restore /m:1` — passed 19/19, 0 failed. |
+| Desktop build | `dotnet build src/AIBar.Desktop/AIBar.Desktop.csproj --no-restore /m:1` — passed with 0 warnings and 0 errors. |
+| Final repository check | `git status --porcelain=v1` was clean before package and before this documentation update; `git diff --check` exited 0. No generated artifact was copied into or tracked by the repository. |
+| Rollback boundary | Revert only this final 4.2 documentation evidence and task checkbox plus the committed Unit-4 paths `scripts/Publish-Deterministic.ps1`, `src/AIBar.Desktop/AIBar.Desktop.csproj`, `docs/private-beta.md`, and `tests/AIBar.Domain.Tests/PrivateBetaDistributionTests.cs`; delete the retained external output directory manually. Units 1–3B remain intact. |
+
+**Cumulative final state:** 10/10 implementation tasks complete. The retained ZIP remains unsigned, manual private-beta distribution only; no installer, updater, signing, automatic update/uninstall, or public-release claim was made.
+
+## Final verification remediation — bounded unmanaged correction
+
+**Binding:** `aibar-beta-final-requirements-runtime-verification`; remediates evidence revision `sha256:1de650c383162fd95e178d1d65a7260912e5e18904bfef62e4fb7e14040ebb70`. This corrective candidate changes no completed task checkbox and does not replace `verify-report.md`.
+
+### Findings and evidence
+
+- A-05: Added a production-composition test that observes `LocalCodexAnalyticsView` loading, then partial-result publication with factual totals, coverage, safe warning, and scan time. `dotnet test ... --filter "FullyQualifiedName~Production_view_publishes_local_totals_partial_coverage_warning_and_scan_time_after_loading" --no-restore /m:1` — passed 1/1.
+- A-07: Added a production-composition test that invokes the composed `BetaRuntime` revocation command during the active scan, observes one cancellation and one await, and rejects promotion to complete. `dotnet test ... --filter "FullyQualifiedName~BetaRuntime_revocation_stops_the_active_production_analytics_scan_without_promoting_a_result" --no-restore /m:1` — passed 1/1.
+- B2 relocation: Updated only stale expected hashes for four committed Core source files after recomputing their current committed bytes; the isolated authority test passed 1/1.
+- Visual automation: Updated the card expectation to include the approved `Local Codex data` card; the isolated WPF automation test passed 1/1.
+- Graph fixture: Preserved canonical fixture bytes with `-text` attributes so checkout conversion cannot invalidate their authoritative inventory/recovery hashes; graph projection passed 1/1, including all fault mutations.
+- Private-beta early exit: Classified the isolated test as scheduling-sensitive under aggregate suite load, then made its synthetic early-exit probe wait five seconds while leaving the actual one-second product smoke threshold unchanged; the isolated test and aggregate suites passed.
+- Saturated recovery: Reproduced as non-failing on this candidate; no production or harness change was made. The isolated test passed 1/1.
+
+### Work Unit Evidence
+
+| Evidence | Result |
+|---|---|
+| Focused beta suite | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~BetaConsentOrQuota|FullyQualifiedName~QuotaPresentationHostTests|FullyQualifiedName~QuotaPresentationTests|FullyQualifiedName~BetaPresentation|FullyQualifiedName~BetaAnalytics|FullyQualifiedName~AnalyticsLifecycle|FullyQualifiedName~PrivateBetaDistribution" --no-restore /m:1 --logger "console;verbosity=normal"` — passed 37/37. |
+| Full regression | `dotnet test AIBar.sln --no-restore /m:1 --logger "console;verbosity=normal"` — passed 284/284, exit 0, 6.7151 minutes. |
+| Builds | `dotnet build src/AIBar.Application/AIBar.Application.csproj --no-restore /m:1 --verbosity normal` and `dotnet build src/AIBar.Desktop/AIBar.Desktop.csproj --no-restore /m:1 --verbosity normal` — both passed with 0 warnings and 0 errors. |
+| Runtime boundary | The two added tests use `App.CreateComposition`, actual `LocalCodexAnalyticsView`, and the composed `BetaRuntime` revocation path against synthetic temporary JSONL/SQLite only; no Codex data, credentials, or endpoint was accessed. |
+| Package provenance | No shipped implementation or publisher bytes remain changed; retained ZIP `b894cd3f665c9a16d74d811ad5c5cdf3ca3bed5ef952d77d64effd543f5946fa` remains bound to committed source `058f5bd2fce56c80307af3dafcb494a0c72d8e2f`. This is an uncommitted test/OpenSpec remediation candidate; no package was regenerated. |
+| Rollback boundary | Revert only `.gitattributes` and the five changed test files plus this section; Units 1–4 source behavior and the retained ZIP remain intact. |

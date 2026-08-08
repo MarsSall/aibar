@@ -70,7 +70,7 @@ public sealed class PrivateBetaDistributionTests
     {
         using var fixture = new SyntheticRepository();
         var early = fixture.Output("early");
-        var earlyResult = fixture.Run(early, publisher: fixture.Publisher("exit"));
+        var earlyResult = fixture.Run(early, publisher: fixture.Publisher("exit"), smokeStartupMilliseconds: 5000);
         Assert.NotEqual(0, earlyResult.ExitCode);
         Assert.Contains("BETA_SMOKE_EARLY_EXIT", earlyResult.Output);
         Assert.False(Directory.Exists(early));
@@ -114,11 +114,11 @@ public sealed class PrivateBetaDistributionTests
             return path;
         }
 
-        public (int ExitCode, string Output) Run(string output, string? publisher = null, string? parent = null, int timeout = 5, string? script = null)
+        public (int ExitCode, string Output) Run(string output, string? publisher = null, string? parent = null, int timeout = 5, int smokeStartupMilliseconds = 1000, string? script = null)
         {
             var start = new ProcessStartInfo("pwsh") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
             start.Environment["AIBAR_PRIVATE_BETA_TEST_MODE"] = "1";
-            foreach (var argument in new[] { "-NoProfile", "-File", script ?? Path.Combine(Root, "scripts", "Publish-Deterministic.ps1"), "-PrivateBeta", "-OutputDirectory", output, "-BetaBaselineCommit", Baseline, "-BetaParentCommit", parent ?? Parent, "-PublishCommand", publisher ?? Publisher("stay"), "-ProcessTimeoutSeconds", timeout.ToString() }) start.ArgumentList.Add(argument);
+            foreach (var argument in new[] { "-NoProfile", "-File", script ?? Path.Combine(Root, "scripts", "Publish-Deterministic.ps1"), "-PrivateBeta", "-OutputDirectory", output, "-BetaBaselineCommit", Baseline, "-BetaParentCommit", parent ?? Parent, "-PublishCommand", publisher ?? Publisher("stay"), "-ProcessTimeoutSeconds", timeout.ToString(), "-SmokeStartupMilliseconds", smokeStartupMilliseconds.ToString() }) start.ArgumentList.Add(argument);
             using var process = Process.Start(start)!;
             var text = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd(); process.WaitForExit();
             return (process.ExitCode, text);
