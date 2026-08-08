@@ -131,7 +131,7 @@ No WPF, `BetaRuntime`, lifecycle/disposal orchestration, distribution, cost/tren
 - [x] 3A.2 Analytics-core GREEN implementation
 - [x] 3B.1 Production lifecycle RED tests
 - [x] 3B.2 Production lifecycle GREEN implementation
-- [ ] 4.1 Distribution RED tests
+- [x] 4.1 Distribution RED tests
 - [ ] 4.2 Distribution GREEN and smoke evidence
 
 ## Unit 3B — Production Lifecycle and Presentation
@@ -170,3 +170,31 @@ None. Restored only the corrected Unit-3B candidate paths from preserved `stash@
 | Rollback boundary | Revert `ResetStoppedGeneration` in `LocalCodexAnalyticsView.cs`, the re-enable test/helpers in `AnalyticsLifecycleTests.cs`, and this corrective evidence. The prior Unit 3B lifecycle behavior and all Unit 3A files remain untouched. |
 
 The smallest correction resets `_scan`, `_outcome`, and the completed generation's CTS only after a cooperative non-disposing stop. It does not alter timeout/failure retention, one bounded await per generation, generation-gated late-publication suppression, typed exit outcome/first failure, or process-exit disposal.
+
+## Unit 4 — Private Beta Distribution
+
+**Mode:** Standard behavior-first (`strict_tdd: false`)
+
+### Completed task
+
+- [x] 4.1 Added synthetic-repository RED coverage for canonical-repository and final-3B-parent gates, staged, unstaged, and empty-index sources, deterministic ZIP/provenance, launch, early-exit, timeout, and cleanup behavior.
+
+### Commit-gated preparatory task
+
+- [ ] 4.2 Implemented the deterministic private-beta publisher, provenance sidecars, tester guidance, version, and synthetic Windows x64 smoke harness; final distribution remains blocked until these Unit-4 bytes are committed.
+
+### Work Unit Evidence
+
+| Evidence | Result |
+|---|---|
+| Behavior-first RED | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~PrivateBetaDistribution" --no-restore /m:1` — failed 3/3 before the publisher existed: expected `BETA_SOURCE_UNCOMMITTED` and `BETA_SMOKE_EARLY_EXIT` were absent, and committed-source packaging could not succeed. |
+| Focused GREEN and deterministic provenance | The same command — passed 3/3. Synthetic local Git repositories prove canonical-root, dirty/staged/empty-index, and parent-mismatch rejection; fixed committed source binding; sorted inventory; ZIP SHA-256 binding; byte-identical repeat ZIPs; extracted self-contained launch; early-exit rejection; publish timeout; and incomplete-output removal. |
+| Bounded regression | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~BetaAnalytics|FullyQualifiedName~AnalyticsLifecycle|FullyQualifiedName~BetaPresentation|FullyQualifiedName~BetaConsentOrQuota" --no-restore /m:1` — passed 19/19. |
+| Build | `dotnet build src/AIBar.Desktop/AIBar.Desktop.csproj --no-restore /m:1` — passed with 0 warnings and 0 errors. |
+| Final-package preflight | The actual command failed safely with `BETA_SOURCE_UNCOMMITTED`, exit 1, and `OUTPUT_EXISTS=False`; no ZIP or publish directory was created from uncommitted source. |
+| Runtime harness | Synthetic Windows x64 clean-VM-equivalent harness uses only temporary Git repositories, fake local publishers, and copied Windows executables. It proves extracted launch and forced process cleanup without .NET, Codex files, credentials, or endpoints. The required final artifact smoke remains commit-gated. |
+| Rollback boundary | Revert `Publish-Deterministic.ps1`, `AIBar.Desktop.csproj` version, `docs/private-beta.md`, `PrivateBetaDistributionTests.cs`, and these Unit-4 task/progress entries; Units 1–3B remain intact. |
+
+### Exact continuation
+
+Commit only the six Unit-4 authored paths, then run `pwsh -NoProfile -File .\scripts\Publish-Deterministic.ps1 -PrivateBeta -OutputDirectory "$env:TEMP\aibar-beta-unit4-$([guid]::NewGuid().ToString('N'))" -SourceDateEpoch "1767225600"` from that clean final Unit-4 commit. Confirm its parent is `6e2d8a46d455819c6f30a07a34bf63c9594d5c4c`, smoke-test the produced Windows x64 ZIP without .NET, record the generated manifest/instructions as distribution evidence, and only then mark 4.2 complete.

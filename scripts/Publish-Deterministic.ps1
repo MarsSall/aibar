@@ -24,7 +24,12 @@ param(
     [int]$ProcessTimeoutSeconds = 300,
     [ValidateRange(0, 600000)]
     [int]$CancelAfterMilliseconds = 0,
-    [string]$KnownDescendantIdentityPath
+    [string]$KnownDescendantIdentityPath,
+    [switch]$PrivateBeta,
+    [string]$BetaBaselineCommit,
+    [string]$BetaParentCommit,
+    [ValidateRange(1, 30000)]
+    [int]$SmokeStartupMilliseconds = 1000
 )
 $ErrorActionPreference = "Stop"
 function Write-CapabilityPlan {
@@ -172,6 +177,44 @@ function Invoke-OwnedProcess([string]$FileName, [string[]]$Arguments, [string]$F
         if ($null -ne $process) { $process.Dispose() }
     }
 }
+function Invoke-PrivateBeta {
+    $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+    $canonical = (& git -C $projectRoot rev-parse --show-toplevel).Trim()
+    if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($canonical) -cne $projectRoot) { throw "BETA_REPOSITORY_MISMATCH" }
+    $status = ((& git -C $projectRoot status --porcelain) -join "`n").Trim()
+    if ($LASTEXITCODE -ne 0) { throw "BETA_REPOSITORY_INVALID" }
+    if (-not [string]::IsNullOrWhiteSpace($status)) { throw "BETA_SOURCE_UNCOMMITTED" }
+    $source = (& git -C $projectRoot rev-parse HEAD).Trim(); $parent = (& git -C $projectRoot rev-parse "$source^").Trim()
+    if ($LASTEXITCODE -ne 0) { throw "BETA_SOURCE_MISSING" }
+    $baseline = if ([string]::IsNullOrWhiteSpace($BetaBaselineCommit)) { "cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaBaselineCommit }
+    $requiredParent = if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { "6e2d8a46d455819c6f30a07a34bf63c9594d5c4c" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaParentCommit }
+    if ($parent -cne $requiredParent) { throw "BETA_PARENT_MISMATCH" }
+    & git -C $projectRoot merge-base --is-ancestor $baseline $source
+    if ($LASTEXITCODE -ne 0) { throw "BETA_BASELINE_MISMATCH" }
+    [xml]$projectXml = Get-Content -LiteralPath (Join-Path $projectRoot "src\AIBar.Desktop\AIBar.Desktop.csproj") -Raw
+    $version = [string]($projectXml.Project.PropertyGroup.Version | Select-Object -First 1)
+    if ([string]::IsNullOrWhiteSpace($version)) { throw "BETA_VERSION_MISSING" }
+    $outputRoot = Assert-FreshLeaf $OutputDirectory $projectRoot; $created = $false
+    try {
+        New-Item -ItemType Directory -Path $outputRoot -ErrorAction Stop | Out-Null; $created = $true
+        $publish = Join-Path $outputRoot "publish"; New-Item -ItemType Directory -Path $publish -ErrorAction Stop | Out-Null
+        Invoke-OwnedProcess $PublishCommand @("publish", (Join-Path $projectRoot "src\AIBar.Desktop\AIBar.Desktop.csproj"), "--disable-build-servers", "--configuration", "Release", "--runtime", "win-x64", "--self-contained", "true", "--output", $publish, "/p:ContinuousIntegrationBuild=true", "/p:Deterministic=true", "/p:DebugType=None") "BETA_PUBLISH_FAILED"
+        $notice = "AIBar $version is an unsigned private beta for Windows x64. It is manually distributed and has no updater or installer.`nBaseline ancestor: $baseline`nSource commit: $source`n"
+        [IO.File]::WriteAllText((Join-Path $publish "PRIVATE-BETA.txt"), $notice, [Text.UTF8Encoding]::new($false))
+        $files = @{}; Get-ChildItem -LiteralPath $publish -Recurse -File | ForEach-Object { $relative = $_.FullName.Substring($publish.Length).TrimStart('\','/') -replace '\\','/'; if ($relative.StartsWith('/') -or $relative.Split('/') -contains '..' -or $files.ContainsKey($relative)) { throw "BETA_INVENTORY_INVALID" }; $files[$relative] = [ordered]@{ path=$relative; length=$_.Length; sha256=(Sha $_.FullName) } }
+        $paths = [string[]]$files.Keys; [Array]::Sort($paths, [StringComparer]::Ordinal); $inventory = @($paths | ForEach-Object { [pscustomobject]$files[$_] })
+        Add-Type -AssemblyName System.IO.Compression; Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zipPath = Join-Path $outputRoot "AIBar-win-x64-private-beta.zip"; $stream = [IO.File]::Open($zipPath, [IO.FileMode]::CreateNew); $zip = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create, $false)
+        try { foreach ($relative in $paths) { $entry = $zip.CreateEntry($relative, [IO.Compression.CompressionLevel]::Optimal); $entry.LastWriteTime = [DateTimeOffset]::FromUnixTimeSeconds([long]$SourceDateEpoch); $entry.ExternalAttributes = 0; $input = [IO.File]::OpenRead((Join-Path $publish ($relative -replace '/','\'))); try { $target = $entry.Open(); try { $input.CopyTo($target) } finally { $target.Dispose() } } finally { $input.Dispose() } } } finally { $zip.Dispose(); $stream.Dispose() }
+        $smoke = Join-Path $outputRoot "smoke"; $process = $null
+        try { Expand-Archive -LiteralPath $zipPath -DestinationPath $smoke; $executable = Join-Path $smoke "AIBar.Desktop.exe"; if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "BETA_SMOKE_EXECUTABLE_MISSING" }; $process = Start-Process -FilePath $executable -WorkingDirectory $smoke -PassThru; if ($process.WaitForExit($SmokeStartupMilliseconds)) { throw "BETA_SMOKE_EARLY_EXIT" }; $process.Kill($true); if (-not $process.WaitForExit($ProcessTimeoutSeconds * 1000)) { throw "BETA_SMOKE_TIMEOUT" } } finally { if ($null -ne $process) { if (-not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }; $process.Dispose() }; if (Test-Path -LiteralPath $smoke) { Remove-Item -LiteralPath $smoke -Recurse -Force } }
+        $zipSha = Sha $zipPath
+        [ordered]@{ schemaVersion="aibar-private-beta-1"; target="win-x64"; selfContained=$true; unsigned=$true; baselineCommit=$baseline; sourceCommit=$source; version=$version; inventory=$inventory; zipSha256=$zipSha } | ConvertTo-Json -Compress -Depth 8 | Set-Content -LiteralPath (Join-Path $outputRoot "private-beta-manifest.json") -NoNewline
+        $instructions = "AIBar private beta $version is unsigned. Extract the ZIP, verify `$((Get-FileHash .\AIBar-win-x64-private-beta.zip -Algorithm SHA256).Hash) equals $zipSha, then launch AIBar.Desktop.exe from the extracted directory. Replace an older beta by exiting it and replacing its extracted directory manually; no updater or uninstall is provided. Baseline ancestor: $baseline. Source commit: $source."
+        [IO.File]::WriteAllText((Join-Path $outputRoot "private-beta-instructions.txt"), $instructions + "`n", [Text.UTF8Encoding]::new($false))
+    } catch { if ($created -and (Test-Path -LiteralPath $outputRoot)) { Remove-Item -LiteralPath $outputRoot -Recurse -Force }; throw }
+}
+if ($PrivateBeta) { Invoke-PrivateBeta; exit 0 }
 try {
     if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { throw "OutputDirectory is required." }
     try { $epoch = [long]::Parse($SourceDateEpoch, [Globalization.CultureInfo]::InvariantCulture) } catch { throw "SourceDateEpoch must be an integer." }

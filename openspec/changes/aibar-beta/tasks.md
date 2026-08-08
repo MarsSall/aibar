@@ -50,7 +50,7 @@ Dependency: tracker ← Unit 1 📍 ← Unit 2 ← Planning Amendment ← 3A ←
 
 ## 4 Distribution
 
-- [ ] 4.1 RED tests: canonical-repository/final-3B-parent mismatch; staged/uncommitted/empty-index source; launch/early-exit/timeout/cleanup; fixed committed source.
+- [x] 4.1 RED tests: canonical-repository/final-3B-parent mismatch; staged/uncommitted/empty-index source; launch/early-exit/timeout/cleanup; fixed committed source.
 - [ ] 4.2 GREEN exact final Unit-4 source after 3B, not baseline `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97`; record baseline/source SHA, version, sorted path/length/SHA-256 inventory, ZIP SHA-256, unsigned private-beta tester launch/replacement/version/checksum instructions; distribute only after Windows x64 self-contained smoke.
 
 Suite: `dotnet test AIBar.sln --no-restore`; no live endpoint, credential mutation, push/remote, PR composition, public-release claim. Five implementation slices: Unit 1, Unit 2, 3A, 3B, Unit 4.
