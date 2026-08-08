@@ -88,14 +88,38 @@ On a non-cooperative timeout or failure, the normative retained-on-timeout seman
 
 | Evidence | Result |
 |---|---|
-| Structural readback | All six in-scope artifacts were read against the Planning Amendment boundary; Unit 1/2 remain completed, Planning is complete, and 3A/3B/4 remain unchecked. |
+| Structural readback | At Planning Amendment close, all six in-scope artifacts were read; Unit 1/2 and Planning were complete, while 3A/3B/4 remained unchecked. |
 | Focused validation | `git diff --check` — passed with no whitespace errors. |
 | Runtime harness | N/A: this is documentation-only and changes no product, test, or runtime boundary. No tests, builds, runtime/native attempts, staging, commits, or review were run. |
 | Rollback boundary | Revert the exact future Planning Amendment commit affecting only the six planning artifacts; Unit 1/2 product behavior and the later preserved product/test work remain untouched. |
 
 ### Scope and preservation
 
-The current diff contains only `proposal.md`, `specs/local-usage-analytics/spec.md`, `specs/private-beta-distribution/spec.md`, `design.md`, `tasks.md`, and this `apply-progress.md`; no code or test path is in scope. Product/test changes are explicitly excluded and preserved, without application or inspection, in selective `stash@{0}` named `aibar-beta-unit3-product-split` for later branch restoration.
+The Planning Amendment diff contained only `proposal.md`, `specs/local-usage-analytics/spec.md`, `specs/private-beta-distribution/spec.md`, `design.md`, `tasks.md`, and this `apply-progress.md`; it excluded code and tests. Product/test changes were preserved, without application or inspection, in selective `stash@{0}` named `aibar-beta-unit3-product-split` for later branch restoration.
+
+## Unit 3A — Local Analytics Core
+
+**Mode:** Standard behavior-first (`strict_tdd: false`)
+
+### Completed tasks
+
+- [x] 3A.1 Behavior-first synthetic tests prove factual local token/model totals and scan time; complete, empty, partial, and unavailable coverage; local labels; immutable snapshots; and safe unreadable/mutating source warnings that preserve readable aggregates.
+- [x] 3A.2 `LocalCodexAnalyticsAdapter` composes discovery, scanner, and SQLite aggregation. The scanner has injectable stream-open/pre-stability seams and classifies unreadable versus changed sources without exposing paths.
+
+### Work Unit Evidence
+
+| Evidence | Result |
+|---|---|
+| RED → GREEN | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~BetaAnalytics" --no-restore /m:1` — RED: 2 failed, 1 passed; GREEN: 4/4 passed. |
+| Scanner regression | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~SessionJsonlScanner" --no-restore /m:1` — 12/12 passed. |
+| Bounded regression | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~BetaConsentOrQuota|FullyQualifiedName~BetaPresentation" --no-restore /m:1` — 12/12 passed. |
+| Runtime harness | Synthetic temporary `sessions`/`archived_sessions` discovery → injected scanner → SQLite path passed for unreadable and mutating sources; no live Codex files or endpoint. |
+| Builds | `dotnet build src/AIBar.Application/AIBar.Application.csproj --no-restore /m:1` and `dotnet build src/AIBar.Desktop/AIBar.Desktop.csproj --no-restore /m:1` — passed, 0 warnings/errors. |
+| Rollback boundary | Delete `LocalCodexAnalytics.cs` and `BetaAnalyticsTests.cs`; restore only the named seams in `SessionJsonlScanner.cs` and these two task checks/progress entries. |
+
+### Scope
+
+No WPF, `BetaRuntime`, lifecycle/disposal orchestration, distribution, cost/trend/ETA, live Codex files, endpoint, stash action, staging, commit, review, push, or PR work was performed. The historical combined-Unit-3 progress remains non-authoritative; this slice completes only 3A.
 
 ### Cumulative task state
 
@@ -103,8 +127,8 @@ The current diff contains only `proposal.md`, `specs/local-usage-analytics/spec.
 - [x] 1.2 Consent/quota refresh and failure behavior
 - [x] 2.1 Shared presentation
 - [x] P.1 Planning Amendment
-- [ ] 3A.1 Analytics-core RED tests
-- [ ] 3A.2 Analytics-core GREEN implementation
+- [x] 3A.1 Analytics-core RED tests
+- [x] 3A.2 Analytics-core GREEN implementation
 - [ ] 3B.1 Production lifecycle RED tests
 - [ ] 3B.2 Production lifecycle GREEN implementation
 - [ ] 4.1 Distribution RED tests

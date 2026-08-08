@@ -35,8 +35,8 @@ Dependency: tracker ← Unit 1 📍 ← Unit 2 ← Planning Amendment ← 3A ←
 
 ## 3A — hard <=400 (298)
 
-- [ ] 3A.1 RED behavior-first tests: complete/empty/partial/unavailable coverage; factual-local token/model totals, scan time, warnings/source labels, atomic results, unreadable/mutating sources, safe abandonment.
-- [ ] 3A.2 GREEN only approved `LocalCodexAnalytics.cs`, `BetaAnalyticsTests.cs`, named injectable `SessionJsonlScanner.cs` seams; no WPF/lifecycle/disposal.
+- [x] 3A.1 RED behavior-first tests: complete/empty/partial/unavailable coverage; factual-local token/model totals, scan time, warnings/source labels, atomic results, unreadable/mutating sources, safe abandonment.
+- [x] 3A.2 GREEN only approved `LocalCodexAnalytics.cs`, `BetaAnalyticsTests.cs`, named injectable `SessionJsonlScanner.cs` seams; no WPF/lifecycle/disposal.
 
 ## 3B — hard <=400 (396)
 

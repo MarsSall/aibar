@@ -19,7 +19,7 @@ public sealed class SessionCheckpointStore
         return ValueTask.CompletedTask;
     }
 }
-public sealed class SessionJsonlScanner(SessionCheckpointStore checkpoints, string parserVersion, Action? beforeCommit = null)
+public sealed class SessionJsonlScanner(SessionCheckpointStore checkpoints, string parserVersion, Action? beforeCommit = null, Func<string, Stream>? open = null, Action<string>? beforeStable = null)
 {
         public async ValueTask<SessionParseResult> ScanAsync(string path, CancellationToken cancellationToken)
         {
@@ -45,7 +45,7 @@ public sealed class SessionJsonlScanner(SessionCheckpointStore checkpoints, stri
             var warnings = new HashSet<string>(StringComparer.Ordinal);
             try
             {
-                await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.SequentialScan);
+                await using var stream = (open ?? (file => new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.SequentialScan)))(path);
                 stream.Position = offset;
                 var line = new List<byte>(); var safeOffset = offset;
                 while (stream.ReadByte() is var next && next >= 0)
@@ -55,12 +55,14 @@ public sealed class SessionJsonlScanner(SessionCheckpointStore checkpoints, stri
                     safeOffset = stream.Position; Parse(line, records, warnings); line.Clear();
                 }
                 if (line.Count > 0) warnings.Add("session_incomplete_tail");
+                beforeStable?.Invoke(path);
                 if (!Stable(path, initial)) return Preparation([], warnings.Append("session_file_changed"), rebuild);
                 var last = records.LastOrDefault();
                 var cumulativeFallback = rebuild ? null : checkpoint;
                 var proposed = new SessionCheckpoint(initial.Identity, initial.Length, initial.LastWriteUtcTicks, safeOffset, parserVersion, last?.InputTokens ?? cumulativeFallback?.CumulativeInputTokens ?? 0, last?.CachedInputTokens ?? cumulativeFallback?.CumulativeCachedInputTokens ?? 0, last?.OutputTokens ?? cumulativeFallback?.CumulativeOutputTokens ?? 0);
                 return Preparation(records, warnings, rebuild, proposed);
             }
+            catch (UnauthorizedAccessException) { return Preparation([], warnings.Append("session_file_unreadable"), rebuild); }
             catch (IOException) { return Preparation([], warnings.Append("session_file_changed"), rebuild); }
         }
     private static void Parse(List<byte> bytes, List<SessionTokenRecord> records, HashSet<string> warnings)
@@ -87,6 +89,7 @@ public sealed class SessionJsonlScanner(SessionCheckpointStore checkpoints, stri
             stream.Position = offset - 1;
             return stream.ReadByte() == '\n';
         }
+        catch (UnauthorizedAccessException) { return false; }
         catch (IOException) { return false; }
     }
     private static long Counter(JsonElement usage, string name) => usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty(name, out var value) && value.TryGetInt64(out var count) ? Math.Max(0, count) : 0;
@@ -100,6 +103,7 @@ public sealed class SessionJsonlScanner(SessionCheckpointStore checkpoints, stri
             snapshot = new(file.CreationTimeUtc.Ticks, file.Length, file.LastWriteTimeUtc.Ticks);
             return file.Exists;
         }
+        catch (UnauthorizedAccessException) { snapshot = default; return false; }
         catch (IOException) { snapshot = default; return false; }
     }
     private static bool Stable(string path, FileSnapshot initial) => TrySnapshot(path, out var current) && current == initial;
