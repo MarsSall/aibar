@@ -2,6 +2,12 @@ using AIBar.Domain;
 
 namespace AIBar.Application;
 
+public interface ILocalAnalyticsLifecycle
+{
+    ValueTask StartAsync(CancellationToken cancellationToken);
+    ValueTask StopAsync(CancellationToken cancellationToken);
+}
+
 public sealed class BetaRuntime : IAsyncDisposable
 {
     private readonly ConsentSettings _settings;
@@ -9,14 +15,15 @@ public sealed class BetaRuntime : IAsyncDisposable
     private readonly QuotaRefreshCoordinator _coordinator;
     private readonly IClock _clock;
     private readonly ConsentCredentialSource? _credentials;
+    private readonly ILocalAnalyticsLifecycle? _analytics;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly PeriodicTimer _pollTimer = new(TimeSpan.FromMinutes(5));
     private Task? _polling;
     private bool _disposed;
 
-    public BetaRuntime(ConsentSettings settings, PrivateIntegrationPolicy policy, QuotaRefreshCoordinator coordinator, IClock clock, ConsentCredentialSource? credentials = null)
+    public BetaRuntime(ConsentSettings settings, PrivateIntegrationPolicy policy, QuotaRefreshCoordinator coordinator, IClock clock, ConsentCredentialSource? credentials = null, ILocalAnalyticsLifecycle? analytics = null)
     {
-        _settings = settings; _policy = policy; _coordinator = coordinator; _clock = clock; _credentials = credentials;
+        _settings = settings; _policy = policy; _coordinator = coordinator; _clock = clock; _credentials = credentials; _analytics = analytics;
     }
 
     public string Disclosure => _policy.Disclosure;
@@ -35,6 +42,7 @@ public sealed class BetaRuntime : IAsyncDisposable
         {
             _polling = PollAsync(_lifetime.Token);
             _ = RefreshAsync(RefreshTrigger.Poll, _lifetime.Token).AsTask();
+            if (_analytics is not null) await _analytics.StartAsync(_lifetime.Token);
         }
     }
 
@@ -45,6 +53,7 @@ public sealed class BetaRuntime : IAsyncDisposable
         await _settings.SaveAsync(true, cancellationToken);
         _policy.Enable();
         _coordinator.ResumeAfterClear();
+        if (_analytics is not null) await _analytics.StartAsync(_lifetime.Token);
         await RefreshAsync(RefreshTrigger.Manual, cancellationToken);
     }
 
@@ -54,7 +63,8 @@ public sealed class BetaRuntime : IAsyncDisposable
         await _settings.SaveAsync(false, cancellationToken);
         _policy.Disable();
         CredentialAvailability = CredentialAvailability.Disabled;
-        await _coordinator.CancelAndWaitAsync(cancellationToken);
+        try { if (_analytics is not null) await _analytics.StopAsync(cancellationToken); }
+        finally { await _coordinator.CancelAndWaitAsync(cancellationToken); }
     }
 
     public async ValueTask RefreshAsync(RefreshTrigger trigger, CancellationToken cancellationToken)
@@ -85,12 +95,8 @@ public sealed class BetaRuntime : IAsyncDisposable
         if (_disposed) return;
         _disposed = true;
         _lifetime.Cancel();
-        try { await _coordinator.CancelAndWaitAsync(CancellationToken.None); }
-        catch (ObjectDisposedException) { }
-        _pollTimer.Dispose();
-        if (_polling is not null) await _polling;
-        await _coordinator.DisposeAsync();
-        _lifetime.Dispose();
+        try { await _coordinator.CancelAndWaitAsync(CancellationToken.None); } catch (ObjectDisposedException) { }
+        _pollTimer.Dispose(); if (_polling is not null) await _polling; await _coordinator.DisposeAsync(); _lifetime.Dispose();
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

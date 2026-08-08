@@ -40,8 +40,13 @@ Dependency: tracker ← Unit 1 📍 ← Unit 2 ← Planning Amendment ← 3A ←
 
 ## 3B — hard <=400 (396)
 
-- [ ] 3B.1 RED production composition/exit cooperative/non-cooperative tests.
-- [ ] 3B.2 GREEN exclusive owner/typed outcome plus approved `BetaRuntime.cs`, `LocalCodexAnalyticsView.cs`, `App.xaml.cs`, `MainWindow.xaml`: cancel/await once, suppress late publication, cooperative disposal, retained timeout resources, first failure, never re-await.
+- [x] 3B.1 RED production composition/exit cooperative/non-cooperative tests.
+- [x] 3B.2 GREEN exclusive owner/typed outcome plus approved `BetaRuntime.cs`, `LocalCodexAnalyticsView.cs`, `App.xaml.cs`, `MainWindow.xaml`: cancel/await once, suppress late publication, cooperative disposal, retained timeout resources, first failure, never re-await.
+
+### 3B corrective rerun — revoke then re-enable
+
+- [x] Added behavior-first regression coverage for a cooperative stop followed by re-enable/start: exactly one fresh generation starts, while cancellation and bounded await remain exclusively once per generation.
+- [x] Cleared only the completed non-disposing generation state; timeout/failure retention and exit disposal semantics remain unchanged.
 
 ## 4 Distribution
 

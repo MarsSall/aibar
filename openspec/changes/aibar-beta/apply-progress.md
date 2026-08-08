@@ -129,7 +129,44 @@ No WPF, `BetaRuntime`, lifecycle/disposal orchestration, distribution, cost/tren
 - [x] P.1 Planning Amendment
 - [x] 3A.1 Analytics-core RED tests
 - [x] 3A.2 Analytics-core GREEN implementation
-- [ ] 3B.1 Production lifecycle RED tests
-- [ ] 3B.2 Production lifecycle GREEN implementation
+- [x] 3B.1 Production lifecycle RED tests
+- [x] 3B.2 Production lifecycle GREEN implementation
 - [ ] 4.1 Distribution RED tests
 - [ ] 4.2 Distribution GREEN and smoke evidence
+
+## Unit 3B — Production Lifecycle and Presentation
+
+**Mode:** Standard behavior-first (`strict_tdd: false`)
+
+### Completed tasks
+
+- [x] 3B.1 Added production-composite cooperative and cancellation-insensitive exit-path tests through `CreateComposition` → `TrayHostRuntime.ExitAsync` → `QuotaRuntimeResource`.
+- [x] 3B.2 Added the exclusive `AnalyticsLifecycleOwner`, generation-gated publication, one bounded await, typed first outcome, dependent-resource retention on timeout, and local-data presentation composition.
+
+### Work Unit Evidence
+
+| Evidence | Result |
+|---|---|
+| Behavior-first RED | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~AnalyticsLifecycle" --no-restore /m:1` failed before production implementation because the restored candidate referenced missing `ILocalAnalyticsLifecycle`; the production-composite tests were already present. |
+| Focused test and runtime harness | The same command passed: 2/2, 0 failed (55 ms). The tests use only temporary synthetic `sessions` JSONL and isolated SQLite data, invoke the actual composition and exit path, prove cooperative one-cancel/one-await/disposal, and prove bounded cancellation-insensitive timeout retains analytics view/store, disposes the independent quota store, suppresses late publication, never re-awaits, and drains the released scan. No live Codex files or endpoint were accessed. |
+| Regression | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~BetaAnalytics|FullyQualifiedName~BetaPresentation|FullyQualifiedName~BetaConsentOrQuota" --no-restore /m:1` — passed: 16/16, 0 failed (248 ms). |
+| Builds | `dotnet build src/AIBar.Application/AIBar.Application.csproj --no-restore /m:1` — 0 warnings, 0 errors (1.01 s). `dotnet build src/AIBar.Desktop/AIBar.Desktop.csproj --no-restore /m:1` — 0 warnings, 0 errors (1.40 s). |
+| Diff check | `git diff --check` — passed with no whitespace errors. |
+| Rollback boundary | Delete `LocalCodexAnalyticsView.cs` and `AnalyticsLifecycleTests.cs`; restore the named Unit-3B hunks in `BetaRuntime.cs`, `App.xaml.cs`, and `MainWindow.xaml`, then remove these two task checks and this section. Unit 3A remains intact. |
+
+### Scope and deviations
+
+None. Restored only the corrected Unit-3B candidate paths from preserved `stash@{0}` object `3ff43d33cb16573f5d750767269629771867aec5`; the new lifecycle tests were authored because the stash contained no such test file. No Unit 4, live endpoint, Codex source, stash mutation, staging, commit, review, push, or PR action was performed.
+
+### Corrective rerun — revoke then re-enable
+
+| Evidence | Result |
+|---|---|
+| Behavior-first RED | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~Cooperative_stop_then_reenable_starts_exactly_one_fresh_scan_generation" --no-restore /m:1` — failed: 0/1 passed, timeout waiting for the second scan generation. `StopAsync` left `_scan` and `_outcome` set, so the later `StartAsync` returned without starting a scan. |
+| GREEN | The same command — passed: 1/1, 0 failed. The test cooperatively stops and drains generation one, starts generation two exactly once despite a duplicate start call, then stops and drains it during cleanup. |
+| Lifecycle suite | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~AnalyticsLifecycle" --no-restore /m:1` — passed: 3/3, 0 failed (569 ms). |
+| Bounded regression | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter "FullyQualifiedName~BetaAnalytics|FullyQualifiedName~BetaPresentation|FullyQualifiedName~BetaConsentOrQuota" --no-restore /m:1` — passed: 16/16, 0 failed (245 ms). |
+| Builds | `dotnet build src/AIBar.Application/AIBar.Application.csproj --no-restore /m:1` and `dotnet build src/AIBar.Desktop/AIBar.Desktop.csproj --no-restore /m:1` — passed, 0 warnings and 0 errors. |
+| Rollback boundary | Revert `ResetStoppedGeneration` in `LocalCodexAnalyticsView.cs`, the re-enable test/helpers in `AnalyticsLifecycleTests.cs`, and this corrective evidence. The prior Unit 3B lifecycle behavior and all Unit 3A files remain untouched. |
+
+The smallest correction resets `_scan`, `_outcome`, and the completed generation's CTS only after a cooperative non-disposing stop. It does not alter timeout/failure retention, one bounded await per generation, generation-gated late-publication suppression, typed exit outcome/first failure, or process-exit disposal.

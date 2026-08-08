@@ -44,6 +44,13 @@
                 </Border>
             </GroupBox>
 
+            <GroupBox Header="Local Codex data" automation:AutomationProperties.Name="Local Codex data" Margin="0,16,0,0"><Border Style="{StaticResource QuotaCardStyle}"><StackPanel Margin="16">
+                <TextBlock Text="{Binding Analytics.SourceDetail}" Foreground="{DynamicResource MutedTextBrush}" />
+                <TextBlock Text="{Binding Analytics.TotalTokensLabel}" FontWeight="SemiBold" Margin="0,8,0,0" /><TextBlock Text="{Binding Analytics.ModelTotalsLabel}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Analytics.CoverageLabel}" Foreground="{DynamicResource MutedTextBrush}" /><TextBlock Text="{Binding Analytics.LastScanLabel}" Foreground="{DynamicResource MutedTextBrush}" />
+                <TextBlock Text="{Binding Analytics.WarningLabel}" Foreground="{DynamicResource MutedTextBrush}" /><TextBlock Text="Loading local Codex data" Visibility="{Binding Analytics.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
+            </StackPanel></Border></GroupBox>
+
             <TextBlock Text="{Binding State.Disclosure}" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,16,0,8" />
             <TextBlock Text="{Binding PrivateEndpointDisclosure}" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,0,8" />
             <Button Content="Refresh" Command="{Binding RefreshCommand}" Visibility="{Binding IsRefreshAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" automation:AutomationProperties.Name="Refresh quota" IsTabStop="True" HorizontalAlignment="Left" />
