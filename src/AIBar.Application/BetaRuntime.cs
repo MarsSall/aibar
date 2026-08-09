@@ -18,6 +18,7 @@ public sealed class BetaRuntime : IAsyncDisposable
     private readonly ILocalAnalyticsLifecycle? _analytics;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly PeriodicTimer _pollTimer = new(TimeSpan.FromMinutes(5));
+    private readonly SemaphoreSlim _consentGate = new(1, 1);
     private Task? _polling;
     private bool _disposed;
 
@@ -46,13 +47,24 @@ public sealed class BetaRuntime : IAsyncDisposable
         }
     }
 
-    public async ValueTask AcceptDisclosureAsync(bool accepted, CancellationToken cancellationToken)
+    public async ValueTask GrantConsentAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        if (!accepted) return;
+        await _consentGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_policy.IsEnabled) return;
+            await GrantConsentCoreAsync(cancellationToken);
+        }
+        finally { _consentGate.Release(); }
+    }
+
+    private async Task GrantConsentCoreAsync(CancellationToken cancellationToken)
+    {
         await _settings.SaveAsync(true, cancellationToken);
         _policy.Enable();
         _coordinator.ResumeAfterClear();
+        _polling ??= PollAsync(_lifetime.Token);
         if (_analytics is not null) await _analytics.StartAsync(_lifetime.Token);
         await RefreshAsync(RefreshTrigger.Manual, cancellationToken);
     }

@@ -187,7 +187,7 @@ function Invoke-PrivateBeta {
     $source = (& git -C $projectRoot rev-parse HEAD).Trim(); $parent = (& git -C $projectRoot rev-parse "$source^").Trim()
     if ($LASTEXITCODE -ne 0) { throw "BETA_SOURCE_MISSING" }
     $baseline = if ([string]::IsNullOrWhiteSpace($BetaBaselineCommit)) { "cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaBaselineCommit }
-    $requiredParent = if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { "6e2d8a46d455819c6f30a07a34bf63c9594d5c4c" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaParentCommit }
+    $requiredParent = if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { "5839721a566e5ad8dfc8381b9b9bd41270b7e3a6" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaParentCommit }
     if ($parent -cne $requiredParent) { throw "BETA_PARENT_MISMATCH" }
     & git -C $projectRoot merge-base --is-ancestor $baseline $source
     if ($LASTEXITCODE -ne 0) { throw "BETA_BASELINE_MISMATCH" }

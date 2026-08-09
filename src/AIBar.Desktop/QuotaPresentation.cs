@@ -28,7 +28,8 @@ public sealed record BetaPresentationState(
     TimeSpan? CachedAge,
     string? CachedAgeLabel,
     string? WarningLabel,
-    string Disclosure);
+    string Disclosure,
+    bool IsPrivateIntegrationDisabled = false);
 
 public sealed class QuotaPresentationMapper(IClock clock)
 {
@@ -148,7 +149,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, Func<bool> refreshAvailable, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null)
     {
         ArgumentNullException.ThrowIfNull(refreshAvailable);
-        _coordinator = coordinator; _mapper = mapper; _dispatcher = Dispatcher.CurrentDispatcher; _state = mapper.Map(coordinator.State); _report = report; _refreshAvailable = refreshAvailable; _lifecycleEvents = lifecycleEvents;
+        _coordinator = coordinator; _mapper = mapper; _dispatcher = Dispatcher.CurrentDispatcher; _refreshAvailable = refreshAvailable; _state = Map(coordinator.State); _report = report; _lifecycleEvents = lifecycleEvents;
         _refreshCommand = new ManualRefreshCommand(token => coordinator.RefreshAsync(RefreshTrigger.Manual, token), () => IsRefreshAvailable, report);
         _coordinator.StateChanged += OnStateChanged;
         if (_lifecycleEvents is not null) _lifecycleEvents.ClockChanged += OnClockChanged;
@@ -165,6 +166,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     public void RefreshAvailabilityChanged()
     {
         if (_disposed) return;
+        Update(_coordinator.State);
         _refreshCommand.RefreshCanExecute();
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRefreshAvailable)));
     }
@@ -183,13 +185,34 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     }
     private void Update(QuotaRefreshState state)
     {
-        _state = _mapper.Map(state);
+        _state = Map(state);
         if (state.Failure != _reportedFailure)
         {
             _reportedFailure = state.Failure;
             if (state.Failure is not null) _report?.Invoke(new InvalidOperationException(state.Failure.SafeCode));
         }
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
+    }
+    private BetaPresentationState Map(QuotaRefreshState state)
+    {
+        var mapped = _mapper.Map(state);
+        return _refreshAvailable() ? mapped : mapped with
+        {
+            FreshnessLabel = "Private quota integration disabled",
+            ErrorLabel = null,
+            IsLoading = false,
+            IsFresh = false,
+            IsCached = false,
+            IsDegraded = false,
+            IsMissingCredential = false,
+            IsOffline = false,
+            IsUnavailable = false,
+            IsSafeError = false,
+            CachedAge = null,
+            CachedAgeLabel = null,
+            WarningLabel = null,
+            IsPrivateIntegrationDisabled = true,
+        };
     }
     public ValueTask DisposeAsync()
     {

@@ -160,8 +160,8 @@ public sealed class AnalyticsLifecycleTests
 
     private sealed class FakeTray : ITrayRuntime
     {
-        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationDisableRequested;
-        public void SetRefreshAvailable(bool available) { } public void SetPresentation(BetaPresentationState state) { } public void SetSettingsAvailable(bool available) { } public void SetStartupEnabled(bool enabled) { } public void Show() { } public void Hide() { }
+        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationEnableRequested; public event Action? PrivateIntegrationDisableRequested;
+        public void SetRefreshAvailable(bool available) { } public void SetPresentation(BetaPresentationState state) { } public void SetSettingsAvailable(bool available) { } public void SetPrivateIntegrationEnabled(bool enabled) { } public void SetStartupEnabled(bool enabled) { } public void Show() { } public void Hide() { }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
     private sealed class FakePopover : IPopoverRuntime { public event Action? Deactivated; public bool IsVisible => false; public bool IsOwnedDialogActive => false; public void Show() { } public void Hide() { } public void Activate() { } }

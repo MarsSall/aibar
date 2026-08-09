@@ -51,6 +51,7 @@ public sealed class PrivateBetaDistributionTests
         using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "private-beta-manifest.json")));
         Assert.Equal(fixture.Baseline, manifest.RootElement.GetProperty("baselineCommit").GetString());
         Assert.Equal(fixture.Source, manifest.RootElement.GetProperty("sourceCommit").GetString());
+        Assert.Equal("0.1.0-beta.2", manifest.RootElement.GetProperty("version").GetString());
         Assert.Equal("win-x64", manifest.RootElement.GetProperty("target").GetString());
         Assert.True(manifest.RootElement.GetProperty("selfContained").GetBoolean());
         Assert.Equal(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(output, "AIBar-win-x64-private-beta.zip")))).ToLowerInvariant(), manifest.RootElement.GetProperty("zipSha256").GetString());
@@ -95,7 +96,7 @@ public sealed class PrivateBetaDistributionTests
             Directory.CreateDirectory(Path.Combine(Root, "scripts"));
             Directory.CreateDirectory(Path.Combine(Root, "src", "AIBar.Desktop"));
             File.Copy(Path.Combine(RepositoryRoot(), "scripts", "Publish-Deterministic.ps1"), Path.Combine(Root, "scripts", "Publish-Deterministic.ps1"));
-            File.WriteAllText(Path.Combine(Root, "src", "AIBar.Desktop", "AIBar.Desktop.csproj"), "<Project><PropertyGroup><Version>0.1.0-beta.1</Version></PropertyGroup></Project>");
+            File.WriteAllText(Path.Combine(Root, "src", "AIBar.Desktop", "AIBar.Desktop.csproj"), "<Project><PropertyGroup><Version>0.1.0-beta.2</Version></PropertyGroup></Project>");
             File.WriteAllText(Path.Combine(Root, "README.md"), "baseline");
             Git("init"); Git("add", "."); Git("-c", "user.name=tests", "-c", "user.email=tests@example.invalid", "commit", "-m", "baseline");
             Baseline = Git("rev-parse", "HEAD").Output.Trim();

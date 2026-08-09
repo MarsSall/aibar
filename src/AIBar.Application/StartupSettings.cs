@@ -134,7 +134,7 @@ public interface IAiBarDataClearCommand { ValueTask ClearAsync(CancellationToken
 
 public sealed record PrivacyDefaults(bool TelemetryEnabled = false, bool RemoteCrashReportingEnabled = false);
 
-public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarDataClearCommand clear, PrivateIntegrationPolicy privateIntegration, Func<CancellationToken, ValueTask>? revokePrivate = null)
+public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarDataClearCommand clear, PrivateIntegrationPolicy privateIntegration, Func<CancellationToken, ValueTask>? revokePrivate = null, Func<CancellationToken, ValueTask>? grantPrivate = null)
 {
     public PrivacyDefaults Privacy { get; } = new();
     public bool PrivateIntegrationEnabled => privateIntegration.IsEnabled;
@@ -145,10 +145,16 @@ public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarD
         return await startup.SetEnabledAsync(!enabled, cancellationToken);
     }
     public ValueTask ClearAiBarDataAsync(CancellationToken cancellationToken) => clear.ClearAsync(cancellationToken);
+    public ValueTask EnablePrivateIntegrationAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return grantPrivate is null ? EnableAsync() : grantPrivate(cancellationToken);
+    }
     public ValueTask DisablePrivateIntegrationAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return revokePrivate is null ? DisableAsync() : revokePrivate(cancellationToken);
     }
+    private ValueTask EnableAsync() { privateIntegration.Enable(); return ValueTask.CompletedTask; }
     private ValueTask DisableAsync() { privateIntegration.Disable(); return ValueTask.CompletedTask; }
 }

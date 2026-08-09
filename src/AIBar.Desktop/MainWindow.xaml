@@ -18,6 +18,7 @@
             <TextBlock Text="Offline cached quota" Visibility="{Binding State.IsOffline, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
             <TextBlock Text="Cached quota is degraded" Visibility="{Binding State.IsDegraded, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
             <TextBlock Text="Quota unavailable" Visibility="{Binding State.IsUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
+            <TextBlock Text="Private quota integration is disabled" Visibility="{Binding State.IsPrivateIntegrationDisabled, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
             <TextBlock Text="Quota error" Visibility="{Binding State.IsSafeError, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
 
             <GroupBox automation:AutomationProperties.Name="5-hour quota card" Margin="0,16,0,0">

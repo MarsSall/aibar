@@ -148,8 +148,8 @@ public sealed class BetaPresentationTests
     }
     private sealed class Tray : ITrayRuntime
     {
-        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationDisableRequested;
-        public void SetRefreshAvailable(bool available) { } public void SetSettingsAvailable(bool available) { } public void SetStartupEnabled(bool enabled) { } public void Show() { } public void Hide() { }
+        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationEnableRequested; public event Action? PrivateIntegrationDisableRequested;
+        public void SetRefreshAvailable(bool available) { } public void SetSettingsAvailable(bool available) { } public void SetPrivateIntegrationEnabled(bool enabled) { } public void SetStartupEnabled(bool enabled) { } public void Show() { } public void Hide() { }
         public BetaPresentationState? State { get; private set; }
         public void SetPresentation(BetaPresentationState state) => State = state;
         public void Toggle() => Toggled?.Invoke(); public ValueTask DisposeAsync() => ValueTask.CompletedTask;

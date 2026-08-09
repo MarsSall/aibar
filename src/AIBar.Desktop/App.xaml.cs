@@ -66,7 +66,7 @@ public partial class App : System.Windows.Application
         var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents);
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
         var clear = new ClearAiBarDataService(dataDirectory, [coordinator], CreateEmptyStateFactory(coordinator));
-        return new(new BetaAnalyticsPresentation(presentation, analytics), presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy, async token => { await betaRuntime.RevokeConsentAsync(token); presentation.RefreshAvailabilityChanged(); }), new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, analyticsOwner, store, seams.LifecycleObservation), () => InitializeCompositionAsync(betaRuntime, presentation, default), presentation.ReportUnavailable, coordinator.ReevaluateAsync);
+        return new(new BetaAnalyticsPresentation(presentation, analytics), presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy, betaRuntime.RevokeConsentAsync, betaRuntime.GrantConsentAsync), new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, analyticsOwner, store, seams.LifecycleObservation), () => InitializeCompositionAsync(betaRuntime, presentation, default), presentation.ReportUnavailable, coordinator.ReevaluateAsync);
     }
     internal static async Task InitializeCompositionAsync(BetaRuntime runtime, QuotaPresentationHost presentation, CancellationToken cancellationToken)
     {
@@ -80,7 +80,7 @@ public partial class App : System.Windows.Application
         _taskbar = new TaskbarRecreationMonitor(window);
         var trayPresentation = composition.Presentation is BetaAnalyticsPresentation analyticsPresentation ? analyticsPresentation.QuotaPresentation : composition.Presentation as QuotaPresentationHost;
         _runtime = new TrayHostRuntime(_instance!, new WindowsTrayRuntime(), new WpfPopoverRuntime(window), _taskbar,
-            _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation);
+            _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation, new WindowsPrivateIntegrationConsentPrompt());
         _runtime.Start();
     }
     private static void ReportFault(Exception exception) => Trace.TraceError("AIBar unavailable: {0}", exception.GetType().Name);

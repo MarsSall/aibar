@@ -8,7 +8,7 @@ Define the manually distributed private-beta artifact and tester guidance withou
 
 ### Requirement: Distribution is an unsigned self-contained Windows x64 ZIP
 
-The release candidate MUST be a manually distributed ZIP for Windows x64, MUST be self-contained so testers do not need a separately installed .NET runtime, MUST be explicitly labeled unsigned and private beta, and MUST be built from the exact final Unit 4 source commit after Unit 3B. The immutable commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97` MUST remain the baseline/root ancestor for ancestry proof, not the ZIP source.
+The release candidate MUST be a manually distributed ZIP for Windows x64, MUST be self-contained so testers do not need a separately installed .NET runtime, MUST be explicitly labeled unsigned and private beta, and MUST be built from the exact clean release source commit. The original beta source MUST remain the exact final Unit 4 commit after Unit 3B; a post-release hotfix source MUST have the validated beta closure as its exact parent. The immutable commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97` MUST remain the baseline/root ancestor for ancestry proof, not the ZIP source.
 
 #### Scenario: Tester receives the artifact
 
@@ -26,20 +26,20 @@ The release candidate MUST be a manually distributed ZIP for Windows x64, MUST b
 
 #### Scenario: Final artifact is smoke-tested
 
-- GIVEN a Windows x64 self-contained beta ZIP has been produced from the exact final Unit 4 source commit after Unit 3B
+- GIVEN a Windows x64 self-contained beta ZIP has been produced from its exact clean release source commit
 - WHEN that final artifact is extracted and launched on a Windows x64 machine without .NET installed
 - THEN the application starts successfully from the extracted files
 - AND the ZIP is eligible for manual distribution only after this smoke test passes
 
 ### Requirement: Artifact provenance is bound to the distributed bytes
 
-The artifact metadata and tester instructions MUST bind the immutable baseline/root ancestor commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97`, the exact final Unit 4 artifact source commit after Unit 3B, the version, the complete artifact inventory, and the SHA-256 of the exact ZIP. These bindings MUST identify the same distributed artifact.
+The artifact metadata and tester instructions MUST bind the immutable baseline/root ancestor commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97`, the exact clean release source commit, the version, the complete artifact inventory, and the SHA-256 of the exact ZIP. These bindings MUST identify the same distributed artifact.
 
 #### Scenario: Provenance metadata is checked
 
 - GIVEN the final ZIP, its metadata, and its tester instructions
 - WHEN a tester compares the recorded provenance and inventory with the archive
-- THEN the baseline is identified as ancestry only, the source is the final Unit 4 commit, and version and inventory match
+- THEN the baseline is identified as ancestry only, the source is the exact release commit, and version and inventory match
 - AND the recorded SHA-256 matches the exact ZIP bytes
 
 ### Requirement: Checksums and versions are verifiable
