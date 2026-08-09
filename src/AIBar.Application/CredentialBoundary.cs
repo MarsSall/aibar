@@ -38,7 +38,10 @@ public sealed class CodexCredentialReader(ICredentialFileReader files)
                 FileShare.ReadWrite | FileShare.Delete,
                 cancellationToken);
             var fields = await JsonSerializer.DeserializeAsync<CredentialFields>(stream, cancellationToken: cancellationToken);
-            return string.IsNullOrWhiteSpace(fields?.AccessToken) ? null : new RequestCredential(fields.AccessToken, fields.AccountId);
+            var useCurrent = !string.IsNullOrWhiteSpace(fields?.Tokens?.AccessToken);
+            var accessToken = useCurrent ? fields!.Tokens!.AccessToken : fields?.AccessToken;
+            if (string.IsNullOrWhiteSpace(accessToken)) return null;
+            return new RequestCredential(accessToken, useCurrent ? fields!.Tokens!.AccountId : fields?.AccountId);
         }
         catch (FileNotFoundException) { return null; }
         catch (DirectoryNotFoundException) { return null; }
@@ -57,6 +60,18 @@ public sealed class CodexCredentialReader(ICredentialFileReader files)
     }
 
     private sealed class CredentialFields
+    {
+        [JsonPropertyName("tokens")]
+        public TokenFields? Tokens { get; init; }
+
+        [JsonPropertyName("access_token")]
+        public string? AccessToken { get; init; }
+
+        [JsonPropertyName("account_id")]
+        public string? AccountId { get; init; }
+    }
+
+    private sealed class TokenFields
     {
         [JsonPropertyName("access_token")]
         public string? AccessToken { get; init; }

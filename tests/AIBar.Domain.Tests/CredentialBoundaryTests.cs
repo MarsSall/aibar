@@ -12,21 +12,51 @@ public sealed class CredentialBoundaryTests
         Assert.Equal(Path.Combine("D:/user", ".codex"), CodexRootResolver.Resolve(" ", "D:/user"));
     }
 
-    [Fact]
-    public async Task Reader_returns_only_credential_and_optional_account_id()
+    [Theory]
+    [InlineData("{\"tokens\":{\"access_token\":\"nested-access\",\"refresh_token\":\"ignored-refresh\",\"account_id\":\"nested-account\"}}", "nested-account")]
+    [InlineData("{\"tokens\":{\"access_token\":\"nested-access\",\"refresh_token\":\"ignored-refresh\"},\"access_token\":\"legacy-access\",\"account_id\":\"legacy-account\"}", null)]
+    public async Task Reader_uses_current_nested_access_token_with_optional_account_id(string content, string? expectedAccountId)
     {
-        var reader = new CodexCredentialReader(new StubFiles("{\"access_token\":\"token-123\",\"account_id\":\"acct-456\",\"refresh_token\":\"never-materialized\",\"nested\":{\"secret\":\"also-skipped\"}}"));
+        var reader = new CodexCredentialReader(new StubFiles(content));
 
         using var credential = await reader.ReadAsync("D:/synthetic/.codex", CancellationToken.None);
 
-        Assert.Equal("token-123", credential!.AccessToken);
-        Assert.Equal("acct-456", credential.AccountId);
+        Assert.Equal("nested-access", credential!.AccessToken);
+        Assert.Equal(expectedAccountId, credential.AccountId);
+    }
+
+    [Fact]
+    public async Task Reader_prefers_the_complete_nested_pair_over_legacy_fields()
+    {
+        var reader = new CodexCredentialReader(new StubFiles("{\"tokens\":{\"access_token\":\"nested-access\",\"account_id\":\"nested-account\"},\"access_token\":\"legacy-access\",\"account_id\":\"legacy-account\"}"));
+
+        using var credential = await reader.ReadAsync("D:/synthetic/.codex", CancellationToken.None);
+
+        Assert.Equal("nested-access", credential!.AccessToken);
+        Assert.Equal("nested-account", credential.AccountId);
+    }
+
+    [Theory]
+    [InlineData("{\"access_token\":\"legacy-access\",\"account_id\":\"legacy-account\"}")]
+    [InlineData("{\"tokens\":{\"account_id\":\"nested-account\"},\"access_token\":\"legacy-access\",\"account_id\":\"legacy-account\"}")]
+    [InlineData("{\"tokens\":{\"access_token\":\" \",\"account_id\":\"nested-account\"},\"access_token\":\"legacy-access\",\"account_id\":\"legacy-account\"}")]
+    public async Task Reader_falls_back_to_legacy_only_without_a_usable_nested_access_token(string content)
+    {
+        var reader = new CodexCredentialReader(new StubFiles(content));
+
+        using var credential = await reader.ReadAsync("D:/synthetic/.codex", CancellationToken.None);
+
+        Assert.Equal("legacy-access", credential!.AccessToken);
+        Assert.Equal("legacy-account", credential.AccountId);
     }
 
     [Theory]
     [InlineData("{}")]
     [InlineData("{bad")]
     [InlineData("{\"access_token\":\" \"}")]
+    [InlineData("{\"tokens\":{}}")]
+    [InlineData("{\"tokens\":{\"access_token\":\" \"}}")]
+    [InlineData("{\"OPENAI_API_KEY\":\"ignored-api-key\",\"personal_access_token\":\"ignored-personal\",\"tokens\":{\"refresh_token\":\"ignored-refresh\",\"id_token\":\"ignored-id\"}}")]
     [InlineData("[]")]
     [InlineData("null")]
     [InlineData("\"token-123\"")]

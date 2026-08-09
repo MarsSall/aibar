@@ -28,7 +28,7 @@ public sealed class BetaConsentOrQuotaTests : IDisposable
     public async Task Credential_availability_is_secret_free_and_disabled_lookup_is_suppressed()
     {
         var policy = new PrivateIntegrationPolicy();
-        var files = new ScriptedCredentialFiles("{\"access_token\":\"secret-token\",\"account_id\":\"account\"}");
+        var files = new ScriptedCredentialFiles("{\"tokens\":{\"access_token\":\"synthetic-access\",\"account_id\":\"synthetic-account\"}}");
         var source = new ConsentCredentialSource(policy, new CodexCredentialReader(files), "codex");
 
         Assert.Equal(CredentialAvailability.Disabled, await source.GetAvailabilityAsync(default));
@@ -38,9 +38,11 @@ public sealed class BetaConsentOrQuotaTests : IDisposable
         Assert.Equal(CredentialAvailability.Available, await source.GetAvailabilityAsync(default));
         Assert.Equal(1, files.Calls);
 
-        files.Content = "{}";
+        files.Content = "{bad";
         Assert.Equal(CredentialAvailability.Missing, await source.GetAvailabilityAsync(default));
-        files.Failure = new IOException("cannot read secret-token");
+        files.Failure = new FileNotFoundException();
+        Assert.Equal(CredentialAvailability.Missing, await source.GetAvailabilityAsync(default));
+        files.Failure = new IOException("synthetic unreadable file");
         Assert.Equal(CredentialAvailability.Unusable, await source.GetAvailabilityAsync(default));
     }
 
