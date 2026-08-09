@@ -8,7 +8,7 @@ Define the manually distributed private-beta artifact and tester guidance withou
 
 ### Requirement: Distribution is an unsigned self-contained Windows x64 ZIP
 
-The release candidate MUST be a manually distributed ZIP for Windows x64, MUST be self-contained so testers do not need a separately installed .NET runtime, MUST be explicitly labeled unsigned and private beta, and MUST be built from the exact clean release source commit. The original beta source MUST remain the exact final Unit 4 commit after Unit 3B; a post-release hotfix source MUST have the validated beta closure as its exact parent. The immutable commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97` MUST remain the baseline/root ancestor for ancestry proof, not the ZIP source.
+The release candidate MUST be a manually distributed ZIP for Windows x64, MUST be self-contained so testers do not need a separately installed .NET runtime, MUST be explicitly labeled unsigned and private beta, and MUST be built from the exact clean release source commit. The original beta source MUST remain the exact final Unit 4 commit after Unit 3B; the final beta.2 source MUST have commit `a86668d6ed1e2721e3c497415a7b74b93506b55d` as its exact parent. The immutable commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97` MUST remain the baseline/root ancestor for ancestry proof, not the ZIP source.
 
 #### Scenario: Tester receives the artifact
 
@@ -33,13 +33,13 @@ The release candidate MUST be a manually distributed ZIP for Windows x64, MUST b
 
 ### Requirement: Artifact provenance is bound to the distributed bytes
 
-The artifact metadata and tester instructions MUST bind the immutable baseline/root ancestor commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97`, the exact clean release source commit, the version, the complete artifact inventory, and the SHA-256 of the exact ZIP. These bindings MUST identify the same distributed artifact.
+The artifact metadata and tester instructions MUST bind the immutable baseline/root ancestor commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97`, final beta.2 parent commit `a86668d6ed1e2721e3c497415a7b74b93506b55d`, the exact clean release source commit, the version, the complete artifact inventory, and the SHA-256 of the exact ZIP. These bindings MUST identify the same distributed artifact.
 
 #### Scenario: Provenance metadata is checked
 
 - GIVEN the final ZIP, its metadata, and its tester instructions
 - WHEN a tester compares the recorded provenance and inventory with the archive
-- THEN the baseline is identified as ancestry only, the source is the exact release commit, and version and inventory match
+- THEN the baseline is identified as ancestry only, the parent and source identify the exact release lineage, and version and inventory match
 - AND the recorded SHA-256 matches the exact ZIP bytes
 
 ### Requirement: Checksums and versions are verifiable

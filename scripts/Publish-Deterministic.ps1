@@ -187,7 +187,7 @@ function Invoke-PrivateBeta {
     $source = (& git -C $projectRoot rev-parse HEAD).Trim(); $parent = (& git -C $projectRoot rev-parse "$source^").Trim()
     if ($LASTEXITCODE -ne 0) { throw "BETA_SOURCE_MISSING" }
     $baseline = if ([string]::IsNullOrWhiteSpace($BetaBaselineCommit)) { "cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaBaselineCommit }
-    $requiredParent = if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { "5839721a566e5ad8dfc8381b9b9bd41270b7e3a6" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaParentCommit }
+    $requiredParent = if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { "a86668d6ed1e2721e3c497415a7b74b93506b55d" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaParentCommit }
     if ($parent -cne $requiredParent) { throw "BETA_PARENT_MISMATCH" }
     & git -C $projectRoot merge-base --is-ancestor $baseline $source
     if ($LASTEXITCODE -ne 0) { throw "BETA_BASELINE_MISMATCH" }
@@ -209,8 +209,8 @@ function Invoke-PrivateBeta {
         $smoke = Join-Path $outputRoot "smoke"; $process = $null
         try { Expand-Archive -LiteralPath $zipPath -DestinationPath $smoke; $executable = Join-Path $smoke "AIBar.Desktop.exe"; if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "BETA_SMOKE_EXECUTABLE_MISSING" }; $process = Start-Process -FilePath $executable -WorkingDirectory $smoke -PassThru; if ($process.WaitForExit($SmokeStartupMilliseconds)) { throw "BETA_SMOKE_EARLY_EXIT" }; $process.Kill($true); if (-not $process.WaitForExit($ProcessTimeoutSeconds * 1000)) { throw "BETA_SMOKE_TIMEOUT" } } finally { if ($null -ne $process) { if (-not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }; $process.Dispose() }; if (Test-Path -LiteralPath $smoke) { Remove-Item -LiteralPath $smoke -Recurse -Force } }
         $zipSha = Sha $zipPath
-        [ordered]@{ schemaVersion="aibar-private-beta-1"; target="win-x64"; selfContained=$true; unsigned=$true; baselineCommit=$baseline; sourceCommit=$source; version=$version; inventory=$inventory; zipSha256=$zipSha } | ConvertTo-Json -Compress -Depth 8 | Set-Content -LiteralPath (Join-Path $outputRoot "private-beta-manifest.json") -NoNewline
-        $instructions = "AIBar private beta $version is unsigned. Extract the ZIP, verify `$((Get-FileHash .\AIBar-win-x64-private-beta.zip -Algorithm SHA256).Hash) equals $zipSha, then launch AIBar.Desktop.exe from the extracted directory. Replace an older beta by exiting it and replacing its extracted directory manually; no updater or uninstall is provided. Baseline ancestor: $baseline. Source commit: $source."
+        [ordered]@{ schemaVersion="aibar-private-beta-1"; target="win-x64"; selfContained=$true; unsigned=$true; baselineCommit=$baseline; parentCommit=$parent; sourceCommit=$source; version=$version; inventory=$inventory; zipSha256=$zipSha } | ConvertTo-Json -Compress -Depth 8 | Set-Content -LiteralPath (Join-Path $outputRoot "private-beta-manifest.json") -NoNewline
+        $instructions = "AIBar private beta $version is unsigned. Extract the ZIP, verify `$((Get-FileHash .\AIBar-win-x64-private-beta.zip -Algorithm SHA256).Hash) equals $zipSha, then launch AIBar.Desktop.exe from the extracted directory. Replace an older beta by exiting it and replacing its extracted directory manually; no updater or uninstall is provided. Baseline ancestor: $baseline. Parent commit: $parent. Source commit: $source."
         [IO.File]::WriteAllText((Join-Path $outputRoot "private-beta-instructions.txt"), $instructions + "`n", [Text.UTF8Encoding]::new($false))
     } catch { if ($created -and (Test-Path -LiteralPath $outputRoot)) { Remove-Item -LiteralPath $outputRoot -Recurse -Force }; throw }
 }

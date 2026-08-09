@@ -8,6 +8,14 @@ namespace AIBar.Domain.Tests;
 public sealed class PrivateBetaDistributionTests
 {
     [Fact]
+    public void Private_beta_production_default_is_bound_to_the_final_beta2_parent()
+    {
+        var script = File.ReadAllText(Path.Combine(RepositoryRoot(), "scripts", "Publish-Deterministic.ps1"));
+
+        Assert.Contains("if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { \"a86668d6ed1e2721e3c497415a7b74b93506b55d\" }", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Private_beta_rejects_dirty_or_wrong_parent_committed_sources()
     {
         using var fixture = new SyntheticRepository();
@@ -49,9 +57,14 @@ public sealed class PrivateBetaDistributionTests
 
         Assert.Equal(0, result.ExitCode);
         using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "private-beta-manifest.json")));
-        Assert.Equal(fixture.Baseline, manifest.RootElement.GetProperty("baselineCommit").GetString());
-        Assert.Equal(fixture.Source, manifest.RootElement.GetProperty("sourceCommit").GetString());
-        Assert.Equal("0.1.0-beta.2", manifest.RootElement.GetProperty("version").GetString());
+        var baseline = manifest.RootElement.GetProperty("baselineCommit").GetString();
+        var parent = manifest.RootElement.GetProperty("parentCommit").GetString();
+        var source = manifest.RootElement.GetProperty("sourceCommit").GetString();
+        var version = manifest.RootElement.GetProperty("version").GetString();
+        Assert.Equal(fixture.Baseline, baseline);
+        Assert.Equal(fixture.Parent, parent);
+        Assert.Equal(fixture.Source, source);
+        Assert.Equal("0.1.0-beta.2", version);
         Assert.Equal("win-x64", manifest.RootElement.GetProperty("target").GetString());
         Assert.True(manifest.RootElement.GetProperty("selfContained").GetBoolean());
         Assert.Equal(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(output, "AIBar-win-x64-private-beta.zip")))).ToLowerInvariant(), manifest.RootElement.GetProperty("zipSha256").GetString());
@@ -60,7 +73,11 @@ public sealed class PrivateBetaDistributionTests
         using var archive = ZipFile.OpenRead(Path.Combine(output, "AIBar-win-x64-private-beta.zip"));
         Assert.Equal(archive.Entries.Select(entry => entry.FullName).OrderBy(path => path, StringComparer.Ordinal), archive.Entries.Select(entry => entry.FullName));
         Assert.Contains(archive.Entries, entry => entry.FullName == "PRIVATE-BETA.txt");
-        Assert.Contains(fixture.Source, File.ReadAllText(Path.Combine(output, "private-beta-instructions.txt")), StringComparison.Ordinal);
+        var instructions = File.ReadAllText(Path.Combine(output, "private-beta-instructions.txt"));
+        Assert.Contains($"AIBar private beta {version}", instructions, StringComparison.Ordinal);
+        Assert.Contains($"Baseline ancestor: {baseline}.", instructions, StringComparison.Ordinal);
+        Assert.Contains($"Parent commit: {parent}.", instructions, StringComparison.Ordinal);
+        Assert.Contains($"Source commit: {source}.", instructions, StringComparison.Ordinal);
         var repeat = fixture.Output("repeat");
         Assert.Equal(0, fixture.Run(repeat, publisher: fixture.Publisher("stay")).ExitCode);
         Assert.Equal(File.ReadAllBytes(Path.Combine(output, "AIBar-win-x64-private-beta.zip")), File.ReadAllBytes(Path.Combine(repeat, "AIBar-win-x64-private-beta.zip")));
