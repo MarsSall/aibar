@@ -962,7 +962,7 @@ Prior generated outputs and runtime evidence MUST NOT be reused as implementatio
 
 ## Slice 8B.1 applied (2026-07-19)
 
-**Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `auto-chain` / `feature-branch-chain`. This PR #3 work unit starts at reviewed Slice 8B.0 (`c03fa7f62757994e5457711634b1a1e970706334`) and implements only the private one-shot gesture, structured in-memory sinks, and tray/UI adapter. No export, filesystem/network I/O, raw-text parser, installer, or `SafeRedactor` change was introduced.
+**Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `auto-chain` / `feature-branch-chain`. This PR #3 work unit starts at reviewed Slice 8B.0 (`18bd84f2da2e0e8f9b9215838e45bb3a8ad1c68d`) and implements only the private one-shot gesture, structured in-memory sinks, and tray/UI adapter. No export, filesystem/network I/O, raw-text parser, installer, or `SafeRedactor` change was introduced.
 
 | Work Unit Evidence | Exact result |
 |---|---|
@@ -1009,7 +1009,7 @@ Prior generated outputs and runtime evidence MUST NOT be reused as implementatio
 
 ## Slice 8A applied (2026-07-18)
 
-**Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `feature-branch-chain` with a **Slice 8A-only `size:exception`**, explicitly maintainer-approved in session 2026-07-18. Slices 8B–8E remain `auto-chain` and <=400. This child starts at Slice 7C parent `66dbfbac94256b9d259247076c1517688ad5e75b` and is limited to per-user startup/settings and Clear AIBar Data command wiring.
+**Status:** Standard mode (`strict_tdd: false`); `applyState: ready`; `feature-branch-chain` with a **Slice 8A-only `size:exception`**, explicitly maintainer-approved in session 2026-07-18. Slices 8B–8E remain `auto-chain` and <=400. This child starts at Slice 7C parent `e7ec5974d0a7041e9e814811aeb48fb5332e95ea` and is limited to per-user startup/settings and Clear AIBar Data command wiring.
 
 | Work Unit Evidence | Exact result |
 |---|---|
@@ -1024,7 +1024,7 @@ Prior generated outputs and runtime evidence MUST NOT be reused as implementatio
 
 **Size exception rationale:** maintainer explicitly approved `size:exception` for Slice 8A in session 2026-07-18 after truthful production/runtime corrections exceeded the original budget. The exception applies only to this unit; 8B–8E remain auto-chained and <=400.
 
-**Exact Slice 8A authored changed-line receipt from `66dbfbac94256b9d259247076c1517688ad5e75b`: 455 additions + 26 deletions = 481 total, including the authorized Slice 8 planning diff. This exceeds 400 solely under the Slice 8A-only maintainer-approved `size:exception`.**
+**Exact Slice 8A authored changed-line receipt from `e7ec5974d0a7041e9e814811aeb48fb5332e95ea`: 455 additions + 26 deletions = 481 total, including the authorized Slice 8 planning diff. This exceeds 400 solely under the Slice 8A-only maintainer-approved `size:exception`.**
 
 ## Slice 7C applied (2026-07-18)
 
@@ -1051,7 +1051,7 @@ Prior generated outputs and runtime evidence MUST NOT be reused as implementatio
 | Focused ViewModel | `dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --filter FullyQualifiedName~ViewModel` — passed 4/4, failed 0, skipped 0. |
 | Full solution / build / diff | `dotnet test AIBar.sln --nologo` — passed 171/171, failed 0, skipped 0; `dotnet build AIBar.sln --nologo` — succeeded, 0 warnings, 0 errors; `git diff --check` — passed (LF-to-CRLF advisories only). |
 
-**Exact Slice 7C authored changed-line receipt from `42729af3c603b42868d7492071a41d6b21e0e13d`: 124 additions + 7 deletions = 131 total, below the 400-line limit.**
+**Exact Slice 7C authored changed-line receipt from `ae07a778a06be8e589318c8e82c71176d8848bd1`: 124 additions + 7 deletions = 131 total, below the 400-line limit.**
 
 ## Slice 7A applied (2026-07-14)
 

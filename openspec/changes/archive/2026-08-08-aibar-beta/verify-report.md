@@ -20,7 +20,7 @@ build_output_hash: sha256:a67657279587800775f2bfce0ed8c0f533eb36a5137e008b6b7fe1
 **Version**: 0.1.0-beta.1
 **Mode**: Standard
 **Artifact store**: OpenSpec
-**Authoritative source**: `058f5bd2fce56c80307af3dafcb494a0c72d8e2f`
+**Authoritative source**: `7ea0599898d952733d17250f2abf8cbaeafc27fe`
 **Verification kind**: Fresh independent final verification after bounded remediation
 **Skill resolution**: `paths-injected`
 
@@ -157,9 +157,9 @@ ZIP SHA-256: b894cd3f665c9a16d74d811ad5c5cdf3ca3bed5ef952d77d64effd543f5946fa
 Manifest SHA-256: a2ebf4f50eff6d0b719ba1f88c0383e96c1279ea9b0a32bfc03d14e4ad984a38
 Instructions SHA-256: 0bcba73d891e04244adba1cd21708a30108afed949c967d2145929faf40853c8
 Inventory: 471/471 entries matched ordinal path, length, and file SHA-256
-Source: 058f5bd2fce56c80307af3dafcb494a0c72d8e2f
-Parent: 6e2d8a46d455819c6f30a07a34bf63c9594d5c4c
-Baseline ancestor: cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97 (merge-base exit 0)
+Source: 7ea0599898d952733d17250f2abf8cbaeafc27fe
+Parent: f04d78983065523c3bf9f66d6d2f98ddbd7a93a0
+Baseline ancestor: c4e35c01d5ed9cff30b136802a39196a3b2ed91d (merge-base exit 0)
 Version: 0.1.0-beta.1
 Target: win-x64; self-contained: true; unsigned: true
 Smoke: survived 1000 ms with empty DOTNET_ROOT, DOTNET_MULTILEVEL_LOOKUP=0, isolated profile/temp, and system-only PATH; process tree killed; exit -1
@@ -174,8 +174,8 @@ The retained ZIP and sidecars were read only and were not regenerated or modifie
 
 ```text
 Branch: feature/aibar-beta-unit-4
-HEAD: 058f5bd2fce56c80307af3dafcb494a0c72d8e2f
-HEAD parent: 6e2d8a46d455819c6f30a07a34bf63c9594d5c4c
+HEAD: 7ea0599898d952733d17250f2abf8cbaeafc27fe
+HEAD parent: f04d78983065523c3bf9f66d6d2f98ddbd7a93a0
 Baseline ancestry check: exit 0
 stash@{0}: 3ff43d33cb16573f5d750767269629771867aec5 (unchanged)
 Staged/index changes: 0

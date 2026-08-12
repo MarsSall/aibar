@@ -2,7 +2,7 @@
 
 ## Technical Approach
 
-Split Unit 3 into a deterministic analytics core (3A) and production lifecycle/presentation integration (3B). A documentation-only Planning Amendment follows completed Unit 2 and becomes 3A's exact parent. Unit 4 publishes the committed 3B successor; `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97` remains ancestry baseline only.
+Split Unit 3 into a deterministic analytics core (3A) and production lifecycle/presentation integration (3B). A documentation-only Planning Amendment follows completed Unit 2 and becomes 3A's exact parent. Unit 4 publishes the committed 3B successor; `c4e35c01d5ed9cff30b136802a39196a3b2ed91d` remains ancestry baseline only.
 
 ## Architecture Decisions
 
@@ -62,7 +62,7 @@ Tests call actual `CreateComposition(seams)`, start the scan, and invoke actual 
 
 ## Delivery, Distribution, and Rollback
 
-Chain: Unit 2 `fab8ca0b5f588319926141a3cad276317319de99` (377 lines) → Planning Amendment (measured 257 changed lines, forecast ≤300, hard ≤400) → 3A (≤298) → 3B (≤396) → Unit 4 (≤400). The future Planning Amendment commit is 3A's exact parent. Implementation commits contain their tests; every child targets its immediate parent and is independently reversible, while polluted child diffs require rebase/retarget.
+Chain: Unit 2 `0ae69590513b24cd88934f9c7a40a077ab54cdd8` (377 lines) → Planning Amendment (measured 257 changed lines, forecast ≤300, hard ≤400) → 3A (≤298) → 3B (≤396) → Unit 4 (≤400). The future Planning Amendment commit is 3A's exact parent. Implementation commits contain their tests; every child targets its immediate parent and is independently reversible, while polluted child diffs require rebase/retarget.
 
 The Planning Amendment owns only corrected `proposal.md`, delta specs, `design.md`, `tasks.md`, and the truthful `apply-progress.md` replan. It contains no product code or tests; excluded Unit 3 product/test work remains preserved in the named selective stash `aibar-beta-unit3-product-split` for later branch restoration. Reverting it restores the Unit 2 planning state without reverting Unit 2 product behavior; reverting any implementation slice removes only that slice.
 

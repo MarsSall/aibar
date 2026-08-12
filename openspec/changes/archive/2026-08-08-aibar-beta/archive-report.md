@@ -55,8 +55,8 @@ The first verification failure was remediated by the one maintainer-authorized b
 
 - ZIP: `C:\Users\mjsal\AppData\Local\Temp\opencode\aibar-beta-unit4-f3f465ed17054b74a388d2d0a29531a0\AIBar-win-x64-private-beta.zip`
 - ZIP SHA-256: `b894cd3f665c9a16d74d811ad5c5cdf3ca3bed5ef952d77d64effd543f5946fa`
-- Source commit: `058f5bd2fce56c80307af3dafcb494a0c72d8e2f`
-- Parent: `6e2d8a46d455819c6f30a07a34bf63c9594d5c4c`
+- Source commit: `7ea0599898d952733d17250f2abf8cbaeafc27fe`
+- Parent: `f04d78983065523c3bf9f66d6d2f98ddbd7a93a0`
 - Version: `0.1.0-beta.1`
 - Inventory: 471 entries verified for path, length, and SHA-256.
 - Smoke: self-contained Windows x64 launch passed without .NET; no residual application, dotnet, or testhost processes remained.

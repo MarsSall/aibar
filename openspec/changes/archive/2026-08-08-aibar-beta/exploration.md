@@ -2,7 +2,7 @@
 
 ### Current State
 
-AIBar already contains most lower-level capabilities needed for a private beta, but they do not form a complete user-visible path. The clean `feature/aibar-beta` branch points exactly at committed baseline `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97`; there are no commits or working-tree changes between that baseline and the branch before this exploration artifact. The beta should be developed as a new, independent change on top of that commit. It must not depend on uncommitted files in the original worktree or resume the interrupted `aibar-foundation` packaging chain.
+AIBar already contains most lower-level capabilities needed for a private beta, but they do not form a complete user-visible path. The clean `feature/aibar-beta` branch points exactly at committed baseline `c4e35c01d5ed9cff30b136802a39196a3b2ed91d`; there are no commits or working-tree changes between that baseline and the branch before this exploration artifact. The beta should be developed as a new, independent change on top of that commit. It must not depend on uncommitted files in the original worktree or resume the interrupted `aibar-foundation` packaging chain.
 
 | Capability | Existing implementation | Disconnection or correction needed for beta |
 |---|---|---|

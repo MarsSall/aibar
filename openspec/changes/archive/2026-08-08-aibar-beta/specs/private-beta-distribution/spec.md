@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Define the manually distributed private-beta artifact and tester guidance without resuming packaging authority. The immutable commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97` is the beta baseline/root ancestor and MUST NOT be treated as the ZIP source.
+Define the manually distributed private-beta artifact and tester guidance without resuming packaging authority. The immutable commit `c4e35c01d5ed9cff30b136802a39196a3b2ed91d` is the beta baseline/root ancestor and MUST NOT be treated as the ZIP source.
 
 ## Requirements
 
 ### Requirement: Distribution is an unsigned self-contained Windows x64 ZIP
 
-The release candidate MUST be a manually distributed ZIP for Windows x64, MUST be self-contained so testers do not need a separately installed .NET runtime, MUST be explicitly labeled unsigned and private beta, and MUST be built from the exact final Unit 4 source commit after Unit 3B. The immutable commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97` MUST remain the baseline/root ancestor for ancestry proof, not the ZIP source.
+The release candidate MUST be a manually distributed ZIP for Windows x64, MUST be self-contained so testers do not need a separately installed .NET runtime, MUST be explicitly labeled unsigned and private beta, and MUST be built from the exact final Unit 4 source commit after Unit 3B. The immutable commit `c4e35c01d5ed9cff30b136802a39196a3b2ed91d` MUST remain the baseline/root ancestor for ancestry proof, not the ZIP source.
 
 #### Scenario: Tester receives the artifact
 
@@ -33,7 +33,7 @@ The release candidate MUST be a manually distributed ZIP for Windows x64, MUST b
 
 ### Requirement: Artifact provenance is bound to the distributed bytes
 
-The artifact metadata and tester instructions MUST bind the immutable baseline/root ancestor commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97`, the exact final Unit 4 artifact source commit after Unit 3B, the version, the complete artifact inventory, and the SHA-256 of the exact ZIP. These bindings MUST identify the same distributed artifact.
+The artifact metadata and tester instructions MUST bind the immutable baseline/root ancestor commit `c4e35c01d5ed9cff30b136802a39196a3b2ed91d`, the exact final Unit 4 artifact source commit after Unit 3B, the version, the complete artifact inventory, and the SHA-256 of the exact ZIP. These bindings MUST identify the same distributed artifact.
 
 #### Scenario: Provenance metadata is checked
 

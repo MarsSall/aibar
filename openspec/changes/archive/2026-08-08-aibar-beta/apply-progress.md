@@ -61,7 +61,7 @@ None. No Unit 2 presentation bindings, Unit 3 analytics, Unit 4 distribution, pa
 | Runtime harness | The five-test in-process tray/popup/lifecycle harness advances `IClock` by five minutes below the ten-minute freshness threshold, opens the popover, verifies the `00:55:00` remap, and proves the exact resulting immutable instance reaches both the popup property observer and tray observer without a provider call. No live endpoint was accessed; private endpoint use remains outside this work unit. |
 | Direct affected build | `dotnet build src/AIBar.Desktop/AIBar.Desktop.csproj --no-restore /m:1` — passed: 0 warnings, 0 errors (1.53 s). |
 | Solution build | `dotnet build AIBar.sln --no-restore /m:1` — blocked before remaining solution compilation by the pre-existing missing `tools/AIBar.Packaging.Supervisor/obj/project.assets.json` restore artifact (`NETSDK1004`). No restore or packaging action was performed. |
-| Diff check | `git diff --check` — passed with no whitespace errors. The worktree remains based exactly on `f2d72b63dd5a50f67f94997d1fbe8f4da39e0cba`. |
+| Diff check | `git diff --check` — passed with no whitespace errors. The worktree remains based exactly on `2677108a9ba6726093d7b6f426aa325153be70e9`. |
 | Rollback boundary | Revert `QuotaPresentation.cs`, `HostRuntime.cs`, `WindowsLifecycleEvents.cs`, the Unit-2 composition and XAML hunks in `App.xaml.cs` and `MainWindow.xaml`, `BetaPresentationTests.cs`, and the Unit-2 fake-tray method; Unit-1 consent/quota behavior remains intact. |
 
 ### Scope and deviations
@@ -181,7 +181,7 @@ The smallest correction resets `_scan`, `_outcome`, and the completed generation
 
 ### Completed final task
 
-- [x] 4.2 Published and smoke-validated the deterministic private-beta ZIP from committed Unit-4 source `058f5bd2fce56c80307af3dafcb494a0c72d8e2f`; the retained artifact is eligible only for manual private-beta distribution.
+- [x] 4.2 Published and smoke-validated the deterministic private-beta ZIP from committed Unit-4 source `7ea0599898d952733d17250f2abf8cbaeafc27fe`; the retained artifact is eligible only for manual private-beta distribution.
 
 ### Work Unit Evidence
 
@@ -197,13 +197,13 @@ The smallest correction resets `_scan`, `_outcome`, and the completed generation
 
 ### Exact continuation
 
-Commit only the six Unit-4 authored paths, then run `pwsh -NoProfile -File .\scripts\Publish-Deterministic.ps1 -PrivateBeta -OutputDirectory "$env:TEMP\aibar-beta-unit4-$([guid]::NewGuid().ToString('N'))" -SourceDateEpoch "1767225600"` from that clean final Unit-4 commit. Confirm its parent is `6e2d8a46d455819c6f30a07a34bf63c9594d5c4c`, smoke-test the produced Windows x64 ZIP without .NET, record the generated manifest/instructions as distribution evidence, and only then mark 4.2 complete.
+Commit only the six Unit-4 authored paths, then run `pwsh -NoProfile -File .\scripts\Publish-Deterministic.ps1 -PrivateBeta -OutputDirectory "$env:TEMP\aibar-beta-unit4-$([guid]::NewGuid().ToString('N'))" -SourceDateEpoch "1767225600"` from that clean final Unit-4 commit. Confirm its parent is `f04d78983065523c3bf9f66d6d2f98ddbd7a93a0`, smoke-test the produced Windows x64 ZIP without .NET, record the generated manifest/instructions as distribution evidence, and only then mark 4.2 complete.
 
 ### Final package and smoke evidence
 
 | Evidence | Result |
 |---|---|
-| Immutable source gate | Branch `feature/aibar-beta-unit-4`; clean `HEAD` and exact final source `058f5bd2fce56c80307af3dafcb494a0c72d8e2f`; exact parent `6e2d8a46d455819c6f30a07a34bf63c9594d5c4c`; baseline ancestor `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97`; `git merge-base --is-ancestor` exited 0. `stash@{0}` remained `3ff43d33cb16573f5d750767269629771867aec5`. |
+| Immutable source gate | Branch `feature/aibar-beta-unit-4`; clean `HEAD` and exact final source `7ea0599898d952733d17250f2abf8cbaeafc27fe`; exact parent `f04d78983065523c3bf9f66d6d2f98ddbd7a93a0`; baseline ancestor `c4e35c01d5ed9cff30b136802a39196a3b2ed91d`; `git merge-base --is-ancestor` exited 0. `stash@{0}` remained `3ff43d33cb16573f5d750767269629771867aec5`. |
 | Real deterministic package | Pre-approved parent `C:\Users\mjsal\AppData\Local\Temp\opencode` existed. From the clean commit, `pwsh -NoProfile -File .\scripts\Publish-Deterministic.ps1 -PrivateBeta -OutputDirectory "C:\Users\mjsal\AppData\Local\Temp\opencode\aibar-beta-unit4-f3f465ed17054b74a388d2d0a29531a0" -SourceDateEpoch "1767225600"` exited 0 using a fresh nonexistent output leaf. |
 | Retained artifact and provenance | `C:\Users\mjsal\AppData\Local\Temp\opencode\aibar-beta-unit4-f3f465ed17054b74a388d2d0a29531a0\AIBar-win-x64-private-beta.zip`; version `0.1.0-beta.1`; 471 inventory entries sorted ordinally by path, each matching recorded length and SHA-256; ZIP SHA-256 `b894cd3f665c9a16d74d811ad5c5cdf3ca3bed5ef952d77d64effd543f5946fa`. The manifest's source, baseline, version, inventory, and ZIP hash all matched the produced archive bytes. |
 | Distribution sidecars | `private-beta-manifest.json` and `private-beta-instructions.txt` were retained beside the ZIP. Instructions bind the same version/source/baseline/hash and state unsigned private beta, manual replacement, and no updater or uninstall. |
@@ -239,5 +239,5 @@ Commit only the six Unit-4 authored paths, then run `pwsh -NoProfile -File .\scr
 | Full regression | `dotnet test AIBar.sln --no-restore /m:1 --logger "console;verbosity=normal"` — passed 284/284, exit 0, 6.7151 minutes. |
 | Builds | `dotnet build src/AIBar.Application/AIBar.Application.csproj --no-restore /m:1 --verbosity normal` and `dotnet build src/AIBar.Desktop/AIBar.Desktop.csproj --no-restore /m:1 --verbosity normal` — both passed with 0 warnings and 0 errors. |
 | Runtime boundary | The two added tests use `App.CreateComposition`, actual `LocalCodexAnalyticsView`, and the composed `BetaRuntime` revocation path against synthetic temporary JSONL/SQLite only; no Codex data, credentials, or endpoint was accessed. |
-| Package provenance | No shipped implementation or publisher bytes remain changed; retained ZIP `b894cd3f665c9a16d74d811ad5c5cdf3ca3bed5ef952d77d64effd543f5946fa` remains bound to committed source `058f5bd2fce56c80307af3dafcb494a0c72d8e2f`. This is an uncommitted test/OpenSpec remediation candidate; no package was regenerated. |
+| Package provenance | No shipped implementation or publisher bytes remain changed; retained ZIP `b894cd3f665c9a16d74d811ad5c5cdf3ca3bed5ef952d77d64effd543f5946fa` remains bound to committed source `7ea0599898d952733d17250f2abf8cbaeafc27fe`. This is an uncommitted test/OpenSpec remediation candidate; no package was regenerated. |
 | Rollback boundary | Revert only `.gitattributes` and the five changed test files plus this section; Units 1–4 source behavior and the retained ZIP remain intact. |

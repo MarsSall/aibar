@@ -186,8 +186,8 @@ function Invoke-PrivateBeta {
     if (-not [string]::IsNullOrWhiteSpace($status)) { throw "BETA_SOURCE_UNCOMMITTED" }
     $source = (& git -C $projectRoot rev-parse HEAD).Trim(); $parent = (& git -C $projectRoot rev-parse "$source^").Trim()
     if ($LASTEXITCODE -ne 0) { throw "BETA_SOURCE_MISSING" }
-    $baseline = if ([string]::IsNullOrWhiteSpace($BetaBaselineCommit)) { "cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaBaselineCommit }
-    $requiredParent = if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { "50f283645bb0c97962ed7a4dbf881761538cda1e" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaParentCommit }
+    $baseline = if ([string]::IsNullOrWhiteSpace($BetaBaselineCommit)) { "c4e35c01d5ed9cff30b136802a39196a3b2ed91d" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaBaselineCommit }
+    $requiredParent = if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { "816c28b6747a6e9aa62c5c23c216cd4feb7a55fd" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaParentCommit }
     if ($parent -cne $requiredParent) { throw "BETA_PARENT_MISMATCH" }
     & git -C $projectRoot merge-base --is-ancestor $baseline $source
     if ($LASTEXITCODE -ne 0) { throw "BETA_BASELINE_MISMATCH" }

@@ -2,7 +2,7 @@
 
 ## Intent
 
-Deliver a private beta rooted at exact immutable baseline commit `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97`: testers can consent to Codex access, view quota and factual local usage, and run an unsigned portable build without AIBar storing secrets. This commit is the beta change's root parent and ancestry proof, not the final ZIP source tree.
+Deliver a private beta rooted at exact immutable baseline commit `c4e35c01d5ed9cff30b136802a39196a3b2ed91d`: testers can consent to Codex access, view quota and factual local usage, and run an unsigned portable build without AIBar storing secrets. This commit is the beta change's root parent and ancestry proof, not the final ZIP source tree.
 
 ## User Outcomes
 
@@ -39,7 +39,7 @@ None; no baseline OpenSpec capabilities exist.
 
 ## Approach
 
-Compose existing services through the WPF host, with one tray/popup state and snapshots preserved on safe failures. Do not create a second shell or resume release engineering. Use a five-slice Feature Branch Chain within 1000 lines per slice: Unit 1 consent/quota; Unit 2 presentation; Unit 3A analytics core; Unit 3B lifecycle/presentation; Unit 4 distribution. Before 3A, land the documentation-only Planning Amendment as its exact parent: it changes only the six planning artifacts, excludes all product/test changes, and preserves those later changes in the named selective stash `aibar-beta-unit3-product-split` for later branch restoration. Build the ZIP from the exact final Unit 4 source commit after Unit 3B while retaining `cc8eca54b8c49ffae3f88aa35f328cbf85a9ab97` as the immutable baseline/root parent for ancestry proof.
+Compose existing services through the WPF host, with one tray/popup state and snapshots preserved on safe failures. Do not create a second shell or resume release engineering. Use a five-slice Feature Branch Chain within 1000 lines per slice: Unit 1 consent/quota; Unit 2 presentation; Unit 3A analytics core; Unit 3B lifecycle/presentation; Unit 4 distribution. Before 3A, land the documentation-only Planning Amendment as its exact parent: it changes only the six planning artifacts, excludes all product/test changes, and preserves those later changes in the named selective stash `aibar-beta-unit3-product-split` for later branch restoration. Build the ZIP from the exact final Unit 4 source commit after Unit 3B while retaining `c4e35c01d5ed9cff30b136802a39196a3b2ed91d` as the immutable baseline/root parent for ancestry proof.
 
 ## Affected Areas
 

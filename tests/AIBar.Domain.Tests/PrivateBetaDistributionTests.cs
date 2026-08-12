@@ -8,11 +8,11 @@ namespace AIBar.Domain.Tests;
 public sealed class PrivateBetaDistributionTests
 {
     [Fact]
-    public void Private_beta_production_default_is_bound_to_the_final_beta3_parent()
+    public void Private_beta_production_default_is_bound_to_the_final_beta4_parent()
     {
         var script = File.ReadAllText(Path.Combine(RepositoryRoot(), "scripts", "Publish-Deterministic.ps1"));
 
-        Assert.Contains("if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { \"50f283645bb0c97962ed7a4dbf881761538cda1e\" }", script, StringComparison.Ordinal);
+        Assert.Contains("if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { \"816c28b6747a6e9aa62c5c23c216cd4feb7a55fd\" }", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public sealed class PrivateBetaDistributionTests
         Assert.Equal(fixture.Baseline, baseline);
         Assert.Equal(fixture.Parent, parent);
         Assert.Equal(fixture.Source, source);
-        Assert.Equal("0.1.0-beta.3", version);
+        Assert.Equal("0.1.0-beta.4", version);
         Assert.Equal("win-x64", manifest.RootElement.GetProperty("target").GetString());
         Assert.True(manifest.RootElement.GetProperty("selfContained").GetBoolean());
         Assert.Equal(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(output, "AIBar-win-x64-private-beta.zip")))).ToLowerInvariant(), manifest.RootElement.GetProperty("zipSha256").GetString());
@@ -113,7 +113,7 @@ public sealed class PrivateBetaDistributionTests
             Directory.CreateDirectory(Path.Combine(Root, "scripts"));
             Directory.CreateDirectory(Path.Combine(Root, "src", "AIBar.Desktop"));
             File.Copy(Path.Combine(RepositoryRoot(), "scripts", "Publish-Deterministic.ps1"), Path.Combine(Root, "scripts", "Publish-Deterministic.ps1"));
-            File.WriteAllText(Path.Combine(Root, "src", "AIBar.Desktop", "AIBar.Desktop.csproj"), "<Project><PropertyGroup><Version>0.1.0-beta.3</Version></PropertyGroup></Project>");
+            File.WriteAllText(Path.Combine(Root, "src", "AIBar.Desktop", "AIBar.Desktop.csproj"), "<Project><PropertyGroup><Version>0.1.0-beta.4</Version></PropertyGroup></Project>");
             File.WriteAllText(Path.Combine(Root, "README.md"), "baseline");
             Git("init"); Git("add", "."); Git("-c", "user.name=tests", "-c", "user.email=tests@example.invalid", "commit", "-m", "baseline");
             Baseline = Git("rev-parse", "HEAD").Output.Trim();

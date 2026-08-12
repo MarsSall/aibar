@@ -233,7 +233,7 @@ The first chained full-suite/build shell reached its 900-second wrapper timeout 
 
 ## Evidence consistency
 
-Stable evidence revision: `sha256:89688e77851d5263c76a2e9d6cb1e4168a2c8d3a6f25daa5d4b7d7b3f6b453eb`, SHA-256 over the 414-byte LF/UTF-8 manifest binding HEAD `13fdc5e70687be954129fda3f95600782f5b0a09` and current Git blob hashes for `DirectoryCapability.cs`, `PackagingSupervisorTests.cs`, `tasks.md`, and `apply-progress.md`. Apply claims align with fresh 50/50 focused, 277/277 full-suite, build, cleanup, and process evidence.
+Stable evidence revision: `sha256:89688e77851d5263c76a2e9d6cb1e4168a2c8d3a6f25daa5d4b7d7b3f6b453eb`, SHA-256 over the 414-byte LF/UTF-8 manifest binding HEAD `feb9309fdb681f1db570c9e1a68cecf3d5c4e354` and current Git blob hashes for `DirectoryCapability.cs`, `PackagingSupervisorTests.cs`, `tasks.md`, and `apply-progress.md`. Apply claims align with fresh 50/50 focused, 277/277 full-suite, build, cleanup, and process evidence.
 
 `.gitignore` HEAD/index/worktree blobs are byte-identical at `16d3fd82b1698894b9b3f4d707e12db4f16cd7f1`; its pre-existing metadata-only unstaged status was preserved. No production or test file was edited by verification.
 
@@ -585,7 +585,7 @@ Recommended bounded remediation: in one newly authorized b1a correction limited 
 
 ## Status: PASS (bounded correction); whole-change archive BLOCKED
 
-Slice 5B and controller-authorized corrections `RELIABILITY-001` and `RELIABILITY-002` pass independent slice-scoped verification. The canonical spec is `openspec/changes/aibar-foundation/specs/aibar-foundation/spec.md`. Action context is `repo-local` at `C:/Users/mjsal/Desarrollos IA/Modificacion de Terminales/aibar`; ownership is proven inside that root. Branch/base: `feature/aibar-foundation-slice-5b` / `bcd0931cb7c2f3196811fa017e461c5be52b1027`. Delivery remains `auto-chain` / `feature-branch-chain`, Slice 5B only. This report does not claim review approval.
+Slice 5B and controller-authorized corrections `RELIABILITY-001` and `RELIABILITY-002` pass independent slice-scoped verification. The canonical spec is `openspec/changes/aibar-foundation/specs/aibar-foundation/spec.md`. Action context is `repo-local` at `C:/Users/mjsal/Desarrollos IA/Modificacion de Terminales/aibar`; ownership is proven inside that root. Branch/base: `feature/aibar-foundation-slice-5b` / `ef59e3c12f62e3fe5b65563a6cf534fcf50faac9`. Delivery remains `auto-chain` / `feature-branch-chain`, Slice 5B only. This report does not claim review approval.
 
 ## Scope and workload
 
@@ -650,7 +650,7 @@ Slice 5B blockers: **none**. Whole-change/archive remains blocked by later unche
 
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: e5cca98473c45efbd89ddc31f9066a0e6d579c6c
+evidence_revision: 1df8d47a4b22d05d9e8f5a0f0cf01a748081a3a8
 scope: integrated-b2a-plus-b2b-units-1-2-3-only
 verdict: fail
 blockers: 2
