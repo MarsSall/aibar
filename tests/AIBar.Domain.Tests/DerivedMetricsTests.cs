@@ -80,6 +80,19 @@ public sealed class DerivedMetricsTests
     }
 
     [Fact]
+    public void Eta_is_unavailable_without_a_primary_window()
+    {
+        var weeklyOnly = new QuotaSnapshot(null, new(40, Now.AddDays(6)), Now);
+
+        var result = Eta().Calculate(weeklyOnly, Observation(Now.AddHours(-2), 20), Observation(Now.AddHours(-1), 40));
+
+        Assert.Equal(DerivedMetricState.Unavailable, result.State);
+        Assert.Null(result.ObservedRatePerHour);
+        Assert.Null(result.RemainingPercentage);
+        Assert.Null(result.EstimatedExhaustionAt);
+    }
+
+    [Fact]
     public void Eta_is_a_simple_linear_estimate_only_for_current_service_window_observations()
     {
         var result = Eta().Calculate(Snapshot(), Observation(Now.AddHours(-2), 20), Observation(Now.AddHours(-1), 40));

@@ -8,14 +8,87 @@ namespace AIBar.Domain.Tests;
 public sealed class QuotaHttpProviderTests
 {
     [Fact]
-    public async Task Maps_variant_windows_and_optional_credits_with_scoped_authorization()
+    public async Task Maps_official_windows_with_unix_resets_and_available_credits()
     {
         var handler = new StubHandler(
-            Json("{\"rate_limit\":{\"primary_window\":{\"used_percent\":25,\"reset_time\":\"2030-01-01T01:00:00Z\"},\"secondary_window\":{\"percentage_used\":75,\"reset_at\":\"2030-01-02T01:00:00Z\"}}}"),
-            Json("{\"reset_credits\":3}"));
+            Json("""{"rate_limit":{"primary_window":{"used_percent":25,"reset_at":1893459600,"limit_window_seconds":18000},"secondary_window":{"used_percent":75,"reset_at":1893546000,"limit_window_seconds":604800}}}"""),
+            Json("""{"available_count":3,"credits":[]}"""));
         var result = await Provider(handler).GetQuotaAsync(CancellationToken.None);
-        Assert.Equal(25, result.Snapshot!.Primary.PercentageUsed); Assert.Equal(75, result.Snapshot.Weekly.PercentageUsed);
+        Assert.Equal(25, result.Snapshot!.Primary!.PercentageUsed); Assert.Equal(75, result.Snapshot.Weekly!.PercentageUsed);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1893459600), result.Snapshot.Primary.ResetAt);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1893546000), result.Snapshot.Weekly.ResetAt);
         Assert.Equal(3, result.ResetCredits); Assert.All(handler.Requests, r => Assert.Equal("Bearer secret-token", r.Headers.Authorization!.ToString()));
+    }
+
+    [Fact]
+    public async Task Maps_weekly_only_official_primary_without_inventing_a_five_hour_window()
+    {
+        var result = await Provider(new StubHandler(
+            Json("""{"rate_limit":{"primary_window":{"used_percent":42.5,"reset_at":1893974400,"limit_window_seconds":604800},"secondary_window":null}}"""),
+            Json("""{"available_count":0}"""))).GetQuotaAsync(CancellationToken.None);
+
+        Assert.Null(result.Failure);
+        Assert.Null(result.Snapshot!.Primary);
+        Assert.Equal(42.5m, result.Snapshot.Weekly!.PercentageUsed);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1893974400), result.Snapshot.Weekly.ResetAt);
+    }
+
+    [Fact]
+    public async Task Classifies_official_windows_by_duration_not_position()
+    {
+        var result = await Provider(new StubHandler(
+            Json("""{"rate_limit":{"primary_window":{"used_percent":70,"reset_at":1893974400,"limit_window_seconds":604800},"secondary_window":{"used_percent":20,"reset_at":1893459600,"limit_window_seconds":18000}}}"""),
+            Json("""{"reset_credits":1}"""))).GetQuotaAsync(CancellationToken.None);
+
+        Assert.Equal(20, result.Snapshot!.Primary!.PercentageUsed);
+        Assert.Equal(70, result.Snapshot.Weekly!.PercentageUsed);
+        Assert.Equal(1, result.ResetCredits);
+    }
+
+    [Theory]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"used_percent\":10,\"reset_at\":1893459600,\"limit_window_seconds\":3600},\"secondary_window\":null}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":null,\"secondary_window\":null}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"used_percent\":10,\"reset_at\":1893459600,\"limit_window_seconds\":18000},\"secondary_window\":{\"used_percent\":20,\"reset_at\":1893463200,\"limit_window_seconds\":18000}}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"used_percent\":10,\"reset_at\":1893459600,\"limit_window_seconds\":18000},\"five_hour\":{\"used_percent\":10,\"reset_at\":1893459600}}}")]
+    public async Task Rejects_unknown_duration_or_both_null_official_windows(string json)
+    {
+        var result = await Provider(new StubHandler(Json(json))).GetQuotaAsync(CancellationToken.None);
+
+        Assert.Equal("quota_malformed", result.Failure!.SafeCode);
+        Assert.Null(result.Snapshot);
+    }
+
+    [Theory]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"used_percent\":10,\"reset_at\":1893459600,\"limit_window_seconds\":18000},\"primary_window\":{\"used_percent\":20,\"reset_at\":1893463200,\"limit_window_seconds\":18000}}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"percentage_used\":10,\"used_percent\":90,\"reset_at\":1893459600,\"limit_window_seconds\":18000}}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"percentage_used\":10,\"used_percent\":10,\"reset_at\":1893459600,\"limit_window_seconds\":18000}}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"used_percent\":10,\"used_percent\":90,\"reset_at\":1893459600,\"limit_window_seconds\":18000}}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"used_percent\":10,\"reset_at\":1893459600,\"reset_at\":1893463200,\"limit_window_seconds\":18000}}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"used_percent\":10,\"reset_at\":1893459600,\"reset_time\":1893463200,\"limit_window_seconds\":18000}}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"used_percent\":10,\"reset_at\":1893459600,\"reset_time\":1893459600,\"limit_window_seconds\":18000}}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"used_percent\":10,\"reset_at\":1893459600,\"limit_window_seconds\":18000,\"limit_window_seconds\":604800}}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"used_percent\":10,\"reset_at\":1893459600,\"limit_window_seconds\":18000,\"limit_window_seconds\":18000}}}")]
+    [InlineData("{\"rate_limit\":{\"primary_window\":{\"used_percent\":10,\"reset_at\":1893459600,\"limit_window_seconds\":18000}},\"rate_limit\":{\"primary_window\":{\"used_percent\":20,\"reset_at\":1893463200,\"limit_window_seconds\":18000}}}")]
+    [InlineData("{\"five_hour\":{\"percentage_used\":10,\"reset_at\":1893459600},\"five_hour\":{\"percentage_used\":20,\"reset_at\":1893463200}}")]
+    public async Task Rejects_duplicate_or_aliased_recognized_quota_properties(string json)
+    {
+        var result = await Provider(new StubHandler(Json(json))).GetQuotaAsync(CancellationToken.None);
+
+        Assert.Equal("quota_malformed", result.Failure!.SafeCode);
+        Assert.Null(result.Snapshot);
+    }
+
+    [Theory]
+    [InlineData("{\"available_count\":1,\"reset_credits\":2}")]
+    [InlineData("{\"available_count\":1,\"reset_credits\":1}")]
+    [InlineData("{\"available_count\":1,\"available_count\":2}")]
+    public async Task Rejects_duplicate_or_aliased_optional_credit_properties(string json)
+    {
+        var result = await Provider(new StubHandler(Json(Valid), Json(json))).GetQuotaAsync(CancellationToken.None);
+
+        Assert.NotNull(result.Snapshot);
+        Assert.Equal("quota_optional_malformed", result.OptionalFailure!.SafeCode);
+        Assert.Null(result.ResetCredits);
     }
 
     [Theory]
@@ -46,7 +119,7 @@ public sealed class QuotaHttpProviderTests
         var missing = new QuotaHttpProvider(new StubHandler(), new PrivateIntegrationPolicy(true), _ => ValueTask.FromResult<RequestCredential?>(null));
         Assert.Equal(QuotaErrorKind.Unavailable, (await missing.GetQuotaAsync(CancellationToken.None)).Failure!.Kind);
         Assert.Equal(QuotaErrorKind.MalformedResponse, (await Provider(new StubHandler(Json("[]"))).GetQuotaAsync(CancellationToken.None)).Failure!.Kind);
-        var optional = await Provider(new StubHandler(Json(Valid), Json("[]"))).GetQuotaAsync(CancellationToken.None);
+        var optional = await Provider(new StubHandler(Json(Valid), Json("{\"credits\":[]}"))).GetQuotaAsync(CancellationToken.None);
         Assert.NotNull(optional.Snapshot); Assert.Equal("quota_optional_malformed", optional.OptionalFailure!.SafeCode);
     }
 
@@ -63,7 +136,7 @@ public sealed class QuotaHttpProviderTests
     public async Task Honors_retry_after_http_dates_with_controlled_time_and_cap()
     {
         var now = new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero); var delays = new List<TimeSpan>();
-        QuotaHttpProvider WithDate(DateTimeOffset date) { var retry = new HttpResponseMessage((HttpStatusCode)429); retry.Headers.RetryAfter = new(date); return new(new StubHandler(retry, Json(Valid), Json("{\"credits\":1}")), new PrivateIntegrationPolicy(true), _ => ValueTask.FromResult<RequestCredential?>(new("secret-token", null)), utcNow: () => now, delay: (value, _) => { delays.Add(value); return Task.CompletedTask; }); }
+        QuotaHttpProvider WithDate(DateTimeOffset date) { var retry = new HttpResponseMessage((HttpStatusCode)429); retry.Headers.RetryAfter = new(date); return new(new StubHandler(retry, Json(Valid), Json("{\"available_count\":1}")), new PrivateIntegrationPolicy(true), _ => ValueTask.FromResult<RequestCredential?>(new("secret-token", null)), utcNow: () => now, delay: (value, _) => { delays.Add(value); return Task.CompletedTask; }); }
         await WithDate(now.AddMinutes(-1)).GetQuotaAsync(CancellationToken.None);
         await WithDate(now.AddMinutes(1)).GetQuotaAsync(CancellationToken.None);
         Assert.Equal([TimeSpan.Zero, TimeSpan.FromSeconds(5)], delays);

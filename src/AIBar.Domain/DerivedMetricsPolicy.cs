@@ -49,11 +49,12 @@ public sealed class LinearExhaustionEtaPolicy(IClock clock, FreshnessPolicy fres
     public ExhaustionEtaResult Calculate(QuotaSnapshot serviceQuota, IEnumerable<QuotaUsageObservation> observations)
     {
         var facts = observations.OrderBy(item => item.ObservedAt).ToArray();
+        var window = serviceQuota.Primary;
+        if (window is null) return Result(DerivedMetricState.Unavailable, null, null, null, serviceQuota, facts);
         if (facts.Length < 2) return Result(DerivedMetricState.Unsupported, null, null, null, serviceQuota, facts);
 
         var now = clock.UtcNow;
-        var window = serviceQuota.Primary;
-        if (!HasValidCurrentWindow(serviceQuota, facts, now))
+        if (!HasValidCurrentWindow(serviceQuota, window, facts, now))
             return Result(DerivedMetricState.Unavailable, null, null, null, serviceQuota, facts);
 
         var first = facts[^2];
@@ -69,9 +70,9 @@ public sealed class LinearExhaustionEtaPolicy(IClock clock, FreshnessPolicy fres
             : Result(DerivedMetricState.Available, rate, remaining, eta, serviceQuota, facts);
     }
 
-    private bool HasValidCurrentWindow(QuotaSnapshot quota, IReadOnlyList<QuotaUsageObservation> observations, DateTimeOffset now) =>
-        freshness.Evaluate(quota, now) == FreshnessState.Current && quota.Primary.ResetAt > now &&
-        observations.All(item => item.ResetAt == quota.Primary.ResetAt && item.ObservedAt <= now &&
+    private bool HasValidCurrentWindow(QuotaSnapshot quota, QuotaWindow window, IReadOnlyList<QuotaUsageObservation> observations, DateTimeOffset now) =>
+        freshness.Evaluate(quota, now) == FreshnessState.Current && window.ResetAt > now &&
+        observations.All(item => item.ResetAt == window.ResetAt && item.ObservedAt <= now &&
             item.PercentageUsed is >= 0 and <= 100);
 
     private static ExhaustionEtaResult Result(DerivedMetricState state, decimal? rate, decimal? remaining, DateTimeOffset? eta, QuotaSnapshot quota, IReadOnlyList<QuotaUsageObservation> observations) =>

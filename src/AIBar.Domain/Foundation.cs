@@ -16,16 +16,17 @@ public sealed record QuotaWindow(decimal PercentageUsed, DateTimeOffset ResetAt)
 
 public sealed record QuotaSnapshot
 {
-    public QuotaSnapshot(QuotaWindow primary, QuotaWindow weekly, DateTimeOffset retrievedAt, decimal? resetCredits = null)
+    public QuotaSnapshot(QuotaWindow? primary, QuotaWindow? weekly, DateTimeOffset retrievedAt, decimal? resetCredits = null)
     {
+        if (primary is null && weekly is null) throw new ArgumentException("At least one quota window is required.");
         Primary = primary;
         Weekly = weekly;
         RetrievedAt = retrievedAt;
         ResetCredits = resetCredits;
     }
 
-    public QuotaWindow Primary { get; }
-    public QuotaWindow Weekly { get; }
+    public QuotaWindow? Primary { get; }
+    public QuotaWindow? Weekly { get; }
     public DateTimeOffset RetrievedAt { get; }
     public decimal? ResetCredits { get; }
 }

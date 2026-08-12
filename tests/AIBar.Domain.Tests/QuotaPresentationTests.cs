@@ -23,6 +23,25 @@ public sealed class QuotaPresentationTests
         Assert.Null(unavailable.Primary.PercentageUsed); Assert.Equal("Unavailable", unavailable.FreshnessLabel);
     }
 
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void Maps_each_quota_card_availability_from_its_service_window(bool hasPrimary, bool hasWeekly)
+    {
+        var snapshot = hasPrimary || hasWeekly
+            ? new QuotaSnapshot(hasPrimary ? new(42, Now.AddHours(5)) : null, hasWeekly ? new(20, Now.AddDays(7)) : null, Now)
+            : null;
+
+        var view = new QuotaPresentationMapper(new FixedClock(Now)).Map(new(snapshot, FreshnessState.Current, false, null, null));
+
+        Assert.Equal(hasPrimary, view.IsPrimaryAvailable);
+        Assert.Equal(hasWeekly, view.IsWeeklyAvailable);
+        Assert.Equal(hasPrimary ? 42m : null, view.Primary.PercentageUsed);
+        Assert.Equal(hasWeekly ? 20m : null, view.Weekly.PercentageUsed);
+    }
+
     [Fact]
     public void Retained_snapshot_with_failure_is_never_labeled_current()
     {

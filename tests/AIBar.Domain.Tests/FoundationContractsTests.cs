@@ -35,6 +35,19 @@ public sealed class FoundationContractsTests
     }
 
     [Fact]
+    public void Quota_snapshot_requires_at_least_one_independently_optional_window()
+    {
+        var now = new DateTimeOffset(2026, 7, 12, 10, 0, 0, TimeSpan.Zero);
+        var weekly = new QuotaWindow(12, now.AddDays(7));
+
+        var snapshot = new QuotaSnapshot(null, weekly, now);
+
+        Assert.Null(snapshot.Primary);
+        Assert.Equal(weekly, snapshot.Weekly);
+        Assert.Throws<ArgumentException>(() => new QuotaSnapshot(null, null, now));
+    }
+
+    [Fact]
     public void Token_deltas_clamp_each_cumulative_component_independently()
     {
         var previous = new TokenTotals(100, 50, 25);

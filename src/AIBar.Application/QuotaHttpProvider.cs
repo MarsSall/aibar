@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Globalization;
 using System.Text.Json;
 using AIBar.Domain;
 
@@ -103,21 +104,97 @@ public sealed class QuotaHttpProvider : IQuotaProvider
         {
             using var document = JsonDocument.Parse(body); var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return false;
-            if (root.TryGetProperty("rate_limit", out var rateLimit)) root = rateLimit;
+            if (CountProperties(root, "rate_limit") > 1 || HasDuplicateWindowProperties(root)) return false;
+            if (root.TryGetProperty("rate_limit", out var rateLimit))
+            {
+                if (CountProperties(root, "primary_window", "secondary_window", "five_hour", "weekly") > 0) return false;
+                root = rateLimit;
+            }
             if (root.ValueKind != JsonValueKind.Object) return false;
-            return TryWindow(root, "five_hour", "primary_window", out var primary) && TryWindow(root, "weekly", "secondary_window", out var weekly) && (snapshot = new(primary, weekly, DateTimeOffset.UtcNow)) is not null;
+            if (HasDuplicateWindowProperties(root)) return false;
+            QuotaWindow? primary;
+            QuotaWindow? weekly;
+            var hasOfficialWindows = root.TryGetProperty("primary_window", out _) || root.TryGetProperty("secondary_window", out _);
+            var hasNamedWindows = root.TryGetProperty("five_hour", out _) || root.TryGetProperty("weekly", out _);
+            if (hasOfficialWindows && hasNamedWindows) return false;
+            if (hasOfficialWindows)
+            {
+                primary = null; weekly = null;
+                if (!TryOfficialWindow(root, "primary_window", ref primary, ref weekly) ||
+                    !TryOfficialWindow(root, "secondary_window", ref primary, ref weekly)) return false;
+            }
+            else if (!TryNamedWindow(root, "five_hour", 18000, out primary) ||
+                     !TryNamedWindow(root, "weekly", 604800, out weekly)) return false;
+            return (primary is not null || weekly is not null) && (snapshot = new(primary, weekly, DateTimeOffset.UtcNow)) is not null;
         }
         catch (JsonException) { return false; }
     }
-    private static bool TryWindow(JsonElement root, string first, string second, out QuotaWindow window)
+
+    private static bool TryOfficialWindow(JsonElement root, string name, ref QuotaWindow? primary, ref QuotaWindow? weekly)
+    {
+        if (!root.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null) return true;
+        if (!TryWindow(value, out var window) || CountProperties(value, "limit_window_seconds") != 1 ||
+            !value.TryGetProperty("limit_window_seconds", out var duration) || !duration.TryGetInt32(out var seconds)) return false;
+        return seconds switch
+        {
+            18000 when primary is null => (primary = window) is not null,
+            604800 when weekly is null => (weekly = window) is not null,
+            _ => false,
+        };
+    }
+
+    private static bool TryNamedWindow(JsonElement root, string name, int expectedDuration, out QuotaWindow? window)
+    {
+        window = null;
+        if (!root.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null) return true;
+        if (value.ValueKind != JsonValueKind.Object || CountProperties(value, "limit_window_seconds") > 1 ||
+            (value.TryGetProperty("limit_window_seconds", out var duration) && (!duration.TryGetInt32(out var seconds) || seconds != expectedDuration))) return false;
+        if (!TryWindow(value, out var parsed)) return false;
+        window = parsed;
+        return true;
+    }
+
+    private static bool TryWindow(JsonElement value, out QuotaWindow window)
     {
         window = null!;
-        if (!(root.TryGetProperty(first, out var value) || root.TryGetProperty(second, out value)) || value.ValueKind != JsonValueKind.Object) return false;
-        if (!((value.TryGetProperty("percentage_used", out var percentage) || value.TryGetProperty("used_percent", out percentage)) && percentage.TryGetDecimal(out var used) && used is >= 0 and <= 100 && (value.TryGetProperty("reset_at", out var reset) || value.TryGetProperty("reset_time", out reset)) && reset.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(reset.GetString(), out var at))) return false;
-        window = new(used, at); return true;
+        if (value.ValueKind != JsonValueKind.Object ||
+            CountProperties(value, "percentage_used", "used_percent") != 1 ||
+            CountProperties(value, "reset_at", "reset_time") != 1 ||
+            !((value.TryGetProperty("percentage_used", out var percentage) || value.TryGetProperty("used_percent", out percentage)) &&
+              percentage.TryGetDecimal(out var used) && used is >= 0 and <= 100) ||
+            !((value.TryGetProperty("reset_at", out var reset) || value.TryGetProperty("reset_time", out reset)) && TryReset(reset, out var at))) return false;
+        window = new(used, at);
+        return true;
     }
+
+    private static bool TryReset(JsonElement value, out DateTimeOffset resetAt)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+            return DateTimeOffset.TryParse(value.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out resetAt);
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var unixSeconds))
+        {
+            try { resetAt = DateTimeOffset.FromUnixTimeSeconds(unixSeconds); return true; }
+            catch (ArgumentOutOfRangeException) { }
+        }
+        resetAt = default;
+        return false;
+    }
+
+    private static bool HasDuplicateWindowProperties(JsonElement value) =>
+        CountProperties(value, "primary_window") > 1 || CountProperties(value, "secondary_window") > 1 ||
+        CountProperties(value, "five_hour") > 1 || CountProperties(value, "weekly") > 1;
+
+    private static int CountProperties(JsonElement value, params string[] names)
+    {
+        var count = 0;
+        foreach (var property in value.EnumerateObject())
+            foreach (var name in names)
+                if (property.NameEquals(name)) { count++; break; }
+        return count;
+    }
+
     private static bool TryCredits(string body, out decimal credits)
     {
-        credits = 0; try { using var doc = JsonDocument.Parse(body); return doc.RootElement.ValueKind == JsonValueKind.Object && (doc.RootElement.TryGetProperty("reset_credits", out var value) || doc.RootElement.TryGetProperty("credits", out value)) && value.TryGetDecimal(out credits); } catch (JsonException) { return false; }
+        credits = 0; try { using var doc = JsonDocument.Parse(body); return doc.RootElement.ValueKind == JsonValueKind.Object && CountProperties(doc.RootElement, "available_count", "reset_credits") == 1 && (doc.RootElement.TryGetProperty("available_count", out var value) || doc.RootElement.TryGetProperty("reset_credits", out value)) && value.TryGetDecimal(out credits); } catch (JsonException) { return false; }
     }
 }

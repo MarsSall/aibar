@@ -35,9 +35,13 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
         Assert.Contains(values, value => value.Contains("Weekly.ResetCountdown", StringComparison.Ordinal));
         Assert.Contains("{Binding FreshnessLabel}", values);
         Assert.Contains("{Binding PrivateEndpointDisclosure}", values);
+        var primaryCard = window.Descendants().Single(element => element.Attributes().Any(attribute => attribute.Value == "5-hour quota card"));
+        var weeklyCard = window.Descendants().Single(element => element.Attributes().Any(attribute => attribute.Value == "Weekly quota card"));
+        Assert.Equal("{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", primaryCard.Attribute("Visibility")?.Value);
+        Assert.Equal("{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", weeklyCard.Attribute("Visibility")?.Value);
     }
     [Fact]
-    public void Runtime_ui_automation_exposes_named_cards_and_button_command()
+    public void Runtime_ui_automation_exposes_named_cards_card_availability_and_button_command()
     {
         Exception? failure = null;
         var thread = new Thread(() =>
@@ -58,6 +62,18 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
                 button.GetType().GetMethod("OnClick", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(button, null);
                 Assert.True(provider.Entered.Wait(TimeSpan.FromSeconds(2)));
                 Assert.False(button.IsEnabled);
+                foreach (var availability in new[] { (Primary: false, Weekly: true), (Primary: true, Weekly: false), (Primary: true, Weekly: true), (Primary: false, Weekly: false) })
+                {
+                    var snapshot = availability.Primary || availability.Weekly ? new QuotaSnapshot(availability.Primary ? new(42, DateTimeOffset.UtcNow.AddHours(5)) : null, availability.Weekly ? new(20, DateTimeOffset.UtcNow.AddDays(7)) : null, DateTimeOffset.UtcNow) : null;
+                    var cardCoordinator = new QuotaRefreshCoordinator(new EmptyStore(snapshot), provider, new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
+                    var cardHost = new QuotaPresentationHost(cardCoordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow))); var initialization = cardCoordinator.InitializeAsync(default).AsTask(); PumpUntil(() => initialization.IsCompleted); Assert.True(initialization.IsCompletedSuccessfully);
+                    var analytics = new LocalCodexAnalyticsView(); var cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics) }; cardWindow.Show(); cardWindow.UpdateLayout();
+                    System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); cardWindow.UpdateLayout();
+                    var quotaCards = FindVisualChildren<System.Windows.Controls.GroupBox>(cardWindow).Take(2).ToArray();
+                    Assert.Equal(availability.Primary ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, quotaCards[0].Visibility);
+                    Assert.Equal(availability.Weekly ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, quotaCards[1].Visibility); cardWindow.Close();
+                    var cardCleanup = DisposeAsync(analytics, cardHost, cardCoordinator); PumpUntil(() => cardCleanup.IsCompleted); Assert.True(cardCleanup.IsCompletedSuccessfully);
+                }
                 var disabled = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), false);
                 var disabledWindow = new MainWindow { DataContext = disabled };
                 disabledWindow.Show();
@@ -99,9 +115,9 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
         public ValueTask SaveAsync(QuotaSnapshot snapshot, CancellationToken cancellationToken) => ValueTask.CompletedTask;
         public ValueTask ClearAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
-    private sealed class EmptyStore : IQuotaSnapshotStore
+    private sealed class EmptyStore(QuotaSnapshot? snapshot = null) : IQuotaSnapshotStore
     {
-        public ValueTask<QuotaSnapshot?> LoadAsync(CancellationToken cancellationToken) => ValueTask.FromResult<QuotaSnapshot?>(null);
+        public ValueTask<QuotaSnapshot?> LoadAsync(CancellationToken cancellationToken) => ValueTask.FromResult(snapshot);
         public ValueTask SaveAsync(QuotaSnapshot snapshot, CancellationToken cancellationToken) => ValueTask.CompletedTask;
         public ValueTask ClearAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }

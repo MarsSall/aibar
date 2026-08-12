@@ -15,7 +15,7 @@ public sealed class QuotaRefreshCoordinatorTests
         await using var coordinator = Create(store, provider);
 
         await coordinator.InitializeAsync(default);
-        Assert.Equal(42, coordinator.State.Snapshot!.Primary.PercentageUsed);
+        Assert.Equal(42, coordinator.State.Snapshot!.Primary!.PercentageUsed);
         Assert.Equal(FreshnessState.Current, coordinator.State.Freshness);
         await coordinator.RefreshAsync(RefreshTrigger.Poll, default);
 
@@ -40,7 +40,7 @@ public sealed class QuotaRefreshCoordinatorTests
 
         Assert.Equal(1, provider.Calls);
         Assert.Equal(1, store.Saves);
-        Assert.Equal(42, coordinator.State.Snapshot!.Primary.PercentageUsed);
+        Assert.Equal(42, coordinator.State.Snapshot!.Primary!.PercentageUsed);
     }
 
     [Fact]

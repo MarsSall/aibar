@@ -21,7 +21,7 @@
             <TextBlock Text="Private quota integration is disabled" Visibility="{Binding State.IsPrivateIntegrationDisabled, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
             <TextBlock Text="Quota error" Visibility="{Binding State.IsSafeError, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
 
-            <GroupBox automation:AutomationProperties.Name="5-hour quota card" Margin="0,16,0,0">
+            <GroupBox automation:AutomationProperties.Name="5-hour quota card" Margin="0,16,0,0" Visibility="{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Border Style="{StaticResource QuotaCardStyle}">
                     <Grid Margin="16">
                         <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
@@ -33,7 +33,7 @@
                 </Border>
             </GroupBox>
 
-            <GroupBox automation:AutomationProperties.Name="Weekly quota card" Margin="0,8,0,0">
+            <GroupBox automation:AutomationProperties.Name="Weekly quota card" Margin="0,8,0,0" Visibility="{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Border Style="{StaticResource QuotaCardStyle}">
                     <Grid Margin="16">
                         <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>

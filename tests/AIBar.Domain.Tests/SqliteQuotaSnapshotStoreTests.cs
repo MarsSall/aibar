@@ -44,6 +44,19 @@ public sealed class SqliteQuotaSnapshotStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Saves_and_loads_a_weekly_only_snapshot_without_fabricating_primary_data()
+    {
+        await using var store = new SqliteQuotaSnapshotStore(_path);
+        var snapshot = new QuotaSnapshot(null, new(42.5m, new DateTimeOffset(2030, 1, 8, 0, 0, 0, TimeSpan.Zero)), new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero), 3);
+
+        await store.SaveAsync(snapshot, CancellationToken.None);
+        var loaded = await store.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(snapshot, loaded);
+        Assert.Null(loaded!.Primary);
+    }
+
+    [Fact]
     public async Task Migrates_v1_and_preserves_its_snapshot()
     {
         await using (var connection = Open())
@@ -54,7 +67,26 @@ public sealed class SqliteQuotaSnapshotStoreTests : IDisposable
         await using var store = new SqliteQuotaSnapshotStore(_path);
         Assert.Equal(7.5m, (await store.LoadAsync(CancellationToken.None))!.ResetCredits);
         await using var migrated = Open();
-        Assert.Equal(2L, (long)(await Scalar(migrated, "PRAGMA user_version;"))!);
+        Assert.Equal(3L, (long)(await Scalar(migrated, "PRAGMA user_version;"))!);
+    }
+
+    [Fact]
+    public async Task Migrates_v2_and_preserves_its_snapshot()
+    {
+        await using (var connection = Open())
+        {
+            await Execute(connection, "CREATE TABLE schema_meta (version INTEGER PRIMARY KEY); INSERT INTO schema_meta VALUES (2); CREATE TABLE quota_snapshot (id INTEGER PRIMARY KEY CHECK (id = 1), schema_version INTEGER NOT NULL REFERENCES schema_meta(version), primary_percentage TEXT NOT NULL, primary_reset_at TEXT NOT NULL, weekly_percentage TEXT NOT NULL, weekly_reset_at TEXT NOT NULL, reset_credits TEXT NULL, retrieved_at TEXT NOT NULL, schema_adapter_version INTEGER NOT NULL); PRAGMA user_version = 2;");
+            await Execute(connection, "INSERT INTO quota_snapshot VALUES (1, 2, '10', '2030-01-01T01:00:00+00:00', '20', '2030-01-08T01:00:00+00:00', '7.5', '2030-01-01T00:00:00+00:00', 1);");
+        }
+
+        await using var store = new SqliteQuotaSnapshotStore(_path);
+        var snapshot = await store.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(10, snapshot!.Primary!.PercentageUsed);
+        Assert.Equal(20, snapshot.Weekly!.PercentageUsed);
+        Assert.Equal(7.5m, snapshot.ResetCredits);
+        await using var migrated = Open();
+        Assert.Equal(3L, (long)(await Scalar(migrated, "PRAGMA user_version;"))!);
     }
 
     [Fact]
@@ -96,10 +128,23 @@ public sealed class SqliteQuotaSnapshotStoreTests : IDisposable
         await stable.SaveAsync(Snapshot(10), CancellationToken.None);
         await using (var failing = new SqliteQuotaSnapshotStore(_path, () => throw new InvalidOperationException("synthetic crash")))
             await Assert.ThrowsAsync<InvalidOperationException>(() => failing.SaveAsync(Snapshot(90), CancellationToken.None).AsTask());
-        Assert.Equal(10, (await stable.LoadAsync(CancellationToken.None))!.Primary.PercentageUsed);
+        Assert.Equal(10, (await stable.LoadAsync(CancellationToken.None))!.Primary!.PercentageUsed);
         await using var connection = Open();
         await Execute(connection, "UPDATE quota_snapshot SET primary_percentage = 'not-a-number';");
         Assert.Null(await stable.LoadAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Partial_or_both_null_window_groups_load_empty()
+    {
+        await using var store = new SqliteQuotaSnapshotStore(_path);
+        await store.SaveAsync(Snapshot(), CancellationToken.None);
+        await using var connection = Open();
+        await Execute(connection, "PRAGMA ignore_check_constraints = ON; UPDATE quota_snapshot SET primary_reset_at = NULL;");
+        Assert.Null(await store.LoadAsync(CancellationToken.None));
+
+        await Execute(connection, "UPDATE quota_snapshot SET primary_percentage = NULL, weekly_percentage = NULL, weekly_reset_at = NULL;");
+        Assert.Null(await store.LoadAsync(CancellationToken.None));
     }
 
     public void Dispose() { if (File.Exists(_path)) File.Delete(_path); }

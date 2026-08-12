@@ -79,8 +79,8 @@ public sealed class BetaConsentOrQuotaTests : IDisposable
         await runtime.InitializeAsync(default);
         await WaitUntilAsync(() => runtime.State.Snapshot?.RetrievedAt == Now && !runtime.State.IsLoading);
 
-        Assert.Equal(42, runtime.State.Snapshot!.Primary.PercentageUsed);
-        Assert.Equal(20, runtime.State.Snapshot.Weekly.PercentageUsed);
+        Assert.Equal(42, runtime.State.Snapshot!.Primary!.PercentageUsed);
+        Assert.Equal(20, runtime.State.Snapshot.Weekly!.PercentageUsed);
         Assert.Equal(FreshnessState.Current, runtime.State.Freshness);
 
         var gate = new TaskCompletionSource<QuotaProviderResult>(TaskCreationOptions.RunContinuationsAsynchronously);

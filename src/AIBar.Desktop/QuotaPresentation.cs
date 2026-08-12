@@ -9,6 +9,8 @@ public sealed record QuotaWindowPresentation(string Label, decimal? PercentageUs
 public sealed record BetaPresentationState(
     QuotaWindowPresentation Primary,
     QuotaWindowPresentation Weekly,
+    bool IsPrimaryAvailable,
+    bool IsWeeklyAvailable,
     bool IsCurrent,
     string FreshnessLabel,
     string? ErrorLabel,
@@ -51,6 +53,8 @@ public sealed class QuotaPresentationMapper(IClock clock)
         return new(
             Window("5-hour quota", snapshot?.Primary),
             Window("Weekly quota", snapshot?.Weekly),
+            snapshot?.Primary is not null,
+            snapshot?.Weekly is not null,
             isFresh,
             freshness,
             warning,
@@ -130,7 +134,7 @@ public sealed class ManualRefreshCommand(Func<CancellationToken, ValueTask> refr
 public sealed class UnavailableQuotaPresentation
 {
     public QuotaWindowPresentation Primary { get; } = new("5-hour quota", null, null); public QuotaWindowPresentation Weekly { get; } = new("Weekly quota", null, null);
-    public string FreshnessLabel => "Unavailable"; public string PrivateEndpointDisclosure => "Quota access is unavailable."; public bool IsRefreshAvailable => false;
+    public bool IsPrimaryAvailable => false; public bool IsWeeklyAvailable => false; public string FreshnessLabel => "Unavailable"; public string PrivateEndpointDisclosure => "Quota access is unavailable."; public bool IsRefreshAvailable => false;
 }
 public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDisposable
 {
@@ -160,6 +164,8 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     public BetaPresentationState State => _state;
     public QuotaWindowPresentation Primary => _state.Primary;
     public QuotaWindowPresentation Weekly => _state.Weekly;
+    public bool IsPrimaryAvailable => _state.IsPrimaryAvailable;
+    public bool IsWeeklyAvailable => _state.IsWeeklyAvailable;
     public string FreshnessLabel => _state.FreshnessLabel;
     public string? PrivateEndpointDisclosure => _state.PrivateEndpointDisclosure;
     public async ValueTask InitializeAsync(CancellationToken cancellationToken) => await _coordinator.InitializeAsync(cancellationToken);

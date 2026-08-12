@@ -6,15 +6,15 @@ Define one truthful quota status for tray and popup views, including live refres
 
 ## Requirements
 
-### Requirement: Live quota reports both windows
+### Requirement: Live quota reports available windows
 
-When consent and usable credentials permit access, the system MUST support a real refresh that reports quota for the five-hour window and weekly window, including each window's reset instant when supplied by the source. A live result MUST be marked fresh.
+When consent and usable credentials permit access, the system MUST support a real refresh that independently reports quota for the five-hour window, weekly window, or both, including each available window's reset instant when supplied by the source. A successful live result MUST contain at least one recognized window and MUST be marked fresh. A card for an absent service window MUST be hidden and MUST NOT be fabricated.
 
 #### Scenario: Live refresh succeeds
 
 - GIVEN consent is enabled and credential lookup succeeds
 - WHEN a quota refresh completes successfully
-- THEN the five-hour and weekly quota data are available as one fresh result
+- THEN at least one recognized five-hour or weekly quota window is available as one fresh result
 - AND tray and popup can render that same result
 
 #### Scenario: Refresh is loading
@@ -82,6 +82,6 @@ The tray and popup MUST render the same quota state and values from the same lat
 
 ## Acceptance Criteria
 
-- Live results cover five-hour and weekly windows and are shared by tray and popup.
+- Live results contain at least one recognized five-hour or weekly window and are shared by tray and popup.
 - Failed refreshes preserve only clearly cached, degraded snapshots.
 - Missing credential, offline, unavailable, and safe-error states remain distinct.
