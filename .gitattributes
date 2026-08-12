@@ -1,0 +1,2 @@
+tests/AIBar.Domain.Tests/Fixtures/PackagingGraph/publish/** -text
+tests/AIBar.Domain.Tests/Fixtures/PackagingGraph/sources/** -text

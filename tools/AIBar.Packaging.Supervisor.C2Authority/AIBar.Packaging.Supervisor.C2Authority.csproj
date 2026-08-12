@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework><RuntimeIdentifier>win-x64</RuntimeIdentifier><PlatformTarget>x64</PlatformTarget>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><AssemblyName>AIBar.Packaging.Supervisor.C2Authority</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="..\AIBar.Packaging.Supervisor.Core\AIBar.Packaging.Supervisor.Core.csproj" /></ItemGroup>
+  <Import Project="..\..\eng\signing\AIBar.Signing.props" />
+</Project>

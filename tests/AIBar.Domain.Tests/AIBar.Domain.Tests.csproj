@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AIBar.Domain\AIBar.Domain.csproj" />
+    <ProjectReference Include="..\..\src\AIBar.Application\AIBar.Application.csproj" />
+    <ProjectReference Include="..\..\src\AIBar.Desktop\AIBar.Desktop.csproj" />
+    <ProjectReference Include="..\AIBar.Packaging.Supervisor.Authority.Testing\AIBar.Packaging.Supervisor.Authority.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="PackagingSupervisorTests.cs" />
+  </ItemGroup>
+
+  <Import Project="..\..\eng\signing\AIBar.Signing.props" />
+
+  <Target Name="RefuseTestDistribution" BeforeTargets="Pack;Publish">
+    <Error Text="AIBar.Domain.Tests is test-only and cannot be packaged or published." />
+  </Target>
+
+</Project>

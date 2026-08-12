@@ -1,0 +1,43 @@
+strict_tdd: false
+context: |
+  AIBar is a newly initialized, otherwise empty Git repository.
+  It is intended to become a Windows application.
+  No technology stack, package manager, source files, project conventions,
+  or test runner are currently present.
+  Technology choices are intentionally deferred until a later planning phase.
+rules:
+  proposal:
+    require_problem_statement: true
+  spec:
+    require_acceptance_criteria: true
+  design:
+    require_tradeoffs: true
+  tasks:
+    protect_review_workload: true
+  apply:
+    test_command: ""
+  verify:
+    test_command: ""
+testing:
+  detected: "2026-07-12"
+  runner:
+    command: ""
+    framework: ""
+  layers:
+    unit: ""
+    integration: ""
+    e2e: ""
+  commands:
+    unit: []
+    integration: []
+    e2e: []
+  coverage:
+    command: ""
+    commands: []
+quality:
+  lint: ""
+  lint_commands: []
+  typecheck: ""
+  typecheck_commands: []
+  format: ""
+  format_commands: []
