@@ -9,15 +9,15 @@ public sealed class SqliteUsageEventLedgerTests : IDisposable
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"aibar-ledger-{Guid.NewGuid():N}.db");
 
     [Fact]
-    public async Task Creates_v1_namespaced_schema_without_claiming_database_version()
+    public async Task Creates_v2_namespaced_schema_without_claiming_database_version()
     {
         await using (var existing = Open()) await Execute(existing, "CREATE TABLE unrelated(value TEXT); INSERT INTO unrelated VALUES('keep'); PRAGMA user_version=3;");
         await using (var ledger = await Ledger()) { Assert.Equal(0, await ledger.CountAsync()); await ledger.UpsertBatchAsync([Event()]); }
         await using var db = new SqliteConnection($"Data Source={_path};Pooling=False"); await db.OpenAsync();
         Assert.Equal(3L, await Scalar(db, "PRAGMA user_version;")); Assert.Equal("wal", await Scalar(db, "PRAGMA journal_mode;"));
-        Assert.Equal(1L, await Scalar(db, "SELECT version FROM usage_schema_meta WHERE component='usage_ledger';"));
+        Assert.Equal(2L, await Scalar(db, "SELECT version FROM usage_schema_meta WHERE component='usage_ledger';"));
         Assert.Equal("keep", await Scalar(db, "SELECT value FROM unrelated;"));
-        Assert.Equal(2L, await Scalar(db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN('usage_source','usage_event');"));
+        Assert.Equal(3L, await Scalar(db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN('usage_source','usage_event','usage_checkpoint');"));
         Assert.Equal(1L, await Scalar(db, "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='usage_event_source_idx';"));
         var columns = (string)(await Scalar(db, "SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('usage_source') UNION ALL SELECT name FROM pragma_table_info('usage_event'));"))!;
         Assert.DoesNotContain(new[] { "path", "session", "project", "message", "response", "prompt", "content" }, term => columns.Contains(term, StringComparison.OrdinalIgnoreCase));
@@ -37,6 +37,26 @@ public sealed class SqliteUsageEventLedgerTests : IDisposable
         Assert.Equal(At.ToUnixTimeMilliseconds(), await Scalar(db, "SELECT first_seen_at_ms FROM usage_source;"));
         Assert.Equal(At.AddMinutes(4).ToUnixTimeMilliseconds(), await Scalar(db, "SELECT last_seen_at_ms FROM usage_source;"));
         Assert.Equal(9L, await Scalar(db, "SELECT warning_flags FROM usage_source;"));
+    }
+
+    [Fact]
+    public async Task Existing_v1_ledger_migrates_checkpoint_storage_in_place()
+    {
+        await using (var ledger = await Ledger()) Assert.Equal(0, await ledger.CountAsync());
+        await using (var db = Open()) await Execute(db, "DROP TABLE usage_checkpoint; UPDATE usage_schema_meta SET version=1 WHERE component='usage_ledger';");
+        await using (var reopened = new SqliteUsageEventLedger(_path)) Assert.Equal(0, await reopened.CountAsync());
+        await using var verify = Open(); Assert.Equal(2L, await Scalar(verify, "SELECT version FROM usage_schema_meta WHERE component='usage_ledger';"));
+        Assert.Equal(1L, await Scalar(verify, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='usage_checkpoint';"));
+    }
+
+    [Fact]
+    public async Task Failed_fresh_schema_creation_leaves_no_version_marker_or_partial_owned_tables()
+    {
+        await using (var db = Open()) await Execute(db, "CREATE TABLE usage_source(preserved TEXT); INSERT INTO usage_source VALUES('keep');");
+        await using var ledger = new SqliteUsageEventLedger(_path);
+        await Assert.ThrowsAsync<SqliteException>(() => ledger.CountAsync().AsTask());
+        await using var verify = Open(); Assert.Equal("keep", await Scalar(verify, "SELECT preserved FROM usage_source;"));
+        Assert.Equal(0L, await Scalar(verify, "SELECT COUNT(*) FROM sqlite_master WHERE name IN('usage_schema_meta','usage_event','usage_checkpoint');"));
     }
 
     [Fact]
@@ -171,12 +191,12 @@ public sealed class SqliteUsageEventLedgerTests : IDisposable
     [Fact]
     public async Task Rejects_future_schema_without_mutation()
     {
-        await using (var db = Open()) await Execute(db, "PRAGMA journal_mode=DELETE; CREATE TABLE preserved(value TEXT); INSERT INTO preserved VALUES('keep'); CREATE TABLE usage_schema_meta(component TEXT PRIMARY KEY,version INTEGER NOT NULL); INSERT INTO usage_schema_meta VALUES('usage_ledger',2); PRAGMA user_version=3;");
+        await using (var db = Open()) await Execute(db, "PRAGMA journal_mode=DELETE; CREATE TABLE preserved(value TEXT); INSERT INTO preserved VALUES('keep'); CREATE TABLE usage_schema_meta(component TEXT PRIMARY KEY,version INTEGER NOT NULL); INSERT INTO usage_schema_meta VALUES('usage_ledger',3); PRAGMA user_version=3;");
         await using var ledger = new SqliteUsageEventLedger(_path);
         await Assert.ThrowsAsync<NotSupportedException>(() => ledger.CountAsync().AsTask());
         await using var verify = Open(); Assert.Equal("keep", await Scalar(verify, "SELECT value FROM preserved;"));
         Assert.Equal("delete", await Scalar(verify, "PRAGMA journal_mode;")); Assert.Equal(3L, await Scalar(verify, "PRAGMA user_version;"));
-        Assert.Equal(2L, await Scalar(verify, "SELECT version FROM usage_schema_meta WHERE component='usage_ledger';"));
+        Assert.Equal(3L, await Scalar(verify, "SELECT version FROM usage_schema_meta WHERE component='usage_ledger';"));
         Assert.Equal(2L, await Scalar(verify, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"));
         Assert.Equal(0L, await Scalar(verify, "SELECT COUNT(*) FROM sqlite_master WHERE name='usage_event';"));
     }
