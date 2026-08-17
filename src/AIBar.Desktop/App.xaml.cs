@@ -8,13 +8,18 @@ using AIBar.Domain;
 namespace AIBar.Desktop;
 public partial class App : System.Windows.Application
 {
+    private readonly bool _suppressHostStartup;
     private SingleInstanceHost? _instance;
     private TaskbarRecreationMonitor? _taskbar;
     private TrayHostRuntime? _runtime;
 
+    public App() : this(false) { }
+    internal App(bool suppressHostStartup) => _suppressHostStartup = suppressHostStartup;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (_suppressHostStartup) return;
         _instance = new SingleInstanceHost("AIBar");
         if (!_instance.IsPrimary)
         {

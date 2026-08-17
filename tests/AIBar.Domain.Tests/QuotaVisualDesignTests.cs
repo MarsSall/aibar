@@ -46,10 +46,14 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
         Exception? failure = null;
         var thread = new Thread(() =>
         {
+            App? app = null;
+            var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
             try
             {
-                var app = new App(); app.InitializeComponent();
-                SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext(System.Windows.Threading.Dispatcher.CurrentDispatcher));
+                app = new App(suppressHostStartup: true); app.InitializeComponent();
+                app.ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
+                Assert.Equal(System.Windows.ShutdownMode.OnExplicitShutdown, app.ShutdownMode);
+                SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext(dispatcher));
                 var provider = new GatedProvider();
                 var coordinator = new QuotaRefreshCoordinator(new EmptyStore(), provider, new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
                 var host = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)));
@@ -81,8 +85,21 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
                 provider.Release(); PumpUntil(() => button.IsEnabled);
                 Assert.True(button.IsEnabled); Assert.Equal(1, provider.Calls);
                 disabledWindow.Close(); window.Close();
-                var cleanup = DisposeAsync(disabled, host, coordinator); PumpUntil(() => cleanup.IsCompleted); Assert.True(cleanup.IsCompletedSuccessfully); app.Shutdown();
+                var cleanup = DisposeAsync(disabled, host, coordinator); PumpUntil(() => cleanup.IsCompleted); Assert.True(cleanup.IsCompletedSuccessfully);
             } catch (Exception exception) { failure = exception; }
+            finally
+            {
+                try
+                {
+                    if (app is not null)
+                    {
+                        foreach (System.Windows.Window openWindow in app.Windows.Cast<System.Windows.Window>().ToArray()) openWindow.Close();
+                        app.Shutdown();
+                    }
+                    if (!dispatcher.HasShutdownStarted) dispatcher.InvokeShutdown();
+                }
+                catch (Exception cleanupException) { failure ??= cleanupException; }
+            }
         });
         thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
