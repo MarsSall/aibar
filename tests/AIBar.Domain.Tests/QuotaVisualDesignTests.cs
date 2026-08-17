@@ -177,8 +177,13 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
     }
     private static string ReadProjectFile(string relativePath)
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        var directory = new DirectoryInfo(Environment.CurrentDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "AIBar.sln"))) directory = directory.Parent;
+        if (directory is null)
+        {
+            directory = new DirectoryInfo(AppContext.BaseDirectory);
+            while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "AIBar.sln"))) directory = directory.Parent;
+        }
         return File.ReadAllText(Path.Combine(directory!.FullName, relativePath));
     }
 }
