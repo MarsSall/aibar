@@ -84,6 +84,29 @@ public sealed class BetaPresentationTests
     }
 
     [Fact]
+    public async Task Forwards_local_usage_changes_without_changing_quota_or_legacy_analytics_bindings()
+    {
+        var clock = new MutableClock(Now);
+        await using var coordinator = new QuotaRefreshCoordinator(new SnapshotStore(Snapshot(Now)), new NeverProvider(), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromDays(1));
+        await using var quota = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock));
+        var analytics = new LocalCodexAnalyticsView();
+        var result = new LocalUsageCoordinatorResult(
+            [new(UsageTool.OpenCode, LocalUsageSourceStatus.Completed, 0), new(UsageTool.Pi, LocalUsageSourceStatus.Completed, 0)],
+            LocalUsageProjectionStatus.Completed, []);
+        var local = new LocalUsagePresentationHost(new(), _ => ValueTask.FromResult(result), (_, _) => ValueTask.FromResult(result), _ => ValueTask.FromResult(result));
+        var presentation = new BetaAnalyticsPresentation(quota, analytics, local);
+        string? changed = null; presentation.PropertyChanged += (_, args) => changed = args.PropertyName;
+
+        await local.StartAsync();
+
+        Assert.Equal(nameof(BetaAnalyticsPresentation.LocalUsage), changed);
+        Assert.Same(local.State, presentation.LocalUsage);
+        Assert.Same(analytics.State, presentation.Analytics);
+        Assert.Same(quota.State, presentation.State);
+        await analytics.DisposeAsync();
+    }
+
+    [Fact]
     public void Popup_display_remaps_countdowns_below_freshness_threshold_and_publishes_one_state_to_both_observers()
     {
         var clock = new MutableClock(Now);

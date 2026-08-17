@@ -71,7 +71,7 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
                     var snapshot = availability.Primary || availability.Weekly ? new QuotaSnapshot(availability.Primary ? new(42, DateTimeOffset.UtcNow.AddHours(5)) : null, availability.Weekly ? new(20, DateTimeOffset.UtcNow.AddDays(7)) : null, DateTimeOffset.UtcNow) : null;
                     var cardCoordinator = new QuotaRefreshCoordinator(new EmptyStore(snapshot), provider, new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
                     var cardHost = new QuotaPresentationHost(cardCoordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow))); var initialization = cardCoordinator.InitializeAsync(default).AsTask(); PumpUntil(() => initialization.IsCompleted); Assert.True(initialization.IsCompletedSuccessfully);
-                    var analytics = new LocalCodexAnalyticsView(); var cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics) }; cardWindow.Show(); cardWindow.UpdateLayout();
+                    var analytics = new LocalCodexAnalyticsView(); var cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics, LocalUsageHost()) }; cardWindow.Show(); cardWindow.UpdateLayout();
                     System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); cardWindow.UpdateLayout();
                     var quotaCards = FindVisualChildren<System.Windows.Controls.GroupBox>(cardWindow).Take(2).ToArray();
                     Assert.Equal(availability.Primary ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, quotaCards[0].Visibility);
@@ -148,6 +148,13 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
             Calls++; Entered.Set(); return await _result.Task.WaitAsync(cancellationToken);
         }
         public void Release() => _result.SetResult(new(null, new(QuotaErrorKind.Unavailable, "quota_disabled")));
+    }
+    private static LocalUsagePresentationHost LocalUsageHost()
+    {
+        var result = new LocalUsageCoordinatorResult(
+            [new(UsageTool.OpenCode, LocalUsageSourceStatus.Disabled, 0), new(UsageTool.Pi, LocalUsageSourceStatus.Disabled, 0)],
+            LocalUsageProjectionStatus.Skipped, []);
+        return new(new(), _ => ValueTask.FromResult(result), (_, _) => ValueTask.FromResult(result), _ => ValueTask.FromResult(result));
     }
     private static async Task DisposeAsync(params IAsyncDisposable[] resources) { foreach (var resource in resources) await resource.DisposeAsync(); }
     private static void PumpUntil(Func<bool> condition)

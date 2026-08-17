@@ -141,7 +141,7 @@ public sealed class AnalyticsLifecycleTests
                 lock (events) events.Add(item);
                 if (item == "analytics_cancelled") cancelled.Set();
                 if (item == "analytics_scan_finished") finished.TrySetResult();
-            }));
+            }, Path.Combine(root, "home")));
             var instance = new SingleInstanceHost($"AIBar.lifecycle.{Guid.NewGuid():N}");
             var host = new TrayHostRuntime(instance, new FakeTray(), new FakePopover(), new FakeTaskbar(), _ => Task.CompletedTask, composition.Resource, () => { });
             instance.Dispose();

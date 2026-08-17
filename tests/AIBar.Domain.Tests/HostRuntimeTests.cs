@@ -164,7 +164,7 @@ public sealed class HostRuntimeTests
     public async Task Fresh_production_composition_identifies_disabled_private_integration_and_exposes_enable_only()
     {
         var root = Path.Combine(Path.GetTempPath(), $"aibar-onboarding-{Guid.NewGuid():N}");
-        var composition = App.CreateComposition(new(root, Path.Combine(root, "codex")));
+        var composition = App.CreateComposition(new(root, Path.Combine(root, "codex"), UserProfile: Path.Combine(root, "home")));
         var presentation = ((BetaAnalyticsPresentation)composition.Presentation).QuotaPresentation;
         using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
         var tray = new FakeTray();

@@ -87,12 +87,14 @@ public sealed class BetaAnalyticsPresentation : INotifyPropertyChanged
 {
     private readonly QuotaPresentationHost _quota;
     private readonly LocalCodexAnalyticsView _analytics;
+    private readonly LocalUsagePresentationHost _localUsage;
 
-    public BetaAnalyticsPresentation(QuotaPresentationHost quota, LocalCodexAnalyticsView analytics)
+    public BetaAnalyticsPresentation(QuotaPresentationHost quota, LocalCodexAnalyticsView analytics, LocalUsagePresentationHost localUsage)
     {
-        _quota = quota; _analytics = analytics;
+        _quota = quota; _analytics = analytics; _localUsage = localUsage;
         _quota.PropertyChanged += OnQuotaChanged;
         _analytics.PropertyChanged += OnAnalyticsChanged;
+        _localUsage.PropertyChanged += OnLocalUsageChanged;
     }
 
     public QuotaWindowPresentation Primary => _quota.Primary;
@@ -103,8 +105,10 @@ public sealed class BetaAnalyticsPresentation : INotifyPropertyChanged
     public IManualRefreshCommand RefreshCommand => _quota.RefreshCommand;
     public BetaPresentationState State => _quota.State;
     public LocalAnalyticsState Analytics => _analytics.State;
+    public LocalUsagePresentationState LocalUsage => _localUsage.State;
     public QuotaPresentationHost QuotaPresentation => _quota;
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnQuotaChanged(object? sender, PropertyChangedEventArgs args) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
     private void OnAnalyticsChanged(object? sender, PropertyChangedEventArgs args) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Analytics)));
+    private void OnLocalUsageChanged(object? sender, PropertyChangedEventArgs args) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LocalUsage)));
 }
