@@ -134,17 +134,43 @@ public interface IAiBarDataClearCommand { ValueTask ClearAsync(CancellationToken
 
 public sealed record PrivacyDefaults(bool TelemetryEnabled = false, bool RemoteCrashReportingEnabled = false);
 
-public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarDataClearCommand clear, PrivateIntegrationPolicy privateIntegration, Func<CancellationToken, ValueTask>? revokePrivate = null, Func<CancellationToken, ValueTask>? grantPrivate = null)
+public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarDataClearCommand clear, PrivateIntegrationPolicy privateIntegration,
+    Func<CancellationToken, ValueTask>? revokePrivate = null, Func<CancellationToken, ValueTask>? grantPrivate = null,
+    Func<CancellationToken, ValueTask<LocalUsagePolicy>>? loadLocalUsage = null,
+    Func<LocalUsagePolicy, CancellationToken, ValueTask>? saveLocalUsage = null,
+    Func<LocalUsagePolicy, CancellationToken, ValueTask>? applyLocalUsage = null)
 {
+    private readonly SemaphoreSlim _localUsageGate = new(1, 1);
+    private LocalUsagePolicy _localUsagePolicy = LocalUsagePolicy.Disabled;
     public PrivacyDefaults Privacy { get; } = new();
     public bool PrivateIntegrationEnabled => privateIntegration.IsEnabled;
     public bool LocalAnalyticsEnabled => true;
+    public bool LocalUsageAvailable => loadLocalUsage is not null && saveLocalUsage is not null && applyLocalUsage is not null;
+    public LocalUsagePolicy LocalUsagePolicy => Volatile.Read(ref _localUsagePolicy);
     public async ValueTask<bool> ToggleStartupAsync(CancellationToken cancellationToken)
     {
         var enabled = await startup.IsEnabledAsync(cancellationToken);
         return await startup.SetEnabledAsync(!enabled, cancellationToken);
     }
-    public ValueTask ClearAiBarDataAsync(CancellationToken cancellationToken) => clear.ClearAsync(cancellationToken);
+    public async ValueTask ClearAiBarDataAsync(CancellationToken cancellationToken)
+    {
+        if (!LocalUsageAvailable) { await clear.ClearAsync(cancellationToken); return; }
+        await _localUsageGate.WaitAsync(cancellationToken);
+        try
+        {
+            await clear.ClearAsync(cancellationToken);
+            var policy = await loadLocalUsage!(cancellationToken);
+            await applyLocalUsage!(policy, cancellationToken);
+            Volatile.Write(ref _localUsagePolicy, policy);
+        }
+        finally { _localUsageGate.Release(); }
+    }
+    public ValueTask<LocalUsagePolicy> LoadLocalUsagePolicyAsync(CancellationToken cancellationToken) =>
+        ChangeLocalUsageAsync(null, cancellationToken);
+    public ValueTask<LocalUsagePolicy> ToggleOpenCodeLocalUsageAsync(CancellationToken cancellationToken) =>
+        ChangeLocalUsageAsync(UsageTool.OpenCode, cancellationToken);
+    public ValueTask<LocalUsagePolicy> TogglePiLocalUsageAsync(CancellationToken cancellationToken) =>
+        ChangeLocalUsageAsync(UsageTool.Pi, cancellationToken);
     public ValueTask EnablePrivateIntegrationAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -157,4 +183,25 @@ public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarD
     }
     private ValueTask EnableAsync() { privateIntegration.Enable(); return ValueTask.CompletedTask; }
     private ValueTask DisableAsync() { privateIntegration.Disable(); return ValueTask.CompletedTask; }
+    private async ValueTask<LocalUsagePolicy> ChangeLocalUsageAsync(UsageTool? tool, CancellationToken cancellationToken)
+    {
+        if (!LocalUsageAvailable) return LocalUsagePolicy.Disabled;
+        await _localUsageGate.WaitAsync(cancellationToken);
+        try
+        {
+            var current = await loadLocalUsage!(cancellationToken);
+            if (tool is null) { Volatile.Write(ref _localUsagePolicy, current); return current; }
+            var updated = tool.Value switch
+            {
+                UsageTool.OpenCode => current with { OpenCodeEnabled = !current.OpenCodeEnabled },
+                UsageTool.Pi => current with { PiEnabled = !current.PiEnabled },
+                _ => throw new ArgumentOutOfRangeException(nameof(tool)),
+            };
+            await saveLocalUsage!(updated, cancellationToken);
+            await applyLocalUsage!(updated, cancellationToken);
+            Volatile.Write(ref _localUsagePolicy, updated);
+            return updated;
+        }
+        finally { _localUsageGate.Release(); }
+    }
 }

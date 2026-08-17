@@ -83,6 +83,69 @@ public sealed class StartupSettingsTests
     }
 
     [Fact]
+    public async Task Local_usage_commands_serialize_complete_independent_transactions_without_lost_updates()
+    {
+        var persisted = LocalUsagePolicy.Disabled;
+        var events = new List<(string Stage, LocalUsagePolicy Policy)>();
+        var firstSaveEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstSave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saveCalls = 0;
+        ValueTask<LocalUsagePolicy> Load(CancellationToken _) => ValueTask.FromResult(persisted);
+        async ValueTask Save(LocalUsagePolicy policy, CancellationToken token)
+        {
+            if (Interlocked.Increment(ref saveCalls) == 1)
+            {
+                firstSaveEntered.SetResult();
+                await releaseFirstSave.Task.WaitAsync(token);
+            }
+            persisted = policy; events.Add(("save", policy));
+        }
+        ValueTask Apply(LocalUsagePolicy policy, CancellationToken _)
+        {
+            Assert.Equal(persisted, policy);
+            events.Add(("apply", policy));
+            return ValueTask.CompletedTask;
+        }
+        var commands = new NativeSettingsCommands(new FakeRegistration(), new FakeClearService(), new(),
+            loadLocalUsage: Load, saveLocalUsage: Save, applyLocalUsage: Apply);
+
+        var openCode = commands.ToggleOpenCodeLocalUsageAsync(default).AsTask();
+        await firstSaveEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var pi = commands.TogglePiLocalUsageAsync(default).AsTask();
+        Assert.False(pi.IsCompleted);
+        releaseFirstSave.SetResult();
+        await Task.WhenAll(openCode, pi);
+
+        Assert.Equal(new(true, true), persisted);
+        Assert.Equal(new[]
+        {
+            ("save", new LocalUsagePolicy(true, false)), ("apply", new LocalUsagePolicy(true, false)),
+            ("save", new LocalUsagePolicy(true, true)), ("apply", new LocalUsagePolicy(true, true)),
+        }, events);
+        Assert.Equal(persisted, commands.LocalUsagePolicy);
+    }
+
+    [Fact]
+    public async Task Local_usage_failure_and_cancellation_do_not_publish_unapplied_state()
+    {
+        var persisted = LocalUsagePolicy.Disabled;
+        var commands = new NativeSettingsCommands(new FakeRegistration(), new FakeClearService(), new(),
+            loadLocalUsage: _ => ValueTask.FromResult(persisted),
+            saveLocalUsage: (policy, _) => { persisted = policy; return ValueTask.CompletedTask; },
+            applyLocalUsage: (_, _) => ValueTask.FromException(new IOException("synthetic apply failure")));
+
+        await Assert.ThrowsAsync<IOException>(() => commands.ToggleOpenCodeLocalUsageAsync(default).AsTask());
+
+        Assert.Equal(new(true, false), persisted);
+        Assert.Equal(LocalUsagePolicy.Disabled, commands.LocalUsagePolicy);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => commands.TogglePiLocalUsageAsync(cancellation.Token).AsTask());
+        Assert.Equal(new(true, false), persisted);
+        Assert.Equal(LocalUsagePolicy.Disabled, commands.LocalUsagePolicy);
+    }
+
+    [Fact]
     public async Task Private_kill_switch_remains_disabled_and_preserves_local_analytics()
     {
         var policy = new PrivateIntegrationPolicy(true);
