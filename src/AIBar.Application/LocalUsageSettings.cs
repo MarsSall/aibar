@@ -1,10 +1,12 @@
 using System.Text;
 using System.Text.Json;
+using System.Diagnostics;
 using AIBar.Domain;
 
 namespace AIBar.Application;
 
-public sealed record LocalUsagePolicy(bool OpenCodeEnabled, bool PiEnabled)
+[DebuggerDisplay("Local usage policy")]
+public sealed record LocalUsagePolicy(bool OpenCodeEnabled, bool PiEnabled, string? OpenCodeDataRoot = null)
 {
     public static LocalUsagePolicy Disabled { get; } = new(false, false);
 
@@ -14,6 +16,7 @@ public sealed record LocalUsagePolicy(bool OpenCodeEnabled, bool PiEnabled)
         UsageTool.Pi => PiEnabled,
         _ => throw new ArgumentOutOfRangeException(nameof(tool), tool, "Unsupported usage tool."),
     };
+    public override string ToString() => "Local usage policy";
 }
 
 public sealed class LocalUsageSettings
@@ -41,14 +44,18 @@ public sealed class LocalUsageSettings
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
             if (document.RootElement.ValueKind != JsonValueKind.Object) return LocalUsagePolicy.Disabled;
             var seen = 0;
+            var schema = 0;
             var openCode = false;
             var pi = false;
+            string? openCodeDataRoot = null;
             foreach (var property in document.RootElement.EnumerateObject())
             {
                 switch (property.Name)
                 {
-                    case "schema" when (seen & 1) == 0 && property.Value.ValueKind == JsonValueKind.Number && property.Value.GetRawText() == "1":
+                    case "schema" when (seen & 1) == 0 && property.Value.ValueKind == JsonValueKind.Number
+                        && property.Value.GetRawText() is "1" or "2":
                         seen |= 1;
+                        schema = property.Value.GetInt32();
                         break;
                     case "openCodeEnabled" when (seen & 2) == 0 && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False:
                         seen |= 2;
@@ -58,11 +65,19 @@ public sealed class LocalUsageSettings
                         seen |= 4;
                         pi = property.Value.GetBoolean();
                         break;
+                    case "openCodeDataRoot" when (seen & 8) == 0 && property.Value.ValueKind is JsonValueKind.Null or JsonValueKind.String:
+                        seen |= 8;
+                        openCodeDataRoot = property.Value.ValueKind == JsonValueKind.Null ? null : property.Value.GetString();
+                        break;
                     default:
                         return LocalUsagePolicy.Disabled;
                 }
             }
-            return seen == 7 ? new(openCode, pi) : LocalUsagePolicy.Disabled;
+            if (schema == 1 && seen == 7) return new(openCode, pi);
+            if (schema != 2 || seen != 15) return LocalUsagePolicy.Disabled;
+            if (openCodeDataRoot is not null && (!LocalUsageSourceRootResolver.TryNormalizeOpenCodeDataRoot(openCodeDataRoot, false, out var normalized)
+                || !StringComparer.Ordinal.Equals(openCodeDataRoot, normalized))) return LocalUsagePolicy.Disabled;
+            return new(openCode, pi, openCodeDataRoot);
         }
         catch (FileNotFoundException) { return LocalUsagePolicy.Disabled; }
         catch (DirectoryNotFoundException) { return LocalUsagePolicy.Disabled; }
@@ -74,6 +89,9 @@ public sealed class LocalUsageSettings
     public async ValueTask SaveAsync(LocalUsagePolicy policy, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(policy);
+        if (policy.OpenCodeDataRoot is not null && (!LocalUsageSourceRootResolver.TryNormalizeOpenCodeDataRoot(policy.OpenCodeDataRoot, false, out var normalized)
+            || !StringComparer.Ordinal.Equals(policy.OpenCodeDataRoot, normalized)))
+            throw new InvalidOperationException(LocalUsageSourceRootResolver.InvalidOpenCodeDataRootMessage);
         await _saveGate.WaitAsync(cancellationToken);
         string? temporary = null;
         try
@@ -83,7 +101,7 @@ public sealed class LocalUsageSettings
             Directory.CreateDirectory(directory);
             EnsureSafePath();
             temporary = Path.Combine(directory, $".{Path.GetFileName(_path)}.{Guid.NewGuid():N}.tmp");
-            var json = $"{{\"schema\":1,\"openCodeEnabled\":{(policy.OpenCodeEnabled ? "true" : "false")},\"piEnabled\":{(policy.PiEnabled ? "true" : "false")}}}";
+            var json = JsonSerializer.Serialize(new { schema = 2, openCodeEnabled = policy.OpenCodeEnabled, piEnabled = policy.PiEnabled, openCodeDataRoot = policy.OpenCodeDataRoot });
             await using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous | FileOptions.WriteThrough))
             {
                 await stream.WriteAsync(Encoding.UTF8.GetBytes(json), cancellationToken);

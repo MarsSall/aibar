@@ -1,5 +1,6 @@
 using AIBar.Application;
 using AIBar.Domain;
+using System.Text.Json;
 
 namespace AIBar.Domain.Tests;
 
@@ -29,14 +30,26 @@ public sealed class LocalUsageSettingsTests : IDisposable
     }
 
     [Fact]
-    public async Task Roundtrip_persists_only_the_exact_disclosed_shape()
+    public async Task Schema_one_loads_without_rewrite_and_schema_two_roundtrips_null_or_normalized_custom_root()
     {
-        await new LocalUsageSettings(SettingsPath).SaveAsync(new(true, false), default);
+        Directory.CreateDirectory(_root);
+        const string schemaOne = "{\"schema\":1,\"openCodeEnabled\":true,\"piEnabled\":false}";
+        await File.WriteAllTextAsync(SettingsPath, schemaOne);
+        var migrated = await new LocalUsageSettings(SettingsPath).LoadAsync(default);
+        Assert.True(migrated.OpenCodeEnabled); Assert.Null(migrated.OpenCodeDataRoot);
+        Assert.Equal(schemaOne, await File.ReadAllTextAsync(SettingsPath));
 
-        Assert.Equal("{\"schema\":1,\"openCodeEnabled\":true,\"piEnabled\":false}", await File.ReadAllTextAsync(SettingsPath));
+        var custom = Path.Combine(_root, "custom"); Directory.CreateDirectory(custom);
+        await new LocalUsageSettings(SettingsPath).SaveAsync(new(true, false, custom), default);
+
+        Assert.Equal(JsonSerializer.Serialize(new { schema = 2, openCodeEnabled = true, piEnabled = false, openCodeDataRoot = custom }), await File.ReadAllTextAsync(SettingsPath));
         var reopened = await new LocalUsageSettings(SettingsPath).LoadAsync(default);
-        Assert.True(reopened.IsEnabled(UsageTool.OpenCode));
-        Assert.False(reopened.IsEnabled(UsageTool.Pi));
+        Assert.Equal(new(true, false, custom), reopened);
+        Directory.Delete(custom);
+        Assert.Equal(custom, (await new LocalUsageSettings(SettingsPath).LoadAsync(default)).OpenCodeDataRoot);
+
+        await new LocalUsageSettings(SettingsPath).SaveAsync(reopened with { OpenCodeDataRoot = null }, default);
+        Assert.Equal(new(true, false), await new LocalUsageSettings(SettingsPath).LoadAsync(default));
     }
 
     [Theory]
@@ -52,6 +65,9 @@ public sealed class LocalUsageSettingsTests : IDisposable
     [InlineData("{\"schema\":1,\"schema\":1,\"openCodeEnabled\":true,\"piEnabled\":true}")]
     [InlineData("{\"schema\":1,\"openCodeEnabled\":true,\"openCodeEnabled\":false,\"piEnabled\":true}")]
     [InlineData("{\"schema\":1,\"openCodeEnabled\":true,\"piEnabled\":true,\"sourcePath\":\"private\"}")]
+    [InlineData("{\"schema\":2,\"openCodeEnabled\":true,\"piEnabled\":true,\"openCodeDataRoot\":1}")]
+    [InlineData("{\"schema\":2,\"openCodeEnabled\":true,\"piEnabled\":true,\"openCodeDataRoot\":\"relative\"}")]
+    [InlineData("{\"schema\":1,\"openCodeEnabled\":true,\"piEnabled\":true,\"openCodeDataRoot\":null}")]
     public async Task Ambiguous_or_invalid_documents_fail_closed(string json)
     {
         Directory.CreateDirectory(_root);
@@ -129,7 +145,7 @@ public sealed class LocalUsageSettingsTests : IDisposable
         var final = await store.LoadAsync(default);
         Assert.False(final.IsEnabled(UsageTool.OpenCode));
         Assert.True(final.IsEnabled(UsageTool.Pi));
-        Assert.Equal("{\"schema\":1,\"openCodeEnabled\":false,\"piEnabled\":true}", await File.ReadAllTextAsync(SettingsPath));
+        Assert.Equal("{\"schema\":2,\"openCodeEnabled\":false,\"piEnabled\":true,\"openCodeDataRoot\":null}", await File.ReadAllTextAsync(SettingsPath));
         Assert.Equal(2, calls);
         Assert.Empty(Directory.EnumerateFiles(_root, "*.tmp"));
     }

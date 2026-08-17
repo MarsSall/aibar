@@ -29,4 +29,36 @@ public sealed class LocalUsageSourceRootResolverTests
         Assert.Null(roots.OpenCodeDataRoot);
         Assert.Null(roots.PiSessionsRoot);
     }
+
+    [Fact]
+    public void Custom_root_requires_canonical_existing_fixed_local_directory_but_persisted_missing_root_stays_effective()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"aibar-root-{Guid.NewGuid():N}");
+        var custom = Path.Combine(root, "custom"); Directory.CreateDirectory(custom);
+        try
+        {
+            Assert.True(LocalUsageSourceRootResolver.TryNormalizeOpenCodeDataRoot(custom, true, out var normalized));
+            Assert.Equal(custom, normalized);
+            Assert.Equal(custom, LocalUsageSourceRootResolver.ResolveOpenCodeDataRoot("default", custom));
+            Assert.False(LocalUsageSourceRootResolver.TryNormalizeOpenCodeDataRoot(custom + Path.DirectorySeparatorChar, true, out _));
+            Assert.False(LocalUsageSourceRootResolver.TryNormalizeOpenCodeDataRoot(@"\\server\share\opencode", true, out _));
+            Assert.False(LocalUsageSourceRootResolver.TryNormalizeOpenCodeDataRoot(Path.GetPathRoot(custom), true, out _));
+            Assert.False(LocalUsageSourceRootResolver.TryNormalizeOpenCodeDataRoot(custom, true, out _, _ => (DriveType.Network, true)));
+            Directory.Delete(custom);
+            Assert.Equal(custom, LocalUsageSourceRootResolver.ResolveOpenCodeDataRoot("default", custom));
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void Custom_root_rejects_reparse_ancestry()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"aibar-root-link-{Guid.NewGuid():N}");
+        var target = Path.Combine(root, "target"); var link = Path.Combine(root, "link"); Directory.CreateDirectory(target);
+        try { Directory.CreateSymbolicLink(link, target); }
+        catch (Exception error) when (error is UnauthorizedAccessException or IOException or PlatformNotSupportedException)
+        { if (Directory.Exists(root)) Directory.Delete(root, true); throw Xunit.Sdk.SkipException.ForSkip($"Symbolic-link test unsupported: {error.GetType().Name}"); }
+        try { Assert.False(LocalUsageSourceRootResolver.TryNormalizeOpenCodeDataRoot(link, true, out _)); }
+        finally { Directory.Delete(root, true); }
+    }
 }

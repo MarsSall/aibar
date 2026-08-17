@@ -146,6 +146,34 @@ public sealed class StartupSettingsTests
     }
 
     [Fact]
+    public async Task OpenCode_root_choose_and_reset_share_save_before_apply_gate_and_invalid_choice_preserves_state()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"aibar-command-root-{Guid.NewGuid():N}"); Directory.CreateDirectory(root);
+        try
+        {
+            var persisted = new LocalUsagePolicy(true, false); var events = new List<(string, string?)>();
+            var applyEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseApply = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            ValueTask Save(LocalUsagePolicy policy, CancellationToken _) { persisted = policy; events.Add(("save", policy.OpenCodeDataRoot)); return ValueTask.CompletedTask; }
+            async ValueTask Apply(LocalUsagePolicy policy, CancellationToken token)
+            { events.Add(("apply", policy.OpenCodeDataRoot)); if (policy.OpenCodeDataRoot is not null) { applyEntered.SetResult(); await releaseApply.Task.WaitAsync(token); } }
+            var commands = new NativeSettingsCommands(new FakeRegistration(), new FakeClearService(), new(),
+                loadLocalUsage: _ => ValueTask.FromResult(persisted), saveLocalUsage: Save, applyLocalUsage: Apply);
+
+            var choose = commands.ChooseOpenCodeDataRootAsync(root, default).AsTask(); await applyEntered.Task;
+            var reset = commands.ResetOpenCodeDataRootAsync(default).AsTask(); Assert.False(reset.IsCompleted);
+            releaseApply.SetResult(); await Task.WhenAll(choose, reset);
+
+            Assert.Equal(new[] { ("save", root), ("apply", root), ("save", (string?)null), ("apply", (string?)null) }, events);
+            Assert.Equal(new(true, false), persisted); Assert.Equal(persisted, commands.LocalUsagePolicy);
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => commands.ChooseOpenCodeDataRootAsync(Path.Combine(root, "missing"), default).AsTask());
+            Assert.Equal(LocalUsageSourceRootResolver.InvalidOpenCodeDataRootMessage, error.Message);
+            Assert.Equal(4, events.Count); Assert.Equal(new(true, false), persisted);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
     public async Task Private_kill_switch_remains_disabled_and_preserves_local_analytics()
     {
         var policy = new PrivateIntegrationPolicy(true);

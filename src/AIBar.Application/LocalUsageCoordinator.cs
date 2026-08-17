@@ -103,8 +103,9 @@ public sealed class LocalUsageCoordinator : IAsyncDisposable, IAiBarClearWork
                         return await ProjectAsync(Failure(policy, LocalUsageSourceStatus.RebuildRequired, LocalUsageWarning.RebuildRequired), cancellation.Token);
                     salt = await _saltStore.GetOrCreateAsync(cancellation.Token);
                 }
+                var openCodeDataRoot = LocalUsageSourceRootResolver.ResolveOpenCodeDataRoot(_openCodeDataRoot, policy.OpenCodeDataRoot);
                 var discovery = new LocalUsageSourceDiscovery().Discover(policy,
-                    salt.CreateDiscoveryFacts(_openCodeDataRoot, _piSessionsRoot, _piLayout), cancellation.Token);
+                    salt.CreateDiscoveryFacts(openCodeDataRoot, _piSessionsRoot, _piLayout), cancellation.Token);
                 return await ProjectAsync(await ProcessAsync(policy, discovery, cancellation.Token), cancellation.Token);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { throw; }

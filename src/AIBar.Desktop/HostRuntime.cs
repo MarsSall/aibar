@@ -5,6 +5,7 @@ using System.Windows.Interop;
 using System.Windows.Threading;
 using AIBar.Application;
 using AIBar.Domain;
+using Microsoft.Win32;
 using Forms = System.Windows.Forms;
 
 namespace AIBar.Desktop;
@@ -45,6 +46,22 @@ public interface ITaskbarRecreationEvents { event Action? Recreated; }
 
 public interface IPrivateIntegrationConsentPrompt { bool Confirm(); }
 
+public interface IOpenCodeDataRootTray
+{
+    event Action? OpenCodeDataFolderChooseRequested;
+    event Action? OpenCodeDataFolderResetRequested;
+}
+
+public interface IOpenCodeDataFolderPicker { string? Choose(); void ShowFailure(); }
+
+internal static class OpenCodeDataFolderCopy
+{
+    internal const string Choose = "Choose OpenCode data folder...";
+    internal const string Reset = "Use default OpenCode data folder";
+    internal const string Guidance = "Select the folder that contains opencode.db.";
+    internal const string Failure = "The selected OpenCode folder cannot be used.";
+}
+
 public sealed class TrayHostRuntime : IAsyncDisposable
 {
     private readonly SingleInstanceHost _instance;
@@ -60,6 +77,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private readonly Func<RefreshTrigger, CancellationToken, ValueTask>? _reevaluate;
     private readonly QuotaPresentationHost? _presentation;
     private readonly IPrivateIntegrationConsentPrompt? _consentPrompt;
+    private readonly IOpenCodeDataFolderPicker? _openCodeFolderPicker;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly DispatcherTimer _activationTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private Task? _cleanupTask;
@@ -67,9 +85,9 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private int _grantingConsent;
     private bool _disposed;
 
-    public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess, IManualRefreshCommand? refreshCommand = null, NativeSettingsCommands? settings = null, Action? reportSettingsFailure = null, Func<RefreshTrigger, CancellationToken, ValueTask>? reevaluate = null, QuotaPresentationHost? presentation = null, IPrivateIntegrationConsentPrompt? consentPrompt = null)
+    public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess, IManualRefreshCommand? refreshCommand = null, NativeSettingsCommands? settings = null, Action? reportSettingsFailure = null, Func<RefreshTrigger, CancellationToken, ValueTask>? reevaluate = null, QuotaPresentationHost? presentation = null, IPrivateIntegrationConsentPrompt? consentPrompt = null, IOpenCodeDataFolderPicker? openCodeFolderPicker = null)
     {
-        _instance = instance; _tray = tray; _popover = popover; _taskbar = taskbar; _awaitCancelledWork = awaitCancelledWork; _persistence = persistence; _exitProcess = exitProcess; _refreshCommand = refreshCommand; _settings = settings; _reportSettingsFailure = reportSettingsFailure; _reevaluate = reevaluate; _presentation = presentation; _consentPrompt = consentPrompt;
+        _instance = instance; _tray = tray; _popover = popover; _taskbar = taskbar; _awaitCancelledWork = awaitCancelledWork; _persistence = persistence; _exitProcess = exitProcess; _refreshCommand = refreshCommand; _settings = settings; _reportSettingsFailure = reportSettingsFailure; _reevaluate = reevaluate; _presentation = presentation; _consentPrompt = consentPrompt; _openCodeFolderPicker = openCodeFolderPicker;
         if (_refreshCommand is not null) _refreshCommand.CanExecuteChanged += OnRefreshAvailabilityChanged;
         _tray.SetRefreshAvailable(_refreshCommand?.CanExecute == true);
         if (_presentation is not null) { _presentation.PropertyChanged += OnPresentationChanged; _tray.SetPresentation(_presentation.State); }
@@ -77,6 +95,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
         _tray.SetPrivateIntegrationEnabled(settings?.PrivateIntegrationEnabled == true);
         _tray.SetLocalUsageAvailable(settings?.LocalUsageAvailable == true); _tray.SetLocalUsagePolicy(settings?.LocalUsagePolicy ?? LocalUsagePolicy.Disabled);
         _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _tray.RefreshRequested += OnRefreshRequested; _tray.StartupToggleRequested += OnStartupToggleRequested; _tray.ClearAiBarDataRequested += OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested += OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested += OnPrivateIntegrationDisableRequested; _tray.OpenCodeLocalUsageToggleRequested += OnOpenCodeLocalUsageToggleRequested; _tray.PiLocalUsageToggleRequested += OnPiLocalUsageToggleRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += ShowPopover;
+        if (_tray is IOpenCodeDataRootTray rootTray) { rootTray.OpenCodeDataFolderChooseRequested += OnOpenCodeDataFolderChooseRequested; rootTray.OpenCodeDataFolderResetRequested += OnOpenCodeDataFolderResetRequested; }
         _activationTimer.Tick += DispatchPendingActivation;
     }
 
@@ -151,6 +170,27 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private void OnPrivateIntegrationDisableRequested() => _ = SetPrivateIntegrationSafelyAsync(settings => settings.DisablePrivateIntegrationAsync(_shutdown.Token));
     private void OnOpenCodeLocalUsageToggleRequested() => _ = ChangeLocalUsageSafelyAsync(settings => settings.ToggleOpenCodeLocalUsageAsync(_shutdown.Token));
     private void OnPiLocalUsageToggleRequested() => _ = ChangeLocalUsageSafelyAsync(settings => settings.TogglePiLocalUsageAsync(_shutdown.Token));
+    private void OnOpenCodeDataFolderChooseRequested() => _ = ChooseOpenCodeDataFolderSafelyAsync();
+    private void OnOpenCodeDataFolderResetRequested() => _ = ChangeOpenCodeDataFolderSafelyAsync(settings => settings.ResetOpenCodeDataRootAsync(_shutdown.Token));
+    private async Task ChooseOpenCodeDataFolderSafelyAsync()
+    {
+        if (_settings?.LocalUsageAvailable != true || _openCodeFolderPicker is null) return;
+        string? selected;
+        try { selected = _openCodeFolderPicker.Choose(); }
+        catch { ShowOpenCodeFolderFailure(); return; }
+        if (selected is null) { ShowOpenCodeFolderFailure(); return; }
+        await ChangeOpenCodeDataFolderSafelyAsync(settings => settings.ChooseOpenCodeDataRootAsync(selected, _shutdown.Token));
+    }
+    private async Task ChangeOpenCodeDataFolderSafelyAsync(Func<NativeSettingsCommands, ValueTask<LocalUsagePolicy>> operation)
+    {
+        if (_settings?.LocalUsageAvailable != true) return;
+        try { await operation(_settings); SetLocalUsagePolicy(); }
+        catch { ShowOpenCodeFolderFailure(); }
+    }
+    private void ShowOpenCodeFolderFailure()
+    {
+        if (!_shutdown.IsCancellationRequested) try { _openCodeFolderPicker?.ShowFailure(); } catch { }
+    }
     private async Task EnablePrivateIntegrationSafelyAsync()
     {
         if (_settings is null || _consentPrompt is null || Interlocked.CompareExchange(ref _grantingConsent, 1, 0) != 0) return;
@@ -203,6 +243,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private void Detach()
     {
         _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _tray.RefreshRequested -= OnRefreshRequested; _tray.StartupToggleRequested -= OnStartupToggleRequested; _tray.ClearAiBarDataRequested -= OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested -= OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested -= OnPrivateIntegrationDisableRequested; _tray.OpenCodeLocalUsageToggleRequested -= OnOpenCodeLocalUsageToggleRequested; _tray.PiLocalUsageToggleRequested -= OnPiLocalUsageToggleRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= ShowPopover;
+        if (_tray is IOpenCodeDataRootTray rootTray) { rootTray.OpenCodeDataFolderChooseRequested -= OnOpenCodeDataFolderChooseRequested; rootTray.OpenCodeDataFolderResetRequested -= OnOpenCodeDataFolderResetRequested; }
         if (_refreshCommand is not null) _refreshCommand.CanExecuteChanged -= OnRefreshAvailabilityChanged;
         if (_presentation is not null) _presentation.PropertyChanged -= OnPresentationChanged;
     }
@@ -210,7 +251,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     public ValueTask DisposeAsync() => new(ExitAsync());
 }
 
-public sealed class WindowsTrayRuntime : ITrayRuntime
+public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray
 {
     private readonly Forms.NotifyIcon _icon = new() { Icon = SystemIcons.Application, Text = "AIBar", Visible = false };
     private readonly Forms.ContextMenuStrip _menu = new();
@@ -221,12 +262,14 @@ public sealed class WindowsTrayRuntime : ITrayRuntime
     private readonly Forms.ToolStripMenuItem _disablePrivate = new("Disable Private Quota Integration");
     private readonly Forms.ToolStripMenuItem _openCodeUsage = new("Read OpenCode usage data locally");
     private readonly Forms.ToolStripMenuItem _piUsage = new("Read Pi usage data locally");
+    private readonly Forms.ToolStripMenuItem _chooseOpenCodeFolder = new(OpenCodeDataFolderCopy.Choose) { AccessibleName = OpenCodeDataFolderCopy.Choose };
+    private readonly Forms.ToolStripMenuItem _resetOpenCodeFolder = new(OpenCodeDataFolderCopy.Reset) { AccessibleName = OpenCodeDataFolderCopy.Reset };
     private bool _settingsAvailable;
     private bool _privateIntegrationEnabled;
     public WindowsTrayRuntime()
     {
         var exit = new Forms.ToolStripMenuItem("Exit AIBar");
-        _refresh.Click += (_, _) => RefreshRequested?.Invoke(); _startup.Click += (_, _) => StartupToggleRequested?.Invoke(); _clear.Click += (_, _) => ClearAiBarDataRequested?.Invoke(); _enablePrivate.Click += (_, _) => PrivateIntegrationEnableRequested?.Invoke(); _disablePrivate.Click += (_, _) => PrivateIntegrationDisableRequested?.Invoke(); _openCodeUsage.Click += (_, _) => OpenCodeLocalUsageToggleRequested?.Invoke(); _piUsage.Click += (_, _) => PiLocalUsageToggleRequested?.Invoke(); exit.Click += (_, _) => ExitRequested?.Invoke(); _menu.Items.Add(exit); _icon.ContextMenuStrip = _menu;
+        _refresh.Click += (_, _) => RefreshRequested?.Invoke(); _startup.Click += (_, _) => StartupToggleRequested?.Invoke(); _clear.Click += (_, _) => ClearAiBarDataRequested?.Invoke(); _enablePrivate.Click += (_, _) => PrivateIntegrationEnableRequested?.Invoke(); _disablePrivate.Click += (_, _) => PrivateIntegrationDisableRequested?.Invoke(); _openCodeUsage.Click += (_, _) => OpenCodeLocalUsageToggleRequested?.Invoke(); _piUsage.Click += (_, _) => PiLocalUsageToggleRequested?.Invoke(); _chooseOpenCodeFolder.Click += (_, _) => OpenCodeDataFolderChooseRequested?.Invoke(); _resetOpenCodeFolder.Click += (_, _) => OpenCodeDataFolderResetRequested?.Invoke(); exit.Click += (_, _) => ExitRequested?.Invoke(); _menu.Items.Add(exit); _icon.ContextMenuStrip = _menu;
         _icon.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) Toggled?.Invoke(); };
     }
     public event Action? Toggled;
@@ -238,6 +281,8 @@ public sealed class WindowsTrayRuntime : ITrayRuntime
     public event Action? PrivateIntegrationDisableRequested;
     public event Action? OpenCodeLocalUsageToggleRequested;
     public event Action? PiLocalUsageToggleRequested;
+    public event Action? OpenCodeDataFolderChooseRequested;
+    public event Action? OpenCodeDataFolderResetRequested;
     public void SetRefreshAvailable(bool available)
     {
         if (available && !_menu.Items.Contains(_refresh)) _menu.Items.Insert(0, _refresh);
@@ -264,10 +309,10 @@ public sealed class WindowsTrayRuntime : ITrayRuntime
     public void SetStartupEnabled(bool enabled) => _startup.Checked = enabled;
     public void SetLocalUsageAvailable(bool available)
     {
-        if (available) { if (!_menu.Items.Contains(_piUsage)) _menu.Items.Insert(0, _piUsage); if (!_menu.Items.Contains(_openCodeUsage)) _menu.Items.Insert(0, _openCodeUsage); }
-        else { _menu.Items.Remove(_openCodeUsage); _menu.Items.Remove(_piUsage); }
+        if (available) { if (!_menu.Items.Contains(_resetOpenCodeFolder)) _menu.Items.Insert(0, _resetOpenCodeFolder); if (!_menu.Items.Contains(_chooseOpenCodeFolder)) _menu.Items.Insert(0, _chooseOpenCodeFolder); if (!_menu.Items.Contains(_piUsage)) _menu.Items.Insert(0, _piUsage); if (!_menu.Items.Contains(_openCodeUsage)) _menu.Items.Insert(0, _openCodeUsage); }
+        else { _menu.Items.Remove(_openCodeUsage); _menu.Items.Remove(_piUsage); _menu.Items.Remove(_chooseOpenCodeFolder); _menu.Items.Remove(_resetOpenCodeFolder); }
     }
-    public void SetLocalUsagePolicy(LocalUsagePolicy policy) { _openCodeUsage.Checked = policy.OpenCodeEnabled; _piUsage.Checked = policy.PiEnabled; }
+    public void SetLocalUsagePolicy(LocalUsagePolicy policy) { _openCodeUsage.Checked = policy.OpenCodeEnabled; _piUsage.Checked = policy.PiEnabled; _resetOpenCodeFolder.Enabled = policy.OpenCodeDataRoot is not null; }
     public void Show() => _icon.Visible = true;
     public void Hide() => _icon.Visible = false;
     public ValueTask DisposeAsync() { _icon.Dispose(); return ValueTask.CompletedTask; }
@@ -277,6 +322,16 @@ public sealed class WindowsPrivateIntegrationConsentPrompt : IPrivateIntegration
 {
     private const string Disclosure = "Enable AIBar's private quota integration?\n\nAIBar will read your existing local Codex credential to access a private, undocumented, unsupported quota endpoint. Only your consent is saved. Credential values are never stored, displayed, or logged. You can disable this integration at any time.";
     public bool Confirm() => Forms.MessageBox.Show(Disclosure, "Enable Private Quota Integration", Forms.MessageBoxButtons.OKCancel, Forms.MessageBoxIcon.Warning, Forms.MessageBoxDefaultButton.Button2) == Forms.DialogResult.OK;
+}
+
+public sealed class WindowsOpenCodeDataFolderPicker : IOpenCodeDataFolderPicker
+{
+    public string? Choose()
+    {
+        var dialog = new OpenFolderDialog { Multiselect = false, Title = OpenCodeDataFolderCopy.Guidance };
+        return dialog.ShowDialog() == true ? dialog.FolderName : null;
+    }
+    public void ShowFailure() => Forms.MessageBox.Show(OpenCodeDataFolderCopy.Failure, "OpenCode data folder", Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Warning);
 }
 
 public sealed class WpfPopoverRuntime : IPopoverRuntime

@@ -104,13 +104,33 @@ public sealed class LocalUsageCoordinatorTests : IDisposable
         await Assert.ThrowsAsync<ObjectDisposedException>(() => coordinator.RefreshAsync().AsTask());
     }
 
+    [Fact]
+    public async Task Custom_root_live_apply_changes_source_identity_and_reset_retains_both_histories()
+    {
+        var custom = Path.Combine(_root, "custom"); Directory.CreateDirectory(_root);
+        await CreateOpenCode(); await AddOpenCode("default"); await CreateOpenCode(custom); await AddOpenCode("custom", custom);
+        var settings = new LocalUsageSettings(SettingsPath); await settings.SaveAsync(new(true, false), default);
+        await using var ledger = new SqliteUsageEventLedger(LedgerPath);
+        await using var coordinator = new LocalUsageCoordinator(settings, new(SaltPath, new SyntheticProtector()), ledger, OpenRoot, PiRoot, DayPolicy);
+        Assert.Equal(1, (await coordinator.StartAsync()).Tools[0].EventsCommitted);
+
+        var selected = new LocalUsagePolicy(true, false, custom); await settings.SaveAsync(selected, default);
+        var changed = await coordinator.ApplyPolicyAsync(selected);
+        Assert.Equal(1, changed.Tools[0].EventsCommitted); Assert.Equal(2, await ledger.CountAsync());
+        Assert.Equal(8, Assert.Single(changed.ProjectionFacts.Where(item => item.Scope == UsageProjectionScope.OpenCode)).Tokens.Total);
+
+        var reset = selected with { OpenCodeDataRoot = null }; await settings.SaveAsync(reset, default);
+        Assert.Equal(0, (await coordinator.ApplyPolicyAsync(reset)).Tools[0].EventsCommitted);
+        Assert.Equal(2, await ledger.CountAsync());
+    }
+
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static (long OpenCode, long Pi, long Combined) Totals(IReadOnlyList<DailyToolModelUsageFact> facts) =>
         (Assert.Single(facts.Where(item => item.Scope == UsageProjectionScope.OpenCode)).Tokens.Total,
          Assert.Single(facts.Where(item => item.Scope == UsageProjectionScope.Pi)).Tokens.Total,
          Assert.Single(facts.Where(item => item.Scope == UsageProjectionScope.Combined)).Tokens.Total);
-    private async Task CreateOpenCode() { Directory.CreateDirectory(OpenRoot); await using var db = Open(Path.Combine(OpenRoot, "opencode.db")); await Execute(db, "CREATE TABLE message(id TEXT PRIMARY KEY,time_created INTEGER,time_updated INTEGER,data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY,message_id TEXT,time_created INTEGER,time_updated INTEGER,data TEXT);"); }
-    private async Task AddOpenCode(string id) { await using var db = Open(Path.Combine(OpenRoot, "opencode.db")); await using var command = db.CreateCommand(); command.CommandText = "INSERT INTO message VALUES($m,$at,$at,$md); INSERT INTO part VALUES($p,$m,$at,$at,$pd);"; command.Parameters.AddWithValue("$m", "message-" + id); command.Parameters.AddWithValue("$p", id); command.Parameters.AddWithValue("$at", At.ToUnixTimeMilliseconds()); command.Parameters.AddWithValue("$md", "{\"role\":\"assistant\",\"providerID\":\"provider\",\"modelID\":\"model\"}"); command.Parameters.AddWithValue("$pd", "{\"type\":\"step-finish\",\"reason\":\"stop\",\"tokens\":{\"total\":4,\"input\":1,\"output\":2,\"reasoning\":1,\"cache\":{\"read\":0,\"write\":0}}}"); await command.ExecuteNonQueryAsync(); }
+    private async Task CreateOpenCode(string? root = null) { root ??= OpenRoot; Directory.CreateDirectory(root); await using var db = Open(Path.Combine(root, "opencode.db")); await Execute(db, "CREATE TABLE message(id TEXT PRIMARY KEY,time_created INTEGER,time_updated INTEGER,data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY,message_id TEXT,time_created INTEGER,time_updated INTEGER,data TEXT);"); }
+    private async Task AddOpenCode(string id, string? root = null) { await using var db = Open(Path.Combine(root ?? OpenRoot, "opencode.db")); await using var command = db.CreateCommand(); command.CommandText = "INSERT INTO message VALUES($m,$at,$at,$md); INSERT INTO part VALUES($p,$m,$at,$at,$pd);"; command.Parameters.AddWithValue("$m", "message-" + id); command.Parameters.AddWithValue("$p", id); command.Parameters.AddWithValue("$at", At.ToUnixTimeMilliseconds()); command.Parameters.AddWithValue("$md", "{\"role\":\"assistant\",\"providerID\":\"provider\",\"modelID\":\"model\"}"); command.Parameters.AddWithValue("$pd", "{\"type\":\"step-finish\",\"reason\":\"stop\",\"tokens\":{\"total\":4,\"input\":1,\"output\":2,\"reasoning\":1,\"cache\":{\"read\":0,\"write\":0}}}"); await command.ExecuteNonQueryAsync(); }
     private async Task PiSession(string directory, string id) { var path = Path.Combine(PiRoot, $"--{directory}--"); Directory.CreateDirectory(path); await File.WriteAllTextAsync(Path.Combine(path, "session.jsonl"), Header() + "\n" + Assistant(id) + "\n", new UTF8Encoding(false)); }
     private static string Header() => JsonSerializer.Serialize(new { type = "session", version = 3, id = "fixture", timestamp = At });
     private static string Assistant(string id) => JsonSerializer.Serialize(new { type = "message", id, timestamp = At, message = new { role = "assistant", api = "api", provider = "provider", model = "model", timestamp = At.ToUnixTimeMilliseconds(), stopReason = "stop", usage = new { input = 1, output = 2, reasoning = 1, cacheRead = 0, cacheWrite = 0, totalTokens = 3, cost = new { total = 0 } } } });

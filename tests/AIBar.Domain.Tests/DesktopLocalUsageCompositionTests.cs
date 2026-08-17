@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using AIBar.Application;
 using AIBar.Desktop;
+using Microsoft.Data.Sqlite;
 
 namespace AIBar.Domain.Tests;
 
@@ -107,5 +108,56 @@ public sealed class DesktopLocalUsageCompositionTests
             await first.Resource.DisposeAsync();
             if (Directory.Exists(root)) Directory.Delete(root, true);
         }
+    }
+
+    [Fact]
+    public async Task Disabled_selection_avoids_source_access_restart_uses_custom_and_live_reset_retains_default_history()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"aibar-local-custom-{Guid.NewGuid():N}");
+        var home = Path.Combine(root, "profile"); var defaultRoot = LocalUsageSourceRootResolver.Resolve(new(home)).OpenCodeDataRoot!;
+        var customRoot = Path.Combine(root, "custom-opencode");
+        var defaultDb = await CreateOpenCode(defaultRoot, "default"); var customDb = await CreateOpenCode(customRoot, "custom");
+        var defaultHash = SHA256.HashData(await File.ReadAllBytesAsync(defaultDb)); var customHash = SHA256.HashData(await File.ReadAllBytesAsync(customDb));
+        try
+        {
+            var first = App.CreateComposition(new(root, Path.Combine(root, "codex"), UserProfile: home));
+            await first.Initialize();
+            await using (var locked = new FileStream(customDb, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                var selected = await first.Settings!.ChooseOpenCodeDataRootAsync(customRoot, default);
+                Assert.Equal(new(false, false, customRoot), selected);
+                Assert.False(File.Exists(Path.Combine(root, "local-usage.db"))); Assert.False(File.Exists(Path.Combine(root, "local-usage-identity-salt.bin")));
+            }
+            await first.Resource.DisposeAsync();
+
+            var second = App.CreateComposition(new(root, Path.Combine(root, "codex"), UserProfile: home));
+            try
+            {
+                await second.Initialize();
+                Assert.Equal(customRoot, (await second.Settings!.LoadLocalUsagePolicyAsync(default)).OpenCodeDataRoot);
+                await second.Settings.ToggleOpenCodeLocalUsageAsync(default);
+                var custom = await second.RefreshLocalUsage!(default);
+                Assert.Equal(4, Assert.Single(custom.ProjectionFacts.Where(item => item.Scope == UsageProjectionScope.OpenCode)).Tokens.Total);
+
+                await second.Settings.ResetOpenCodeDataRootAsync(default);
+                var reset = await second.RefreshLocalUsage!(default);
+                Assert.Equal(8, Assert.Single(reset.ProjectionFacts.Where(item => item.Scope == UsageProjectionScope.OpenCode)).Tokens.Total);
+                Assert.Null(second.Settings.LocalUsagePolicy.OpenCodeDataRoot);
+                Assert.Equal(defaultHash, SHA256.HashData(await File.ReadAllBytesAsync(defaultDb)));
+                Assert.Equal(customHash, SHA256.HashData(await File.ReadAllBytesAsync(customDb)));
+            }
+            finally { await second.Resource.DisposeAsync(); }
+        }
+        finally { SqliteConnection.ClearAllPools(); if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    private static async Task<string> CreateOpenCode(string root, string id)
+    {
+        Directory.CreateDirectory(root); var path = Path.Combine(root, "opencode.db");
+        await using var db = new SqliteConnection($"Data Source={path};Pooling=False"); await db.OpenAsync(); await using var command = db.CreateCommand();
+        command.CommandText = "CREATE TABLE message(id TEXT PRIMARY KEY,time_created INTEGER,time_updated INTEGER,data TEXT); CREATE TABLE part(id TEXT PRIMARY KEY,message_id TEXT,time_created INTEGER,time_updated INTEGER,data TEXT); INSERT INTO message VALUES($message,1,1,$messageData); INSERT INTO part VALUES($part,$message,1,1,$partData);";
+        command.Parameters.AddWithValue("$message", "message-" + id); command.Parameters.AddWithValue("$part", id);
+        command.Parameters.AddWithValue("$messageData", "{\"role\":\"assistant\",\"providerID\":\"provider\",\"modelID\":\"model\"}"); command.Parameters.AddWithValue("$partData", "{\"type\":\"step-finish\",\"reason\":\"stop\",\"tokens\":{\"total\":4,\"input\":1,\"output\":2,\"reasoning\":1,\"cache\":{\"read\":0,\"write\":0}}}");
+        await command.ExecuteNonQueryAsync(); return path;
     }
 }

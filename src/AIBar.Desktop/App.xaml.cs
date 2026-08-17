@@ -110,7 +110,7 @@ public partial class App : System.Windows.Application
         _taskbar = new TaskbarRecreationMonitor(window);
         var trayPresentation = composition.Presentation is BetaAnalyticsPresentation analyticsPresentation ? analyticsPresentation.QuotaPresentation : composition.Presentation as QuotaPresentationHost;
         _runtime = new TrayHostRuntime(_instance!, new WindowsTrayRuntime(), new WpfPopoverRuntime(window), _taskbar,
-            _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation, new WindowsPrivateIntegrationConsentPrompt());
+            _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation, new WindowsPrivateIntegrationConsentPrompt(), new WindowsOpenCodeDataFolderPicker());
         _runtime.Start();
     }
     private static void ReportFault(Exception exception) => Trace.TraceError("AIBar unavailable: {0}", exception.GetType().Name);

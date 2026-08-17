@@ -168,9 +168,17 @@ public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarD
     public ValueTask<LocalUsagePolicy> LoadLocalUsagePolicyAsync(CancellationToken cancellationToken) =>
         ChangeLocalUsageAsync(null, cancellationToken);
     public ValueTask<LocalUsagePolicy> ToggleOpenCodeLocalUsageAsync(CancellationToken cancellationToken) =>
-        ChangeLocalUsageAsync(UsageTool.OpenCode, cancellationToken);
+        ChangeLocalUsageAsync(policy => policy with { OpenCodeEnabled = !policy.OpenCodeEnabled }, cancellationToken);
     public ValueTask<LocalUsagePolicy> TogglePiLocalUsageAsync(CancellationToken cancellationToken) =>
-        ChangeLocalUsageAsync(UsageTool.Pi, cancellationToken);
+        ChangeLocalUsageAsync(policy => policy with { PiEnabled = !policy.PiEnabled }, cancellationToken);
+    public ValueTask<LocalUsagePolicy> ChooseOpenCodeDataRootAsync(string selectedRoot, CancellationToken cancellationToken)
+    {
+        if (!LocalUsageSourceRootResolver.TryNormalizeOpenCodeDataRoot(selectedRoot, true, out var normalized))
+            return ValueTask.FromException<LocalUsagePolicy>(new InvalidOperationException(LocalUsageSourceRootResolver.InvalidOpenCodeDataRootMessage));
+        return ChangeLocalUsageAsync(policy => policy with { OpenCodeDataRoot = normalized }, cancellationToken);
+    }
+    public ValueTask<LocalUsagePolicy> ResetOpenCodeDataRootAsync(CancellationToken cancellationToken) =>
+        ChangeLocalUsageAsync(policy => policy with { OpenCodeDataRoot = null }, cancellationToken);
     public ValueTask EnablePrivateIntegrationAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -183,20 +191,15 @@ public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarD
     }
     private ValueTask EnableAsync() { privateIntegration.Enable(); return ValueTask.CompletedTask; }
     private ValueTask DisableAsync() { privateIntegration.Disable(); return ValueTask.CompletedTask; }
-    private async ValueTask<LocalUsagePolicy> ChangeLocalUsageAsync(UsageTool? tool, CancellationToken cancellationToken)
+    private async ValueTask<LocalUsagePolicy> ChangeLocalUsageAsync(Func<LocalUsagePolicy, LocalUsagePolicy>? change, CancellationToken cancellationToken)
     {
         if (!LocalUsageAvailable) return LocalUsagePolicy.Disabled;
         await _localUsageGate.WaitAsync(cancellationToken);
         try
         {
             var current = await loadLocalUsage!(cancellationToken);
-            if (tool is null) { Volatile.Write(ref _localUsagePolicy, current); return current; }
-            var updated = tool.Value switch
-            {
-                UsageTool.OpenCode => current with { OpenCodeEnabled = !current.OpenCodeEnabled },
-                UsageTool.Pi => current with { PiEnabled = !current.PiEnabled },
-                _ => throw new ArgumentOutOfRangeException(nameof(tool)),
-            };
+            if (change is null) { Volatile.Write(ref _localUsagePolicy, current); return current; }
+            var updated = change(current);
             await saveLocalUsage!(updated, cancellationToken);
             await applyLocalUsage!(updated, cancellationToken);
             Volatile.Write(ref _localUsagePolicy, updated);
