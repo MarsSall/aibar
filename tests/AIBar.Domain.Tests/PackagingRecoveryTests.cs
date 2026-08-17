@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace AIBar.Domain.Tests;
 
@@ -10,6 +11,10 @@ namespace AIBar.Domain.Tests;
 public sealed class PackagingRecoveryTests
 {
     private static readonly SemaphoreSlim PublishLock = new(1, 1);
+    private static readonly TimeSpan PublishLockTimeout = TimeSpan.FromSeconds(10);
+    // Covers PowerShell startup, validation, exception serialization, wrapper shutdown, and outer pipe EOF.
+    private static readonly TimeSpan ManagedCompletionGrace = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan ManagedCleanupGrace = TimeSpan.FromSeconds(2);
     [Fact]
     public void Red_existing_sentinel_tree_is_rejected_and_unchanged()
     {
@@ -66,7 +71,7 @@ public sealed class PackagingRecoveryTests
     public void Fresh_runs_have_recursive_inventory_zip_and_stable_identity()
     {
         using var one = TempParent("á one"); using var two = TempParent("two"); var first = Path.Combine(one.Path, "one"); var second = Path.Combine(two.Path, "two");
-        Assert.Equal(0, Run(first).ExitCode); Assert.Equal(0, Run(second).ExitCode);
+        AssertSucceeded(Run(first)); AssertSucceeded(Run(second));
         var a = Contract(first); var b = Contract(second);
         Assert.Equal(a.Files, b.Files); Assert.Equal(a.ZipHash, b.ZipHash); Assert.Equal(a.Inventory, b.Inventory); Assert.Equal(a.Manifest, b.Manifest);
     }
@@ -78,7 +83,7 @@ public sealed class PackagingRecoveryTests
         Assert.NotEqual(0, Run(collision).ExitCode);
         var failed = Path.Combine(parent.Path, "failed"); var failedRun = Run(failed, "not-a-real-dotnet");
         Assert.NotEqual(0, failedRun.ExitCode); Assert.Contains("PUBLISH_INCOMPLETE_OUTPUT", failedRun.Output); Assert.True(Directory.Exists(failed));
-        var retry = Path.Combine(parent.Path, "retry"); Assert.Equal(0, Run(retry).ExitCode); Assert.True(Directory.Exists(failed));
+        var retry = Path.Combine(parent.Path, "retry"); AssertSucceeded(Run(retry)); Assert.True(Directory.Exists(failed));
     }
 
     [Fact]
@@ -86,7 +91,7 @@ public sealed class PackagingRecoveryTests
     {
         var repositoryState = TreeHash(Path.Combine(RepositoryRoot(), "src", "AIBar.Desktop", "obj"), Path.Combine(RepositoryRoot(), "src", "AIBar.Desktop", "bin"));
         using var one = Isolation("café one"); using var two = Isolation("two");
-        var firstRun = Run(one.Output, isolation: one); var secondRun = Run(two.Output, isolation: two); Assert.True(firstRun.ExitCode == 0, firstRun.Output); Assert.True(secondRun.ExitCode == 0, secondRun.Output);
+        var firstRun = Run(one.Output, isolation: one); var secondRun = Run(two.Output, isolation: two); AssertSucceeded(firstRun); AssertSucceeded(secondRun);
         Assert.Equal(repositoryState, TreeHash(Path.Combine(RepositoryRoot(), "src", "AIBar.Desktop", "obj"), Path.Combine(RepositoryRoot(), "src", "AIBar.Desktop", "bin")));
         var first = Contract(one.Output); var second = Contract(two.Output);
         Assert.Equal(first.Files, second.Files); Assert.Equal(first.ZipHash, second.ZipHash); Assert.Equal(first.Inventory, second.Inventory); Assert.Equal(first.Manifest, second.Manifest);
@@ -169,7 +174,60 @@ public sealed class PackagingRecoveryTests
     {
         using var harness = DescendantHarness.Create(); var output = Path.Combine(harness.Root, "recovery");
         var result = Run(output, harness.Executable, timeoutSeconds: 2, boundedWaitSeconds: 7, environment: new Dictionary<string, string>(harness.PublisherEnvironment()) { ["AIBAR_PUBLISH_MODE"] = "saturated" });
-        Assert.Equal(0, result.ExitCode); Assert.True(Directory.Exists(output));
+        AssertSucceeded(result); Assert.True(Directory.Exists(output));
+    }
+
+    [Fact]
+    public void Nonzero_child_reports_stage_exit_code_and_bounded_redacted_stream_tails()
+    {
+        using var harness = DescendantHarness.Create();
+        var environment = new Dictionary<string, string>(harness.PublisherEnvironment()) { ["AIBAR_PUBLISH_MODE"] = "diagnostic-nonzero" };
+        var result = Run(Path.Combine(harness.Root, "nonzero"), harness.Executable, timeoutSeconds: 5, environment: environment);
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("kind=nonzero-exit", result.Output); Assert.Contains("stage=Self-contained win-x64 publish failed.", result.Output); Assert.Contains("exit_code=23", result.Output);
+        Assert.Contains("stdout_tail=[truncated", result.Output); Assert.Contains("stderr_tail=[truncated", result.Output);
+        Assert.Contains("stdout-tail", result.Output); Assert.Contains("stderr-tail", result.Output); Assert.Contains("[redacted]", result.Output);
+        Assert.DoesNotContain("stdout-password", result.Output); Assert.DoesNotContain("stderr-password", result.Output);
+    }
+
+    [Fact]
+    public void Child_timeout_uses_one_deadline_plus_fixed_grace_and_reports_partial_diagnostics()
+    {
+        using var harness = DescendantHarness.Create();
+        var environment = new Dictionary<string, string>(harness.PublisherEnvironment()) { ["AIBAR_PUBLISH_MODE"] = "diagnostic-timeout" };
+        var clock = Stopwatch.StartNew(); var result = Run(Path.Combine(harness.Root, "timeout"), harness.Executable, timeoutSeconds: 1, environment: environment); clock.Stop();
+        Assert.NotEqual(0, result.ExitCode); Assert.InRange(clock.Elapsed, TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(5));
+        Assert.Contains("kind=timeout", result.Output); Assert.Contains("operation_deadline_seconds=1 termination_grace_seconds=2", result.Output);
+        Assert.Contains("timeout-stdout", result.Output); Assert.Contains("timeout-stderr", result.Output); Assert.Contains("exit_code=", result.Output);
+    }
+
+    [Fact]
+    public void Managed_timeout_releases_publish_lock_for_the_next_run()
+    {
+        using var harness = DescendantHarness.Create(); var firstOutput = Path.Combine(harness.Root, "managed-timeout");
+        var timeoutEnvironment = new Dictionary<string, string>(harness.PublisherEnvironment()) { ["AIBAR_PUBLISH_MODE"] = "diagnostic-timeout" };
+        using var first = StartRun(firstOutput, harness.Executable, timeoutSeconds: 30, environment: timeoutEnvironment);
+        var failure = Assert.Throws<Xunit.Sdk.XunitException>(() => first.Complete(TimeSpan.FromMilliseconds(200)));
+        Assert.Contains("managed deadline", failure.Message); Assert.Contains("process_state=", failure.Message); Assert.Contains("stdout_tail=", failure.Message);
+        var nextEnvironment = new Dictionary<string, string>(harness.PublisherEnvironment()) { ["AIBAR_PUBLISH_MODE"] = "diagnostic-nonzero" };
+        var next = Run(Path.Combine(harness.Root, "next"), harness.Executable, timeoutSeconds: 5, environment: nextEnvironment);
+        Assert.Contains("kind=nonzero-exit", next.Output); Assert.Contains("exit_code=23", next.Output);
+    }
+
+    [Fact]
+    public void Nonzero_root_with_retained_stream_handles_returns_pending_tails_and_releases_publish_lock()
+    {
+        using var harness = DescendantHarness.Create();
+        using var run = StartHarnessRun(() => harness.StartChild(exitCode: 7), TimeSpan.FromSeconds(4));
+        Assert.True(harness.Ready.WaitOne(10_000), "The retained-handle descendant did not signal readiness.");
+
+        var clock = Stopwatch.StartNew(); var result = run.Complete(TimeSpan.FromSeconds(4)); clock.Stop();
+        Assert.Equal(7, result.ExitCode); Assert.InRange(clock.Elapsed, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+        Assert.Contains("stdout_tail=[pending]", result.Output); Assert.Contains("stderr_tail=[pending]", result.Output);
+
+        var reacquired = PublishLock.Wait(TimeSpan.Zero);
+        try { Assert.True(reacquired, "PublishLock was not released after the bounded nonzero result."); }
+        finally { if (reacquired) PublishLock.Release(); }
     }
 
     [Fact]
@@ -273,11 +331,11 @@ public sealed class PackagingRecoveryTests
         if (cancelAfterMilliseconds is not null) { psi.ArgumentList.Add("-CancelAfterMilliseconds"); psi.ArgumentList.Add(cancelAfterMilliseconds.Value.ToString()); }
         if (knownDescendantIdentityPath is not null) { psi.ArgumentList.Add("-KnownDescendantIdentityPath"); psi.ArgumentList.Add(knownDescendantIdentityPath); }
         if (environment is not null) foreach (var pair in environment) psi.Environment[pair.Key] = pair.Value;
-        PublishLock.Wait();
+        if (!PublishLock.Wait(PublishLockTimeout)) throw new Xunit.Sdk.XunitException("PublishLock acquisition timed out after 10 seconds; no packaging process was started.");
         try
         {
             var process = Process.Start(psi)!;
-            return new RunningProcess(process, process.StandardOutput.ReadToEndAsync(), process.StandardError.ReadToEndAsync());
+            return new RunningProcess(process, TimeSpan.FromSeconds(timeoutSeconds ?? 300) + ManagedCompletionGrace);
         }
         catch
         {
@@ -285,10 +343,18 @@ public sealed class PackagingRecoveryTests
             throw;
         }
     }
+    private static RunningProcess StartHarnessRun(Func<Process> start, TimeSpan completionDeadline)
+    {
+        if (!PublishLock.Wait(PublishLockTimeout)) throw new Xunit.Sdk.XunitException("PublishLock acquisition timed out after 10 seconds; no synthetic process was started.");
+        try { return new RunningProcess(start(), completionDeadline); }
+        catch { PublishLock.Release(); throw; }
+    }
     private static string RepositoryRoot() { for (var d = new DirectoryInfo(AppContext.BaseDirectory); ; d = d.Parent!) if (File.Exists(Path.Combine(d.FullName, "AIBar.sln"))) return d.FullName; }
     private static string FakeCommand(string parent, string marker) { var path = Path.Combine(parent, "marker.cmd"); File.WriteAllText(path, $"@echo invoked>\"{marker}\"\r\n@exit /b 0"); return path; }
     private static string Hash(Stream stream) => Convert.ToHexString(SHA256.HashData(stream));
     private static string HashFile(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+    private static void AssertSucceeded(RunResult result) => Assert.True(result.ExitCode == 0, BoundedOutput(result.Output));
+    private static string BoundedOutput(string output) => output.Length <= 8192 ? output : $"[truncated discarded_chars={output.Length - 8192}]\n{output[^8192..]}";
     private static string TreeHash(params string[] roots)
     {
         var files = roots.SelectMany(root => Directory.Exists(root) ? Directory.GetFiles(root, "*", SearchOption.AllDirectories).OrderBy(path => path, StringComparer.Ordinal).Select(path => $"{Path.GetRelativePath(root, path)}:{HashFile(path)}") : ["missing"]);
@@ -298,43 +364,141 @@ public sealed class PackagingRecoveryTests
     private static IsolationRoot Isolation(string suffix) => new(Path.Combine(Path.GetTempPath(), $"aibar-8c1-isolated-{Guid.NewGuid():N} {suffix}"));
     private sealed class TemporaryParent(string path) : IDisposable { public string Path { get; } = Directory.CreateDirectory(path).FullName; public void Dispose() { if (Directory.Exists(Path)) Directory.Delete(Path, true); } }
     private sealed record RunResult(int ExitCode, string Output);
-    private sealed class RunningProcess(Process process, Task<string> stdout, Task<string> stderr) : IDisposable
+    private sealed class RunningProcess : IDisposable
     {
-        private readonly Task _work = Task.WhenAll(process.WaitForExitAsync(), stdout, stderr);
-        private bool _disposed;
+        private readonly Process _process;
+        private readonly BoundedCapture _stdout;
+        private readonly BoundedCapture _stderr;
+        private readonly Task _processExit;
+        private readonly Task _drains;
+        private readonly TimeSpan _completionDeadline;
+        private int _lockOwned = 1;
+        private int _disposeStarted;
+
+        public RunningProcess(Process process, TimeSpan completionDeadline)
+        {
+            _process = process; _completionDeadline = completionDeadline;
+            _stdout = new(process.StandardOutput); _stderr = new(process.StandardError);
+            _processExit = process.WaitForExitAsync();
+            _drains = Task.WhenAll(_stdout.Completion, _stderr.Completion);
+        }
 
         public RunResult Complete(TimeSpan? bound)
         {
-            if (bound is { } timeout) Assert.True(_work.Wait(timeout), "PowerShell process exceeded its bounded wait.");
-            else _work.GetAwaiter().GetResult();
-            return new(process.ExitCode, stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult());
+            var timeout = bound ?? _completionDeadline;
+            try { return CompleteCoreAsync(timeout).GetAwaiter().GetResult(); }
+            finally { Dispose(); }
         }
 
         public async Task<RunResult> CompleteAsync(TimeSpan bound)
         {
-            await _work.WaitAsync(bound);
-            return new(process.ExitCode, await stdout + await stderr);
+            try { return await CompleteCoreAsync(bound); }
+            finally { Dispose(); }
+        }
+
+        private async Task<RunResult> CompleteCoreAsync(TimeSpan timeout)
+        {
+            var clock = Stopwatch.StartNew();
+            try { await _processExit.WaitAsync(timeout); }
+            catch (TimeoutException) { throw ManagedDeadline(timeout); }
+
+            var exitCode = _process.ExitCode;
+            var remaining = clock.Elapsed >= timeout ? TimeSpan.Zero : timeout - clock.Elapsed;
+            if (exitCode == 0)
+            {
+                try { await _drains.WaitAsync(remaining); }
+                catch (TimeoutException) { throw ManagedDeadline(timeout); }
+            }
+            else
+            {
+                var drainGrace = remaining < ManagedCleanupGrace ? remaining : ManagedCleanupGrace;
+                if (!_drains.IsCompleted && drainGrace > TimeSpan.Zero)
+                    await Task.WhenAny(_drains, Task.Delay(drainGrace));
+            }
+            return new(exitCode, Output());
+        }
+
+        private string Output() => _stdout.Snapshot("stdout_tail") + "\n" + _stderr.Snapshot("stderr_tail");
+        private Xunit.Sdk.XunitException ManagedDeadline(TimeSpan timeout) => new($"Packaging harness exceeded managed deadline {timeout.TotalSeconds:0.###}s; {Diagnostics()}");
+        private string Diagnostics()
+        {
+            string state;
+            try { state = _process.HasExited ? $"exited exit_code={_process.ExitCode}" : "running exit_code=unavailable"; } catch { state = "unavailable exit_code=unavailable"; }
+            return $"process_state={state}\n{Output()}";
         }
 
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
+            if (Interlocked.Exchange(ref _disposeStarted, 1) != 0) return;
             try
             {
-                if (!process.HasExited) process.Kill(entireProcessTree: true);
-                _work.Wait(TimeSpan.FromSeconds(10));
+                try { if (!_process.HasExited) _process.Kill(entireProcessTree: true); } catch { }
+                try { _stdout.Dispose(); } catch { }
+                try { _stderr.Dispose(); } catch { }
+                try { Task.WhenAll(_processExit, _drains).Wait(ManagedCleanupGrace); } catch { }
             }
             finally
             {
-                process.Dispose();
-                PublishLock.Release();
+                _process.Dispose();
+                if (Interlocked.Exchange(ref _lockOwned, 0) == 1) PublishLock.Release();
             }
+        }
+    }
+    private sealed class BoundedCapture : IDisposable
+    {
+        private const int Limit = 8192;
+        private readonly StreamReader _reader;
+        private readonly StringBuilder _tail = new();
+        private readonly object _sync = new();
+        private long _discarded;
+        private int _eof;
+        private int _stopRequested;
+        public Task Completion { get; }
+
+        public BoundedCapture(StreamReader reader)
+        {
+            _reader = reader;
+            Completion = Pump();
+        }
+
+        private async Task Pump()
+        {
+            try
+            {
+                var buffer = new char[4096];
+                int read;
+                while ((read = await _reader.ReadAsync(buffer)) > 0)
+                    lock (_sync)
+                    {
+                        _tail.Append(buffer, 0, read);
+                        if (_tail.Length > Limit) { var remove = _tail.Length - Limit; _tail.Remove(0, remove); _discarded += remove; }
+                    }
+                Volatile.Write(ref _eof, 1);
+            }
+            catch (Exception error) when (Volatile.Read(ref _stopRequested) == 1 && (error is ObjectDisposedException or IOException or OperationCanceledException)) { }
+        }
+
+        public string Snapshot(string name)
+        {
+            lock (_sync)
+            {
+                var text = Regex.Replace(_tail.ToString(), @"(?i)\b(https?://)[^\s/:@]+:[^\s/@]+@", "$1[redacted]@");
+                text = Regex.Replace(text, @"(?i)\b(password|passwd|pwd|token|secret|api[_-]?key)\s*[:=]\s*[^\s;]+", "$1=[redacted]");
+                var state = Volatile.Read(ref _eof) == 1 ? "complete" : Completion.IsFaulted ? $"faulted error={Completion.Exception!.GetBaseException().GetType().Name}" : Volatile.Read(ref _stopRequested) == 1 ? "stopped" : "pending";
+                if (_discarded > 0) state += $" truncated discarded_chars={_discarded}";
+                return $"{name}=[{state}]\n{text}";
+            }
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _stopRequested, 1) == 0) _reader.Dispose();
         }
     }
     private sealed record Snapshot(Dictionary<string, (long, string)> Files, string ZipHash, byte[] Inventory, byte[] Manifest);
     private sealed class DescendantHarness : IDisposable
     {
+        private const int HarnessCompilationWaitMilliseconds = 30_000;
         private const int BoundedWaitMilliseconds = 10_000;
         public string Root { get; }
         public string Executable { get; }
@@ -369,7 +533,7 @@ if (args[0] == "child")
     using var grandchild = Process.Start(start)!;
     using var childReady = EventWaitHandle.OpenExisting(args[2]);
     Console.Out.WriteLine("child-stdout"); Console.Error.WriteLine("child-stderr");
-    Environment.Exit(childReady.WaitOne(10000) ? 0 : 3);
+    Environment.Exit(childReady.WaitOne(10000) ? int.Parse(args[9]) : 3);
 }
 if (args[0] == "child-only")
 {
@@ -393,6 +557,8 @@ if (args[0] == "publish")
 {
     var mode = Environment.GetEnvironmentVariable("AIBAR_PUBLISH_MODE");
     if (mode == "saturated") { File.WriteAllText(Environment.GetEnvironmentVariable("AIBAR_MARKER")!, $"owned-marker:{Environment.GetEnvironmentVariable("AIBAR_NONCE")}"); Console.Out.Write(new string('o', 1_048_576)); Console.Error.Write(new string('e', 1_048_576)); Environment.Exit(0); }
+    if (mode == "diagnostic-nonzero") { Console.Out.Write(new string('o', 4096)); Console.Out.WriteLine("stdout-tail password=stdout-password"); Console.Error.Write(new string('e', 4096)); Console.Error.WriteLine("stderr-tail https://user:stderr-password@example.invalid/path"); Environment.Exit(23); }
+    if (mode == "diagnostic-timeout") { Console.Out.WriteLine("timeout-stdout"); Console.Out.Flush(); Console.Error.WriteLine("timeout-stderr"); Console.Error.Flush(); Thread.Sleep(30000); Environment.Exit(0); }
     var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("AIBAR_HARNESS_EXE")!) { UseShellExecute = false };
     foreach (var value in new[] { "publisher-child", Environment.GetEnvironmentVariable("AIBAR_HARNESS_EXE")!, Environment.GetEnvironmentVariable("AIBAR_READY")!, Environment.GetEnvironmentVariable("AIBAR_RELEASE")!, Environment.GetEnvironmentVariable("AIBAR_MARKER")!, Environment.GetEnvironmentVariable("AIBAR_IDENTITY")!, Environment.GetEnvironmentVariable("AIBAR_ARGUMENTS")!, Environment.GetEnvironmentVariable("AIBAR_ROOT")!, Environment.GetEnvironmentVariable("AIBAR_NONCE")! }) start.ArgumentList.Add(value);
     using var child = Process.Start(start)!;
@@ -438,7 +604,7 @@ Environment.Exit(release.WaitOne(10000) ? 0 : 4);
             using var compiler = Process.Start(build)!;
             var stdout = compiler.StandardOutput.ReadToEndAsync(); var stderr = compiler.StandardError.ReadToEndAsync();
             var compilerWork = Task.WhenAll(compiler.WaitForExitAsync(), stdout, stderr);
-            if (!compilerWork.Wait(BoundedWaitMilliseconds))
+            if (!compilerWork.Wait(HarnessCompilationWaitMilliseconds))
             {
                 if (!compiler.HasExited) compiler.Kill(entireProcessTree: true);
                 Assert.True(compilerWork.Wait(BoundedWaitMilliseconds), $"Compiler timeout: {Bounded(stdout, stderr)}");
@@ -451,11 +617,12 @@ Environment.Exit(release.WaitOne(10000) ? 0 : 4);
             return new(root, Path.Combine(root, "bin", "Debug", "net8.0", "Harness.exe"), Path.Combine(root, "identity.json"), Path.Combine(root, "arguments.txt"), Path.Combine(root, ".owned-marker"), nonce, readyName, releaseName, ready, release);
         }
 
-        public Process StartChild()
+        public Process StartChild(int exitCode = 0)
         {
             var start = new ProcessStartInfo(Executable) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
             start.ArgumentList.Add("child"); start.ArgumentList.Add(Executable); start.ArgumentList.Add(ReadyName); start.ArgumentList.Add(ReleaseName);
             start.ArgumentList.Add(Marker); start.ArgumentList.Add(IdentityRecord); start.ArgumentList.Add(ArgumentRecord); start.ArgumentList.Add(Root); start.ArgumentList.Add(Nonce);
+            start.ArgumentList.Add(exitCode.ToString());
             return Process.Start(start)!;
         }
 
