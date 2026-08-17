@@ -26,7 +26,7 @@ public sealed class BetaPresentationTests
         Assert.True(loading.IsLoading); Assert.False(loading.IsFresh); Assert.Equal("Loading", loading.FreshnessLabel);
         Assert.True(missing.IsMissingCredential); Assert.True(missing.IsUnavailable); Assert.Equal("Credential unavailable", missing.WarningLabel);
         Assert.True(offlineCached.IsOffline); Assert.True(offlineCached.IsDegraded); Assert.Equal(TimeSpan.FromMinutes(11), offlineCached.CachedAge);
-        Assert.Equal("Cached 00:11:00", offlineCached.CachedAgeLabel); Assert.Equal("Network unavailable", offlineCached.WarningLabel);
+        Assert.Equal("Cached 00h 11m", offlineCached.CachedAgeLabel); Assert.Equal("Network unavailable", offlineCached.WarningLabel);
         Assert.True(safeError.IsSafeError); Assert.Equal("Service unavailable", safeError.WarningLabel); Assert.DoesNotContain("secret", safeError.WarningLabel, StringComparison.OrdinalIgnoreCase);
         Assert.NotEmpty(fresh.Disclosure); Assert.NotEmpty(fresh.QuotaDisclosure); Assert.NotEmpty(fresh.PrivateEndpointDisclosure);
     }
@@ -42,14 +42,14 @@ public sealed class BetaPresentationTests
         await coordinator.InitializeAsync(default);
 
         var trayState = host.State;
-        Assert.Equal("01:00:00", trayState.Primary.ResetCountdown);
+        Assert.Equal("01h 00m", trayState.Primary.ResetCountdown);
         clock.Advance(TimeSpan.FromMinutes(15)); lifecycle.RaiseClockChanged();
-        Assert.Equal("00:45:00", host.State.Primary.ResetCountdown);
+        Assert.Equal("00h 45m", host.State.Primary.ResetCountdown);
         Assert.NotSame(trayState, host.State);
 
         await host.DisposeAsync();
         clock.Advance(TimeSpan.FromMinutes(15)); lifecycle.RaiseClockChanged();
-        Assert.Equal("00:45:00", host.State.Primary.ResetCountdown);
+        Assert.Equal("00h 45m", host.State.Primary.ResetCountdown);
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public sealed class BetaPresentationTests
         {
             tray.Toggle();
 
-            Assert.Equal("00:55:00", presentation.State.Primary.ResetCountdown);
+            Assert.Equal("00h 55m", presentation.State.Primary.ResetCountdown);
             Assert.Same(presentation.State, popupState);
             Assert.Same(presentation.State, tray.State);
             Assert.Equal(0, provider.Calls);

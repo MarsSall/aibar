@@ -82,7 +82,13 @@ public sealed class QuotaPresentationMapper(IClock clock)
         window?.PercentageUsed,
         window is null ? null : FormatCountdown(window.CountdownAt(clock.UtcNow)));
 
-    private static string FormatCountdown(TimeSpan value) => $"{(int)value.TotalHours:00}:{value.Minutes:00}:{value.Seconds:00}";
+    private static string FormatCountdown(TimeSpan value)
+    {
+        var duration = NonNegative(value);
+        return duration < TimeSpan.FromDays(1)
+            ? $"{duration.Hours:00}h {duration.Minutes:00}m"
+            : $"{duration.Days}d {duration.Hours:00}h {duration.Minutes:00}m";
+    }
 
     private static TimeSpan NonNegative(TimeSpan value) => value < TimeSpan.Zero ? TimeSpan.Zero : value;
     private static string? WarningLabel(QuotaFailure? failure, bool isMissingCredential, bool isOffline) =>
