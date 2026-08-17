@@ -17,7 +17,11 @@ public sealed class ClearAiBarDataTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(_root, "cache", "quota.json"), "cache");
         await File.WriteAllTextAsync(Path.Combine(_root, "logs", "nested", "log.txt"), "log");
         await File.WriteAllTextAsync(Path.Combine(_root, "aibar.db"), "database");
+        await File.WriteAllTextAsync(Path.Combine(_root, "analytics.db"), "analytics");
+        await File.WriteAllTextAsync(Path.Combine(_root, "analytics.db-wal"), "analytics-wal");
+        await File.WriteAllTextAsync(Path.Combine(_root, "analytics.db-shm"), "analytics-shm");
         await File.WriteAllTextAsync(Path.Combine(_root, "settings.json"), "settings");
+        await File.WriteAllTextAsync(Path.Combine(_root, "unrelated.txt"), "preserve");
         Directory.CreateDirectory(_codex);
         var source = Path.Combine(_codex, "session.jsonl");
         await File.WriteAllTextAsync(source, "synthetic codex source");
@@ -34,8 +38,12 @@ public sealed class ClearAiBarDataTests : IDisposable
         Assert.Equal(1, recreated); Assert.Equal(before, Hash(source));
         Assert.True(Directory.Exists(Path.Combine(_root, "cache")));
         Assert.Equal("empty", await File.ReadAllTextAsync(Path.Combine(_root, "aibar.db")));
+        Assert.False(File.Exists(Path.Combine(_root, "analytics.db")));
+        Assert.False(File.Exists(Path.Combine(_root, "analytics.db-wal")));
+        Assert.False(File.Exists(Path.Combine(_root, "analytics.db-shm")));
         Assert.False(Directory.Exists(Path.Combine(_root, "logs")));
         Assert.False(File.Exists(Path.Combine(_root, "settings.json")));
+        Assert.Equal("preserve", await File.ReadAllTextAsync(Path.Combine(_root, "unrelated.txt")));
     }
 
     [Fact]

@@ -78,7 +78,7 @@ public partial class App : System.Windows.Application
         var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents);
         var localUsagePresentation = new LocalUsagePresentationHost(localUsage, new LocalUsagePresentationMapper());
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
-        var clear = new ClearAiBarDataService(dataDirectory, [coordinator, localUsage], CreateEmptyStateFactory(coordinator));
+        var clear = new ClearAiBarDataService(dataDirectory, [coordinator, localUsage, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics));
         return new(new BetaAnalyticsPresentation(presentation, analytics, localUsagePresentation), presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy, betaRuntime.RevokeConsentAsync, betaRuntime.GrantConsentAsync,
                 localUsageSettings.LoadAsync, localUsageSettings.SaveAsync, async (value, token) => { await localUsagePresentation.ApplyPolicyAsync(value, token); }),
             new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, analyticsOwner, store, localUsage, localUsageLedger, seams.LifecycleObservation),
@@ -99,7 +99,11 @@ public partial class App : System.Windows.Application
     }
     private static async Task InitializePrivateAsync(BetaRuntime runtime, QuotaPresentationHost presentation, CancellationToken cancellationToken)
     { await runtime.InitializeAsync(cancellationToken); presentation.RefreshAvailabilityChanged(); }
-    internal static Func<CancellationToken, ValueTask> CreateEmptyStateFactory(QuotaRefreshCoordinator coordinator) => coordinator.ClearAsync;
+    internal static Func<CancellationToken, ValueTask> CreateEmptyStateFactory(QuotaRefreshCoordinator coordinator, LocalCodexAnalyticsView? analytics = null) => async token =>
+    {
+        analytics?.ResetAfterClear();
+        await coordinator.ClearAsync(token);
+    };
     private void StartTray(StartupComposition composition)
     {
         var window = new MainWindow { DataContext = composition.Presentation, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
