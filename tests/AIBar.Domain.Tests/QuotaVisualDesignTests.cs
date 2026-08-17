@@ -24,10 +24,12 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
         Assert.Contains("AutomationProperties.Name=\"OpenCode and Pi local usage\"", window, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"{Binding AutomationLabel}\"", window, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding LocalUsage.Rows}\" Focusable=\"False\"", window, StringComparison.Ordinal);
-        var localUsageBreakdown = XDocument.Parse(window).Descendants().Single(element => element.Attribute("Text")?.Value == "{Binding TokenBreakdownLabel}");
-        Assert.Equal("TextBlock", localUsageBreakdown.Name.LocalName);
-        Assert.Equal("Wrap", localUsageBreakdown.Attribute("TextWrapping")?.Value);
-        Assert.Null(localUsageBreakdown.Attribute("Focusable"));
+        var localUsage = XDocument.Parse(window); var expander = localUsage.Descendants().Single(element => element.Name.LocalName == "Expander");
+        Assert.Equal("False", expander.Attribute("IsExpanded")?.Value); Assert.Equal("True", expander.Attribute("Focusable")?.Value); Assert.Equal("True", expander.Attribute("IsTabStop")?.Value);
+        var detailScroller = expander.Descendants().Single(element => element.Name.LocalName == "ScrollViewer");
+        Assert.Equal("180", detailScroller.Attribute("MaxHeight")?.Value); Assert.Equal("Auto", detailScroller.Attribute("VerticalScrollBarVisibility")?.Value);
+        var localUsageBreakdowns = localUsage.Descendants().Where(element => element.Attribute("Text")?.Value == "{Binding TokenBreakdownLabel}").ToArray();
+        Assert.Equal(2, localUsageBreakdowns.Length); Assert.All(localUsageBreakdowns, breakdown => Assert.Equal("Wrap", breakdown.Attribute("TextWrapping")?.Value));
         Assert.Equal(4, window.Split("Style=\"{StaticResource QuotaCardStyle}\"", StringSplitOptions.None).Length - 1);
         Assert.Contains("AutomationProperties.Name=\"Refresh quota\"", window, StringComparison.Ordinal); Assert.Contains("IsTabStop=\"True\"", window, StringComparison.Ordinal);
         Assert.DoesNotContain("<DoubleAnimation", resources, StringComparison.Ordinal);
@@ -83,7 +85,22 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
                     System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); cardWindow.UpdateLayout();
                     var quotaCards = FindVisualChildren<System.Windows.Controls.GroupBox>(cardWindow).Take(2).ToArray();
                     Assert.Equal(availability.Primary ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, quotaCards[0].Visibility);
-                    Assert.Equal(availability.Weekly ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, quotaCards[1].Visibility); cardWindow.Close();
+                    Assert.Equal(availability.Weekly ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, quotaCards[1].Visibility);
+                    var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(cardWindow).ToArray(); Assert.Equal(3, usageExpanders.Length);
+                    var openCode = usageExpanders.Single(item => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(item)!.GetName().StartsWith("OpenCode,", StringComparison.Ordinal));
+                    var openCodePeer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(openCode)!;
+                    Assert.Equal("OpenCode, 165 retained tokens, Input 11 · Cache 55 (read 22, write 33) · Output 44 · Reasoning 55, Retained history", openCodePeer.GetName());
+                    Assert.True(openCode.Focusable); Assert.True(openCode.IsTabStop); Assert.DoesNotContain("model-", openCodePeer.GetName(), StringComparison.Ordinal);
+                    var expandCollapse = Assert.IsAssignableFrom<System.Windows.Automation.Provider.IExpandCollapseProvider>(openCodePeer.GetPattern(System.Windows.Automation.Peers.PatternInterface.ExpandCollapse));
+                    expandCollapse.Expand(); cardWindow.UpdateLayout(); System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    var visibleDetailText = FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible).ToArray();
+                    Assert.Equal(new[] { "model-alpha", "model-zeta" }, visibleDetailText.Where(text => text.Text.StartsWith("model-", StringComparison.Ordinal)).Select(text => text.Text));
+                    Assert.Contains(visibleDetailText, text => text.Text == "150 retained tokens"); Assert.Contains(visibleDetailText, text => text.Text == "15 retained tokens");
+                    var detailNames = visibleDetailText.Select(text => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(text)?.GetName()).OfType<string>().ToArray();
+                    Assert.Contains("2030-01-02, model-alpha, 150 retained tokens, Input 10 · Cache 50 (read 20, write 30) · Output 40 · Reasoning 50", detailNames);
+                    expandCollapse.Collapse(); cardWindow.UpdateLayout(); Assert.False(openCode.IsExpanded);
+                    Assert.DoesNotContain(FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible), text => text.Text.StartsWith("model-", StringComparison.Ordinal));
+                    cardWindow.Close();
                     var cardCleanup = DisposeAsync(analytics, cardHost, cardCoordinator); PumpUntil(() => cardCleanup.IsCompleted); Assert.True(cardCleanup.IsCompletedSuccessfully);
                 }
                 var disabled = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), false);
@@ -159,10 +176,19 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
     }
     private static LocalUsagePresentationHost LocalUsageHost()
     {
+        var facts = new[]
+        {
+            new DailyToolModelUsageFact(new(2030, 1, 1), "test-zone", TimeSpan.Zero, "test-policy", UsageProjectionScope.OpenCode, "model-zeta", new(1, 2, 3, 4, 5)),
+            new DailyToolModelUsageFact(new(2030, 1, 2), "test-zone", TimeSpan.Zero, "test-policy", UsageProjectionScope.OpenCode, "model-alpha", new(10, 20, 30, 40, 50)),
+            new DailyToolModelUsageFact(new(2030, 1, 1), "test-zone", TimeSpan.Zero, "test-policy", UsageProjectionScope.Combined, "model-zeta", new(1, 2, 3, 4, 5)),
+            new DailyToolModelUsageFact(new(2030, 1, 2), "test-zone", TimeSpan.Zero, "test-policy", UsageProjectionScope.Combined, "model-alpha", new(10, 20, 30, 40, 50))
+        };
         var result = new LocalUsageCoordinatorResult(
-            [new(UsageTool.OpenCode, LocalUsageSourceStatus.Disabled, 0), new(UsageTool.Pi, LocalUsageSourceStatus.Disabled, 0)],
-            LocalUsageProjectionStatus.Skipped, []);
-        return new(new(), _ => ValueTask.FromResult(result), (_, _) => ValueTask.FromResult(result), _ => ValueTask.FromResult(result));
+            [new(UsageTool.OpenCode, LocalUsageSourceStatus.Completed, 2), new(UsageTool.Pi, LocalUsageSourceStatus.Completed, 0)],
+            LocalUsageProjectionStatus.Completed, facts);
+        var host = new LocalUsagePresentationHost(new(), _ => ValueTask.FromResult(result), (_, _) => ValueTask.FromResult(result), _ => ValueTask.FromResult(result));
+        host.StartAsync().GetAwaiter().GetResult();
+        return host;
     }
     private static async Task DisposeAsync(params IAsyncDisposable[] resources) { foreach (var resource in resources) await resource.DisposeAsync(); }
     private static void PumpUntil(Func<bool> condition)

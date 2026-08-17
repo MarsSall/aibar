@@ -56,12 +56,24 @@
                 <TextBlock Text="{Binding LocalUsage.Description}" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" />
                 <TextBlock Text="{Binding LocalUsage.StatusLabel}" FontWeight="SemiBold" Margin="0,8,0,0" />
                 <ItemsControl ItemsSource="{Binding LocalUsage.Rows}" Focusable="False" Margin="0,4,0,0"><ItemsControl.ItemTemplate><DataTemplate>
-                    <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                        <TextBlock Text="{Binding ScopeLabel}" FontWeight="SemiBold" automation:AutomationProperties.Name="{Binding AutomationLabel}" />
-                        <TextBlock Grid.Column="1" Text="{Binding TotalLabel}" />
-                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" />
-                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding StatusLabel}" Foreground="{DynamicResource MutedTextBrush}" />
-                    </Grid>
+                    <Expander IsExpanded="False" Focusable="True" IsTabStop="True" HorizontalContentAlignment="Stretch" Margin="0,4,0,0" automation:AutomationProperties.Name="{Binding AutomationLabel}">
+                        <Expander.Header><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <TextBlock Text="{Binding ScopeLabel}" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1" Text="{Binding TotalLabel}" />
+                            <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding StatusLabel}" Foreground="{DynamicResource MutedTextBrush}" />
+                        </Grid></Expander.Header>
+                        <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
+                            <ItemsControl ItemsSource="{Binding Details}" Focusable="False"><ItemsControl.ItemTemplate><DataTemplate>
+                                <Grid Margin="16,4,0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                                    <TextBlock Text="{Binding LocalDayLabel}" FontWeight="SemiBold" automation:AutomationProperties.Name="{Binding AutomationLabel}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding ModelLabel}" TextWrapping="Wrap" Margin="8,0,0,0" />
+                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TotalLabel}" />
+                                    <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" />
+                                </Grid>
+                            </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                        </ScrollViewer>
+                    </Expander>
                 </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
             </StackPanel></Border></GroupBox>
 

@@ -6,13 +6,25 @@ using AIBar.Domain;
 
 namespace AIBar.Desktop;
 
+public sealed record LocalUsagePresentationDetailRow(
+    DateOnly LocalDay,
+    string LocalDayLabel,
+    string ModelLabel,
+    BigInteger Total,
+    string TotalLabel,
+    string TokenBreakdownLabel)
+{
+    public string AutomationLabel => $"{LocalDayLabel}, {ModelLabel}, {TotalLabel}, {TokenBreakdownLabel}";
+}
+
 public sealed record LocalUsagePresentationRow(
     UsageProjectionScope Scope,
     string ScopeLabel,
     BigInteger? Total,
     string TotalLabel,
     string? TokenBreakdownLabel,
-    string StatusLabel)
+    string StatusLabel,
+    IReadOnlyList<LocalUsagePresentationDetailRow> Details)
 {
     public string AutomationLabel => string.IsNullOrEmpty(TokenBreakdownLabel)
         ? $"{ScopeLabel}, {TotalLabel}, {StatusLabel}"
@@ -67,19 +79,43 @@ public sealed class LocalUsagePresentationMapper
 
         var rows = Scopes.Select(scope => totals.TryGetValue(scope, out var total)
             ? new LocalUsagePresentationRow(scope, ScopeLabel(scope), total.Total,
-                $"{total.Total.ToString(CultureInfo.InvariantCulture)} retained tokens", total.Label, RowStatus(scope, result.Tools))
-            : new LocalUsagePresentationRow(scope, ScopeLabel(scope), null, LocalUsageCopy.NoFacts, null, RowStatus(scope, result.Tools)));
+                $"{total.Total.ToString(CultureInfo.InvariantCulture)} retained tokens", total.Label, RowStatus(scope, result.Tools), Details(scope, result.ProjectionFacts))
+            : new LocalUsagePresentationRow(scope, ScopeLabel(scope), null, LocalUsageCopy.NoFacts, null, RowStatus(scope, result.Tools), []));
         return new(result.ProjectionStatus, totals.Count == 0 ? LocalUsageCopy.NoFacts : LocalUsageCopy.Loaded, rows);
     }
 
     private static LocalUsagePresentationState WithoutTotals(LocalUsageProjectionStatus? projectionStatus, string status,
         string total, IReadOnlyList<LocalUsageToolOutcome> tools, string combinedStatus) =>
         new(projectionStatus, status, Scopes.Select(scope => new LocalUsagePresentationRow(scope, ScopeLabel(scope), null,
-            total, null, scope == UsageProjectionScope.Combined ? combinedStatus : RowStatus(scope, tools))));
+            total, null, scope == UsageProjectionScope.Combined ? combinedStatus : RowStatus(scope, tools), [])));
+
+    private static IReadOnlyList<LocalUsagePresentationDetailRow> Details(UsageProjectionScope scope,
+        IReadOnlyList<DailyToolModelUsageFact> facts) => Array.AsReadOnly(facts
+        .Where(fact => fact.Scope == scope)
+        .OrderByDescending(fact => fact.LocalDay)
+        .ThenBy(fact => fact.Model, StringComparer.Ordinal)
+        .Select(Detail)
+        .ToArray());
+
+    private static LocalUsagePresentationDetailRow Detail(DailyToolModelUsageFact fact)
+    {
+        var total = TokenBreakdown.From(fact.Tokens);
+        return new(fact.LocalDay, fact.LocalDay.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), SafeModelLabel(fact.Model),
+            total.Total, $"{total.Total.ToString(CultureInfo.InvariantCulture)} retained tokens", total.Label);
+    }
+
+    private static string SafeModelLabel(string? model)
+    {
+        if (string.IsNullOrWhiteSpace(model)) return LocalUsageCopy.UnknownModel;
+        var label = new string(model.Where(character => !char.IsControl(character)).Take(80).ToArray()).Trim();
+        return string.IsNullOrWhiteSpace(label) ? LocalUsageCopy.UnknownModel : label;
+    }
 
     private readonly record struct TokenBreakdown(BigInteger InputUncached, BigInteger CacheRead, BigInteger CacheWrite,
         BigInteger OutputVisible, BigInteger OutputReasoning)
     {
+        internal static TokenBreakdown From(UsageProjectionTokens tokens) => new(tokens.InputUncached, tokens.CacheRead,
+            tokens.CacheWrite, tokens.OutputVisible, tokens.OutputReasoning);
         internal BigInteger Total => InputUncached + CacheRead + CacheWrite + OutputVisible + OutputReasoning;
         internal string Label
         {
@@ -180,4 +216,5 @@ internal static class LocalUsageCopy
     internal const string RebuildRequired = "Rebuild required";
     internal const string RefreshFailed = "Refresh failed";
     internal const string ProjectionUnavailable = "Projection unavailable";
+    internal const string UnknownModel = "Unknown";
 }
