@@ -52,6 +52,19 @@
                 <TextBlock Text="{Binding Analytics.WarningLabel}" Foreground="{DynamicResource MutedTextBrush}" /><TextBlock Text="Loading local Codex data" Visibility="{Binding Analytics.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Foreground="{DynamicResource MutedTextBrush}" />
             </StackPanel></Border></GroupBox>
 
+            <GroupBox Header="OpenCode and Pi local usage" automation:AutomationProperties.Name="OpenCode and Pi local usage" Margin="0,8,0,0"><Border Style="{StaticResource QuotaCardStyle}"><StackPanel Margin="16">
+                <TextBlock Text="{Binding LocalUsage.Description}" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" />
+                <TextBlock Text="{Binding LocalUsage.StatusLabel}" FontWeight="SemiBold" Margin="0,8,0,0" />
+                <ItemsControl ItemsSource="{Binding LocalUsage.Rows}" Focusable="False" Margin="0,4,0,0"><ItemsControl.ItemTemplate><DataTemplate>
+                    <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                        <TextBlock Text="{Binding ScopeLabel}" FontWeight="SemiBold" automation:AutomationProperties.Name="{Binding AutomationLabel}" />
+                        <TextBlock Grid.Column="1" Text="{Binding TotalLabel}" />
+                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding StatusLabel}" Foreground="{DynamicResource MutedTextBrush}" />
+                    </Grid>
+                </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+            </StackPanel></Border></GroupBox>
+
             <TextBlock Text="{Binding State.Disclosure}" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,16,0,8" />
             <TextBlock Text="{Binding PrivateEndpointDisclosure}" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,0,8" />
             <Button Content="Refresh" Command="{Binding RefreshCommand}" Visibility="{Binding IsRefreshAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" automation:AutomationProperties.Name="Refresh quota" IsTabStop="True" HorizontalAlignment="Left" />

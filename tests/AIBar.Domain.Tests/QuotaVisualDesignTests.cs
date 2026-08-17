@@ -21,6 +21,14 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
 
         Assert.Contains("AutomationProperties.Name=\"5-hour quota card\"", window, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Weekly quota card\"", window, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"OpenCode and Pi local usage\"", window, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"{Binding AutomationLabel}\"", window, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding LocalUsage.Rows}\" Focusable=\"False\"", window, StringComparison.Ordinal);
+        var localUsageBreakdown = XDocument.Parse(window).Descendants().Single(element => element.Attribute("Text")?.Value == "{Binding TokenBreakdownLabel}");
+        Assert.Equal("TextBlock", localUsageBreakdown.Name.LocalName);
+        Assert.Equal("Wrap", localUsageBreakdown.Attribute("TextWrapping")?.Value);
+        Assert.Null(localUsageBreakdown.Attribute("Focusable"));
+        Assert.Equal(4, window.Split("Style=\"{StaticResource QuotaCardStyle}\"", StringSplitOptions.None).Length - 1);
         Assert.Contains("AutomationProperties.Name=\"Refresh quota\"", window, StringComparison.Ordinal); Assert.Contains("IsTabStop=\"True\"", window, StringComparison.Ordinal);
         Assert.DoesNotContain("<DoubleAnimation", resources, StringComparison.Ordinal);
     }
@@ -59,7 +67,7 @@ Assert.Equal(2, highContrastForegrounds.Length); Assert.All(highContrastForegrou
                 var host = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)));
                 var window = new MainWindow { DataContext = host }; window.Show();
                 var cards = FindVisualChildren<System.Windows.Controls.GroupBox>(window).ToArray();
-                Assert.Equal(new[] { "5-hour quota card", "Weekly quota card", "Local Codex data" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
+                Assert.Equal(new[] { "5-hour quota card", "Weekly quota card", "Local Codex data", "OpenCode and Pi local usage" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
                 var button = FindVisualChildren<System.Windows.Controls.Button>(window).Single();
                 Assert.IsAssignableFrom<System.Windows.Input.ICommand>(button.Command);
                 Assert.True(button.IsEnabled);
