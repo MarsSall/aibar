@@ -18,11 +18,15 @@ public interface ITrayRuntime : IAsyncDisposable
     event Action? ClearAiBarDataRequested;
     event Action? PrivateIntegrationEnableRequested;
     event Action? PrivateIntegrationDisableRequested;
+    event Action? OpenCodeLocalUsageToggleRequested;
+    event Action? PiLocalUsageToggleRequested;
     void SetRefreshAvailable(bool available);
     void SetPresentation(BetaPresentationState state);
     void SetSettingsAvailable(bool available);
     void SetPrivateIntegrationEnabled(bool enabled);
     void SetStartupEnabled(bool enabled);
+    void SetLocalUsageAvailable(bool available);
+    void SetLocalUsagePolicy(LocalUsagePolicy policy);
     void Show();
     void Hide();
 }
@@ -71,11 +75,12 @@ public sealed class TrayHostRuntime : IAsyncDisposable
         if (_presentation is not null) { _presentation.PropertyChanged += OnPresentationChanged; _tray.SetPresentation(_presentation.State); }
         _tray.SetSettingsAvailable(settings is not null);
         _tray.SetPrivateIntegrationEnabled(settings?.PrivateIntegrationEnabled == true);
-        _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _tray.RefreshRequested += OnRefreshRequested; _tray.StartupToggleRequested += OnStartupToggleRequested; _tray.ClearAiBarDataRequested += OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested += OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested += OnPrivateIntegrationDisableRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += ShowPopover;
+        _tray.SetLocalUsageAvailable(settings?.LocalUsageAvailable == true); _tray.SetLocalUsagePolicy(settings?.LocalUsagePolicy ?? LocalUsagePolicy.Disabled);
+        _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _tray.RefreshRequested += OnRefreshRequested; _tray.StartupToggleRequested += OnStartupToggleRequested; _tray.ClearAiBarDataRequested += OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested += OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested += OnPrivateIntegrationDisableRequested; _tray.OpenCodeLocalUsageToggleRequested += OnOpenCodeLocalUsageToggleRequested; _tray.PiLocalUsageToggleRequested += OnPiLocalUsageToggleRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += ShowPopover;
         _activationTimer.Tick += DispatchPendingActivation;
     }
 
-    public void Start() { if (_disposed) return; RunSafely(_tray.Show); _activationTimer.Start(); }
+    public void Start() { if (_disposed) return; RunSafely(_tray.Show); _activationTimer.Start(); _ = LoadLocalUsagePolicySafelyAsync(); }
     public bool? StartupEnabled { get; private set; }
     public Task ExitAsync()
     {
@@ -144,6 +149,8 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private void OnClearAiBarDataRequested() => _ = ClearAiBarDataSafelyAsync();
     private void OnPrivateIntegrationEnableRequested() => _ = EnablePrivateIntegrationSafelyAsync();
     private void OnPrivateIntegrationDisableRequested() => _ = SetPrivateIntegrationSafelyAsync(settings => settings.DisablePrivateIntegrationAsync(_shutdown.Token));
+    private void OnOpenCodeLocalUsageToggleRequested() => _ = ChangeLocalUsageSafelyAsync(settings => settings.ToggleOpenCodeLocalUsageAsync(_shutdown.Token));
+    private void OnPiLocalUsageToggleRequested() => _ = ChangeLocalUsageSafelyAsync(settings => settings.TogglePiLocalUsageAsync(_shutdown.Token));
     private async Task EnablePrivateIntegrationSafelyAsync()
     {
         if (_settings is null || _consentPrompt is null || Interlocked.CompareExchange(ref _grantingConsent, 1, 0) != 0) return;
@@ -175,8 +182,19 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     }
     private async Task ClearAiBarDataSafelyAsync()
     {
-        if (_settings is not null) try { await _settings.ClearAiBarDataAsync(_shutdown.Token); } catch (Exception) { _reportSettingsFailure?.Invoke(); }
+        if (_settings is not null) try { await _settings.ClearAiBarDataAsync(_shutdown.Token); SetLocalUsagePolicy(); } catch (Exception) { _reportSettingsFailure?.Invoke(); }
     }
+    private async Task LoadLocalUsagePolicySafelyAsync()
+    {
+        if (_settings?.LocalUsageAvailable != true) return;
+        try { await _settings.LoadLocalUsagePolicyAsync(_shutdown.Token); SetLocalUsagePolicy(); } catch (Exception) { }
+    }
+    private async Task ChangeLocalUsageSafelyAsync(Func<NativeSettingsCommands, ValueTask<LocalUsagePolicy>> operation)
+    {
+        if (_settings?.LocalUsageAvailable != true) return;
+        try { await operation(_settings); SetLocalUsagePolicy(); } catch (Exception) { }
+    }
+    private void SetLocalUsagePolicy() { if (!_disposed) _tray.SetLocalUsagePolicy(_settings?.LocalUsagePolicy ?? LocalUsagePolicy.Disabled); }
     private async Task ToggleStartupSafelyAsync()
     {
         if (_settings is not null) try { StartupEnabled = await _settings.ToggleStartupAsync(_shutdown.Token); _tray.SetStartupEnabled(StartupEnabled.Value); } catch (Exception) { }
@@ -184,7 +202,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private async Task ExitSafelyAsync() { try { await ExitAsync(); } catch (Exception) { } }
     private void Detach()
     {
-        _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _tray.RefreshRequested -= OnRefreshRequested; _tray.StartupToggleRequested -= OnStartupToggleRequested; _tray.ClearAiBarDataRequested -= OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested -= OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested -= OnPrivateIntegrationDisableRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= ShowPopover;
+        _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _tray.RefreshRequested -= OnRefreshRequested; _tray.StartupToggleRequested -= OnStartupToggleRequested; _tray.ClearAiBarDataRequested -= OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested -= OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested -= OnPrivateIntegrationDisableRequested; _tray.OpenCodeLocalUsageToggleRequested -= OnOpenCodeLocalUsageToggleRequested; _tray.PiLocalUsageToggleRequested -= OnPiLocalUsageToggleRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= ShowPopover;
         if (_refreshCommand is not null) _refreshCommand.CanExecuteChanged -= OnRefreshAvailabilityChanged;
         if (_presentation is not null) _presentation.PropertyChanged -= OnPresentationChanged;
     }
@@ -201,12 +219,14 @@ public sealed class WindowsTrayRuntime : ITrayRuntime
     private readonly Forms.ToolStripMenuItem _clear = new("Clear AIBar Data");
     private readonly Forms.ToolStripMenuItem _enablePrivate = new("Enable Private Quota Integration");
     private readonly Forms.ToolStripMenuItem _disablePrivate = new("Disable Private Quota Integration");
+    private readonly Forms.ToolStripMenuItem _openCodeUsage = new("Read OpenCode usage data locally");
+    private readonly Forms.ToolStripMenuItem _piUsage = new("Read Pi usage data locally");
     private bool _settingsAvailable;
     private bool _privateIntegrationEnabled;
     public WindowsTrayRuntime()
     {
         var exit = new Forms.ToolStripMenuItem("Exit AIBar");
-        _refresh.Click += (_, _) => RefreshRequested?.Invoke(); _startup.Click += (_, _) => StartupToggleRequested?.Invoke(); _clear.Click += (_, _) => ClearAiBarDataRequested?.Invoke(); _enablePrivate.Click += (_, _) => PrivateIntegrationEnableRequested?.Invoke(); _disablePrivate.Click += (_, _) => PrivateIntegrationDisableRequested?.Invoke(); exit.Click += (_, _) => ExitRequested?.Invoke(); _menu.Items.Add(exit); _icon.ContextMenuStrip = _menu;
+        _refresh.Click += (_, _) => RefreshRequested?.Invoke(); _startup.Click += (_, _) => StartupToggleRequested?.Invoke(); _clear.Click += (_, _) => ClearAiBarDataRequested?.Invoke(); _enablePrivate.Click += (_, _) => PrivateIntegrationEnableRequested?.Invoke(); _disablePrivate.Click += (_, _) => PrivateIntegrationDisableRequested?.Invoke(); _openCodeUsage.Click += (_, _) => OpenCodeLocalUsageToggleRequested?.Invoke(); _piUsage.Click += (_, _) => PiLocalUsageToggleRequested?.Invoke(); exit.Click += (_, _) => ExitRequested?.Invoke(); _menu.Items.Add(exit); _icon.ContextMenuStrip = _menu;
         _icon.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) Toggled?.Invoke(); };
     }
     public event Action? Toggled;
@@ -216,6 +236,8 @@ public sealed class WindowsTrayRuntime : ITrayRuntime
     public event Action? ClearAiBarDataRequested;
     public event Action? PrivateIntegrationEnableRequested;
     public event Action? PrivateIntegrationDisableRequested;
+    public event Action? OpenCodeLocalUsageToggleRequested;
+    public event Action? PiLocalUsageToggleRequested;
     public void SetRefreshAvailable(bool available)
     {
         if (available && !_menu.Items.Contains(_refresh)) _menu.Items.Insert(0, _refresh);
@@ -240,6 +262,12 @@ public sealed class WindowsTrayRuntime : ITrayRuntime
         if (_settingsAvailable) _menu.Items.Insert(Math.Min(2, _menu.Items.Count), _privateIntegrationEnabled ? _disablePrivate : _enablePrivate);
     }
     public void SetStartupEnabled(bool enabled) => _startup.Checked = enabled;
+    public void SetLocalUsageAvailable(bool available)
+    {
+        if (available) { if (!_menu.Items.Contains(_piUsage)) _menu.Items.Insert(0, _piUsage); if (!_menu.Items.Contains(_openCodeUsage)) _menu.Items.Insert(0, _openCodeUsage); }
+        else { _menu.Items.Remove(_openCodeUsage); _menu.Items.Remove(_piUsage); }
+    }
+    public void SetLocalUsagePolicy(LocalUsagePolicy policy) { _openCodeUsage.Checked = policy.OpenCodeEnabled; _piUsage.Checked = policy.PiEnabled; }
     public void Show() => _icon.Visible = true;
     public void Hide() => _icon.Visible = false;
     public ValueTask DisposeAsync() { _icon.Dispose(); return ValueTask.CompletedTask; }

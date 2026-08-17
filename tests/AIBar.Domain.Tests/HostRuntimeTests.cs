@@ -77,17 +77,41 @@ public sealed class HostRuntimeTests
     public void Native_settings_events_read_back_startup_and_execute_clear_without_live_windows_state()
     {
         using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
-        var tray = new FakeTray(); var startup = new FakeStartupRegistration(); var clear = new FakeClearCommand();
-        var settings = new NativeSettingsCommands(startup, clear, new PrivateIntegrationPolicy());
+        var tray = new FakeTray(); var startup = new FakeStartupRegistration(); var local = new FakeLocalUsageControl(new(true, false));
+        var clear = new FakeClearCommand { OnClear = () => local.Persisted = LocalUsagePolicy.Disabled };
+        var settings = new NativeSettingsCommands(startup, clear, new PrivateIntegrationPolicy(),
+            loadLocalUsage: local.LoadAsync, saveLocalUsage: local.SaveAsync, applyLocalUsage: local.ApplyAsync);
         var host = new TrayHostRuntime(instance, tray, new FakePopover(), new FakeRecreationEvents(), _ => Task.CompletedTask, new ProbeResource(), () => { }, settings: settings);
 
-        host.Start(); tray.StartupToggle();
+        host.Start(); Assert.True(tray.LocalUsageAvailable); Assert.Equal(new(true, false), tray.LocalUsagePolicy); tray.StartupToggle();
         Assert.True(host.StartupEnabled); Assert.True(tray.StartupEnabled); Assert.True(startup.Enabled);
         tray.StartupToggle();
         Assert.False(host.StartupEnabled); Assert.False(tray.StartupEnabled); Assert.False(startup.Enabled);
+        tray.TogglePiLocalUsage();
+        Assert.Equal(new(true, true), tray.LocalUsagePolicy); Assert.Equal(1, local.PiAccesses);
         tray.ClearAiBarData();
-        Assert.Equal(1, clear.Calls);
+        Assert.Equal(1, clear.Calls); Assert.Equal(LocalUsagePolicy.Disabled, tray.LocalUsagePolicy);
         instance.Dispose(); _ = host.ExitAsync();
+    }
+
+    [Fact]
+    public async Task Failed_local_usage_apply_keeps_tray_truthful_and_disposal_detaches_toggle_handlers()
+    {
+        using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
+        var tray = new FakeTray(); var local = new FakeLocalUsageControl(LocalUsagePolicy.Disabled) { ApplyFailure = new IOException("synthetic") };
+        var settings = new NativeSettingsCommands(new FakeStartupRegistration(), new FakeClearCommand(), new(),
+            loadLocalUsage: local.LoadAsync, saveLocalUsage: local.SaveAsync, applyLocalUsage: local.ApplyAsync);
+        var host = new TrayHostRuntime(instance, tray, new FakePopover(), new FakeRecreationEvents(), _ => Task.CompletedTask,
+            new ProbeResource(), () => { }, settings: settings);
+        host.Start();
+
+        tray.ToggleOpenCodeLocalUsage();
+        Assert.Equal(LocalUsagePolicy.Disabled, tray.LocalUsagePolicy);
+        Assert.Equal(new(true, false), local.Persisted);
+        instance.Dispose(); await host.ExitAsync();
+        var saves = local.Saves;
+        tray.TogglePiLocalUsage();
+        Assert.Equal(saves, local.Saves);
     }
 
     [Fact]
@@ -228,7 +252,7 @@ public sealed class HostRuntimeTests
 
     private sealed class FakeTray : ITrayRuntime
     {
-        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationEnableRequested; public event Action? PrivateIntegrationDisableRequested; public event Action? Recreated;
+        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationEnableRequested; public event Action? PrivateIntegrationDisableRequested; public event Action? OpenCodeLocalUsageToggleRequested; public event Action? PiLocalUsageToggleRequested; public event Action? Recreated;
         public int Shows { get; private set; } public int Disposals { get; private set; } public bool RefreshAvailable { get; private set; }
         public void SetRefreshAvailable(bool available) => RefreshAvailable = available;
         public BetaPresentationState? State { get; private set; }
@@ -241,7 +265,11 @@ public sealed class HostRuntimeTests
         public bool DisablePrivateVisible => SettingsAvailable && PrivateIntegrationEnabled;
         public bool StartupEnabled { get; private set; }
         public void SetStartupEnabled(bool enabled) => StartupEnabled = enabled;
-        public void Show() => Shows++; public void Hide() { } public void Click() => Toggled?.Invoke(); public void Exit() => ExitRequested?.Invoke(); public void Refresh() { if (RefreshAvailable) RefreshRequested?.Invoke(); } public void StartupToggle() => StartupToggleRequested?.Invoke(); public void ClearAiBarData() => ClearAiBarDataRequested?.Invoke(); public void EnablePrivate() => PrivateIntegrationEnableRequested?.Invoke(); public void DisablePrivate() => PrivateIntegrationDisableRequested?.Invoke(); public void Recreate() => Recreated?.Invoke();
+        public bool LocalUsageAvailable { get; private set; }
+        public LocalUsagePolicy LocalUsagePolicy { get; private set; } = LocalUsagePolicy.Disabled;
+        public void SetLocalUsageAvailable(bool available) => LocalUsageAvailable = available;
+        public void SetLocalUsagePolicy(LocalUsagePolicy policy) => LocalUsagePolicy = policy;
+        public void Show() => Shows++; public void Hide() { } public void Click() => Toggled?.Invoke(); public void Exit() => ExitRequested?.Invoke(); public void Refresh() { if (RefreshAvailable) RefreshRequested?.Invoke(); } public void StartupToggle() => StartupToggleRequested?.Invoke(); public void ClearAiBarData() => ClearAiBarDataRequested?.Invoke(); public void EnablePrivate() => PrivateIntegrationEnableRequested?.Invoke(); public void DisablePrivate() => PrivateIntegrationDisableRequested?.Invoke(); public void ToggleOpenCodeLocalUsage() => OpenCodeLocalUsageToggleRequested?.Invoke(); public void TogglePiLocalUsage() => PiLocalUsageToggleRequested?.Invoke(); public void Recreate() => Recreated?.Invoke();
         public ValueTask DisposeAsync() { Disposals++; return ValueTask.CompletedTask; }
     }
 
@@ -273,7 +301,22 @@ public sealed class HostRuntimeTests
     {
         public int Calls { get; private set; }
         public Exception? Failure { get; init; }
-        public ValueTask ClearAsync(CancellationToken cancellationToken) { Calls++; return Failure is null ? ValueTask.CompletedTask : ValueTask.FromException(Failure); }
+        public Action? OnClear { get; init; }
+        public ValueTask ClearAsync(CancellationToken cancellationToken) { Calls++; if (Failure is not null) return ValueTask.FromException(Failure); OnClear?.Invoke(); return ValueTask.CompletedTask; }
+    }
+    private sealed class FakeLocalUsageControl(LocalUsagePolicy policy)
+    {
+        public LocalUsagePolicy Persisted { get; set; } = policy;
+        public int Saves { get; private set; } public int OpenCodeAccesses { get; private set; } public int PiAccesses { get; private set; }
+        public Exception? ApplyFailure { get; init; }
+        public ValueTask<LocalUsagePolicy> LoadAsync(CancellationToken token) => ValueTask.FromResult(Persisted);
+        public ValueTask SaveAsync(LocalUsagePolicy value, CancellationToken token) { Saves++; Persisted = value; return ValueTask.CompletedTask; }
+        public ValueTask ApplyAsync(LocalUsagePolicy value, CancellationToken token)
+        {
+            if (ApplyFailure is not null) return ValueTask.FromException(ApplyFailure);
+            if (value.OpenCodeEnabled) OpenCodeAccesses++; if (value.PiEnabled) PiAccesses++;
+            return ValueTask.CompletedTask;
+        }
     }
     private sealed class FakeQuotaStore(QuotaSnapshot snapshot) : IQuotaSnapshotStore
     {
