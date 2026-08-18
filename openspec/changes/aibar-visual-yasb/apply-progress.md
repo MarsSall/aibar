@@ -1,5 +1,33 @@
 # Apply Progress — aibar-visual-yasb
 
+## Unit 1b — failed candidate preserved and split into writer then clear
+
+- **Maintainer decision:** `Dividir writer/clear`. The active chain is now `1a-privacy -> 1b-writer -> 1b-clear -> 2`; 1b-clear may start only from a committed 1b-writer child.
+- **Failed candidate identity:** The preserved candidate is exactly **359 authored source/test lines** across five paths and remains uncommitted and unstaged: 164 lines in untracked `src/AIBar.Desktop/QuotaExportWindows.cs`, 144 lines in untracked `tests/AIBar.Domain.Tests/QuotaExportWriterTests.cs`, 2 changed lines in `src/AIBar.Application/ClearAiBarDataService.cs`, 12 changed lines in `src/AIBar.Desktop/App.xaml.cs`, and 37 changed lines in `tests/AIBar.Domain.Tests/ClearAiBarDataTests.cs`. Evidence: `sha256:6c7c9a9be9234e8b006d18f16b66c057122d6443d5ba0c45750c9b09fd548381`.
+- **Observed outcome:** Static acceptance failed and **no test was run**. The candidate grants current user and SYSTEM `FullControl` and tests that same permissive descriptor instead of minimum rights; it does not prove concurrent readers observe only complete old/new documents. The clear/composition portion does not yet prove queued/in-flight coordination, stale-completion suppression, bounded disabled/null recreation or safe absence, writer-failure isolation in the clear child, or explicit disposal order. No 1b implementation, check, or commit task is complete.
+- **Native state:** The failed Unit 1b native attempt was reset. The reset is procedural state only; it does not erase the failed evidence, authorize another attempt, or create completion credit.
+- **1b-writer forecast:** **335–360 authored source/test lines** (approximately 175–190 production and 160–170 tests) in `src/AIBar.Desktop/QuotaExportWindows.cs` and `tests/AIBar.Domain.Tests/QuotaExportWriterTests.cs`, plus only unavoidable project metadata. This includes replacing `FullControl` with protected minimum rights and adding real complete-reader atomicity coverage. Hard stop: **360**, never 400 and no `size:exception`.
+- **1b-clear forecast:** **90–140 authored source/test lines** (approximately 20–40 production and 70–100 tests) in `src/AIBar.Application/ClearAiBarDataService.cs`, `src/AIBar.Desktop/App.xaml.cs`, and `tests/AIBar.Domain.Tests/ClearAiBarDataTests.cs`. It owns exact-path clear coordination, stale suppression, disabled/null recreation or safe absence, composition, writer-failure isolation, and explicit disposal order. Hard stop: **160**.
+- **Rollback boundaries:** Roll back 1b-clear only after proving the snapshot disabled/null or safely absent; remove its clear/composition wiring while retaining committed 1b-writer and all Application privacy behavior. Roll back 1b-writer by first securing/removing or atomically nulling the snapshot, then removing the writer while leaving 1a-privacy intact.
+
+### Candidate-preservation recommendation — parent authorization required; do not execute during planning
+
+Use one **named Git stash including untracked files**, scoped to the exact five candidate paths, only after explicit parent authorization. Do not create a WIP commit: it would pollute the feature-branch chain with a non-deliverable mixed candidate and could be mistaken for reviewed history.
+
+1. From `feat/aibar-visual-yasb-1b`, create a stash named `aibar-visual-yasb-1b-preserved-359-6c7c9a9b` with `--include-untracked` and exact pathspecs for:
+   - `src/AIBar.Desktop/QuotaExportWindows.cs`
+   - `tests/AIBar.Domain.Tests/QuotaExportWriterTests.cs`
+   - `src/AIBar.Application/ClearAiBarDataService.cs`
+   - `src/AIBar.Desktop/App.xaml.cs`
+   - `tests/AIBar.Domain.Tests/ClearAiBarDataTests.cs`
+2. Immediately record the immutable stash object ID rather than relying on the movable `stash@{0}` label. Because the writer files were untracked, restore only those two paths from `<stash-oid>^3` into the worktree with `git restore --source=<stash-oid>^3 --worktree -- <writer-paths>`. Do not use `stash pop` or restore the clear trio on the writer child.
+3. Implement, validate, and commit 1b-writer as the first child. Create 1b-clear from that committed child, then restore only the three tracked clear/composition paths from `<stash-oid>` with `git restore --source=<stash-oid> --worktree -- <clear-paths>`.
+4. Keep the named stash and recorded object ID until both children are committed and their exact path scopes are verified. Any later stash removal is a separate parent-owned action.
+
+**Tradeoff:** this keeps both child diffs honest and avoids a WIP commit, but a stash is local-only and easy to misreference if its ordinal moves. The recorded object ID, exact pathspecs, separate untracked-parent restore, and prohibition on `pop` are therefore mandatory. The stash operation temporarily removes the five candidate paths from the worktree, so it must not occur without explicit parent authorization.
+
+**Next action:** `await parent authorization for the exact named-stash preservation and selective 1b-writer restoration plan`.
+
 ## Unit 1a-privacy — accepted publisher and consent-lifecycle result
 
 - **Scope:** Work remained on child branch `feat/aibar-visual-yasb-1a-privacy` based on accepted authority commit `130c626`. The candidate changes only the six intended Application/test paths; no Desktop, filesystem adapter, paths, ACL, YASB, staging, commit, push, or PR work occurred.
@@ -35,7 +63,7 @@
 - **Integrity:** Both source/test files and this progress artifact pass no-index `git diff --check`; only the exact intended source/test paths are present for this unit. The tracker planning commit normalized Markdown hard breaks before branch creation, and the child diff remains whitespace-clean.
 - **Task state:** `1a-contract.1` through `1a-contract.9` are complete. Native settlement and independent acceptance both passed, and the maintainer authorized the local commit on child branch `feat/aibar-visual-yasb-1a-contract`. Every authority, privacy, platform, and later-unit task remains unchecked.
 
-> The full cumulative history below is intentionally retained. Earlier sections that describe a failed attempt, a 223-line mixed candidate, preservation pending authorization, or a zero-progress split-decision snapshot are historical and are superseded only by the bounded current result above; they remain evidence of what occurred at those earlier stages.
+> The full cumulative history below is intentionally retained. The Unit 1b writer/clear split at the top of this file is the active plan. Earlier sections that describe a failed attempt, a 223-line mixed candidate, preservation pending authorization, a zero-progress split-decision snapshot, or an unsplit `Unit 1b` are historical only; they remain evidence of what occurred and are not active tasks or dependencies.
 
 ## Maintainer-authorized Unit 1a-contract apply
 

@@ -4,17 +4,17 @@
 
 | Field | Value |
 |---|---|
-| Estimated changed lines | **2,530–3,150 authored lines total** across ten bounded units |
-| 400-line budget risk | High overall; every child forecast is below 400 and has an explicit hard split trigger |
+| Estimated changed lines | **Unit 1b replacement: 425–500 authored source/test lines** across two bounded children; unrelated accepted-unit forecasts are unchanged |
+| 400-line budget risk | High overall; 1b-writer stops at 360 and 1b-clear at 160, with no child allowed to reach 400 |
 | Chained PRs recommended | Yes |
-| Suggested order | 1a-contract → 1a-authority → 1a-privacy → 1b → 2 → 3 → 4a → 4b → 5 → 6 |
+| Suggested order | 1a-contract → 1a-authority → 1a-privacy → 1b-writer → 1b-clear → 2 → 3 → 4a → 4b → 5 → 6 |
 | Delivery strategy | ask-on-risk → chained delivery selected |
 | Chain strategy | feature-branch-chain |
 | Size exception | None; `size:exception` is not authorized |
 
-Decision needed before apply: explicit approval is required for disposition of the preserved current candidate and for Unit 1a-contract apply.
+Decision needed before apply: the maintainer selected `Dividir writer/clear`; the parent must still explicitly authorize the stash-based preservation and selective restoration of the current candidate before 1b-writer implementation begins.
 
-The current **223-authored-line source/test candidate** remains intact, uncommitted, and unstaged. Its absolute target-scoped evidence is **35/35**, and the latest native validation-only objective is complete, but independent acceptance validation failed. Passing tests omitted required contract and concurrency cases, so no task is complete and no current line earns completion credit in this plan.
+The current **359-authored-line source/test candidate** remains intact, uncommitted, and unstaged across five paths: **308 lines** in the writer pair and **51 lines** in the clear/composition trio. Static acceptance found permissive `FullControl` ACLs instead of minimum rights, tests that encode that permissive contract, no concurrent-reader old/new atomicity proof, and incomplete clear coordination, stale-suppression, failure, and disposal coverage. **No test was run**, no task is complete, and no current line earns completion credit. Evidence: `sha256:6c7c9a9be9234e8b006d18f16b66c057122d6443d5ba0c45750c9b09fd548381`; native attempt state was reset.
 
 This replanning task runs no tests or builds and changes no source/test byte.
 
@@ -24,7 +24,8 @@ This replanning task runs no tests or builds and changes no source/test byte.
 1a-contract Closed projection + fail-closed wire contract
   -> 1a-authority Serialized causal authority stream
   -> 1a-privacy Publisher + consent/privacy lifecycle
-  -> 1b Windows writer/ACL/filesystem privacy
+  -> 1b-writer Windows canonical-path atomic writer
+  -> 1b-clear Clear transaction + composition/disposal
   -> 2 --show activation
   -> 3 Automatic themes
   -> 4a Popup hierarchy/tray
@@ -41,8 +42,9 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 | 1a-contract | `feat/aibar-visual-yasb-1a-contract` | tracker | Closed projection, wire normalizer, full contract matrices | 160–220 | 180 |
 | 1a-authority | `feat/aibar-visual-yasb-1a-authority` | 1a-contract | Serialized coordinator transitions, sequence/delivery/generation races | 235–285 | 115 |
 | 1a-privacy | `feat/aibar-visual-yasb-1a-privacy` | 1a-authority | Publisher ordering, cancellation, consent lifecycle | 180–260 | 140 |
-| 1b | `feat/aibar-visual-yasb-1b` | 1a-privacy | Windows atomic writer, ACL, clear, composition | 300–360 | 40 |
-| 2 | `feat/aibar-visual-yasb-2` | 1b | Payload-free activation | 230–290 | 110 |
+| 1b-writer | `feat/aibar-visual-yasb-1b-writer` | 1a-privacy | Canonical path, minimum-rights ACL/readback, durable atomic writer, complete old/new readers | 335–360 | 40 |
+| 1b-clear | `feat/aibar-visual-yasb-1b-clear` | 1b-writer | Exact clear transaction, stale suppression, disabled/null or safe absence, composition/disposal | 90–140 | 260 |
+| 2 | `feat/aibar-visual-yasb-2` | 1b-clear | Payload-free activation | 230–290 | 110 |
 | 3 | `feat/aibar-visual-yasb-3` | 2 | Semantic Windows themes | 320–380 | 20 |
 | 4a | `feat/aibar-visual-yasb-4a` | 3 | Popup hierarchy, accessibility, tray | 340–380 | 20 |
 | 4b | `feat/aibar-visual-yasb-4b` | 4a | Placement, DPI, DWM, rendered checks | 300–370 | 30 |
@@ -53,7 +55,7 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 - Each unit is one behavior-complete commit boundary and one candidate review scope.
 - Tests stay with the behavior they verify; documentation stays with the user-visible workflow.
-- Preserve the current 223-line candidate exactly until an explicit disposition decision.
+- Preserve the current 359-line five-path candidate exactly until the parent explicitly authorizes the named stash and selective child restoration plan in `apply-progress.md`.
 - A hard split trigger is a stop, not permission to omit cases or exceed 400 lines.
 - No unit may use `size:exception`.
 - All validation uses synthetic state and isolated local files only. No private endpoint, network, real credential, real profile, live AIBar/YASB process, or real user dataset is permitted.
@@ -178,45 +180,78 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 - [x] **1a-privacy.8 CHECK — verify privacy independently:** Run focused pure/in-memory publisher and lifecycle tests covering restart, equal-content unlock, freshness-only updates, latest-state bursts, blocked cancellation, failures, races, and disposal. No Desktop/filesystem/profile/live data. <!-- sdd-owner: implementation -->
 - [x] **1a-privacy.9 COMMIT BOUNDARY — privacy only:** Freeze one Application publisher/lifecycle commit based on authority. Shared `QuotaExport.cs` may contain contract and privacy symbols, but this child owns only the latter. Rollback leaves contract/authority intact and external disclosure absent. <!-- sdd-owner: implementation -->
 
-**Hard split trigger:** Stop at 260 and recalculate. If the full restart/freshness/cancellation/concurrency matrix cannot fit below 320, replan before 1b. Do not move platform work inward, omit cancellation, cross 400, or use an exception.
+**Hard split trigger:** Stop at 260 and recalculate. If the full restart/freshness/cancellation/concurrency matrix cannot fit below 320, replan before 1b-writer. Do not move platform work inward, omit cancellation, cross 400, or use an exception.
 
-## Unit 1b — Windows atomic writer, ACL, composition, and filesystem privacy
+## Unit 1b-writer — Windows canonical-path atomic writer
 
-**Forecast:** 300–360 authored lines. **Margin:** 40 lines. **Risk:** High (data exposure, ACL ordering, atomic replacement, reparse/concurrency).
+**Forecast:** **335–360 authored source/test lines**: approximately 175–190 production lines and 160–170 test lines, including correction of the current permissive rights model and the missing complete-reader proof. **Margin:** 40 lines. **Risk:** High (data exposure, ACL ordering, atomic replacement, reparse/concurrency).
 
 **Expected files:**
-- `src/AIBar.Application/ClearAiBarDataService.cs`
 - `src/AIBar.Desktop/QuotaExportWindows.cs`
-- `src/AIBar.Desktop/App.xaml.cs`
 - `tests/AIBar.Domain.Tests/QuotaExportWriterTests.cs`
-- `tests/AIBar.Domain.Tests/ClearAiBarDataTests.cs`
+- only unavoidable project metadata if source/test inclusion cannot use existing conventions
 
-**Start state:** Contract, authority, and privacy units are complete; no Windows writer is composed and no external snapshot is required.
+**Start state:** 1a-privacy is complete. The preserved two-path writer candidate is 308 authored lines but failed static acceptance; it is not implementation credit and remains untouched until the parent authorizes selective restoration.
 
-**End state:** `%LOCALAPPDATA%\AIBar\yasb-quota.json` is published only through a same-directory atomic commit with directory/existing destination/temp/result ACL proof, reparse and sharing defenses, clear ownership, disabled recreation, and safe composition.
+**End state:** `%LOCALAPPDATA%\AIBar\yasb-quota.json` is published only through a canonical-path, same-directory atomic commit with protected minimum-rights directory/destination/temp/result ACL proof, reparse and sharing defenses, durable validated BOM-less UTF-8 bytes, complete old/new reader views, and exact owned-temp cleanup.
 
-**Dependencies:** 1a-privacy transitively through authority/contract; Windows ACL and same-volume atomic APIs; existing clear transaction and Desktop composition.
+**Dependencies:** 1a-privacy transitively through authority/contract; Windows ACL and same-volume atomic APIs. This child targets 1a-privacy.
 
-**Exclusions:** Application redesign, activation/kernel ACLs, themes, popup/tray, YASB reader/launcher, ZIP/docs, real profile paths, endpoint/cadence/credential changes.
+**Exclusions:** Clear-data ownership or recreation; Desktop composition/disposal; Application redesign; activation/kernel ACLs; themes; popup/tray; YASB reader/launcher; ZIP/docs; real profile paths; endpoint/cadence/credential changes.
 
 ### Behavior-first tests and contracts
 
-- [ ] **1b.1 RED — ACL matrix:** Cover new/existing directory/destination, broad inherited/explicit ACE removal, current-user+SYSTEM result, application/read-back failure at directory/destination/temp/result, and no valued visibility after pre-commit failure. <!-- sdd-owner: implementation -->
-- [ ] **1b.2 RED — atomic matrix:** Cover first write, replace, same-directory GUID temp, secure-before-write, flush/close/schema validation, first-write race, failures before/after write and before commit, sharing, cancellation, previous-byte survival, complete old/new reader views, and exact temp cleanup. <!-- sdd-owner: implementation -->
-- [ ] **1b.3 RED — reparse/concurrency matrix:** Reject parent, destination, temp, and race-substituted reparse points. Cover concurrent first/replace and latest-state flow through the real writer with a complete latest document and compliant ACL. <!-- sdd-owner: implementation -->
-- [ ] **1b.4 RED — clear/composition matrix:** Cover exact owned path, staged rollback, queued/in-flight clear, disabled recreation or safe absence, stale callback suppression, sibling composition, disposal order, and writer failure isolation from cache/UI. <!-- sdd-owner: implementation -->
+- [ ] **1b-writer.1 RED — canonical path and minimum-rights ACL matrix:** Cover exact fully qualified owned destination, new/existing directory/destination, protected inheritance, removal of broad inherited/explicit ACEs, exact current-user+SYSTEM minimum rights with no `FullControl`, ACL application/readback failures at directory/destination/temp/result, and no newly valued visibility after pre-commit failure. <!-- sdd-owner: implementation -->
+- [ ] **1b-writer.2 RED — durable validated UTF-8 and cleanup matrix:** Cover same-directory GUID temp creation with the final descriptor, exact BOM-less UTF-8 schema bytes, flush/close/durable-readback validation, failures before/after write and before commit, cancellation, previous-byte survival, and deletion of only the exact owned temp. <!-- sdd-owner: implementation -->
+- [ ] **1b-writer.3 RED — reparse and replacement-race matrix:** Reject directory ancestry, destination, temporary, commit-race, and result-race reparse substitution. Cover first-write destination appearance/disappearance and replacement races without copy, cross-directory, permissive, or elevation fallback. <!-- sdd-owner: implementation -->
+- [ ] **1b-writer.4 RED — readers, sharing, and concurrent writers:** Hold concurrent readers across first/replace operations and prove every read parses as the complete old or complete new document, never partial/missing due to writer mechanics. Cover reader sharing, concurrent first/replace requests, stale-request suppression, latest complete document, compliant ACL, and no leftover temp. <!-- sdd-owner: implementation -->
 
 ### Production implementation
 
-- [ ] **1b.5 GREEN — secure atomic writer:** Implement exact path, pre-commit ACL/reparse checks, secure same-directory temp, validated write/flush/close, atomic rename/replace, result verification, and exact cleanup; no copy/cross-directory/elevation/permissive fallback. <!-- sdd-owner: implementation -->
-- [ ] **1b.6 GREEN — clear and composition:** Add exact owned path, preserve staged rollback/reparse defenses, recreate only disabled/null after clear, compose publisher/writer beside presentation, and prevent shutdown recreation. <!-- sdd-owner: implementation -->
+- [ ] **1b-writer.5 GREEN — protected minimum-rights path boundary:** Implement the canonical current-user path, exact destination validation, reparse/race checks, and protected current-user+SYSTEM ACLs containing only the rights required for directory traversal/create/replace/delete and snapshot read/write; read back every descriptor. <!-- sdd-owner: implementation -->
+- [ ] **1b-writer.6 GREEN — durable same-directory atomic commit:** Create the secure temp with its descriptor, write and durably flush validated UTF-8, close and revalidate, use only atomic move/replace, verify final bytes/ACL, serialize writer requests, suppress stale requests, and clean only the exact temp on every failure. <!-- sdd-owner: implementation -->
 
 ### Focused check and commit boundary
 
-- [ ] **1b.7 CHECK — verify 1b:** Run isolated writer/clear/composition tests only; inspect ACLs, old/new atomicity, reparse/sharing/concurrency, previous bytes, owned path, disabled recreation, and no real profile/network/live process. <!-- sdd-owner: implementation -->
-- [ ] **1b.8 COMMIT BOUNDARY — Windows publication:** Freeze one Windows filesystem/privacy commit based on 1a-privacy. Rollback first secures/removes or nulls the snapshot, then removes writer/composition while retaining all Application units. <!-- sdd-owner: implementation -->
+- [ ] **1b-writer.7 CHECK — verify writer independently:** Run isolated writer tests only; inspect minimum-rights ACLs/readback, BOM-less validated bytes, durability, reparse/sharing/races, complete old/new concurrent-reader views, previous-byte survival, latest-state behavior, and exact cleanup. Use only synthetic isolated paths. <!-- sdd-owner: implementation -->
+- [ ] **1b-writer.8 COMMIT BOUNDARY — writer only:** Freeze one canonical-path Windows writer commit based on 1a-privacy. Rollback first secures and removes the snapshot or atomically publishes disabled/null, then removes the writer while leaving Application privacy intact. <!-- sdd-owner: implementation -->
 
-**Hard split trigger:** Stop at 360 and recalculate. If the security/atomic/clear matrix cannot stay below 400, require a new planning split before Unit 2. Never omit security cases or use an exception.
+**Hard stop:** Stop at **360 authored source/test lines** and replan before any edit that would cross it. Never omit minimum-rights, reader atomicity, durability, reparse, or cleanup cases; never reach 400 or use an exception.
+
+## Unit 1b-clear — Exact clear transaction and Desktop composition
+
+**Forecast:** **90–140 authored source/test lines**: approximately 20–40 production lines and 70–100 focused test lines, including rehomed writer-failure isolation and missing coordination/disposal cases. **Margin:** 260 lines. **Risk:** High (privacy clear ordering and stale publication).
+
+**Expected files:**
+- `src/AIBar.Application/ClearAiBarDataService.cs`
+- `src/AIBar.Desktop/App.xaml.cs`
+- `tests/AIBar.Domain.Tests/ClearAiBarDataTests.cs`
+
+**Start state:** 1b-writer is committed and independently accepted. The preserved three-path clear/composition candidate is 51 authored lines but proves only exact path inclusion, staged rollback, and a narrow composition happy path; it earns no implementation credit.
+
+**End state:** Clear mutates only the exact owned snapshot path after queued/in-flight publication is coordinated, stale completions cannot recreate valued bytes, and completion leaves a disabled/null snapshot or proven safe absence. Desktop composition isolates writer failures from authoritative cache/UI and disposes publisher/writer-facing resources before dependencies they can call.
+
+**Dependencies:** committed 1b-writer and transitively 1a-privacy; existing staged clear transaction and Desktop lifecycle seams. This child targets 1b-writer.
+
+**Exclusions:** Writer ACL/reparse/durability/atomic implementation; activation; themes; popup/tray; YASB reader/launcher; ZIP/docs; real profile paths; endpoint/cadence/credential changes.
+
+### Behavior-first tests and contracts
+
+- [ ] **1b-clear.1 RED — exact owned-path transaction:** Cover only `yasb-quota.json`, absent idempotence, staged move/delete, rollback when a later owned target fails, reparse rejection, unrelated-path preservation, and retry after failure. <!-- sdd-owner: implementation -->
+- [ ] **1b-clear.2 RED — queued/in-flight coordination and stale suppression:** Block ordinary publication, queue a later write, then clear. Require cancellation/await before path mutation, no stale completion or queued resurrection, and disabled/null recreation or proven safe absence on success and bounded failure paths. <!-- sdd-owner: implementation -->
+- [ ] **1b-clear.3 RED — composition, failure isolation, and disposal order:** Exercise production-shaped synthetic composition, writer failure without cache/UI corruption, clear during initialization/publication, shutdown without recreation, and explicit publisher/writer-facing disposal before coordinator/store dependencies. <!-- sdd-owner: implementation -->
+
+### Production implementation
+
+- [ ] **1b-clear.4 GREEN — exact clear protocol:** Add only the exact snapshot to owned targets, preserve staged rollback/reparse defenses, coordinate current publisher work, suppress stale completion, and recreate only disabled/null or leave proven safe absence. <!-- sdd-owner: implementation -->
+- [ ] **1b-clear.5 GREEN — composition and lifecycle:** Compose the committed writer beside presentation, isolate routine writer failure, wire clear ordering through existing privacy authority, and make disposal order explicit so shutdown cannot recreate or publish after dependencies are disposed. <!-- sdd-owner: implementation -->
+
+### Focused check and commit boundary
+
+- [ ] **1b-clear.6 CHECK — verify clear independently:** Run only isolated clear/composition tests; inspect exact ownership, rollback, in-flight/queued coordination, stale suppression, disabled/null or safe absence, failure isolation, and disposal order. Use no real profile/network/live process. <!-- sdd-owner: implementation -->
+- [ ] **1b-clear.7 COMMIT BOUNDARY — clear/composition only:** Freeze one clear/composition commit based on committed 1b-writer. Rollback removes clear composition and snapshot ownership while retaining the writer and all Application privacy behavior; first prove the snapshot disabled/null or safely absent. <!-- sdd-owner: implementation -->
+
+**Hard stop:** Stop at **160 authored source/test lines** and replan before borrowing writer internals or Unit 2 scope. Never reach 400 or use an exception.
 
 ## Unit 2 — Payload-free `--show` activation
 
@@ -224,11 +259,11 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 **Expected files:** `src/AIBar.Desktop/HostPrimitives.cs`, `src/AIBar.Desktop/App.xaml.cs`, `src/AIBar.Desktop/HostRuntime.cs`, `tests/AIBar.Domain.Tests/HostPrimitivesTests.cs`, `tests/AIBar.Domain.Tests/HostRuntimeTests.cs`.
 
-**Start state:** Units 1a-contract through 1b are complete; existing single-instance and tray startup are unchanged.
+**Start state:** Units 1a-contract through 1b-clear are complete; existing single-instance and tray startup are unchanged.
 
 **End state:** Exactly `--show` requests one show with no payload; first/secondary/startup-race flows preserve one authority.
 
-**Dependencies:** 1b in the chain and existing single-instance/host readiness seams.
+**Dependencies:** committed 1b-clear in the chain and existing single-instance/host readiness seams.
 
 **Exclusions:** theme/DWM/layout/YASB launcher, general IPC, path/process discovery, endpoint behavior.
 
@@ -321,7 +356,7 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 **End state:** Fixed-path bounded reader emits only label/tooltip/className with permanent slots and safe failures; left-click passes only `--show`; stock config/CSS is exact and path-neutral.
 
-**Dependencies:** 1a-contract/authority/privacy, 1b, Unit 2, and 4b in the chain.
+**Dependencies:** 1a-contract/authority/privacy, 1b-writer path/atomic contract, committed 1b-clear, Unit 2, and 4b in the chain.
 
 **Exclusions:** native/forked YASB, refresh/auth/network, process/path discovery, arbitrary parameters, cleanup/ZIP/docs.
 
@@ -345,7 +380,7 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 **End state:** Inventory contains bounded assets/docs, examples are path-neutral, and rollback stops unless the fixed snapshot is absent or disabled/null after read-back.
 
-**Dependencies:** Unit 5 assets, 1a-contract schema, 1b path/atomic boundary, existing deterministic publish flow.
+**Dependencies:** Unit 5 assets, 1a-contract schema, 1b-writer path/atomic boundary, committed 1b-clear, existing deterministic publish flow.
 
 **Exclusions:** installer/signing/updater/package manager/public release/native YASB/live smoke.
 
@@ -372,7 +407,8 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 | Retrieval racing clear/cancellation | 1a-authority.4, .7–.8 |
 | Same-reference/concurrent sequencing and StateChanged compatibility | 1a-authority.1, .3, .5–.8 |
 | Freshness/latest-state publisher and privacy cancellation | 1a-privacy.1–.9 |
-| Atomic/ACL/reparse/current-user/clear/composition | 1b.1–.8 |
+| Canonical path, minimum-rights ACL/readback, reparse, durable atomic UTF-8, complete old/new readers, exact temp cleanup | 1b-writer.1–.8 |
+| Exact clear ownership, in-flight/queued coordination, stale suppression, disabled/null or absence, composition/disposal | 1b-clear.1–.7 |
 | Exact payload-free `--show` | 2.1–2.6, 5.4–5.5 |
 | Automatic light/dark/high-contrast | 3.1–3.6 |
 | Permanent accessible popup/tray slots | 4a.1–4a.7 |
@@ -383,9 +419,10 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 ## Parent-owned lifecycle actions
 
 - [x] Maintainer selected `feature-branch-chain`; no `size:exception` is authorized. <!-- sdd-owner: parent -->
-- [ ] Maintainer decides disposition of the preserved 223-line candidate and explicitly approves Unit 1a-contract apply. <!-- sdd-owner: parent -->
+- [x] Maintainer selected `Dividir writer/clear`; the prior five-path Unit 1b candidate earns no completion credit. <!-- sdd-owner: parent -->
+- [ ] Parent explicitly authorizes the named stash including untracked files, records its immutable object ID, and permits selective restoration of only the two 1b-writer paths; keep the stash through both child commits. <!-- sdd-owner: parent -->
 - [ ] After each applied unit, use the repository-owned bounded validation/review policy for that exact below-400 unit. <!-- sdd-owner: parent -->
-- [ ] Before archive, confirm all ten units and final cleanup/inventory evidence without fabricating completion from prior target counts. <!-- sdd-owner: parent -->
+- [ ] Before archive, confirm all eleven units and final cleanup/inventory evidence without fabricating completion from prior target counts. <!-- sdd-owner: parent -->
 
 ## Global exclusions
 

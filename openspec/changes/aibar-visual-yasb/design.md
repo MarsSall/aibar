@@ -2,14 +2,15 @@
 
 ## Decision summary
 
-AIBar remains the only quota authority. The first product slice is delivered through four independently reviewable units, with contract and authority separated so neither wire correctness nor causal sequencing can hide behind passing tests for the other:
+AIBar remains the only quota authority. The first product slice is delivered through five independently reviewable units, with contract, authority, Windows publication, and clear coordination separated so passing one boundary cannot hide an incomplete adjacent contract:
 
 1. **Unit 1a-contract — closed projection and fail-closed wire contract** owns the Application export records, enums, projector, serializer/normalizer boundary, exact allowlists and wire domains, nullable reset semantics, and the complete projection/contract acceptance matrices.
 2. **Unit 1a-authority — serialized causal authority stream** depends on 1a-contract and owns `QuotaAuthorityUpdate` plus `QuotaRefreshCoordinator` transition serialization, sequence allocation, ordered cross-event delivery, and retrieval-generation causality.
 3. **Unit 1a-privacy — generation-gated publisher and consent lifecycle** depends on 1a-authority and owns publisher ordering, freshness propagation, disclosure epochs, cancellation, disable/revoke/clear, and persisted-consent gating.
-4. **Unit 1b — Windows writer/ACL/composition** depends on 1a-privacy and owns the Windows path, same-directory atomic writer, pre-commit ACL guarantees, clear-data ownership, and Desktop composition.
+4. **Unit 1b-writer — Windows canonical-path atomic writer** depends on 1a-privacy and owns minimum-rights protected ACLs and readback, reparse defenses, same-directory secure temporary files, durable validated UTF-8 writes, atomic move/replace, complete old/new reader views, and exact cleanup.
+5. **Unit 1b-clear — clear transaction and Desktop composition** depends on the committed 1b-writer child and owns exact snapshot-path clearing, in-flight/queued coordination and stale suppression, disabled/null recreation or safe absence, writer failure isolation, composition, and explicit disposal order.
 
-The current 223-authored-line source/test candidate is preserved, uncommitted and unstaged, pending an explicit disposition decision. Its target-scoped 35/35 evidence completed the latest native validation-only objective, but independent acceptance validation failed because required contract and concurrency cases were absent. No implementation task receives completion credit.
+The current 359-authored-line five-path source/test candidate is preserved, uncommitted and unstaged. Static acceptance found missing minimum-rights ACL behavior, reader atomicity proof, and clear coordination/lifecycle coverage; no test was run. The maintainer selected `Dividir writer/clear`, so no implementation task receives completion credit and candidate preservation still requires explicit parent authorization before any worktree rearrangement.
 
 ## Architecture and dependency direction
 
@@ -38,15 +39,18 @@ AIBar.Application
     v
 AIBar.Desktop
     |
-    | Unit 1b (depends on privacy)
-    |   ACL-safe atomic file adapter + clear ownership + composition
+    | Unit 1b-writer (depends on privacy)
+    |   canonical path + ACL-safe atomic file adapter
+    |
+    | Unit 1b-clear (depends on committed writer)
+    |   exact clear ownership + stale suppression + composition/disposal
     v
 %LOCALAPPDATA%\AIBar\yasb-quota.json
     ^ read only; never a refresh or command channel
 stock YASB assets -> AIBar.Desktop.exe --show
 ```
 
-Neither Domain nor Application references WPF, Windows theme APIs, JSON filesystem details, ACL APIs, or YASB types. Contract contains no coordinator, authority event, publisher, consent, privacy epoch, Desktop, filesystem, or ACL behavior. Authority contains no publisher, consent/privacy lifecycle, Desktop, filesystem, or ACL behavior. Privacy contains no Desktop, filesystem, or ACL implementation. Unit 1b is the first unit allowed to make external bytes visible.
+Neither Domain nor Application references WPF, Windows theme APIs, JSON filesystem details, ACL APIs, or YASB types. Contract contains no coordinator, authority event, publisher, consent, privacy epoch, Desktop, filesystem, or ACL behavior. Authority contains no publisher, consent/privacy lifecycle, Desktop, filesystem, or ACL behavior. Privacy contains no Desktop, filesystem, or ACL implementation. Unit 1b-writer is the first unit allowed to make external bytes visible; Unit 1b-clear then integrates that committed boundary into clear and Desktop lifecycle ownership.
 
 `QuotaExport.cs` may appear in Unit 1a-contract and later Unit 1a-privacy diffs only by symbol ownership: contract owns records/enums/input/projector/normalizer/ports, while privacy may add publisher/lifecycle symbols. Unit 1a-authority does not add its symbols to the contract-owned region: `QuotaRefreshCoordinator` and `QuotaAuthorityUpdate` belong to authority and may use `QuotaRefreshCoordinator.cs` plus a repository-conventional authority-specific file.
 
@@ -62,7 +66,7 @@ Neither Domain nor Application references WPF, Windows theme APIs, JSON filesyst
 | Legacy event compatibility | Each accepted transition produces one `QuotaAuthorityUpdate`, then one matching `StateChanged(update.State)` in the same non-interleaved drain turn; existing consumers keep one legacy callback per transition | Cross-event tests prove state identity/content compatibility and prevent a later transition from interleaving between the paired events. |
 | Retrieval generation | Retrieval generation increments exactly once only after a valid non-null real retrieval is persisted and accepted for the current operation generation | Equal content still proves a causally new retrieval; cache load, loading, failure, replay, cancellation, clear, and persistence failure do not. |
 | Publication | Unit 1a-privacy subscribes to every authority update and serializes publication through one latest-state gate | Retrieval generation is unlock evidence only; event sequence and state control freshness and final ordering. |
-| Filesystem | `WindowsAtomicQuotaExportWriter` secures and verifies directory, existing destination, and same-directory temporary file before commit, then atomically renames/replaces and verifies the result | Readers see old or new complete JSON, and ACL failure cannot expose new valued bytes. |
+| Filesystem | Unit 1b-writer makes `WindowsAtomicQuotaExportWriter` secure and read back minimum-rights protected ACLs for the directory, existing destination, same-directory temporary file, and result before reporting success; it durably writes validated UTF-8 and uses only atomic move/replace | Concurrent readers see a complete old or new document, and ACL, reparse, durability, or cleanup failure cannot authorize newly visible valued bytes. |
 | Activation | Parse exactly zero arguments or the one-token `--show`; preserve the fixed local single-instance event | No arbitrary payload or general IPC is introduced. |
 | Theme/popup/YASB | Preserve the existing WPF host, add semantic Windows resources and quota-first layout, and use stock YASB assets over the sanitized file | The integration stays display-only and avoids a second quota authority. |
 
@@ -232,19 +236,29 @@ Disable, revoke, clear, enable, and disposal advance the disclosure epoch and ca
 
 Mandatory privacy cases remain restart/cache suppression, equal-content retrieval unlock, latest-state and same-reference bursts, blocked ordinary-write cancellation, cancellation-resistant writers, disable/revoke/clear/re-enable races, privacy-operation failure, routine writer failure isolation, and disposal/unsubscription.
 
-## 4. Unit 1b: Windows writer and composition
+## 4. Unit 1b-writer: Windows canonical-path writer
 
 `WindowsQuotaExportPath.ForCurrentUser()` resolves exactly `%LOCALAPPDATA%\AIBar\yasb-quota.json`. The writer:
 
-1. rejects reparse points at directory, destination, temporary, or race-reopened paths;
-2. secures and reads back the directory and any existing destination for current user plus SYSTEM before valued bytes;
+1. rejects reparse points at the directory, destination, temporary file, and every race-reopened path;
+2. applies and reads back protected, minimum-rights ACLs for only the current user and SYSTEM, with no inherited, broad, deny, or `FullControl` shortcut;
 3. creates a same-directory GUID temporary file with the compliant descriptor at creation;
-4. serializes only a validated contract document, writes, flushes, closes, and revalidates bytes and descriptor;
-5. atomically replaces/renames with no cross-directory or copy-over fallback;
-6. verifies the resulting descriptor before success;
-7. deletes only its exact temporary file.
+4. serializes only a validated contract document, writes exact BOM-less UTF-8 bytes, flushes durably, closes, and revalidates bytes and descriptor;
+5. atomically replaces/renames with no cross-directory or copy-over fallback so concurrent readers observe only a complete old or complete new document;
+6. verifies the resulting descriptor and bytes before success;
+7. deletes only its exact temporary file on every pre-commit failure and never removes an unrelated path.
 
-Unit 1b adds the exact snapshot to clear-data ownership and composes the publisher/writer beside presentation. Failure never corrupts quota cache/UI or authorizes newly visible valued bytes. No real profile path is used in tests.
+The preserved writer portion is 308 authored lines. Correcting the permissive `FullControl` contract, its matching tests, and the missing reader-atomicity proof yields a realistic **335–360 authored source/test line** forecast. Stop at **360**; do not omit security cases, cross 400, or use a size exception. Expected paths are primarily `src/AIBar.Desktop/QuotaExportWindows.cs` and `tests/AIBar.Domain.Tests/QuotaExportWriterTests.cs`, plus only unavoidable project metadata.
+
+Rollback first secures and removes the snapshot or atomically publishes a disabled/null snapshot, then removes the writer while leaving the complete 1a-privacy Application boundary intact.
+
+## 5. Unit 1b-clear: clear transaction and Desktop composition
+
+Unit 1b-clear starts only from a committed 1b-writer child. It adds the exact snapshot path to clear-data ownership, coordinates queued and in-flight publisher work before path mutation, suppresses stale completion, and finishes with a disabled/null recreation or proven safe absence. Desktop composition keeps writer failure isolated from authoritative cache and UI state and disposes publisher/writer-facing resources before the dependencies they can call.
+
+The preserved clear/composition portion is 51 authored lines but covers only path inclusion and a narrow happy path. The required coordination, stale-suppression, failure, and disposal matrices yield a realistic **90–140 authored source/test line** forecast with a **160-line hard stop**. Expected paths are `src/AIBar.Application/ClearAiBarDataService.cs`, `src/AIBar.Desktop/App.xaml.cs`, and `tests/AIBar.Domain.Tests/ClearAiBarDataTests.cs`.
+
+Rollback removes 1b-clear composition and exact-path ownership while retaining the committed writer and every 1a Application unit; before rollback completes, the snapshot must be disabled/null or safely absent. No real profile path is used in either child’s tests.
 
 ## Remaining product architecture
 
@@ -269,9 +283,9 @@ The bounded PowerShell reader reads only the known sanitized file, validates sch
 | `src/AIBar.Application/QuotaAuthorityUpdate.cs` (optional, repository-conventional) | 1a-authority: authority update record if not colocated with coordinator. |
 | `src/AIBar.Application/BetaRuntime.cs` | 1a-privacy: persisted-consent pending enablement before retrieval. |
 | `src/AIBar.Application/StartupSettings.cs` | 1a-privacy: fail-closed disable/revoke and enable-before-retrieval ordering. |
-| `src/AIBar.Application/ClearAiBarDataService.cs` | 1b: exact owned snapshot path and clear/disabled recreation integration. |
-| `src/AIBar.Desktop/QuotaExportWindows.cs` | 1b: Windows path, JSON adapter/context, ACL-safe same-directory writer. |
-| `src/AIBar.Desktop/App.xaml.cs` | 1b composition; later activation/theme lifecycle integration. |
+| `src/AIBar.Application/ClearAiBarDataService.cs` | 1b-clear: exact owned snapshot path and clear transaction integration. |
+| `src/AIBar.Desktop/QuotaExportWindows.cs` | 1b-writer: Windows canonical path, JSON adapter/context, minimum-rights ACL-safe same-directory writer. |
+| `src/AIBar.Desktop/App.xaml.cs` | 1b-clear composition and explicit disposal order; later activation/theme lifecycle integration. |
 | `src/AIBar.Desktop/HostPrimitives.cs` | Unit 2 startup intent/kernel safety; Unit 4b placement primitives. |
 | `src/AIBar.Desktop/HostRuntime.cs` | Units 2, 4a, 4b: show lifecycle, tray state flow, placement/surface integration. |
 | `src/AIBar.Desktop/WindowsTheme.cs` | Units 3 and 4b: theme source/controller and progressive surface. |
@@ -280,7 +294,7 @@ The bounded PowerShell reader reads only the known sanitized file, validates sch
 | `tests/AIBar.Domain.Tests/QuotaExportTests.cs` | 1a-contract contract/projection/direct-document matrices; later 1a-privacy publisher/privacy matrices by test-class ownership. No authority-stream coverage is hidden here unless clearly separated. |
 | `tests/AIBar.Domain.Tests/QuotaRefreshCoordinatorTests.cs` | 1a-authority serialized transition, generation, concurrency, clear/cancellation, same-reference, and cross-event compatibility matrices. |
 | `tests/AIBar.Domain.Tests/BetaConsentOrQuotaTests.cs` | 1a-privacy persisted-consent and qualifying-retrieval lifecycle. |
-| `tests/AIBar.Domain.Tests/QuotaExportWriterTests.cs` | 1b atomic/ACL/reparse/sharing/concurrency tests. |
+| `tests/AIBar.Domain.Tests/QuotaExportWriterTests.cs` | 1b-writer minimum-rights ACL/readback, reparse, durability, complete-reader, sharing, concurrency, and cleanup tests. |
 | `tests/AIBar.Domain.Tests/HostPrimitivesTests.cs` | Units 2/4b parser, kernel, and placement matrices. |
 | `tests/AIBar.Domain.Tests/HostRuntimeTests.cs` | Units 2/4a host activation and exact tray presentation flow. |
 | `tests/AIBar.Domain.Tests/QuotaVisualDesignTests.cs` | Units 3/4a/4b theme parity, permanent popup/tray slots, accessibility. |
@@ -308,8 +322,14 @@ QuotaRefreshCoordinator (1a-authority)
                     -> disclosure epoch owns cancellation
                     -> QuotaExportProjector + normalizer (1a-contract)
                     -> IQuotaExportWriter
-                          -> WindowsAtomicQuotaExportWriter (1b)
-                          -> secure same-directory atomic commit
+                              -> WindowsAtomicQuotaExportWriter (1b-writer)
+                              -> secure same-directory atomic commit
+
+    clear/composition (1b-clear)
+      -> cancel/await queued and in-flight publication
+      -> mutate only exact owned snapshot path
+      -> disabled/null recreation or safe absence
+      -> dispose writer-facing resources before their dependencies
                           -> yasb-quota.json
 ```
 
@@ -359,7 +379,7 @@ YASB click -> show-aibar.cmd -> AIBar.Desktop.exe --show
 1. **1a-contract:** pure synthetic tests for exact schema/version/property/domain allowlists; forbidden root/db/source-model and private fields; complete state/failure/credential/cache/partial-window matrices; 0/100/interior/out-of-range percentages; exact retained source time; nullable reset; UTC normalization; unknown enums; and inconsistent direct-document fail-closed serialization.
 2. **1a-authority:** synthetic coordinator/store/provider tests with real task concurrency for transition serialization, sequence and delivery order, StateChanged pairing, accepted/persisted generation, equal-content retrieval, persistence failure, reevaluate/clear/refresh/cancellation races, replay, and disposal.
 3. **1a-privacy:** cancellation-aware in-memory writer tests for restart generation gating, freshness propagation, latest-state/same-reference bursts, epoch cancellation, privacy-operation failures, and disposal.
-4. **1b:** isolated Windows temporary-directory tests for first/replace, ACL ordering, broad ACE removal/failure, reparse/sharing/concurrency, previous-byte survival, clear, disabled recreation, and composition.
+4. **1b-writer / 1b-clear:** isolated Windows temporary-directory tests first prove minimum-rights ACL ordering/readback, first/replace, reparse/sharing/concurrent complete-reader behavior, durable UTF-8 bytes, previous-byte survival, and exact cleanup; the following child proves exact-path clear coordination, stale suppression, disabled/null recreation or safe absence, writer failure isolation, composition, and disposal order.
 5. **2–4b:** focused parser/host, theme, popup/tray, placement, synthetic render, focus, automation, DPI, and DWM-fallback tests.
 6. **5–6:** synthetic isolated reader/cleanup fixtures, exact stock asset inspection, deterministic inventory, and rollback ordering. No live AIBar/YASB, real profile, private endpoint, credential, or user dataset.
 
@@ -373,7 +393,7 @@ Passing a selected target count is insufficient when any mandatory matrix row is
 | Sanitized export: truthful values and age | 1a-contract complete state/failure/credential/partial-window/timestamp/percentage matrices with exact retained source time. |
 | Quota status and authority freshness | 1a-authority serialized every-transition stream, monotonic sequence, accepted/persisted retrieval generation, ordered legacy compatibility. |
 | Privacy actions and restart | 1a-privacy generation-only unlock, event/state freshness, epoch cancellation, fail-closed disable/revoke/clear. |
-| Atomic current-user publication | 1b same-directory ACL-safe writer, clear ownership, disabled recreation, Desktop composition. |
+| Atomic current-user publication | 1b-writer same-directory minimum-rights ACL-safe writer and complete old/new reader behavior; 1b-clear exact ownership, stale suppression, disabled/null recreation or safe absence, Desktop composition, and disposal order. |
 | External show | Unit 2 payload-free parser and existing single-instance event. |
 | Windows theme | Unit 3 matching semantic resources and dispatcher-safe high-contrast-first controller. |
 | Popup presentation | Units 4a/4b fixed quota-first layout, accessibility, tray flow, DPI/work-area placement, rendered validation, opaque fallback. |
@@ -385,18 +405,18 @@ Passing a selected target count is insufficient when any mandatory matrix row is
 Rollout is one linear feature-branch chain:
 
 ```text
-1a-contract -> 1a-authority -> 1a-privacy -> 1b -> 2 -> 3 -> 4a -> 4b -> 5 -> 6
+1a-contract -> 1a-authority -> 1a-privacy -> 1b-writer -> 1b-clear -> 2 -> 3 -> 4a -> 4b -> 5 -> 6
 ```
 
-1a-contract can land as a pure closed contract with no coordinator or external file. 1a-authority then adds the internal causal stream while preserving `StateChanged` consumers. 1a-privacy adds in-memory publication policy only after authority order is proven. 1b is the first externally visible publication unit. Later presentation and asset units consume those boundaries without redefining them.
+1a-contract can land as a pure closed contract with no coordinator or external file. 1a-authority then adds the internal causal stream while preserving `StateChanged` consumers. 1a-privacy adds in-memory publication policy only after authority order is proven. 1b-writer is the first externally visible publication unit; 1b-clear then binds it to clear and Desktop lifecycle ownership. Later presentation and asset units consume those boundaries without redefining them.
 
 There is no migration of `quota.db`, credentials, sessions, endpoint behavior, refresh cadence, or analytics. Event sequence, retrieval generation, and disclosure epoch are process-local and are neither persisted nor exported. Schema-v1 readers reject future schemas safely.
 
-Rollback follows reverse ownership. Remove 1b external output safely before removing privacy; remove privacy before authority; remove authority before contract. Reverting authority restores the prior coordinator while preserving existing quota refresh/cache/presentation behavior. Reverting contract removes only projection types after dependents are gone. Theme/popup changes can revert independently. Installed YASB rollback must stop AIBar and successfully remove or replace the snapshot with disabled/null before assets are removed.
+Rollback follows reverse ownership. Revert 1b-clear only after the snapshot is disabled/null or safely absent, leaving the committed writer and Application privacy intact. Revert 1b-writer only after securing/removing or nulling its snapshot, leaving 1a-privacy intact; then remove privacy before authority and authority before contract. Reverting authority restores the prior coordinator while preserving existing quota refresh/cache/presentation behavior. Reverting contract removes only projection types after dependents are gone. Theme/popup changes can revert independently. Installed YASB rollback must stop AIBar and successfully remove or replace the snapshot with disabled/null before assets are removed.
 
-The current 223-line candidate is not eligible to land or earn completion credit. A later explicit decision must either dispose of it or authorize adapting it to Unit 1a-contract; implementation cannot begin from this planning handoff.
+The current 359-line five-path candidate is not eligible to land or earn completion credit. It remains unchanged until the parent explicitly authorizes the documented stash-based preservation and selective child restoration; this planning handoff does not execute that mechanism.
 
-## Ten review units and forecasts
+## Eleven review units and forecasts
 
 Forecasts count authored additions plus deletions and keep tests with behavior. They are planning ranges, not completion claims.
 
@@ -404,16 +424,17 @@ Forecasts count authored additions plus deletions and keep tests with behavior. 
 |---|---|---:|---:|---|
 | 1a-contract | First child; closed records/enums/projector/normalizer/ports and full contract matrices; no coordinator/publisher/platform | 160–220 | 180 | Stop at 220; if complete matrices cannot fit below 300, replan before authority. |
 | 1a-authority | Depends on contract; update record, coordinator serialization, sequence/delivery/generation/races; no publisher/platform | 120–180 | 220 | Stop at 180; if concurrency and cross-event proof cannot fit below 280, replan before privacy. |
-| 1a-privacy | Depends on authority; publisher, event freshness, epochs/cancellation, consent lifecycle | 180–260 | 140 | Stop at 260; if complete privacy matrix cannot fit below 320, replan before 1b. |
-| 1b | Depends on privacy; Windows writer/ACL/clear/composition | 300–360 | 40 | Stop at 360 and split before 400; never omit security coverage. |
-| 2 | Depends on 1b; payload-free activation | 230–290 | 110 | Replan at 360 if kernel compatibility needs a separate adapter. |
+| 1a-privacy | Depends on authority; publisher, event freshness, epochs/cancellation, consent lifecycle | 180–260 | 140 | Stop at 260; if complete privacy matrix cannot fit below 320, replan before 1b-writer. |
+| 1b-writer | Depends on privacy; canonical path, minimum-rights ACL/readback, reparse-safe durable atomic writer, complete old/new readers | 335–360 | 40 | Stop at 360; never omit minimum-rights or reader atomicity coverage, cross 400, or use an exception. |
+| 1b-clear | Depends on committed 1b-writer; exact clear transaction, stale suppression, disabled/null or absent result, composition/disposal | 90–140 | 260 | Stop at 160; do not borrow writer implementation or Unit 2 scope. |
+| 2 | Depends on 1b-clear; payload-free activation | 230–290 | 110 | Replan at 360 if kernel compatibility needs a separate adapter. |
 | 3 | Depends on 2; automatic semantic themes | 320–380 | 20 | At 380 retain only required semantic migration; never cross 400. |
 | 4a | Depends on 3; popup hierarchy/accessibility/tray | 340–380 | 20 | At 380 defer placement/render breadth to 4b; never cross 400. |
 | 4b | Depends on 4a; placement/DPI/DWM/rendered validation | 300–370 | 30 | At 370 table-drive required cases or replan before 400. |
 | 5 | Depends on 4b and export/activation contracts; stock YASB assets | 320–380 | 20 | At 380 table-drive fixtures or replan; no production path parameter. |
-| 6 | Depends on 5 and 1b path contract; ZIP/docs/cleanup | 260–330 | 70 | At 330 keep cleanup proof together and replan packaging breadth. |
+| 6 | Depends on 5, the 1b-writer path contract, and committed 1b-clear; ZIP/docs/cleanup | 260–330 | 70 | At 330 keep cleanup proof together and replan packaging breadth. |
 
-Total forecast: **2,530–3,150 authored lines** across ten review units. Every child remains below 400, the selected strategy is `feature-branch-chain`, and no `size:exception` is authorized.
+The Unit 1b replacement forecasts **425–500 authored source/test lines across two sequential children**. All unrelated accepted-unit forecasts remain unchanged. Every child remains below 400, the selected strategy is `feature-branch-chain`, and no `size:exception` is authorized.
 
 ## Explicit exclusions
 
