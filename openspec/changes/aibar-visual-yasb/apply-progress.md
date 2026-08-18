@@ -1,0 +1,147 @@
+# Apply Progress — Unit 1a-contract
+
+## Bounded acceptance remediation — current result
+
+- **Authorization and scope:** The maintainer authorized one bounded remediation of Unit `1a-contract` only, raised this unit's hard source/test cap from 220 to **260 authored lines**, and authorized no `size:exception`. No native SDD, review, attempt, dispatcher, authority, publisher, consent/privacy, Desktop, filesystem, ACL, YASB, or later-unit work was performed.
+- **Pre-edit forecast:** The requested mapping correction, partial-cache/weekly-only/generic-unavailable coverage, two-publication timestamp proof, canonical fallback expansion, and xUnit2017 cleanup were forecast at **230–242 total authored source/test lines** from the 208-line candidate. Complete remediation therefore fit below 260 without compressing assertions into unreadable chains.
+- **Outcome:** **passed**. No-cache/no-failure now projects `state: unavailable` with JSON `warning: null`. Explicit failures without cache remain bounded `warning: unavailable`; partial weekly-only cache is retained exactly during refresh and operational failure.
+- **Publication-time evidence:** Two distinct trusted UTC publication times prove `generatedAt` advances while retained `sourceRetrievedAt` remains byte-identical, value-identical, and UTC.
+- **Fail-closed evidence:** The shared fallback assertion now verifies numeric schema version 1, trusted UTC `generatedAt`, the complete ordered top-level allowlist, `state: unavailable`, `warning: unavailable`, and null source/window fields for every existing arbitrary inconsistent direct-document case.
+- **Mandatory matrix inspection:** The approved Unit 1a-contract matrix was inspected once after edits. The newly required partial-cache, weekly-only, generic unavailable, no-cache/no-failure JSON-null, and republish-age rows completed the genuinely absent coverage; no additional specified row remained absent.
+- **Focused target:** `dotnet test "C:/Users/mjsal/Desarrollos IA/Modificacion de Terminales/aibar-analytics-v2/tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj" --no-restore --filter "FullyQualifiedName~QuotaExportTests"` ran exactly once after static corrections and passed **6/6** with 0 failed and 0 skipped. Reported compiler/analyzer warnings came from unchanged test files or existing unsigned assembly references; no warning named either changed source/test file, and changed-file xUnit2017 is absent.
+- **Diagnostics:** A primary LSP diagnostics tool was not exposed in this worker runtime. Focused compilation and tests succeeded.
+- **Candidate identity:** `sha256:c01b2d0ff4bd6f5767a9c0e0ba64222cf28e09524c5827b3d2dfbac38a3529da` over the two ordered path-bound source/test files. The candidate is **238 authored lines**: 114 in `src/AIBar.Application/QuotaExport.cs` and 124 in `tests/AIBar.Domain.Tests/QuotaExportTests.cs`.
+- **Integrity:** Both source/test files and this progress artifact pass no-index `git diff --check`; only the exact intended source/test paths are present for this unit, and the Git index remains empty. A full no-index check of the pre-existing untracked `tasks.md` also reports intentional Markdown hard-break spaces in untouched later-unit start/end/dependency lines; the edited Unit 1a-contract checkbox lines are clean, so those historical spaces were preserved rather than changed outside this remediation.
+- **Task state:** `1a-contract.1` through `1a-contract.8` are complete. `1a-contract.9 COMMIT BOUNDARY` remains unchecked and parent-owned settlement is unresolved. Every authority, privacy, platform, and later-unit task remains unchecked.
+
+> The full cumulative history below is intentionally retained. Earlier sections that describe a failed attempt, a 223-line mixed candidate, preservation pending authorization, or a zero-progress split-decision snapshot are historical and are superseded only by the bounded current result above; they remain evidence of what occurred at those earlier stages.
+
+## Maintainer-authorized Unit 1a-contract apply
+
+- **Authorized disposition:** the previously preserved mixed candidate is no longer present. The maintainer authorized this clean source/test disposition and a contract-only apply; the pre-apply working tree showed only the untracked `openspec/changes/aibar-visual-yasb/` artifact set.
+- **Pre-edit forecast for tasks 1a-contract.1–.7:** 85–95 production lines plus 115–125 compact table-driven test lines, for 200–220 authored source/test lines total. This includes the closed schema/domain checks, forbidden-field sentinels, complete projection/failure/credential/window matrix, timestamp/percentage/reset boundaries, arbitrary direct-document fallback matrix, nullable-reset records/ports, projector, normalizer, and validating wire serialization.
+- **Hard stop:** source/test implementation may proceed only while all mandatory cases remain covered at no more than 220 authored additions plus deletions; there is no size exception and no authority/privacy/platform scope may be borrowed.
+
+## Unit 1a-contract attempt result
+
+- **Outcome:** failed. The one authorized focused command reached the intended `aibar-analytics-v2` project but compilation failed at `QuotaExportTests.cs:27` with `CS0246` because `JsonReaderException` was not resolved; no selected test executed and the command was not rerun.
+- **Candidate:** `src/AIBar.Application/QuotaExport.cs` has 115 additions and `tests/AIBar.Domain.Tests/QuotaExportTests.cs` has 93 additions, for **208 authored source/test lines**. The source/test scope contains exactly those two untracked paths, both pass no-index `git diff --check`, and the index remains empty.
+- **Diagnostics:** a primary LSP diagnostics tool was not available in this worker runtime. The test/build output named only paths under the intended `aibar-analytics-v2` checkout.
+- **Task state:** tasks `1a-contract.1` through `.7` remain unchecked because required passing evidence is absent; `1a-contract.8` and every later/authority/privacy task also remain unchecked.
+- **Next action:** parent-owned disposition of this failed candidate and any separately authorized correction attempt; do not relabel the failed compile as behavior evidence.
+
+## Current status
+
+- **Maintainer planning decision:** `Dividir contract/authority`.
+- **Implementation status:** acceptance incomplete; no task in the new ten-unit plan is complete.
+- **Candidate state:** the current source/test candidate is preserved intact, uncommitted, and unstaged at **223 authored lines**: 25 additions and 5 deletions in `QuotaRefreshCoordinator.cs`, 67 lines in untracked `QuotaExport.cs`, and 126 lines in untracked `QuotaExportTests.cs`.
+- **Target-scoped evidence:** the absolute target completed **35/35**. This is evidence only for the selected cases that ran; it does not cover omitted acceptance rows.
+- **Independent acceptance validation:** **FAIL**. Passing target tests are insufficient because required contract and authority/concurrency cases are absent or contradicted by the candidate.
+- **Native objective:** the latest native validation-only objective is complete. Native procedural completion does not convert the independent acceptance failure into implementation completion.
+- **Planning progress:** all implementation/check/commit tasks for 1a-contract, 1a-authority, 1a-privacy, and 1b are unchecked; all later implementation tasks also remain not started. Only the parent-owned `feature-branch-chain` decision remains checked in `tasks.md`.
+- **Candidate disposition:** unresolved. Preserve every source/test byte until the maintainer explicitly decides whether the candidate is discarded, retained for selective adaptation, or otherwise handled by a later authorized apply.
+- **Next action:** `await explicit approval for candidate disposition and Unit 1a-contract apply`.
+
+## Cumulative candidate, interruption, and evidence history
+
+| Stage | Observed evidence or disposition | Result for the current plan |
+|---|---|---|
+| Earlier mixed Unit 1a candidate | 277 authored source/test lines with a recorded focused 40/40 selection | Independently insufficient. It omitted authority freshness, blocked-write cancellation, no-cache warning, and matrix coverage. It earns no completion credit. |
+| Earlier disposition | Maintainer authorized discarding that mixed candidate and restoring the source/test tree before a narrower attempt | Historical candidate closed; no discarded line carries forward as completed work. |
+| Narrow Application attempt | Added `QuotaExport.cs`, changed `QuotaRefreshCoordinator.cs`, and added `QuotaExportTests.cs`; 145 authored lines | Compilation failed before tests ran. `QuotaExportTests.cs` passed `QuotaRefreshState` where a helper expected `QuotaSnapshot?` (`CS1503`). No checkbox was completed. |
+| Zero-edit procedural interruption | A continuation/preflight stopped for procedural authority before changing source/test bytes | Zero source/test edit and zero behavioral evidence. It is retained only as interruption history. |
+| Exceptional correction | A separately authorized exceptional correction superseded the compile-failing shape and led to the current candidate lineage | The correction is historical authorization, not acceptance. Its resulting candidate remains subject to independent validation and disposition. |
+| Wrong-checkout test incident | A reported test execution used the wrong checkout | Invalid evidence. It is excluded from all RED/GREEN, target, acceptance, and completion claims. |
+| Current absolute target | The intended absolute target later completed 35/35 | Valid only for the selected target cases. It proves neither omitted contract matrices nor concurrent authority ordering. |
+| Latest native validation-only objective | Completed with the target evidence recorded | Procedurally complete; no source/test disposition or acceptance completion follows from it. |
+| Independent acceptance validation | Reviewed the current candidate against the approved proposal/specifications and mandatory omitted cases | **FAIL**. No task may be considered complete. |
+| Maintainer decision | `Dividir contract/authority` | Replan into independent 1a-contract and 1a-authority units before privacy; preserve the 223-line candidate pending later disposition. |
+
+The earlier 40/40 and current 35/35 runs are both bounded evidence. Neither may be relabeled as complete GREEN evidence for 1a-contract, 1a-authority, 1a-privacy, or 1b because the missing acceptance cases were not exercised.
+
+## Independent acceptance findings assigned to the new units
+
+### Unit 1a-contract — closed projection and fail-closed wire contract
+
+The current candidate does not yet establish this unit because:
+
+- `QuotaExportWindow.ResetAt` is non-nullable even though missing reset must be representable as null.
+- The public `Serialize` path can receive arbitrary `QuotaExportDocument` values, force `schemaVersion` to 1 while preserving other inconsistent fields, and throw for unknown state/warning values instead of failing closed.
+- Unknown state or warning input must normalize or reject into the canonical unavailable/null document, never throw or leak an arbitrary wire value.
+- Missing and unusable credential mapping/evidence is incomplete.
+- Mandatory cases are missing or incomplete: numeric `schemaVersion` assertion; forbidden root/db/source-model properties; weekly-only projection; exact retained source timestamp; an interior percentage; nullable/missing reset; and inconsistent direct-document serialization.
+- The full state/failure/cache/credential/timestamp/percentage/partial-window/forbidden-field matrices must pass independently of coordinator behavior.
+
+Contract owns export records/enums/input/projector/validating serialization boundary/ports. It owns no `QuotaAuthorityUpdate`, coordinator event stream, publisher, consent/privacy behavior, Desktop, filesystem, or ACL code.
+
+### Unit 1a-authority — serialized causal authority stream
+
+The current candidate does not yet establish this unit because:
+
+- sequence allocation and event invocation are not one serialized delivery protocol; concurrent callers can allocate under a lock and still deliver callbacks out of order;
+- transition state mutation, sequence allocation, retrieval-generation allocation, and paired event delivery need one accepted order;
+- concurrent reevaluate/clear/refresh behavior is under-tested;
+- retrieval racing clear or cancellation is not proven safe;
+- same-reference and equal-content concurrent sequencing is not proven;
+- cross-event `AuthorityUpdated`/`StateChanged` compatibility and non-interleaving are not proven;
+- persistence-before-generation is positive evidence, but it is not enough without the complete failure/race matrix.
+
+Authority owns `QuotaAuthorityUpdate` and `QuotaRefreshCoordinator`. It depends on contract but owns no publisher, consent/privacy lifecycle, Desktop, filesystem, or ACL behavior.
+
+### Unit 1a-privacy — publisher and consent lifecycle
+
+Privacy now depends on the independently complete authority unit. Its prior responsibilities remain:
+
+- subscribe to every serialized authority update;
+- use retrieval generation only for post-enable unlock;
+- use event sequence and state for freshness and latest-state order;
+- cancel blocked ordinary writes when disclosure epoch advances;
+- make disable/revoke/clear/re-enable and persisted-consent restart fail closed;
+- prove latest-state, same-reference, cancellation-resistant writer, privacy race, and disposal matrices.
+
+No publisher or privacy work can begin merely because the current mixed candidate contains contract/authority symbols.
+
+### Unit 1b — Windows writer and composition
+
+Unit 1b remains the Windows path, same-directory atomic writer, pre-commit ACL, clear ownership, disabled recreation, and Desktop composition unit. It depends on 1a-privacy and transitively on independently accepted authority and contract units.
+
+## Positive evidence retained without overstating it
+
+The following findings remain useful constraints for a later apply:
+
+- operational no-cache mapping in the current projector uses bounded unavailable behavior rather than stale `refresh-failed` disclosure;
+- the current wire shape is bounded to the intended root/window fields for the exercised projected documents;
+- accepted retrieval generation is allocated after persistence in the exercised path;
+- no platform, filesystem, consent/privacy publisher, Desktop, or private-data access was added by the current candidate;
+- the current authored source/test delta is exactly 223 lines;
+- the intended absolute target completed 35/35.
+
+These positives do not compensate for omitted mandatory cases or authority serialization defects.
+
+## Replanned implementation progress
+
+| Review unit | Progress | State |
+|---|---:|---|
+| 1a-contract — closed projection and fail-closed wire contract | 0 | Not started; candidate disposition and apply approval required. |
+| 1a-authority — serialized causal authority stream | 0 | Not started; depends on independently complete 1a-contract. |
+| 1a-privacy — publisher/freshness/cancellation/consent lifecycle | 0 | Not started; depends on independently complete 1a-authority. |
+| 1b — Windows writer/ACL/composition | 0 | Not started; depends on 1a-privacy. |
+| 2 — payload-free activation | 0 | Not started; depends on 1b in the chain. |
+| 3 — automatic semantic themes | 0 | Not started; depends on 2. |
+| 4a — popup hierarchy/accessibility/tray | 0 | Not started; depends on 3. |
+| 4b — placement/DPI/DWM/rendered validation | 0 | Not started; depends on 4a. |
+| 5 — stock YASB adapter | 0 | Not started; depends on 4b and earlier contracts. |
+| 6 — ZIP/docs/rollback cleanup | 0 | Not started; depends on 5. |
+
+## Candidate integrity and continuation boundary
+
+- Preserve all current source/test bytes exactly until an explicit disposition response is supplied.
+- Do not split, repair, format, stage, commit, or delete the candidate during planning.
+- Do not reuse wrong-checkout output as evidence.
+- Do not treat 35/35, 40/40, native objective completion, bounded shape, or persistence-before-generation as completion of omitted acceptance cases.
+- Start 1a-contract first. Do not start authority until contract has an independent end state; do not start privacy until authority has an independent end state; do not start 1b until privacy is complete.
+- `QuotaExport.cs` may span contract and later privacy only by symbol ownership. Authority symbols belong with the coordinator/authority unit.
+- Keep `feature-branch-chain`; no child may reach 400 authored lines and no `size:exception` is authorized.
+- This planning handoff runs no tests/builds/native lifecycle commands and changes no source/test byte.
+
+**Next action:** `await explicit approval for candidate disposition and Unit 1a-contract apply`.
