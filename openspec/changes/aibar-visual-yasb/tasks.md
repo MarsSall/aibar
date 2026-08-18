@@ -39,7 +39,7 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 |---:|---|---|---|---:|---:|
 | Tracker | `feat/aibar-visual-yasb` | `main` | Draft integration only | n/a | n/a |
 | 1a-contract | `feat/aibar-visual-yasb-1a-contract` | tracker | Closed projection, wire normalizer, full contract matrices | 160–220 | 180 |
-| 1a-authority | `feat/aibar-visual-yasb-1a-authority` | 1a-contract | Serialized coordinator transitions, sequence/delivery/generation races | 120–180 | 220 |
+| 1a-authority | `feat/aibar-visual-yasb-1a-authority` | 1a-contract | Serialized coordinator transitions, sequence/delivery/generation races | 235–285 | 115 |
 | 1a-privacy | `feat/aibar-visual-yasb-1a-privacy` | 1a-authority | Publisher ordering, cancellation, consent lifecycle | 180–260 | 140 |
 | 1b | `feat/aibar-visual-yasb-1b` | 1a-privacy | Windows atomic writer, ACL, clear, composition | 300–360 | 40 |
 | 2 | `feat/aibar-visual-yasb-2` | 1b | Payload-free activation | 230–290 | 110 |
@@ -96,7 +96,13 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 ## Unit 1a-authority — Serialized causal authority stream
 
-**Forecast:** 120–180 authored lines. **Margin:** 220 lines. **Risk:** High (concurrent authority ordering and causal generation).
+**Superseding maintainer decision:** The proposed `1a-authority-stream` / `1a-authority-races` split is rejected and superseded. Tasks `1a-authority.1`–`.8` remain one coherent causal-protocol unit with a hard cap of **300 authored source/test lines** and no `size:exception`.
+
+**Revalidated pre-edit forecast:** **235–285 authored source/test lines**: 95–110 production lines, 50–55 transition/order/generation matrix lines, and 90–120 real-race/lifecycle matrix plus bounded correction allowance. The complete forecast fits the authorized 300-line cap, so the coherent attempt proceeded.
+
+**Accepted evidence:** The corrected candidate is **271 authored source/test lines**. The exact absolute `QuotaRefreshCoordinatorTests` target passed **18/18**, native settlement completed with evidence `sha256:5d158001dd07f9a5fabe9ece4bb70c65ee5d9e5110518f1f68136d4fc97b05b8`, and independent acceptance returned PASS. Tasks `1a-authority.1`–`.8` are complete; `.9` remains the parent-owned commit boundary.
+
+**Risk:** High (concurrent authority ordering and causal generation).
 
 **Expected files:**
 - `src/AIBar.Application/QuotaRefreshCoordinator.cs`
@@ -114,23 +120,23 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 ### Behavior-first tests and contracts
 
-- [ ] **1a-authority.1 RED — serialized transition and cross-event order:** Observe initialization success/failure, loading, accepted success, null result, provider failure, persistence failure, optional failure, freshness-only reevaluation, and clear. Require one monotonic contiguous sequence per accepted transition and one contiguous `AuthorityUpdated(update)` plus matching `StateChanged(update.State)` pair with no cross-transition interleaving. <!-- sdd-owner: implementation -->
-- [ ] **1a-authority.2 RED — retrieval-generation causality:** Prove cache load, loading, reevaluation, failure, null result, replay, cancellation, clear, optional failure, and persistence failure do not increment. Prove a valid non-null retrieval increments exactly once only after persistence and operation-generation acceptance, including equal-value/equal-timestamp/equal-reference content. <!-- sdd-owner: implementation -->
-- [ ] **1a-authority.3 RED — real concurrent sequencing:** Race reevaluate with reevaluate, refresh completion with reevaluate, and multiple same-reference/equal-content transitions. Block a subscriber to expose callback races. Require allocation and delivery order to agree and the final `State` to match the last delivered update. <!-- sdd-owner: implementation -->
-- [ ] **1a-authority.4 RED — retrieval versus clear/cancellation:** Race a provider/store completion against `CancelAndWaitAsync` and `ClearAsync`. Require cancelled/cleared retrievals never to become authoritative or increment generation, clear-to-unavailable to retain final order, and replay callers to observe the same active operation without duplicate authority. <!-- sdd-owner: implementation -->
-- [ ] **1a-authority.5 RED — lifecycle compatibility:** Cover reentrant and throwing subscribers according to repository event policy, disposal during in-flight work, no transitions after disposal, and unchanged existing `StateChanged` consumer semantics. <!-- sdd-owner: implementation -->
+- [x] **1a-authority.1 RED — serialized transition and cross-event order:** Observe initialization success/failure, loading, accepted success, null result, provider failure, persistence failure, optional failure, freshness-only reevaluation, and clear. Require one monotonic contiguous sequence per accepted transition and one contiguous `AuthorityUpdated(update)` plus matching `StateChanged(update.State)` pair with no cross-transition interleaving. <!-- sdd-owner: implementation -->
+- [x] **1a-authority.2 RED — retrieval-generation causality:** Prove cache load, loading, reevaluation, failure, null result, replay, cancellation, clear, optional failure, and persistence failure do not increment. Prove a valid non-null retrieval increments exactly once only after persistence and operation-generation acceptance, including equal-value/equal-timestamp/equal-reference content. <!-- sdd-owner: implementation -->
+- [x] **1a-authority.3 RED — real concurrent sequencing:** Race reevaluate with reevaluate, refresh completion with reevaluate, and multiple same-reference/equal-content transitions. Block a subscriber to expose callback races. Require allocation and delivery order to agree and the final `State` to match the last delivered update. <!-- sdd-owner: implementation -->
+- [x] **1a-authority.4 RED — retrieval versus clear/cancellation:** Race a provider/store completion against `CancelAndWaitAsync` and `ClearAsync`. Require cancelled/cleared retrievals never to become authoritative or increment generation, clear-to-unavailable to retain final order, and replay callers to observe the same active operation without duplicate authority. <!-- sdd-owner: implementation -->
+- [x] **1a-authority.5 RED — lifecycle compatibility:** Cover reentrant and throwing subscribers according to repository event policy, disposal during in-flight work, no transitions after disposal, and unchanged existing `StateChanged` consumer semantics. <!-- sdd-owner: implementation -->
 
 ### Production implementation
 
-- [ ] **1a-authority.6 GREEN — authority-owned update and queue/drain:** Implement `QuotaAuthorityUpdate` outside the contract-owned `QuotaExport.cs` region and one coordinator-owned serialized transition queue/drain. Mutate state, allocate sequence/generation, enqueue immutable updates, and deliver callbacks outside the state lock but in accepted order. <!-- sdd-owner: implementation -->
-- [ ] **1a-authority.7 GREEN — causal acceptance:** Integrate initialization, refresh, reevaluation, clear, cancellation, persistence, replay, and disposal through the same transition protocol. Reject stale operation generations and increment retrieval generation only at accepted/persisted commit. <!-- sdd-owner: implementation -->
+- [x] **1a-authority.6 GREEN — authority-owned update and queue/drain:** Implement `QuotaAuthorityUpdate` outside the contract-owned `QuotaExport.cs` region and one coordinator-owned serialized transition queue/drain. Mutate state, allocate sequence/generation, enqueue immutable updates, and deliver callbacks outside the state lock but in accepted order. <!-- sdd-owner: implementation -->
+- [x] **1a-authority.7 GREEN — causal acceptance:** Integrate initialization, refresh, reevaluation, clear, cancellation, persistence, replay, and disposal through the same transition protocol. Reject stale operation generations and increment retrieval generation only at accepted/persisted commit. <!-- sdd-owner: implementation -->
 
 ### Focused check and commit boundary
 
-- [ ] **1a-authority.8 CHECK — verify authority independently:** Run focused synthetic coordinator tests with actual concurrent tasks and blocking seams. Inspect sequence allocation versus callback order, same-reference/equal-content behavior, cross-event compatibility, clear/cancellation races, and persistence-before-generation. Contract serializer tests are not substitute evidence. <!-- sdd-owner: implementation -->
-- [ ] **1a-authority.9 COMMIT BOUNDARY — authority only:** Freeze one coordinator/authority-stream commit based on 1a-contract. Rollback removes the new stream and restores prior coordinator event behavior without changing the closed export contract or creating external files. <!-- sdd-owner: implementation -->
+- [x] **1a-authority.8 CHECK — verify authority independently:** Run focused synthetic coordinator tests with actual concurrent tasks and blocking seams. Inspect sequence allocation versus callback order, same-reference/equal-content behavior, cross-event compatibility, clear/cancellation races, and persistence-before-generation. Contract serializer tests are not substitute evidence. <!-- sdd-owner: implementation -->
+- [x] **1a-authority.9 COMMIT BOUNDARY — authority only:** Freeze one coordinator/authority-stream commit based on 1a-contract. Rollback removes the new stream and restores prior coordinator event behavior without changing the closed export contract or creating external files. <!-- sdd-owner: implementation -->
 
-**Hard split trigger:** Stop and recalculate at 180 authored lines. If the complete real-concurrency, generation, and cross-event matrix cannot fit below 280, require a new explicit split before 1a-privacy. Do not weaken serialization, drop race cases, cross 400, or use an exception.
+**Authorized hard cap:** Stop before crossing **300 authored source/test lines**. The rejected stream/races split remains superseded; any new split or cap change requires a fresh maintainer decision. Do not weaken serialization, drop race cases, cross 400, or use an exception.
 
 ## Unit 1a-privacy — Publisher, freshness propagation, cancellation, and consent lifecycle
 

@@ -1,6 +1,17 @@
-# Apply Progress — Unit 1a-contract
+# Apply Progress — aibar-visual-yasb
 
-## Bounded acceptance remediation — current result
+## Unit 1a-authority — coherent attempt result
+
+- **Superseding authority:** The maintainer rejected the proposed `1a-authority-stream` / `1a-authority-races` split and authorized tasks `.1`–`.8` as one coherent causal-protocol unit with a hard cap of **300 authored source/test lines** and no `size:exception`. This decision supersedes the historical 180-line interruption and proposed split below.
+- **Scope:** Work remained on branch `feat/aibar-visual-yasb-1a-authority` at accepted contract commit `7c6887983302ecfd8e06fbeab5c2c618931c76bb`. No native SDD, review, attempt, dispatcher, settlement, staging, commit, privacy, publisher, Desktop, filesystem, ACL, YASB, or later-unit work was performed.
+- **Context and forecast:** The full design, sanitized-export and quota-status specifications, authority tasks, cumulative progress, current coordinator and tests, provider/store/clock/freshness/clear/lifecycle interfaces, and `StateChanged` consumer policy were inspected. The complete **235–285** forecast fit below 300, so source/test implementation proceeded without a split.
+- **Implemented candidate:** `QuotaAuthorityUpdate` is authority-owned outside `QuotaExport.cs`; the coordinator candidate centralizes state/sequence/generation enqueue under one gate and drains paired `AuthorityUpdated`/`StateChanged` callbacks outside that gate. Synthetic tests were added for transition/generation matrices, same-reference/equal-content retrievals, blocked/reentrant/throwing subscribers, reevaluate/refresh races, replay, provider/store versus cancel/clear, and disposal.
+- **Focused outcome:** **passed**. After the maintainer-authorized fixture correction, the exact absolute `QuotaRefreshCoordinatorTests` target ran once and passed **18/18** with zero failures or skips. Native settlement completed with evidence `sha256:5d158001dd07f9a5fabe9ece4bb70c65ee5d9e5110518f1f68136d4fc97b05b8`, remediating the prior compile-failure evidence, and independent acceptance returned PASS.
+- **Candidate evidence:** The authored source/test delta is **271 lines**: 161 in `QuotaRefreshCoordinator.cs`, 5 in `QuotaAuthorityUpdate.cs`, and 105 in `QuotaRefreshCoordinatorTests.cs`. `QuotaExportTests.cs` is unchanged.
+- **Integrity:** The source/test candidate stays within the 300-line hard cap, uses only the three intended authority paths, has an empty index, and passes whitespace checks. LSP diagnostics were not exposed; focused compilation/tests and independent source inspection passed.
+- **Task state and next action:** `1a-authority.1` through `.9` are complete. Native settlement and independent acceptance passed, and the maintainer authorized the local commit on child branch `feat/aibar-visual-yasb-1a-authority`. Privacy and all later tasks remain unchecked; the rejected split remains superseded.
+
+## Unit 1a-contract — bounded acceptance remediation result
 
 - **Authorization and scope:** The maintainer authorized one bounded remediation of Unit `1a-contract` only, raised this unit's hard source/test cap from 220 to **260 authored lines**, and authorized no `size:exception`. No native SDD, review, attempt, dispatcher, authority, publisher, consent/privacy, Desktop, filesystem, ACL, YASB, or later-unit work was performed.
 - **Pre-edit forecast:** The requested mapping correction, partial-cache/weekly-only/generic-unavailable coverage, two-publication timestamp proof, canonical fallback expansion, and xUnit2017 cleanup were forecast at **230–242 total authored source/test lines** from the 208-line candidate. Complete remediation therefore fit below 260 without compressing assertions into unreadable chains.

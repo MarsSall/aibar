@@ -276,6 +276,102 @@ Assert.Equal(FreshnessState.Unavailable, coordinator.State.Freshness);
 Assert.Equal(1, provider.Calls);
 }
 
+[Fact]
+public async Task Authority_stream_pairs_transitions_and_advances_only_persisted_retrievals()
+{
+    var clock = new MutableClock(Now); var store = new FakeStore(Snapshot(Now));
+    var provider = new FakeProvider(new QuotaProviderResult(null, new(QuotaErrorKind.Network, "network")));
+    await using var coordinator = Create(store, provider, clock); var updates = Capture(coordinator);
+    await coordinator.InitializeAsync(default); await coordinator.RefreshAsync(RefreshTrigger.Manual, default);
+    var real = Snapshot(Now.AddMinutes(1));
+    provider.Result = new(real, null, null, new(QuotaErrorKind.Service, "optional"));
+    await coordinator.RefreshAsync(RefreshTrigger.Manual, default);
+    provider.Result = new(real, null); await coordinator.RefreshAsync(RefreshTrigger.Manual, default);
+    store.ThrowOnSave = true; await coordinator.RefreshAsync(RefreshTrigger.Manual, default);
+    Assert.Equal(real.RetrievedAt, coordinator.State.Snapshot!.RetrievedAt);
+    clock.UtcNow = Now.AddMinutes(20); await coordinator.ReevaluateAsync(RefreshTrigger.Sleep, default); await coordinator.ClearAsync(default);
+    Assert.Equal(Enumerable.Range(1, 11).Select(value => (long)value), updates.Select(update => update.EventSequence));
+    Assert.Equal(new long[] { 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2 }, updates.Select(update => update.RetrievalGeneration));
+    Assert.Same(updates[^1].State, coordinator.State); Assert.Equal(FreshnessState.Unavailable, coordinator.State.Freshness);
+
+    await using var loadFailure = Create(new FakeStore(null) { ThrowOnLoad = true }, new FakeProvider(new(null, null)));
+    var loadUpdates = Capture(loadFailure); await loadFailure.InitializeAsync(default); Assert.Equal(0L, Assert.Single(loadUpdates).RetrievalGeneration);
+    await using var providerFailure = Create(new FakeStore(null), new FakeProvider(Task.FromException<QuotaProviderResult>(new InvalidOperationException())));
+    var failureUpdates = Capture(providerFailure); await providerFailure.RefreshAsync(RefreshTrigger.Manual, default);
+    Assert.Equal(new long[] { 0, 0 }, failureUpdates.Select(update => update.RetrievalGeneration));
+}
+
+[Fact]
+public async Task Concurrent_reentrant_and_replayed_transitions_remain_ordered()
+{
+    var clock = new MutableClock(Now); var providerGate = new TaskCompletionSource<QuotaProviderResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+    var provider = new FakeProvider(providerGate.Task);
+    await using var coordinator = Create(new FakeStore(Snapshot(Now)), provider, clock);
+    var updates = Capture(coordinator); var entered = new ManualResetEventSlim(); var release = new ManualResetEventSlim();
+    coordinator.AuthorityUpdated += update =>
+    {
+        if (update.EventSequence == 1) { clock.UtcNow = Now.AddMinutes(20); Assert.True(coordinator.ReevaluateAsync(RefreshTrigger.Sleep, default).IsCompletedSuccessfully); }
+        if (update.EventSequence == 3) { entered.Set(); Assert.True(release.Wait(TimeSpan.FromSeconds(2))); }
+    };
+    await coordinator.InitializeAsync(default); Assert.Equal(new long[] { 1, 2 }, updates.Select(update => update.EventSequence));
+    var refresh = Task.Run(async () => await coordinator.RefreshAsync(RefreshTrigger.Manual, default));
+    Assert.True(entered.Wait(TimeSpan.FromSeconds(2))); clock.UtcNow = Now;
+    var reevaluations = Task.WhenAll(Task.Run(async () => await coordinator.ReevaluateAsync(RefreshTrigger.Sleep, default)), Task.Run(async () => await coordinator.ReevaluateAsync(RefreshTrigger.Sleep, default)));
+    var replay = coordinator.RefreshAsync(RefreshTrigger.Manual, default).AsTask(); Assert.Same(replay, coordinator.RefreshAsync(RefreshTrigger.Manual, default).AsTask());
+    await reevaluations; release.Set(); await provider.CallStarted.Task.WaitAsync(TimeSpan.FromSeconds(2)); clock.UtcNow = Now.AddMinutes(20);
+    var completionRace = Task.Run(() => providerGate.SetResult(new(Snapshot(clock.UtcNow), null)));
+    var freshnessRace = Task.Run(async () => await coordinator.ReevaluateAsync(RefreshTrigger.Sleep, default));
+    await Task.WhenAll(refresh, replay, completionRace, freshnessRace);
+    Assert.Equal(Enumerable.Range(1, updates.Count).Select(value => (long)value), updates.Select(update => update.EventSequence));
+    Assert.Same(updates[^1].State, coordinator.State);
+}
+
+[Fact]
+public async Task Cancellation_and_clear_win_blocked_provider_and_store_completions()
+{
+    var providerGate = new TaskCompletionSource<QuotaProviderResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+    await using var cancelled = Create(new FakeStore(null), new FakeProvider(providerGate.Task)); var cancelledUpdates = Capture(cancelled);
+    var refresh = cancelled.RefreshAsync(RefreshTrigger.Manual, default).AsTask(); var cancel = cancelled.CancelAndWaitAsync(default).AsTask();
+    Assert.False(cancel.IsCompleted); providerGate.SetResult(new(Snapshot(Now), null)); await Task.WhenAll(refresh, cancel);
+    Assert.All(cancelledUpdates, update => Assert.Equal(0L, update.RetrievalGeneration)); Assert.Null(cancelled.State.Snapshot); Assert.False(cancelled.State.IsLoading);
+
+    var saveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var saveRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var store = new FakeStore(null) { SaveStarted = saveStarted, SaveRelease = saveRelease };
+    await using var cleared = Create(store, new FakeProvider(new(Snapshot(Now), null))); var clearedUpdates = Capture(cleared);
+    var saving = cleared.RefreshAsync(RefreshTrigger.Manual, default).AsTask(); await saveStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    var clear = cleared.ClearAsync(default).AsTask(); Assert.False(clear.IsCompleted); saveRelease.SetResult(); await Task.WhenAll(saving, clear);
+    Assert.All(clearedUpdates, update => Assert.Equal(0L, update.RetrievalGeneration)); Assert.Same(clearedUpdates[^1].State, cleared.State);
+    Assert.Null(cleared.State.Snapshot); Assert.Equal(FreshnessState.Unavailable, cleared.State.Freshness);
+}
+
+[Fact]
+public async Task Throwing_subscribers_recover_and_disposal_rejects_late_work()
+{
+    var clock = new MutableClock(Now); await using var coordinator = Create(new FakeStore(Snapshot(Now)), new FakeProvider(new(Snapshot(Now), null)), clock);
+    var updates = Capture(coordinator); await coordinator.InitializeAsync(default);
+    void Throwing(QuotaRefreshState _) => throw new InvalidOperationException("subscriber");
+    coordinator.StateChanged += Throwing; clock.UtcNow = Now.AddMinutes(20);
+    await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.ReevaluateAsync(RefreshTrigger.Sleep, default).AsTask());
+    coordinator.StateChanged -= Throwing; clock.UtcNow = Now; await coordinator.ReevaluateAsync(RefreshTrigger.Sleep, default);
+    Assert.Equal(new long[] { 1, 2, 3 }, updates.Select(update => update.EventSequence));
+
+    var gate = new TaskCompletionSource<QuotaProviderResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+    var disposed = Create(new FakeStore(null), new FakeProvider(gate.Task)); var disposedUpdates = Capture(disposed);
+    var refresh = disposed.RefreshAsync(RefreshTrigger.Manual, default).AsTask(); var disposal = disposed.DisposeAsync().AsTask();
+    Assert.False(disposal.IsCompleted); gate.SetResult(new(Snapshot(Now), null)); await Task.WhenAll(refresh, disposal);
+    Assert.Single(disposedUpdates); await Assert.ThrowsAsync<ObjectDisposedException>(() => disposed.RefreshAsync(RefreshTrigger.Manual, default).AsTask());
+    await Assert.ThrowsAsync<ObjectDisposedException>(() => disposed.ReevaluateAsync(RefreshTrigger.Sleep, default).AsTask());
+}
+
+private static List<QuotaAuthorityUpdate> Capture(QuotaRefreshCoordinator coordinator)
+{
+    var updates = new List<QuotaAuthorityUpdate>(); QuotaAuthorityUpdate? pending = null;
+    coordinator.AuthorityUpdated += update => { Assert.Null(pending); pending = update; updates.Add(update); };
+    coordinator.StateChanged += state => { Assert.NotNull(pending); Assert.Same(pending!.State, state); pending = null; };
+    return updates;
+}
+
 private static async Task WaitUntilAsync(Func<bool> condition)
 {
 for (var attempt = 0; attempt < 100 && !condition(); attempt++) await Task.Delay(10);
@@ -312,9 +408,12 @@ public void RaiseClockChanged() => ClockChanged?.Invoke();
     {
         public int Saves { get; private set; }
         public int Clears { get; private set; }
-        public bool ThrowOnSave { get; init; }
-        public ValueTask<QuotaSnapshot?> LoadAsync(CancellationToken _) => ValueTask.FromResult(snapshot);
-        public ValueTask SaveAsync(QuotaSnapshot value, CancellationToken _) { if (ThrowOnSave) throw new InvalidOperationException(); snapshot = value; Saves++; return ValueTask.CompletedTask; }
+        public bool ThrowOnLoad { get; init; }
+        public bool ThrowOnSave { get; set; }
+        public TaskCompletionSource? SaveStarted { get; init; }
+        public TaskCompletionSource? SaveRelease { get; init; }
+        public ValueTask<QuotaSnapshot?> LoadAsync(CancellationToken _) => ThrowOnLoad ? throw new InvalidOperationException() : ValueTask.FromResult(snapshot);
+        public async ValueTask SaveAsync(QuotaSnapshot value, CancellationToken _) { SaveStarted?.TrySetResult(); if (SaveRelease is not null) await SaveRelease.Task; if (ThrowOnSave) throw new InvalidOperationException(); snapshot = value; Saves++; }
         public ValueTask ClearAsync(CancellationToken _) { snapshot = null; Clears++; return ValueTask.CompletedTask; }
     }
 
