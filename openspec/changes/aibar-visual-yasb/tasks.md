@@ -90,7 +90,7 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 ### Focused check and commit boundary
 
 - [x] **1a-contract.8 CHECK — verify contract independently:** Run only focused pure/synthetic contract tests. Inspect every mandatory matrix row, exact wire bytes/properties, nullable reset, weekly-only, interior percentage, source timestamp retention, forbidden root/db/source fields, credential mapping, and direct-document fallback. No coordinator or concurrency test is used as substitute evidence. <!-- sdd-owner: implementation -->
-- [ ] **1a-contract.9 COMMIT BOUNDARY — contract only:** Freeze one Application contract/projector commit. If the current candidate is retained, first remove/rehome authority-owned symbols/tests so this diff has no coordinator stream. Rollback removes only the export contract and creates no external file. <!-- sdd-owner: implementation -->
+- [x] **1a-contract.9 COMMIT BOUNDARY — contract only:** Freeze one Application contract/projector commit. If the current candidate is retained, first remove/rehome authority-owned symbols/tests so this diff has no coordinator stream. Rollback removes only the export contract and creates no external file. <!-- sdd-owner: implementation -->
 
 **Hard split trigger:** Stop and recalculate at 220 authored lines. If the complete contract matrices cannot fit below 300, require a new explicit planning split before 1a-authority. Do not move authority/publisher work inward, omit cases, cross 400, or use an exception.
 
