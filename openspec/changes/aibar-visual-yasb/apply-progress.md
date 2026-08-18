@@ -1,5 +1,15 @@
 # Apply Progress — aibar-visual-yasb
 
+## Unit 1a-privacy — accepted publisher and consent-lifecycle result
+
+- **Scope:** Work remained on child branch `feat/aibar-visual-yasb-1a-privacy` based on accepted authority commit `130c626`. The candidate changes only the six intended Application/test paths; no Desktop, filesystem adapter, paths, ACL, YASB, staging, commit, push, or PR work occurred.
+- **Implemented candidate:** `QuotaExportPublisher` consumes serialized authority updates, gates post-enable disclosure on retrieval generation, uses event sequence/state for freshness and latest-state ordering, owns disclosure-epoch cancellation, rejects stale completions, isolates routine publication failures, and integrates persisted/manual consent lifecycle ordering.
+- **Runtime evidence:** The absolute lifecycle/contract selection compiled and passed **29/29**. Its filter omitted `QuotaExportPublisherTests`; that incomplete evidence was recorded rather than relabeled. After explicit maintainer authorization, the corrected exclusive absolute target `FullyQualifiedName~QuotaExportPublisherTests` passed **5/5** without code changes. Combined runtime evidence is **34/34**.
+- **Native settlement:** Objective completed with evidence `sha256:216fd2e690e97810e3986133bc3c7ca2962e45fb1bbd5e3f70212866173d2145`, remediating omitted-filter evidence `sha256:e0fd70b2b93b983c8bb982c2278e34226afbc590a7fbf34dbc5a6ad5a1e62f18`.
+- **Candidate evidence:** The authored source/test delta is exactly **260 lines**: 36 in `BetaRuntime.cs`, 103 in `QuotaExport.cs`, 1 in `StartupSettings.cs`, 17 in `BetaConsentOrQuotaTests.cs`, 87 in `QuotaExportTests.cs`, and 16 in `StartupSettingsTests.cs`.
+- **Integrity:** Static independent inspection passed without correction; `git diff --check` passed with only line-ending notices, the index remains empty, and no test process remained. The source/test candidate is exactly at the unit hard stop and below the native 400-line ceiling.
+- **Task state and next action:** `1a-privacy.1` through `.9` are complete. Native settlement and independent inspection passed, and the maintainer authorized the local commit on child branch `feat/aibar-visual-yasb-1a-privacy`. All later tasks remain unchecked.
+
 ## Unit 1a-authority — coherent attempt result
 
 - **Superseding authority:** The maintainer rejected the proposed `1a-authority-stream` / `1a-authority-races` split and authorized tasks `.1`–`.8` as one coherent causal-protocol unit with a hard cap of **300 authored source/test lines** and no `size:exception`. This decision supersedes the historical 180-line interruption and proposed split below.

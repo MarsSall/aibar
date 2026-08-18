@@ -112,3 +112,106 @@ public static class QuotaExportWire
     private static string State(QuotaExportState value) => value switch { QuotaExportState.Current => "current", QuotaExportState.Refreshing => "refreshing", QuotaExportState.Stale => "stale", QuotaExportState.Disabled => "disabled", _ => "unavailable" };
     private static string Warning(QuotaExportWarning value) => value switch { QuotaExportWarning.RefreshFailed => "refresh-failed", QuotaExportWarning.AuthenticationFailed => "authentication-failed", QuotaExportWarning.Disabled => "disabled", _ => "unavailable" };
 }
+
+public sealed class QuotaExportPublisher : IAsyncDisposable
+{
+    private readonly QuotaRefreshCoordinator _authority;
+    private readonly IQuotaExportWriter _writer;
+    private readonly IClock _clock;
+    private readonly object _gate = new();
+    private readonly SemaphoreSlim _privacyGate = new(1, 1);
+    private CancellationTokenSource _epochCancellation = new();
+    private (QuotaAuthorityUpdate Update, long Epoch, CancellationToken Token)? _pending;
+    private QuotaAuthorityUpdate? _latest;
+    private Task _drain = Task.CompletedTask;
+    private long _epoch;
+    private long _baseline;
+    private bool _enabled;
+    private bool _unlocked;
+    private bool _draining;
+    private bool _disposed;
+    public QuotaExportPublisher(QuotaRefreshCoordinator authority, IQuotaExportWriter writer, IClock clock)
+    {
+        _authority = authority; _writer = writer; _clock = clock;
+        _authority.AuthorityUpdated += Accept;
+    }
+    internal Task PublicationCompletion { get { lock (_gate) return _drain; } }
+internal void Accept(QuotaAuthorityUpdate update)
+{
+    lock (_gate)
+    {
+if (_disposed || _latest is { } latest && update.EventSequence <= latest.EventSequence) return;
+_latest = update;
+if (!_enabled) return;
+if (!_unlocked && update.RetrievalGeneration > _baseline) _unlocked = true;
+if (!_unlocked) return;
+_pending = (update, _epoch, _epochCancellation.Token);
+if (!_draining) { _draining = true; _drain = DrainAsync(); }
+    }
+}
+public ValueTask EnableAsync(CancellationToken cancellationToken) => ChangeDisclosureAsync(true, cancellationToken);
+public ValueTask DisableAsync(CancellationToken cancellationToken) => ChangeDisclosureAsync(false, cancellationToken);
+private async ValueTask ChangeDisclosureAsync(bool enabled, CancellationToken cancellationToken)
+{
+    await _privacyGate.WaitAsync(cancellationToken);
+    CancellationTokenSource prior; CancellationTokenSource current; Task drain; long epoch;
+    try
+    {
+lock (_gate)
+{
+ObjectDisposedException.ThrowIf(_disposed, this);
+prior = _epochCancellation; current = _epochCancellation = new(); epoch = ++_epoch;
+_enabled = _unlocked = false; _pending = null; drain = _drain;
+}
+prior.Cancel();
+try
+{
+await drain;
+var now = _clock.UtcNow;
+using var linked = CancellationTokenSource.CreateLinkedTokenSource(current.Token, cancellationToken);
+await _writer.WriteAsync(QuotaExportWire.Disabled(now), now, linked.Token);
+if (enabled) lock (_gate) if (!_disposed && epoch == _epoch) { _baseline = _latest?.RetrievalGeneration ?? 0; _enabled = true; }
+}
+finally { prior.Dispose(); }
+    }
+    finally { _privacyGate.Release(); }
+}
+private async Task DrainAsync()
+{
+    await Task.Yield();
+    while (true)
+    {
+(QuotaAuthorityUpdate Update, long Epoch, CancellationToken Token)? work;
+lock (_gate)
+{
+work = _pending; _pending = null;
+if (work is null) { _draining = false; return; }
+}
+try
+{
+lock (_gate) if (_disposed || work.Value.Epoch != _epoch) continue;
+var now = _clock.UtcNow;
+await _writer.WriteAsync(QuotaExportProjector.Project(new(work.Value.Update.State), now), now, work.Value.Token);
+}
+catch (Exception) { }
+    }
+}
+public async ValueTask DisposeAsync()
+{
+    await _privacyGate.WaitAsync();
+    CancellationTokenSource prior; CancellationTokenSource current; Task drain;
+    try
+    {
+lock (_gate)
+{
+if (_disposed) return;
+_disposed = true; prior = _epochCancellation; current = _epochCancellation = new(); ++_epoch;
+_enabled = _unlocked = false; _pending = null; drain = _drain;
+}
+_authority.AuthorityUpdated -= Accept; prior.Cancel();
+try { await drain; var now = _clock.UtcNow; await _writer.WriteAsync(QuotaExportWire.Disabled(now), now, current.Token); }
+finally { prior.Dispose(); current.Cancel(); current.Dispose(); }
+    }
+    finally { _privacyGate.Release(); }
+}
+}

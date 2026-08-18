@@ -16,15 +16,16 @@ public sealed class BetaRuntime : IAsyncDisposable
     private readonly IClock _clock;
     private readonly ConsentCredentialSource? _credentials;
     private readonly ILocalAnalyticsLifecycle? _analytics;
+    private readonly QuotaExportPublisher? _publisher;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly PeriodicTimer _pollTimer = new(TimeSpan.FromMinutes(5));
     private readonly SemaphoreSlim _consentGate = new(1, 1);
     private Task? _polling;
     private bool _disposed;
 
-    public BetaRuntime(ConsentSettings settings, PrivateIntegrationPolicy policy, QuotaRefreshCoordinator coordinator, IClock clock, ConsentCredentialSource? credentials = null, ILocalAnalyticsLifecycle? analytics = null)
+    public BetaRuntime(ConsentSettings settings, PrivateIntegrationPolicy policy, QuotaRefreshCoordinator coordinator, IClock clock, ConsentCredentialSource? credentials = null, ILocalAnalyticsLifecycle? analytics = null, QuotaExportPublisher? publisher = null)
     {
-        _settings = settings; _policy = policy; _coordinator = coordinator; _clock = clock; _credentials = credentials; _analytics = analytics;
+        _settings = settings; _policy = policy; _coordinator = coordinator; _clock = clock; _credentials = credentials; _analytics = analytics; _publisher = publisher;
     }
 
     public string Disclosure => _policy.Disclosure;
@@ -36,7 +37,9 @@ public sealed class BetaRuntime : IAsyncDisposable
     public async ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        if (await _settings.LoadAsync(cancellationToken)) _policy.Enable(); else _policy.Disable();
+        var enabled = await _settings.LoadAsync(cancellationToken);
+        if (_publisher is not null) await (enabled ? _publisher.EnableAsync(cancellationToken) : _publisher.DisableAsync(cancellationToken));
+        if (enabled) _policy.Enable(); else _policy.Disable();
         CredentialAvailability = _policy.IsEnabled ? CredentialAvailability.Missing : CredentialAvailability.Disabled;
         await _coordinator.InitializeAsync(cancellationToken);
         if (_policy.IsEnabled)
@@ -61,6 +64,7 @@ public sealed class BetaRuntime : IAsyncDisposable
 
     private async Task GrantConsentCoreAsync(CancellationToken cancellationToken)
     {
+        if (_publisher is not null) await _publisher.EnableAsync(cancellationToken);
         await _settings.SaveAsync(true, cancellationToken);
         _policy.Enable();
         _coordinator.ResumeAfterClear();
@@ -72,11 +76,17 @@ public sealed class BetaRuntime : IAsyncDisposable
     public async ValueTask RevokeConsentAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        await _settings.SaveAsync(false, cancellationToken);
-        _policy.Disable();
-        CredentialAvailability = CredentialAvailability.Disabled;
-        try { if (_analytics is not null) await _analytics.StopAsync(cancellationToken); }
-        finally { await _coordinator.CancelAndWaitAsync(cancellationToken); }
+        await _consentGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_publisher is not null) await _publisher.DisableAsync(cancellationToken);
+            await _settings.SaveAsync(false, cancellationToken);
+            _policy.Disable();
+            CredentialAvailability = CredentialAvailability.Disabled;
+            try { if (_analytics is not null) await _analytics.StopAsync(cancellationToken); }
+            finally { await _coordinator.CancelAndWaitAsync(cancellationToken); }
+        }
+        finally { _consentGate.Release(); }
     }
 
     public async ValueTask RefreshAsync(RefreshTrigger trigger, CancellationToken cancellationToken)
@@ -106,9 +116,13 @@ public sealed class BetaRuntime : IAsyncDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _lifetime.Cancel();
-        try { await _coordinator.CancelAndWaitAsync(CancellationToken.None); } catch (ObjectDisposedException) { }
-        _pollTimer.Dispose(); if (_polling is not null) await _polling; await _coordinator.DisposeAsync(); _lifetime.Dispose();
+        try { if (_publisher is not null) await _publisher.DisposeAsync(); }
+        finally
+        {
+            _lifetime.Cancel();
+            try { await _coordinator.CancelAndWaitAsync(CancellationToken.None); } catch (ObjectDisposedException) { }
+            _pollTimer.Dispose(); if (_polling is not null) await _polling; await _coordinator.DisposeAsync(); _lifetime.Dispose();
+        }
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

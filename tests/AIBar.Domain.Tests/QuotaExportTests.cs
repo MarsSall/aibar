@@ -122,3 +122,90 @@ public sealed class QuotaExportTests
         }
     private sealed record ForbiddenSource(string Credential, string Token, string Account, string Plan, string Endpoint, string Path, string SafeCode, string Response, string Exception, string Message, string Diagnostic, string Session, string Analytics, string Prompt, string Log, string Environment, string Root, string Db, string Database, string SourceModel);
 }
+
+public sealed class QuotaExportPublisherTests
+{
+private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
+[Fact]
+public async Task Generation_is_an_exclusive_post_enable_unlock_not_freshness()
+{
+    await using var authority = Authority(); var writer = new MemoryWriter(); await using var publisher = new QuotaExportPublisher(authority, writer, new FixedClock(Now));
+    await publisher.EnableAsync(default);
+    var current = State(); var loading = current with { IsLoading = true }; var failed = current with { Freshness = FreshnessState.Stale, Failure = new(QuotaErrorKind.Service, "synthetic") };
+    publisher.Accept(new(current, 1, 0)); publisher.Accept(new(loading, 2, 0)); publisher.Accept(new(failed, 3, 0)); publisher.Accept(new(failed, 4, 0));
+    Assert.Single(writer.Documents);
+    publisher.Accept(new(current, 5, 1)); await publisher.PublicationCompletion;
+    Assert.Equal(QuotaExportState.Current, writer.Documents[^1].State);
+    await publisher.DisableAsync(default); await publisher.EnableAsync(default); var baselineCount = writer.Documents.Count;
+    publisher.Accept(new(current, 6, 1)); Assert.Equal(baselineCount, writer.Documents.Count);
+    publisher.Accept(new(current, 7, 2)); await publisher.PublicationCompletion;
+    Assert.Equal(QuotaExportState.Current, writer.Documents[^1].State);
+}
+
+[Fact]
+public async Task Concurrent_bursts_coalesce_intermediates_but_retain_sequence_latest_freshness()
+{
+    var provider = new ProbeProvider(); await using var authority = Authority(provider); var writer = new MemoryWriter(); await using var publisher = new QuotaExportPublisher(authority, writer, new FixedClock(Now));
+    await publisher.EnableAsync(default); writer.Block = writer.IgnoreCancellation = true;
+    var current = State(); publisher.Accept(new(current, 1, 1)); await writer.Started.Task;
+    var loading = current with { IsLoading = true }; var stale = current with { Freshness = FreshnessState.Stale, Failure = new(QuotaErrorKind.Service, "synthetic") };
+    Parallel.Invoke(() => publisher.Accept(new(stale, 3, 1)), () => publisher.Accept(new(loading, 2, 1)));
+    writer.Release.SetResult(); await publisher.PublicationCompletion;
+    Assert.Equal(new[] { QuotaExportState.Disabled, QuotaExportState.Current, QuotaExportState.Stale }, writer.Documents.Select(value => value.State));
+    var count = writer.Documents.Count; publisher.Accept(new(stale, 4, 1)); await publisher.PublicationCompletion;
+    Assert.Equal(count + 1, writer.Documents.Count); Assert.Equal(0, provider.Calls);
+}
+
+[Theory]
+[InlineData(false)]
+[InlineData(true)]
+public async Task Privacy_and_disposal_cancel_resistant_old_writes_before_safe_completion(bool dispose)
+{
+    await using var authority = Authority(); var writer = new MemoryWriter(); var publisher = new QuotaExportPublisher(authority, writer, new FixedClock(Now));
+    await publisher.EnableAsync(default); writer.Block = writer.IgnoreCancellation = true;
+    publisher.Accept(new(State(), 1, 1)); await writer.Started.Task;
+    var privacy = dispose ? publisher.DisposeAsync().AsTask() : publisher.DisableAsync(default).AsTask();
+    await WaitUntilAsync(() => writer.CancellationObserved); Assert.False(privacy.IsCompleted);
+    writer.Release.SetResult(); await privacy;
+    Assert.Equal(QuotaExportState.Disabled, writer.Documents[^1].State);
+    if (!dispose) { await publisher.DisableAsync(default); await publisher.DisposeAsync(); }
+    publisher.Accept(new(State(), 2, 2)); Assert.Equal(QuotaExportState.Disabled, writer.Documents[^1].State);
+}
+
+[Fact]
+public async Task Writer_and_privacy_failures_are_isolated_or_propagated_fail_closed()
+{
+    var clock = new MutableClock(Now); var provider = new ProbeProvider(); await using var authority = Authority(provider, clock); var writer = new MemoryWriter(); var publisher = new QuotaExportPublisher(authority, writer, clock);
+    await publisher.EnableAsync(default); writer.FailNext = true;
+    await authority.InitializeAsync(default); await authority.RefreshAsync(RefreshTrigger.Manual, default); await publisher.PublicationCompletion;
+    Assert.NotNull(authority.State.Snapshot); Assert.Single(writer.Documents);
+    clock.UtcNow = Now.AddHours(1); await authority.ReevaluateAsync(RefreshTrigger.Sleep, default); await publisher.PublicationCompletion;
+    Assert.Equal(QuotaExportState.Stale, writer.Documents[^1].State);
+    writer.FailNext = true; await Assert.ThrowsAsync<IOException>(() => publisher.DisableAsync(default).AsTask());
+    var count = writer.Documents.Count; publisher.Accept(new(State(), 99, 3)); await publisher.PublicationCompletion; Assert.Equal(count, writer.Documents.Count);
+    await publisher.DisposeAsync();
+}
+
+private static QuotaRefreshState State() => new(new(new(10, Now.AddHours(1)), new(20, Now.AddDays(1)), Now), FreshnessState.Current, false, null, null);
+private static QuotaRefreshCoordinator Authority(ProbeProvider? provider = null, IClock? clock = null) => new(new MemoryStore(), provider ?? new(), clock ?? new FixedClock(Now), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
+private static async Task WaitUntilAsync(Func<bool> condition) { for (var i = 0; i < 100 && !condition(); i++) await Task.Delay(10); Assert.True(condition()); }
+
+private sealed class MemoryWriter : IQuotaExportWriter
+{
+    private readonly object _gate = new(); private readonly List<QuotaExportDocument> _documents = [];
+    public IReadOnlyList<QuotaExportDocument> Documents { get { lock (_gate) return [.. _documents]; } }
+    public bool Block { get; set; } public bool IgnoreCancellation { get; set; } public bool FailNext { get; set; } public bool CancellationObserved { get; private set; }
+    public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously); public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public async ValueTask WriteAsync(QuotaExportDocument document, DateTimeOffset generatedAt, CancellationToken cancellationToken)
+    {
+using var registration = cancellationToken.Register(() => CancellationObserved = true);
+if (FailNext) { FailNext = false; throw new IOException("synthetic writer failure"); }
+if (Block) { Started.TrySetResult(); if (IgnoreCancellation) await Release.Task; else await Release.Task.WaitAsync(cancellationToken); }
+lock (_gate) _documents.Add(document);
+    }
+}
+private sealed class MemoryStore : IQuotaSnapshotStore { public ValueTask<QuotaSnapshot?> LoadAsync(CancellationToken cancellationToken) => ValueTask.FromResult<QuotaSnapshot?>(null); public ValueTask SaveAsync(QuotaSnapshot value, CancellationToken cancellationToken) => ValueTask.CompletedTask; public ValueTask ClearAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask; }
+private sealed class ProbeProvider : IQuotaProvider { public int Calls { get; private set; } public ValueTask<QuotaProviderResult> GetQuotaAsync(CancellationToken cancellationToken) { Calls++; return ValueTask.FromResult(new QuotaProviderResult(State().Snapshot, null)); } }
+private sealed class MutableClock(DateTimeOffset now) : IClock { public DateTimeOffset UtcNow { get; set; } = now; }
+}

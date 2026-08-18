@@ -158,23 +158,25 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 **Exclusions:** Desktop composition, paths, JSON filesystem adapter, ACL/reparse/atomic writer, clear owned path, activation, themes, popup/tray, YASB, ZIP, endpoint/cadence/credential behavior changes.
 
+**Accepted evidence:** The candidate is exactly **260 authored source/test lines** across the six intended Application/test paths. Static independent inspection passed without correction. The absolute lifecycle/contract selection passed **29/29**, and the separately authorized corrected publisher target passed **5/5**, for **34/34** combined runtime evidence. Native settlement completed with evidence `sha256:216fd2e690e97810e3986133bc3c7ca2962e45fb1bbd5e3f70212866173d2145`, remediating the omitted-filter evidence `sha256:e0fd70b2b93b983c8bb982c2278e34226afbc590a7fbf34dbc5a6ad5a1e62f18`. Tasks `1a-privacy.1`–`.8` are complete; `.9` remains the parent-owned commit boundary.
+
 ### Behavior-first tests and contracts
 
-- [ ] **1a-privacy.1 RED — persisted-consent generation gate:** Prove restart cache, loading, reevaluation, failure, replay, and same-reference events cannot unlock at the exclusive baseline; prove a newer accepted/persisted retrieval unlocks even with equal content; failed/null/persistence-failed retrieval does not. <!-- sdd-owner: implementation -->
-- [ ] **1a-privacy.2 RED — freshness/latest-state bursts:** Cover current→stale reevaluation, loading→failure, same-reference updates, rapid and concurrent bursts, coalesced intermediates, and final-state retention. Require sequence/state ordering and no publisher-triggered refresh. <!-- sdd-owner: implementation -->
-- [ ] **1a-privacy.3 RED — epoch cancellation:** Block ordinary publication, then disable, revoke, clear, re-enable, or dispose. Require token cancellation, stale queued/in-flight rejection, disabled/null or safe absence before privacy completion, and no stale resurrection. <!-- sdd-owner: implementation -->
-- [ ] **1a-privacy.4 RED — failures and lifecycle races:** Cover cancellation-resistant writers, disabled/null write failure, repeated privacy commands, privacy versus ordinary races, routine publication failure isolation, unsubscription, and disposal. <!-- sdd-owner: implementation -->
+- [x] **1a-privacy.1 RED — persisted-consent generation gate:** Prove restart cache, loading, reevaluation, failure, replay, and same-reference events cannot unlock at the exclusive baseline; prove a newer accepted/persisted retrieval unlocks even with equal content; failed/null/persistence-failed retrieval does not. <!-- sdd-owner: implementation -->
+- [x] **1a-privacy.2 RED — freshness/latest-state bursts:** Cover current→stale reevaluation, loading→failure, same-reference updates, rapid and concurrent bursts, coalesced intermediates, and final-state retention. Require sequence/state ordering and no publisher-triggered refresh. <!-- sdd-owner: implementation -->
+- [x] **1a-privacy.3 RED — epoch cancellation:** Block ordinary publication, then disable, revoke, clear, re-enable, or dispose. Require token cancellation, stale queued/in-flight rejection, disabled/null or safe absence before privacy completion, and no stale resurrection. <!-- sdd-owner: implementation -->
+- [x] **1a-privacy.4 RED — failures and lifecycle races:** Cover cancellation-resistant writers, disabled/null write failure, repeated privacy commands, privacy versus ordinary races, routine publication failure isolation, unsubscription, and disposal. <!-- sdd-owner: implementation -->
 
 ### Production implementation
 
-- [ ] **1a-privacy.5 GREEN — generation-gated sequence-fresh publisher:** Add `QuotaExportPublisher` over the authority stream with one drain/gate, final-state retention, generation-only unlock, and sequence/state freshness. No timer or refresh call. <!-- sdd-owner: implementation -->
-- [ ] **1a-privacy.6 GREEN — epoch cancellation and operations:** Advance/cancel before disable/revoke/clear/enable/dispose, reject old completions, and complete privacy operations only after a safe current-epoch result. <!-- sdd-owner: implementation -->
-- [ ] **1a-privacy.7 GREEN — consent lifecycle ordering:** Establish persisted/manual enable baselines before retrieval, suppress cache/freshness events, and preserve fail-closed disable/revoke/clear ordering. <!-- sdd-owner: implementation -->
+- [x] **1a-privacy.5 GREEN — generation-gated sequence-fresh publisher:** Add `QuotaExportPublisher` over the authority stream with one drain/gate, final-state retention, generation-only unlock, and sequence/state freshness. No timer or refresh call. <!-- sdd-owner: implementation -->
+- [x] **1a-privacy.6 GREEN — epoch cancellation and operations:** Advance/cancel before disable/revoke/clear/enable/dispose, reject old completions, and complete privacy operations only after a safe current-epoch result. <!-- sdd-owner: implementation -->
+- [x] **1a-privacy.7 GREEN — consent lifecycle ordering:** Establish persisted/manual enable baselines before retrieval, suppress cache/freshness events, and preserve fail-closed disable/revoke/clear ordering. <!-- sdd-owner: implementation -->
 
 ### Focused check and commit boundary
 
-- [ ] **1a-privacy.8 CHECK — verify privacy independently:** Run focused pure/in-memory publisher and lifecycle tests covering restart, equal-content unlock, freshness-only updates, latest-state bursts, blocked cancellation, failures, races, and disposal. No Desktop/filesystem/profile/live data. <!-- sdd-owner: implementation -->
-- [ ] **1a-privacy.9 COMMIT BOUNDARY — privacy only:** Freeze one Application publisher/lifecycle commit based on authority. Shared `QuotaExport.cs` may contain contract and privacy symbols, but this child owns only the latter. Rollback leaves contract/authority intact and external disclosure absent. <!-- sdd-owner: implementation -->
+- [x] **1a-privacy.8 CHECK — verify privacy independently:** Run focused pure/in-memory publisher and lifecycle tests covering restart, equal-content unlock, freshness-only updates, latest-state bursts, blocked cancellation, failures, races, and disposal. No Desktop/filesystem/profile/live data. <!-- sdd-owner: implementation -->
+- [x] **1a-privacy.9 COMMIT BOUNDARY — privacy only:** Freeze one Application publisher/lifecycle commit based on authority. Shared `QuotaExport.cs` may contain contract and privacy symbols, but this child owns only the latter. Rollback leaves contract/authority intact and external disclosure absent. <!-- sdd-owner: implementation -->
 
 **Hard split trigger:** Stop at 260 and recalculate. If the full restart/freshness/cancellation/concurrency matrix cannot fit below 320, replan before 1b. Do not move platform work inward, omit cancellation, cross 400, or use an exception.
 
