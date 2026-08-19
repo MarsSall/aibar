@@ -313,13 +313,13 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 **Exclusions:** placement/DPI/DWM/render harness, YASB, analytics redesign, WinUI.
 
-- [ ] **4a.1 RED — structure/permanent slots:** Both cards always exist in order with value or `--`, nullable reset text, state/age; fixed regions outside the only secondary ScrollViewer. <!-- sdd-owner: implementation -->
-- [ ] **4a.2 RED — accessibility:** Exact window/summary/card names, descriptions, read/tab order, visible focus, non-focusable progress, scroll-into-view, non-color status. <!-- sdd-owner: implementation -->
-- [ ] **4a.3 RED — tray formatter:** Both/partial/no-cache/loading/stale/unavailable/disabled/future-source/length cases; permanent `5h`/`7d`, literal state, truthful age, no private/detail fields. <!-- sdd-owner: implementation -->
-- [ ] **4a.4 RED — production tray flow:** Constructor initial state and filtered later `PropertyChanged` updates pass `BetaPresentationState` through `ITrayRuntime.SetPresentation` to the unchanged tray item. <!-- sdd-owner: implementation -->
-- [ ] **4a.5 GREEN — quota-first layout and tray:** Implement fixed regions, secondary analytics viewport, accessibility, formatter, and exact host wiring without authority logic or icon behavior changes. <!-- sdd-owner: implementation -->
-- [ ] **4a.6 CHECK — verify Unit 4a:** Run focused structural/host/tray tests with synthetic state; inspect tree, order, placeholders, age, and exact wiring. <!-- sdd-owner: implementation -->
-- [ ] **4a.7 COMMIT BOUNDARY — popup/tray:** Freeze one hierarchy/accessibility/tray commit; rollback preserves prior units. <!-- sdd-owner: implementation -->
+- [x] **4a.1 RED — structure/permanent slots:** Both cards always exist in order with value or `--`, nullable reset text, state/age; fixed regions outside the only secondary ScrollViewer. <!-- sdd-owner: implementation -->
+- [x] **4a.2 RED — accessibility:** Exact window/summary/card names, descriptions, read/tab order, visible focus, non-focusable progress, scroll-into-view, non-color status. <!-- sdd-owner: implementation -->
+- [x] **4a.3 RED — tray formatter:** Both/partial/no-cache/loading/stale/unavailable/disabled/future-source/length cases; permanent `5h`/`7d`, literal state, truthful age, no private/detail fields. <!-- sdd-owner: implementation -->
+- [x] **4a.4 RED — production tray flow:** Constructor initial state and filtered later `PropertyChanged` updates pass `BetaPresentationState` through `ITrayRuntime.SetPresentation` to the unchanged tray item. <!-- sdd-owner: implementation -->
+- [x] **4a.5 GREEN — quota-first layout and tray:** Implement fixed regions, secondary analytics viewport, accessibility, formatter, and exact host wiring without authority logic or icon behavior changes. <!-- sdd-owner: implementation -->
+- [x] **4a.6 CHECK — verify Unit 4a:** Run focused structural/host/tray tests with synthetic state; inspect tree, order, placeholders, age, and exact wiring. <!-- sdd-owner: implementation -->
+- [x] **4a.7 COMMIT BOUNDARY — popup/tray:** Freeze one hierarchy/accessibility/tray commit; rollback preserves prior units. <!-- sdd-owner: implementation -->
 
 **Hard split trigger:** At 380 defer placement/render breadth to 4b; never add DWM/YASB or cross 400.
 

@@ -315,6 +315,50 @@ public sealed class HostRuntimeTests
         }
     }
 
+    [Fact]
+    public void Unit_4a_tray_formatter_keeps_both_truthful_slots_and_a_bounded_status()
+    {
+        var cases = new[]
+        {
+        (Presentation(42, 20), "AIBar: 5h 42% | 7d 20% | Current"), (Presentation(42, null, unavailable: true), "AIBar: 5h 42% | 7d -- | Unavailable"),
+        (Presentation(null, null, unavailable: true), "AIBar: 5h -- | 7d -- | Unavailable"), (Presentation(null, null, loading: true), "AIBar: 5h -- | 7d -- | Loading"),
+        (Presentation(42, 20, cached: true, age: "Cached 00h 00m"), "AIBar: 5h 42% | 7d 20% | Stale | Cached 00h 00m"), (Presentation(null, null, disabled: true), "AIBar: 5h -- | 7d -- | Disabled"),
+        (Presentation(null, null) with { FreshnessLabel = "Error", IsSafeError = true }, "AIBar: 5h -- | 7d -- | Error"),
+        (Presentation(42, null, cached: true, age: "Cached 00h 00m") with { FreshnessLabel = "Stale" }, "AIBar: 5h 42% | 7d -- | Stale | Cached 00h 00m")
+        };
+        Assert.All(cases, item => Assert.Equal(item.Item2, TrayPresentationFormatter.Format(item.Item1)));
+        var now = DateTimeOffset.UtcNow; var future = new QuotaPresentationMapper(new FixedClock(now)).Map(new(new(new(42, now.AddHours(5)), new(20, now.AddDays(7)), now.AddHours(1)), FreshnessState.Stale, false, null, null));
+        Assert.Equal(TimeSpan.Zero, future.CachedAge); Assert.Equal("AIBar: 5h 42% | 7d 20% | Stale | Cached 00h 00m", TrayPresentationFormatter.Format(future));
+        var privateState = Presentation(42, 20) with { QuotaDisclosure = "token", AnalyticsDisclosure = "analytics", CostDisclosure = "cost", PrivateEndpointDisclosure = "endpoint" };
+        Assert.DoesNotContain("token", TrayPresentationFormatter.Format(privateState), StringComparison.Ordinal);
+        Assert.True(TrayPresentationFormatter.Format(Presentation(42, 20, cached: true, age: new string('x', 100))).Length <= 63);
+    }
+
+    [Fact]
+    public async Task Unit_4a_host_passes_initial_and_state_updates_to_the_tray()
+    {
+        using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
+        await using var coordinator = new QuotaRefreshCoordinator(new EmptyQuotaStore(), new NeverQuotaProvider(), new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
+        await using var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)));
+        var tray = new FakeTray();
+        await using var host = new TrayHostRuntime(instance, tray, new FakePopover(), new FakeRecreationEvents(), _ => Task.CompletedTask, new ProbeResource(), () => { }, presentation: presentation);
+
+        Assert.Same(presentation.State, tray.State); Assert.Equal(1, tray.PresentationWrites);
+        var callback = typeof(TrayHostRuntime).GetMethod("OnPresentationChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        callback.Invoke(host, [presentation, new System.ComponentModel.PropertyChangedEventArgs(nameof(QuotaPresentationHost.Primary))]);
+        Assert.Equal(1, tray.PresentationWrites); Assert.Same(presentation.State, tray.State);
+        callback.Invoke(host, [presentation, new System.ComponentModel.PropertyChangedEventArgs(nameof(QuotaPresentationHost.State))]);
+        Assert.Equal(2, tray.PresentationWrites); Assert.Same(presentation.State, tray.State);
+        await coordinator.InitializeAsync(default);
+        Assert.Same(presentation.State, tray.State); Assert.True(tray.PresentationWrites > 2);
+        instance.Dispose();
+    }
+
+    private static BetaPresentationState Presentation(decimal? primary, decimal? weekly, bool loading = false, bool cached = false, bool unavailable = false, bool disabled = false, string? age = null) => new(
+        new("5-hour quota", primary, null), new("Weekly quota", weekly, null), primary is not null, weekly is not null, !loading && !cached && !unavailable,
+        !loading && !cached && !unavailable ? "Current" : unavailable ? "Unavailable" : loading ? "Loading" : "Stale", null, null, "", "", "", "", loading,
+        !loading && !cached && !unavailable, cached, cached, false, false, unavailable, false, cached ? TimeSpan.Zero : null, age, null, "", disabled);
+
     private static void PumpUntil(Func<bool> condition)
     {
         var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) }; var timeout = DateTime.UtcNow.AddSeconds(2);
@@ -330,7 +374,8 @@ public sealed class HostRuntimeTests
         public int Shows { get; private set; } public int Disposals { get; private set; } public bool RefreshAvailable { get; private set; }
         public void SetRefreshAvailable(bool available) => RefreshAvailable = available;
         public BetaPresentationState? State { get; private set; }
-        public void SetPresentation(BetaPresentationState state) => State = state;
+        public int PresentationWrites { get; private set; }
+        public void SetPresentation(BetaPresentationState state) { State = state; PresentationWrites++; }
         public bool SettingsAvailable { get; private set; }
         public void SetSettingsAvailable(bool available) => SettingsAvailable = available;
         public bool PrivateIntegrationEnabled { get; private set; }

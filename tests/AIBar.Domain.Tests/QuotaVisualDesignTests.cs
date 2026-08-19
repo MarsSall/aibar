@@ -89,7 +89,7 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal("{StaticResource AccessibleExpanderStyle}", window.Descendants(presentation + "Expander").Single().Attribute("Style")?.Value);
     }
     [Fact]
-    public void Uses_4b_quota_presentation_bindings_without_new_business_state()
+    public void Uses_4a_quota_presentation_bindings_without_new_business_state()
     {
         var window = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml"));
         var values = window.Descendants().Attributes().Select(attribute => attribute.Value).ToArray();
@@ -104,8 +104,8 @@ public sealed class QuotaVisualDesignTests
             Assert.Contains(values, value => value.Contains(branch, StringComparison.Ordinal));
         var primaryCard = window.Descendants().Single(element => element.Attributes().Any(attribute => attribute.Value == "5-hour quota card"));
         var weeklyCard = window.Descendants().Single(element => element.Attributes().Any(attribute => attribute.Value == "Weekly quota card"));
-        Assert.Equal("{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", primaryCard.Attribute("Visibility")?.Value);
-        Assert.Equal("{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", weeklyCard.Attribute("Visibility")?.Value);
+        Assert.Null(primaryCard.Attribute("Visibility"));
+        Assert.Null(weeklyCard.Attribute("Visibility"));
     }
     [Fact]
     public void Runtime_ui_automation_exposes_named_cards_card_availability_and_button_command()
@@ -141,8 +141,7 @@ public sealed class QuotaVisualDesignTests
                     var analytics = new LocalCodexAnalyticsView(); var cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics, LocalUsageHost()) }; cardWindow.Show(); cardWindow.UpdateLayout();
                     System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); cardWindow.UpdateLayout();
                     var quotaCards = FindVisualChildren<System.Windows.Controls.GroupBox>(cardWindow).Take(2).ToArray();
-                    Assert.Equal(availability.Primary ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, quotaCards[0].Visibility);
-                    Assert.Equal(availability.Weekly ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, quotaCards[1].Visibility);
+                    Assert.All(quotaCards, card => Assert.Equal(System.Windows.Visibility.Visible, card.Visibility));
                     var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(cardWindow).ToArray(); Assert.Equal(3, usageExpanders.Length);
                     var openCode = usageExpanders.Single(item => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(item)!.GetName().StartsWith("OpenCode,", StringComparison.Ordinal));
                     var openCodePeer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(openCode)!;
@@ -296,6 +295,57 @@ public sealed class QuotaVisualDesignTests
         });
         thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [Fact]
+    public void Unit_4a_popup_hierarchy_keeps_permanent_slots_and_secondary_scrolling()
+    {
+        var x = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
+        var presentation = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml/presentation");
+        var window = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml"));
+        Assert.Equal("AIBar quota", window.Root!.Attribute("Title")?.Value);
+        var grid = window.Root.Element(presentation + "Grid")!;
+        Assert.Equal(4, grid.Element(presentation + "Grid.RowDefinitions")!.Elements().Count());
+        Assert.Equal(new[] { "0", "1", "2", "3" }, grid.Elements().Where(element => element.Name != presentation + "Grid.RowDefinitions").Select(element => element.Attribute("Grid.Row")?.Value ?? "0"));
+        Assert.Equal("Continue", grid.Attribute("KeyboardNavigation.TabNavigation")?.Value);
+        var cards = window.Descendants(presentation + "GroupBox").Take(2).ToArray();
+        Assert.Equal(new[] { "5-hour quota card", "Weekly quota card" }, cards.Select(card => card.Attribute(presentation + "AutomationProperties.Name")?.Value));
+        Assert.All(cards, card => { Assert.Null(card.Attribute("Visibility")); Assert.Contains("percentage, reset, and state", card.Attribute(presentation + "AutomationProperties.HelpText")?.Value); });
+        var values = window.Descendants().Attributes().Select(attribute => attribute.Value).ToArray();
+        Assert.Equal(2, values.Count(value => value.Contains("TargetNullValue=--", StringComparison.Ordinal)));
+        Assert.Equal(2, values.Count(value => value.Contains("TargetNullValue=unavailable", StringComparison.Ordinal)));
+        Assert.Equal(3, values.Count(value => value == "{Binding FreshnessLabel}"));
+        var scrollers = window.Descendants(presentation + "ScrollViewer").ToArray();
+        Assert.Equal("SecondaryScrollViewer", scrollers[0].Attribute(x + "Name")?.Value);
+        Assert.Equal("2", scrollers[0].Attribute("Grid.Row")?.Value);
+        Assert.Equal("OnSecondaryPreviewGotKeyboardFocus", scrollers[0].Attribute("PreviewGotKeyboardFocus")?.Value);
+        Assert.All(scrollers.Skip(1), scroller => Assert.Contains(scroller.Ancestors(), ancestor => ancestor == scrollers[0]));
+    }
+
+    [Fact]
+    public void Unit_4a_popup_accessibility_keeps_summary_live_status_and_noninteractive_progress()
+    {
+        var x = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
+        var presentation = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml/presentation");
+        var window = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml"));
+        var resources = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/App.xaml"));
+        var summary = window.Descendants(presentation + "Grid").Single(grid => grid.Attribute(presentation + "AutomationProperties.Name")?.Value == "Quota summary");
+        Assert.Equal("0", summary.Attribute("Grid.Row")?.Value);
+        Assert.True(window.Descendants().Count(element => element.Attribute(presentation + "AutomationProperties.LiveSetting")?.Value == "Polite") >= 3);
+        var progress = window.Descendants(presentation + "ProgressBar").ToArray();
+        Assert.Equal(2, progress.Length); Assert.All(progress, item => { Assert.NotNull(item.Attribute(presentation + "AutomationProperties.Name")); Assert.Equal("{StaticResource QuotaProgressStyle}", item.Attribute("Style")?.Value); });
+        var progressStyle = resources.Descendants(presentation + "Style").Single(style => style.Attribute(x + "Key")?.Value == "QuotaProgressStyle");
+        Assert.Equal("False", progressStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "Focusable").Attribute("Value")?.Value);
+        Assert.Equal("False", progressStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "IsHitTestVisible").Attribute("Value")?.Value);
+        var expander = window.Descendants(presentation + "Expander").Single();
+        Assert.Equal("{StaticResource AccessibleExpanderStyle}", expander.Attribute("Style")?.Value);
+        var expanderStyle = resources.Descendants(presentation + "Style").Single(style => style.Attribute(x + "Key")?.Value == "AccessibleExpanderStyle");
+        Assert.Equal("{StaticResource KeyboardFocusVisual}", expanderStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "FocusVisualStyle").Attribute("Value")?.Value);
+        var requested = false; Exception? failure = null;
+        var thread = new Thread(() => { try { var target = new System.Windows.Controls.Border(); target.RequestBringIntoView += (_, _) => requested = true; var args = new System.Windows.Input.KeyboardFocusChangedEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, 0, null, target) { RoutedEvent = System.Windows.Input.Keyboard.PreviewGotKeyboardFocusEvent }; target.RaiseEvent(args); typeof(MainWindow).GetMethod("OnSecondaryPreviewGotKeyboardFocus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow)), [null, args]); } catch (Exception exception) { failure = exception; } finally { System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown(); } });
+        thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+        Assert.True(requested);
     }
 
     private static WindowsTheme ActiveTheme(System.Windows.ResourceDictionary resources) => (WindowsTheme)resources.MergedDictionaries.Last()["Theme"];

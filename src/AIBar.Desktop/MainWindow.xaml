@@ -7,87 +7,103 @@
         Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextBrush}"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="16">
-                <Grid Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                    <TextBlock Text="Quota" Style="{StaticResource QuotaTitleTextStyle}" />
-                    <TextBlock Grid.Column="1" Text="{Binding FreshnessLabel}" Style="{StaticResource QuotaStatusTextStyle}" VerticalAlignment="Center" Margin="8,0,0,0" />
-                    <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,2,0,0">
-                        <TextBlock Text="{Binding State.CachedAgeLabel}" Style="{StaticResource QuotaStatusTextStyle}" />
-                        <TextBlock Text="{Binding State.WarningLabel}" Style="{StaticResource QuotaStatusTextStyle}" />
-                        <TextBlock Text="Loading quota" Visibility="{Binding State.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
-                        <TextBlock Text="Credential unavailable" Visibility="{Binding State.IsMissingCredential, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
-                        <TextBlock Text="Offline cached quota" Visibility="{Binding State.IsOffline, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
-                        <TextBlock Text="Cached quota is degraded" Visibility="{Binding State.IsDegraded, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
-                        <TextBlock Text="Quota unavailable" Visibility="{Binding State.IsUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
-                        <TextBlock Text="Private quota integration is disabled" Visibility="{Binding State.IsPrivateIntegrationDisabled, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
-                        <TextBlock Text="Quota error" Visibility="{Binding State.IsSafeError, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
-                    </StackPanel>
-                </Grid>
+    <Grid Margin="16" KeyboardNavigation.TabNavigation="Continue">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-            <GroupBox automation:AutomationProperties.Name="5-hour quota card" Style="{StaticResource ChromeLessGroupBoxStyle}" Margin="0,8,0,0" Visibility="{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <Grid Grid.Row="0" Margin="0,0,0,8" automation:AutomationProperties.Name="Quota summary">
+            <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <TextBlock Text="Quota" Style="{StaticResource QuotaTitleTextStyle}" />
+            <TextBlock Grid.Column="1" Text="{Binding FreshnessLabel}" Style="{StaticResource QuotaStatusTextStyle}" VerticalAlignment="Center" Margin="8,0,0,0" automation:AutomationProperties.LiveSetting="Polite" />
+        </Grid>
+
+        <StackPanel Grid.Row="1" automation:AutomationProperties.Name="Quota cards">
+            <GroupBox automation:AutomationProperties.Name="5-hour quota card" automation:AutomationProperties.HelpText="5-hour quota percentage, reset, and state" Style="{StaticResource ChromeLessGroupBoxStyle}" Margin="0,0,0,8">
                 <Border Style="{StaticResource QuotaCardStyle}">
                     <Grid Margin="16">
                         <Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
                         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <TextBlock Text="{Binding Primary.Label}" Style="{StaticResource QuotaLabelTextStyle}" />
-                        <TextBlock Grid.Column="1" Text="{Binding Primary.PercentageUsed, StringFormat={}{0:0}%}" Style="{StaticResource QuotaPercentageTextStyle}" />
-                        <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource QuotaProgressStyle}" Value="{Binding Primary.PercentageUsed}" Margin="0,8,0,0" />
-                        <TextBlock Grid.Row="2" Style="{StaticResource QuotaCardSecondaryTextStyle}" Margin="0,6,0,0"><Run Text="Reset " /><Run Text="{Binding Primary.ResetCountdown}" /></TextBlock>
+                        <TextBlock Grid.Column="1" Text="{Binding Primary.PercentageUsed, StringFormat={}{0:0}%, TargetNullValue=--}" Style="{StaticResource QuotaPercentageTextStyle}" />
+                        <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource QuotaProgressStyle}" Value="{Binding Primary.PercentageUsed}" Margin="0,8,0,0" automation:AutomationProperties.Name="5-hour quota progress" />
+                        <StackPanel Grid.Row="2" Margin="0,6,0,0">
+                            <TextBlock Style="{StaticResource QuotaCardSecondaryTextStyle}"><Run Text="Reset " /><Run Text="{Binding Primary.ResetCountdown, TargetNullValue=unavailable}" /></TextBlock>
+                            <TextBlock Text="{Binding FreshnessLabel}" Style="{StaticResource QuotaStatusTextStyle}" />
+                        </StackPanel>
                     </Grid>
                 </Border>
             </GroupBox>
 
-            <GroupBox automation:AutomationProperties.Name="Weekly quota card" Style="{StaticResource ChromeLessGroupBoxStyle}" Margin="0,8,0,0" Visibility="{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <GroupBox automation:AutomationProperties.Name="Weekly quota card" automation:AutomationProperties.HelpText="Weekly quota percentage, reset, and state" Style="{StaticResource ChromeLessGroupBoxStyle}">
                 <Border Style="{StaticResource QuotaCardStyle}">
                     <Grid Margin="16">
                         <Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
                         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <TextBlock Text="{Binding Weekly.Label}" Style="{StaticResource QuotaLabelTextStyle}" />
-                        <TextBlock Grid.Column="1" Text="{Binding Weekly.PercentageUsed, StringFormat={}{0:0}%}" Style="{StaticResource QuotaPercentageTextStyle}" />
-                        <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource QuotaProgressStyle}" Value="{Binding Weekly.PercentageUsed}" Margin="0,8,0,0" />
-                        <TextBlock Grid.Row="2" Style="{StaticResource QuotaCardSecondaryTextStyle}" Margin="0,6,0,0"><Run Text="Reset " /><Run Text="{Binding Weekly.ResetCountdown}" /></TextBlock>
+                        <TextBlock Grid.Column="1" Text="{Binding Weekly.PercentageUsed, StringFormat={}{0:0}%, TargetNullValue=--}" Style="{StaticResource QuotaPercentageTextStyle}" />
+                        <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource QuotaProgressStyle}" Value="{Binding Weekly.PercentageUsed}" Margin="0,8,0,0" automation:AutomationProperties.Name="Weekly quota progress" />
+                        <StackPanel Grid.Row="2" Margin="0,6,0,0">
+                            <TextBlock Style="{StaticResource QuotaCardSecondaryTextStyle}"><Run Text="Reset " /><Run Text="{Binding Weekly.ResetCountdown, TargetNullValue=unavailable}" /></TextBlock>
+                            <TextBlock Text="{Binding FreshnessLabel}" Style="{StaticResource QuotaStatusTextStyle}" />
+                        </StackPanel>
                     </Grid>
                 </Border>
             </GroupBox>
+        </StackPanel>
 
-            <GroupBox Header="Local Codex data" automation:AutomationProperties.Name="Local Codex data" Style="{StaticResource SecondaryGroupBoxStyle}" Margin="0,16,0,0"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="16">
-                <TextBlock Text="{Binding Analytics.SourceDetail}" Style="{StaticResource MutedTextStyle}" />
-                <TextBlock Text="{Binding Analytics.TotalTokensLabel}" FontWeight="SemiBold" Margin="0,8,0,0" /><TextBlock Text="{Binding Analytics.ModelTotalsLabel}" TextWrapping="Wrap" />
-                <TextBlock Text="{Binding Analytics.CoverageLabel}" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding Analytics.LastScanLabel}" Style="{StaticResource MutedTextStyle}" />
-                <TextBlock Text="{Binding Analytics.WarningLabel}" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="Loading local Codex data" Visibility="{Binding Analytics.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource MutedTextStyle}" />
-            </StackPanel></Border></GroupBox>
+        <ScrollViewer x:Name="SecondaryScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PreviewGotKeyboardFocus="OnSecondaryPreviewGotKeyboardFocus" automation:AutomationProperties.Name="Secondary analytics">
+            <StackPanel Margin="0,16,0,0">
+                <GroupBox Header="Local Codex data" automation:AutomationProperties.Name="Local Codex data" Style="{StaticResource SecondaryGroupBoxStyle}"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="16">
+                    <TextBlock Text="{Binding Analytics.SourceDetail}" Style="{StaticResource MutedTextStyle}" />
+                    <TextBlock Text="{Binding Analytics.TotalTokensLabel}" FontWeight="SemiBold" Margin="0,8,0,0" /><TextBlock Text="{Binding Analytics.ModelTotalsLabel}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Analytics.CoverageLabel}" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding Analytics.LastScanLabel}" Style="{StaticResource MutedTextStyle}" />
+                    <TextBlock Text="{Binding Analytics.WarningLabel}" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="Loading local Codex data" Visibility="{Binding Analytics.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource MutedTextStyle}" />
+                </StackPanel></Border></GroupBox>
 
-            <GroupBox Header="OpenCode and Pi local usage" automation:AutomationProperties.Name="OpenCode and Pi local usage" Style="{StaticResource SecondaryGroupBoxStyle}" Margin="0,8,0,0"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="16">
-                <TextBlock Text="{Binding LocalUsage.Description}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
-                <TextBlock Text="{Binding LocalUsage.StatusLabel}" FontWeight="SemiBold" Margin="0,8,0,0" />
-                <ItemsControl ItemsSource="{Binding LocalUsage.Rows}" Focusable="False" Margin="0,4,0,0"><ItemsControl.ItemTemplate><DataTemplate>
-                    <Expander IsExpanded="False" Focusable="True" IsTabStop="True" Style="{StaticResource AccessibleExpanderStyle}" HorizontalContentAlignment="Stretch" Margin="0,4,0,0" automation:AutomationProperties.Name="{Binding AutomationLabel}">
-                        <Expander.Header><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                            <TextBlock Text="{Binding ScopeLabel}" FontWeight="SemiBold" />
-                            <TextBlock Grid.Column="1" Text="{Binding TotalLabel}" />
-                            <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" />
-                            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding StatusLabel}" Style="{StaticResource MutedTextStyle}" />
-                        </Grid></Expander.Header>
-                        <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
-                            <ItemsControl ItemsSource="{Binding Details}" Focusable="False"><ItemsControl.ItemTemplate><DataTemplate>
-                                <Grid Margin="16,4,0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
-                                    <TextBlock Text="{Binding LocalDayLabel}" FontWeight="SemiBold" automation:AutomationProperties.Name="{Binding AutomationLabel}" />
-                                    <TextBlock Grid.Column="1" Text="{Binding ModelLabel}" TextWrapping="Wrap" Margin="8,0,0,0" />
-                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TotalLabel}" />
-                                    <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
-                                </Grid>
-                            </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-                        </ScrollViewer>
-                    </Expander>
-                </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-            </StackPanel></Border></GroupBox>
+                <GroupBox Header="OpenCode and Pi local usage" automation:AutomationProperties.Name="OpenCode and Pi local usage" Style="{StaticResource SecondaryGroupBoxStyle}" Margin="0,8,0,0"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="16">
+                    <TextBlock Text="{Binding LocalUsage.Description}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
+                    <TextBlock Text="{Binding LocalUsage.StatusLabel}" FontWeight="SemiBold" Margin="0,8,0,0" />
+                    <ItemsControl ItemsSource="{Binding LocalUsage.Rows}" Focusable="False" Margin="0,4,0,0"><ItemsControl.ItemTemplate><DataTemplate>
+                        <Expander IsExpanded="False" Focusable="True" IsTabStop="True" Style="{StaticResource AccessibleExpanderStyle}" HorizontalContentAlignment="Stretch" Margin="0,4,0,0" automation:AutomationProperties.Name="{Binding AutomationLabel}">
+                            <Expander.Header><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                <TextBlock Text="{Binding ScopeLabel}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="1" Text="{Binding TotalLabel}" />
+                                <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" />
+                                <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding StatusLabel}" Style="{StaticResource MutedTextStyle}" />
+                            </Grid></Expander.Header>
+                            <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
+                                <ItemsControl ItemsSource="{Binding Details}" Focusable="False"><ItemsControl.ItemTemplate><DataTemplate>
+                                    <Grid Margin="16,4,0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                                        <TextBlock Text="{Binding LocalDayLabel}" FontWeight="SemiBold" automation:AutomationProperties.Name="{Binding AutomationLabel}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding ModelLabel}" TextWrapping="Wrap" Margin="8,0,0,0" />
+                                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TotalLabel}" />
+                                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
+                                    </Grid>
+                                </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                            </ScrollViewer>
+                        </Expander>
+                    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                </StackPanel></Border></GroupBox>
+            </StackPanel>
+        </ScrollViewer>
 
-            <TextBlock Text="{Binding State.Disclosure}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,16,0,8" />
+        <StackPanel Grid.Row="3" Margin="0,8,0,0" automation:AutomationProperties.Name="Quota footer">
+            <TextBlock Text="{Binding State.CachedAgeLabel}" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" />
+            <TextBlock Text="{Binding State.WarningLabel}" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" />
+            <TextBlock Text="Loading quota" Visibility="{Binding State.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
+            <TextBlock Text="Credential unavailable" Visibility="{Binding State.IsMissingCredential, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
+            <TextBlock Text="Offline cached quota" Visibility="{Binding State.IsOffline, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
+            <TextBlock Text="Cached quota is degraded" Visibility="{Binding State.IsDegraded, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
+            <TextBlock Text="Quota unavailable" Visibility="{Binding State.IsUnavailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
+            <TextBlock Text="Private quota integration is disabled" Visibility="{Binding State.IsPrivateIntegrationDisabled, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
+            <TextBlock Text="Quota error" Visibility="{Binding State.IsSafeError, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
+            <TextBlock Text="{Binding State.Disclosure}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" />
             <TextBlock Text="{Binding PrivateEndpointDisclosure}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,0,0,8" />
             <Button Content="Refresh" Command="{Binding RefreshCommand}" Visibility="{Binding IsRefreshAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" automation:AutomationProperties.Name="Refresh quota" IsTabStop="True" HorizontalAlignment="Left" />
         </StackPanel>
-    </ScrollViewer>
+    </Grid>
 </Window>

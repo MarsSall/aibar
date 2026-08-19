@@ -302,11 +302,7 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray
         if (available && !_menu.Items.Contains(_refresh)) _menu.Items.Insert(0, _refresh);
         else if (!available) _menu.Items.Remove(_refresh);
     }
-    public void SetPresentation(BetaPresentationState state)
-    {
-        var percentage = state.Primary.PercentageUsed is { } value ? $" {value:0}%" : string.Empty;
-        _icon.Text = $"AIBar: {state.FreshnessLabel}{percentage}";
-    }
+    public void SetPresentation(BetaPresentationState state) => _icon.Text = TrayPresentationFormatter.Format(state);
     public void SetSettingsAvailable(bool available)
     {
         _settingsAvailable = available;
@@ -330,6 +326,20 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray
     public void Show() => _icon.Visible = true;
     public void Hide() => _icon.Visible = false;
     public ValueTask DisposeAsync() { _icon.Dispose(); return ValueTask.CompletedTask; }
+}
+
+internal static class TrayPresentationFormatter
+{
+    internal static string Format(BetaPresentationState state)
+    {
+        var slots = $"5h {Percentage(state.Primary)} | 7d {Percentage(state.Weekly)}";
+        var status = state.IsPrivateIntegrationDisabled ? "Disabled" : state.IsLoading ? "Loading" : state.IsDegraded || state.IsCached ? "Stale" : state.IsUnavailable ? "Unavailable" : state.FreshnessLabel;
+        var age = state.CachedAgeLabel is { Length: > 0 } ? $" | {state.CachedAgeLabel}" : string.Empty;
+        var text = $"AIBar: {slots} | {status}{age}";
+        return text.Length <= 63 ? text : $"AIBar: {slots} | {status}";
+    }
+
+    private static string Percentage(QuotaWindowPresentation window) => window.PercentageUsed is { } value ? $"{value:0}%" : "--";
 }
 
 public sealed class WindowsPrivateIntegrationConsentPrompt : IPrivateIntegrationConsentPrompt
