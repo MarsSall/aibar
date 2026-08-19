@@ -360,13 +360,13 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 **Exclusions:** native/forked YASB, refresh/auth/network, process/path discovery, arbitrary parameters, cleanup/ZIP/docs.
 
-- [ ] **5.1 RED — fixed private seam:** Private fixture function only; empty production params; fixed LocalApplicationData path; one UTC now; argument rejection before access; no exported helper. <!-- sdd-owner: implementation -->
-- [ ] **5.2 RED — fixture matrix:** Current/refreshing/stale/unavailable/disabled, both/partial windows, nullable reset, malformed/missing/empty/oversized, schema/field/enum/value/time failures, due reset, clock rollback, every warning. <!-- sdd-owner: implementation -->
-- [ ] **5.3 RED — output/poll boundary:** Exact three fields, permanent slots, warning/state/age/reset text, no CSS-only meaning, no write/delete/refresh/auth/start/network. <!-- sdd-owner: implementation -->
-- [ ] **5.4 RED — stock config/launcher:** Exact CustomWidget keys, 60000 interval, `<AIBarRoot>`, no right/middle callback, relative executable, literal single `--show`, no `%*` or discovery. <!-- sdd-owner: implementation -->
-- [ ] **5.5 GREEN — reader/assets:** Implement 16 KiB bounded closed-schema reader, safe formatter, relative launcher, exact YAML and customizable CSS classes. <!-- sdd-owner: implementation -->
-- [ ] **5.6 CHECK — verify Unit 5:** Run isolated Pester/function and static asset checks only; never start AIBar/YASB. <!-- sdd-owner: implementation -->
-- [ ] **5.7 COMMIT BOUNDARY — YASB assets:** Freeze one adapter commit; installed rollback later requires Unit 6 cleanup. <!-- sdd-owner: implementation -->
+- [x] **5.1 RED — fixed private seam:** Private fixture function only; empty production params; fixed LocalApplicationData path; one UTC now; argument rejection before access; no exported helper. <!-- sdd-owner: implementation -->
+- [x] **5.2 RED — fixture matrix:** Current/refreshing/stale/unavailable/disabled, both/partial windows, nullable reset, malformed/missing/empty/oversized, schema/field/enum/value/time failures, due reset, clock rollback, every warning. <!-- sdd-owner: implementation -->
+- [x] **5.3 RED — output/poll boundary:** Exact three fields, permanent slots, warning/state/age/reset text, no CSS-only meaning, no write/delete/refresh/auth/start/network. <!-- sdd-owner: implementation -->
+- [x] **5.4 RED — stock config/launcher:** Exact CustomWidget keys, 60000 interval, `<AIBarRoot>`, no right/middle callback, relative executable, literal single `--show`, no `%*` or discovery. <!-- sdd-owner: implementation -->
+- [x] **5.5 GREEN — reader/assets:** Implement 16 KiB bounded closed-schema reader, safe formatter, relative launcher, exact YAML and customizable CSS classes. <!-- sdd-owner: implementation -->
+- [x] **5.6 CHECK — verify Unit 5:** Run isolated Pester/function and static asset checks only; never start AIBar/YASB. <!-- sdd-owner: implementation -->
+- [x] **5.7 COMMIT BOUNDARY — YASB assets:** Freeze one adapter commit; installed rollback later requires Unit 6 cleanup. <!-- sdd-owner: implementation -->
 
 **Hard split trigger:** At 380 table-drive fixtures or replan; retain all security/path cases, expose no production path parameter, never cross 400.
 

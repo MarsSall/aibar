@@ -1,0 +1,13 @@
+aibar_quota:
+  type: "yasb.custom.CustomWidget"
+  options:
+    label: "{data[label]}"
+    label_alt: "{data[label]}"
+    class_name: "{data[className]}"
+    tooltip: "{data[tooltip]}"
+    exec_options:
+      run_cmd: 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "<AIBarRoot>\yasb\read-aibar-quota.ps1"'
+      run_interval: 60000
+      return_format: "json"
+    callbacks:
+      on_left: 'exec cmd /c "<AIBarRoot>\yasb\show-aibar.cmd"'
