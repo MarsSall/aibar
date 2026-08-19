@@ -139,6 +139,55 @@ public sealed class HostPrimitivesTests
     }
 
     [Fact]
+    public void Unit_4b_production_taskbar_edge_seam_classifies_every_edge_and_defaults_to_bottom()
+    {
+        var bounds = new ScreenRect(0, 0, 1920, 1080);
+        var cases = new[]
+        {
+            (new ScreenRect(0, 0, 1920, 1040), TaskbarEdge.Bottom), (new ScreenRect(0, 40, 1920, 1040), TaskbarEdge.Top),
+            (new ScreenRect(40, 0, 1880, 1080), TaskbarEdge.Left), (new ScreenRect(0, 0, 1880, 1080), TaskbarEdge.Right),
+            (bounds, TaskbarEdge.Bottom), (new ScreenRect(-1, 0, 1921, 1080), TaskbarEdge.Bottom)
+        };
+        Assert.All(cases, item => Assert.Equal(item.Item2, WindowsPopoverPlacementContextProvider.DetectTaskbarEdge(bounds, item.Item1)));
+    }
+
+    [Fact]
+    public void Unit_4b_placement_matrix_is_edge_adjacent_dpi_aware_clamped_and_fail_closed()
+    {
+        var work = new ScreenRect(0, 40, 1920, 1040); var monitor = new ScreenRect(0, 0, 1920, 1080); var cursor = new ScreenRect(1900, 1000, 1, 1);
+        foreach (var edge in Enum.GetValues<TaskbarEdge>())
+        foreach (var dpi in new[] { 1d, 1.25d, 1.5d, 2d })
+        {
+            var result = PopoverPlacement.PlaceInContext(new(work, monitor, cursor, work, 400, 500, dpi, edge));
+            var physical = new ScreenRect(result.Left * dpi, result.Top * dpi, result.Width * dpi, result.Height * dpi);
+            Assert.True(physical.Left >= work.Left && physical.Top >= work.Top && physical.Right <= work.Right && physical.Bottom <= work.Bottom);
+            if (edge == TaskbarEdge.Bottom) Assert.Equal(work.Bottom, physical.Bottom, 6);
+            if (edge == TaskbarEdge.Top) Assert.Equal(work.Top, physical.Top, 6);
+            if (edge == TaskbarEdge.Left) Assert.Equal(work.Left, physical.Left, 6);
+            if (edge == TaskbarEdge.Right) Assert.Equal(work.Right, physical.Right, 6);
+        }
+
+        var negative = PopoverPlacement.PlaceInContext(new(new(-1600, 0, 1600, 900), new(-1600, 0, 1600, 900), new(-10, 800, 1, 1), work, 400, 500, 1, TaskbarEdge.Bottom));
+        Assert.Equal(new PopoverBounds(-400, 400, 400, 500), negative);
+        var fallback = PopoverPlacement.PlaceInContext(new(default, default, null, new(10, 20, 300, 200), 500, 300, 1, TaskbarEdge.Bottom));
+        Assert.Equal(new PopoverBounds(10, 20, 300, 200), fallback);
+        var centered = PopoverPlacement.PlaceInContext(new(work, monitor, null, work, 400, 500, 1, TaskbarEdge.Left));
+        Assert.Equal(centered, PopoverPlacement.PlaceInContext(new(work, monitor, new(double.NaN, 0, 1, 1), work, 400, 500, 1, TaskbarEdge.Left)));
+        Assert.Equal(new PopoverBounds(10, 20, 240, 260), PopoverPlacement.PlaceInContext(new(new(10, 20, 240, 260), new(10, 20, 240, 260), null, work, 400, 260, 1, TaskbarEdge.Bottom)));
+
+        var valid = new PopoverPlacementContext(work, monitor, cursor, work, 400, 500, 1, TaskbarEdge.Bottom);
+        foreach (var bad in new[] { 0d, -1d, double.NaN, double.PositiveInfinity, double.NegativeInfinity })
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => PopoverPlacement.PlaceInContext(valid with { LogicalWidth = bad }));
+            Assert.Throws<ArgumentOutOfRangeException>(() => PopoverPlacement.PlaceInContext(valid with { LogicalHeight = bad }));
+            Assert.Throws<ArgumentOutOfRangeException>(() => PopoverPlacement.PlaceInContext(valid with { DpiScale = bad }));
+        }
+        Assert.Throws<ArgumentOutOfRangeException>(() => PopoverPlacement.PlaceInContext(valid with { WorkArea = default, PrimaryWorkArea = default }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => PopoverPlacement.PlaceInContext(valid with { TaskbarEdge = (TaskbarEdge)99 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => PopoverPlacement.PlaceInContext(valid with { LogicalWidth = double.MaxValue, DpiScale = 2 }));
+    }
+
+    [Fact]
     public void Placement_rejects_non_finite_non_positive_and_overflowing_inputs()
     {
         var valid = new PopoverPlacementInput(new(0, 0, 1600, 1000), new(0, 0, 1600, 1080), 400, 300, 1);

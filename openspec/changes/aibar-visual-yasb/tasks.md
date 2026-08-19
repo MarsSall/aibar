@@ -337,12 +337,12 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 **Exclusions:** YASB/live app, network, WinUI, analytics redesign.
 
-- [ ] **4b.1 RED — placement matrix:** Every taskbar edge, negative monitor, narrow/invalid geometry, cursor/primary fallback, 100/125/150/200% DPI, adjacency, clamp, fixed-region minimum, no discovery. <!-- sdd-owner: implementation -->
-- [ ] **4b.2 RED — rendered/focus matrix:** Synthetic measure/arrange/render proves fixed regions visible, no clipping, secondary-only scroll, focus/automation/tab order, and theme preservation. <!-- sdd-owner: implementation -->
-- [ ] **4b.3 RED — DWM capability matrix:** High contrast, supported/partial/rejected/remote cases with independent failures and complete opaque fallback. <!-- sdd-owner: implementation -->
-- [ ] **4b.4 GREEN — placement/surface:** Add work-area/DPI/anchor seam, recompute each show, safe fallback, capability-checked hints, and opaque base. <!-- sdd-owner: implementation -->
-- [ ] **4b.5 CHECK — verify Unit 4b:** Run pure placement and bounded synthetic Windows render tests; inspect clipping, order, DPI, and fallback. <!-- sdd-owner: implementation -->
-- [ ] **4b.6 COMMIT BOUNDARY — placement/render:** Freeze one placement/DWM/render-validation commit; rollback retains 4a structure. <!-- sdd-owner: implementation -->
+- [x] **4b.1 RED — placement matrix:** Every taskbar edge, negative monitor, narrow/invalid geometry, cursor/primary fallback, 100/125/150/200% DPI, adjacency, clamp, fixed-region minimum, no discovery. <!-- sdd-owner: implementation -->
+- [x] **4b.2 RED — rendered/focus matrix:** Synthetic measure/arrange/render proves fixed regions visible, no clipping, secondary-only scroll, focus/automation/tab order, and theme preservation. <!-- sdd-owner: implementation -->
+- [x] **4b.3 RED — DWM capability matrix:** High contrast, supported/partial/rejected/remote cases with independent failures and complete opaque fallback. <!-- sdd-owner: implementation -->
+- [x] **4b.4 GREEN — placement/surface:** Add work-area/DPI/anchor seam, recompute each show, safe fallback, capability-checked hints, and opaque base. <!-- sdd-owner: implementation -->
+- [x] **4b.5 CHECK — verify Unit 4b:** Run pure placement and bounded synthetic Windows render tests; inspect clipping, order, DPI, and fallback. <!-- sdd-owner: implementation -->
+- [x] **4b.6 COMMIT BOUNDARY — placement/render:** Freeze one placement/DWM/render-validation commit; rollback retains 4a structure. <!-- sdd-owner: implementation -->
 
 **Hard split trigger:** At 370 table-drive required breadth or replan before 400; do not move 4a/YASB scope.
 

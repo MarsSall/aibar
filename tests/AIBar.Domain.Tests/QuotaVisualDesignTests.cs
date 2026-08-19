@@ -348,6 +348,15 @@ public sealed class QuotaVisualDesignTests
         Assert.True(requested);
     }
 
+    [Fact]
+    public void Unit_4b_measurement_limits_preserve_the_Unit_3_semantic_surface()
+    {
+        var window = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml")).Root!;
+        Assert.Equal("300", window.Attribute("MinWidth")?.Value); Assert.Equal("260", window.Attribute("MinHeight")?.Value); Assert.Equal("720", window.Attribute("MaxHeight")?.Value);
+        Assert.Contains("SurfaceBrush", ReadProjectFile("src/AIBar.Desktop/Themes/Semantic.Light.xaml"), StringComparison.Ordinal);
+        Assert.Contains("SurfaceBrush", ReadProjectFile("src/AIBar.Desktop/Themes/Semantic.Dark.xaml"), StringComparison.Ordinal);
+    }
+
     private static WindowsTheme ActiveTheme(System.Windows.ResourceDictionary resources) => (WindowsTheme)resources.MergedDictionaries.Last()["Theme"];
     private sealed class FakeThemeSource(WindowsTheme current) : IWindowsThemeSource
     {

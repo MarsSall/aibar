@@ -1,4 +1,6 @@
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Microsoft.Win32;
 
@@ -120,4 +122,61 @@ public static class ThemeDictionaries
     {
         Source = new Uri($"pack://application:,,,/AIBar.Desktop;component/Themes/Semantic.{theme}.xaml", UriKind.Absolute)
     };
+}
+
+public interface IOpaquePopupSurface
+{
+    void UseOpaqueBase();
+    void SetDarkMode();
+    void SetCorners();
+    void SetBackdrop();
+}
+
+public interface IDwmSurfaceHints
+{
+    bool SupportsHints { get; }
+    bool IsRemoteSession { get; }
+    void ApplyDarkMode(IOpaquePopupSurface surface);
+    void ApplyCorners(IOpaquePopupSurface surface);
+    void ApplyBackdrop(IOpaquePopupSurface surface);
+}
+
+public static class PopupSurface
+{
+    public static void Apply(IOpaquePopupSurface surface, WindowsTheme theme, IDwmSurfaceHints hints)
+    {
+        surface.UseOpaqueBase();
+        if (theme == WindowsTheme.HighContrast) return;
+        if (!hints.SupportsHints) return;
+        if (hints.IsRemoteSession) return;
+        if (theme == WindowsTheme.Dark) Try(() => hints.ApplyDarkMode(surface));
+        Try(() => hints.ApplyCorners(surface));
+        Try(() => hints.ApplyBackdrop(surface));
+    }
+
+    private static void Try(Action apply) { try { apply(); } catch { } }
+}
+
+public sealed class WindowsDwmSurfaceHints : IDwmSurfaceHints
+{
+    public bool SupportsHints => OperatingSystem.IsWindows();
+    public bool IsRemoteSession => GetSystemMetrics(0x1000) != 0;
+    public void ApplyDarkMode(IOpaquePopupSurface surface) => surface.SetDarkMode();
+    public void ApplyCorners(IOpaquePopupSurface surface) => surface.SetCorners();
+    public void ApplyBackdrop(IOpaquePopupSurface surface) => surface.SetBackdrop();
+    [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
+}
+
+public sealed class WpfOpaquePopupSurface(Window window) : IOpaquePopupSurface
+{
+    public void UseOpaqueBase() { window.AllowsTransparency = false; window.Opacity = 1; }
+    public void SetDarkMode() => Set(20, 1);
+    public void SetCorners() => Set(33, 2);
+    public void SetBackdrop() => Set(38, 2);
+    private void Set(int attribute, int value)
+    {
+        var handle = new WindowInteropHelper(window).EnsureHandle();
+        if (DwmSetWindowAttribute(handle, attribute, ref value, sizeof(int)) != 0) throw new InvalidOperationException();
+    }
+    [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
 }
