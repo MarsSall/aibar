@@ -12,6 +12,7 @@ public partial class App : System.Windows.Application
     private SingleInstanceHost? _instance;
     private TaskbarRecreationMonitor? _taskbar;
     private TrayHostRuntime? _runtime;
+    private IThemeController? _theme;
 
     public App() : this(false) { }
     internal App(bool suppressHostStartup) => _suppressHostStartup = suppressHostStartup;
@@ -111,9 +112,10 @@ public partial class App : System.Windows.Application
     private void StartTray(StartupComposition composition)
     {
         var window = new MainWindow { DataContext = composition.Presentation, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
+        _theme = new WindowsThemeController(Resources, new WindowsThemeSource(), Dispatcher);
         _taskbar = new TaskbarRecreationMonitor(window);
         var trayPresentation = composition.Presentation is BetaAnalyticsPresentation analyticsPresentation ? analyticsPresentation.QuotaPresentation : composition.Presentation as QuotaPresentationHost;
-        _runtime = new TrayHostRuntime(_instance!, new WindowsTrayRuntime(), new WpfPopoverRuntime(window), _taskbar,
+        _runtime = new TrayHostRuntime(_instance!, new WindowsTrayRuntime(), new WpfPopoverRuntime(window, _theme), _taskbar,
             _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation, new WindowsPrivateIntegrationConsentPrompt(), new WindowsOpenCodeDataFolderPicker());
         _runtime.Start();
     }
@@ -150,6 +152,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _theme?.Dispose();
         _taskbar?.Dispose();
         _instance?.Dispose();
         base.OnExit(e);

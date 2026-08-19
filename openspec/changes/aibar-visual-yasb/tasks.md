@@ -290,12 +290,12 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 **Exclusions:** layout, placement, DWM, tray formatter, YASB, theme selector.
 
-- [ ] **3.1 RED — dictionary parity:** Assert exact semantic and migrated style key sets across light/dark/high contrast. <!-- sdd-owner: implementation -->
-- [ ] **3.2 RED — source/recovery:** Light, dark, high contrast, invalid/missing registry, runtime/off-dispatcher/missed changes, coalescing, disposal, load failure. <!-- sdd-owner: implementation -->
-- [ ] **3.3 RED — accessibility invariants:** Preserve status text, focus, automation, percentage/reset readability, and window identity across transitions. <!-- sdd-owner: implementation -->
-- [ ] **3.4 GREEN — resources/source/controller:** Add matching dictionaries, injectable source, stable merged-dictionary replacement, dispatcher marshalling, popup-open reevaluation, and high-contrast-first behavior. <!-- sdd-owner: implementation -->
-- [ ] **3.5 CHECK — verify Unit 3:** Run focused fake-source/resource/dispatcher tests and inspect parity, precedence, recovery, identity. <!-- sdd-owner: implementation -->
-- [ ] **3.6 COMMIT BOUNDARY — themes:** Freeze one theme commit; rollback restores prior resource merge. <!-- sdd-owner: implementation -->
+- [x] **3.1 RED — dictionary parity:** Assert exact semantic and migrated style key sets across light/dark/high contrast. <!-- sdd-owner: implementation -->
+- [x] **3.2 RED — source/recovery:** Light, dark, high contrast, invalid/missing registry, runtime/off-dispatcher/missed changes, coalescing, disposal, load failure. <!-- sdd-owner: implementation -->
+- [x] **3.3 RED — accessibility invariants:** Preserve status text, focus, automation, percentage/reset readability, and window identity across transitions. <!-- sdd-owner: implementation -->
+- [x] **3.4 GREEN — resources/source/controller:** Add matching dictionaries, injectable source, stable merged-dictionary replacement, dispatcher marshalling, popup-open reevaluation, and high-contrast-first behavior. <!-- sdd-owner: implementation -->
+- [x] **3.5 CHECK — verify Unit 3:** Run focused fake-source/resource/dispatcher tests and inspect parity, precedence, recovery, identity. <!-- sdd-owner: implementation -->
+- [x] **3.6 COMMIT BOUNDARY — themes:** Freeze one theme commit; rollback restores prior resource merge. <!-- sdd-owner: implementation -->
 
 **Hard split trigger:** At 380 keep non-palette shared styles in `App.xaml`; do not add popup/DWM work or cross 400.
 

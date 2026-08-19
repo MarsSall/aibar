@@ -351,16 +351,21 @@ public sealed class WindowsOpenCodeDataFolderPicker : IOpenCodeDataFolderPicker
 public sealed class WpfPopoverRuntime : IPopoverRuntime
 {
     private readonly Window _window;
-    public WpfPopoverRuntime(Window window)
+    private readonly IThemeController? _theme;
+    public WpfPopoverRuntime(Window window, IThemeController? theme = null)
     {
-        _window = window;
+        _window = window; _theme = theme;
         _window.Deactivated += (_, _) => Deactivated?.Invoke();
     }
     public event Action? Deactivated;
     public bool IsVisible => _window.IsVisible;
-    public bool IsOwnedDialogActive => _window.OwnedWindows.OfType<Window>().Any(candidate => candidate.IsVisible);
-    public void Show() { if (!_window.IsVisible) _window.Show(); }
-    public void Hide() => _window.Hide();
+        public bool IsOwnedDialogActive => _window.OwnedWindows.OfType<Window>().Any(candidate => candidate.IsVisible);
+        public void Show()
+        {
+            _theme?.Reevaluate();
+            if (!_window.IsVisible) _window.Show();
+        }
+        public void Hide() => _window.Hide();
     public void Activate() => _window.Activate();
 }
 

@@ -8,10 +8,18 @@ public sealed class QuotaVisualDesignTests
     [Fact]
     public void Declares_semantic_tokens_and_an_accessible_compact_card_hierarchy()
     {
+        var x = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
         var resources = ReadProjectFile("src/AIBar.Desktop/App.xaml");
+        var applicationResources = XDocument.Parse(resources);
+        var mergedDictionaries = applicationResources.Descendants().Single(element => element.Name.LocalName == "ResourceDictionary.MergedDictionaries");
+        var mergedSource = mergedDictionaries.Elements().Single(element => element.Name.LocalName == "ResourceDictionary").Attribute("Source")!.Value;
+        Assert.Equal("Themes/Semantic.Light.xaml", mergedSource);
+        var semanticKeys = XDocument.Parse(ReadProjectFile($"src/AIBar.Desktop/{mergedSource}")).Descendants()
+            .Select(element => element.Attribute(x + "Key")?.Value).Where(key => key is not null).Cast<string>().Order().ToArray();
+        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, semanticKeys);
         var window = ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml");
 
-        foreach (var key in new[] { "SurfaceBrush", "CardBrush", "TextBrush", "MutedTextBrush", "AccentBrush", "FocusBrush", "SpacingSmall", "SpacingMedium", "CardRadius" })
+        foreach (var key in new[] { "SpacingSmall", "SpacingMedium", "CardRadius" })
             Assert.Contains($"x:Key=\"{key}\"", resources, StringComparison.Ordinal);
         Assert.Contains("QuotaCardStyle", resources, StringComparison.Ordinal);
         Assert.Contains("HighContrast", resources, StringComparison.Ordinal);
@@ -198,6 +206,106 @@ public sealed class QuotaVisualDesignTests
         await using var host = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), report: faults.Add);
         await host.InitializeAsync(default);
         Assert.Equal("Unavailable", host.FreshnessLabel); Assert.Equal("quota_refresh_failed", faults[^1].Message); Assert.DoesNotContain("store secret", faults[^1].Message); Assert.Equal(5, faults.Count);
+    }
+    [Fact]
+    public void Semantic_theme_dictionaries_have_exact_key_parity_and_system_high_contrast_colors()
+    {
+        var x = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
+        var dictionaries = new[] { "Light", "Dark", "HighContrast" }
+            .Select(name => XDocument.Parse(ReadProjectFile($"src/AIBar.Desktop/Themes/Semantic.{name}.xaml"))).ToArray();
+        var keySets = dictionaries.Select(dictionary => dictionary.Descendants().Select(element => element.Attribute(x + "Key")?.Value).Where(key => key is not null).Cast<string>().Order().ToArray()).ToArray();
+        Assert.All(keySets.Skip(1), keys => Assert.Equal(keySets[0], keys));
+        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, keySets[0]);
+            var highContrastMappings = new[]
+            {
+                ("SurfaceBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("CardBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("TextBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("MutedTextBrush", "{DynamicResource {x:Static SystemColors.GrayTextColorKey}}"),
+                ("AccentBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("FocusBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("ProgressTrackBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("SecondaryBorderBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}")
+            };
+            foreach (var (key, color) in highContrastMappings)
+                Assert.Equal(color, dictionaries[2].Descendants().Single(element => element.Attribute(x + "Key")?.Value == key).Attribute("Color")?.Value);
+    }
+
+    [Fact]
+    public void Theme_source_keeps_high_contrast_when_registry_lookup_is_invalid_missing_or_failing()
+    {
+        Assert.Equal(WindowsTheme.Dark, WindowsThemeSource.Resolve(false, 0));
+        Assert.Equal(WindowsTheme.Light, WindowsThemeSource.Resolve(false, () => null));
+        Assert.Equal(WindowsTheme.Light, WindowsThemeSource.Resolve(false, "invalid"));
+        Assert.Equal(WindowsTheme.Light, WindowsThemeSource.Resolve(false, () => throw new InvalidOperationException()));
+        Assert.Equal(WindowsTheme.HighContrast, WindowsThemeSource.Resolve(true, () => throw new InvalidOperationException()));
+    }
+
+    [Fact]
+    public void Theme_controller_coalesces_off_dispatcher_changes_skips_duplicates_and_recovers_without_losing_resources()
+    {
+        var resources = new System.Windows.ResourceDictionary { ["Shared"] = "unchanged" };
+        var source = new FakeThemeSource(WindowsTheme.Light); var factories = 0; var fail = false;
+        var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+        using var controller = new WindowsThemeController(resources, source, dispatcher, theme =>
+        {
+            factories++;
+            if (fail) throw new InvalidOperationException();
+            return new System.Windows.ResourceDictionary { ["Theme"] = theme };
+        });
+        var light = resources.MergedDictionaries.Single(); Assert.Equal(1, factories);
+        source.Raise(); Assert.Same(light, resources.MergedDictionaries.Single()); Assert.Equal(1, factories);
+        var raisedOnDispatcher = true;
+        var worker = new Thread(() =>
+        {
+            raisedOnDispatcher = dispatcher.CheckAccess();
+            source.Current = WindowsTheme.Dark; source.Raise();
+            source.Current = WindowsTheme.HighContrast; source.Raise();
+        });
+        worker.Start(); Assert.True(worker.Join(TimeSpan.FromSeconds(2))); Assert.False(raisedOnDispatcher);
+        Assert.Equal(WindowsTheme.HighContrast, source.Current); Assert.Equal(1, factories);
+        PumpUntil(() => ActiveTheme(resources) == WindowsTheme.HighContrast); Assert.Equal(2, factories);
+        var highContrast = resources.MergedDictionaries.Single(); source.Raise(); Assert.Same(highContrast, resources.MergedDictionaries.Single()); Assert.Equal(2, factories);
+        fail = true; source.Current = WindowsTheme.Light; source.Raise(); Assert.Equal(WindowsTheme.HighContrast, ActiveTheme(resources)); Assert.Equal("unchanged", resources["Shared"]);
+        fail = false; source.Current = WindowsTheme.Dark; controller.Reevaluate(); Assert.Equal(WindowsTheme.Dark, ActiveTheme(resources));
+        controller.Dispose(); source.Current = WindowsTheme.Light; source.Raise(); Assert.Equal(WindowsTheme.Dark, ActiveTheme(resources)); Assert.Equal(1, source.Disposals);
+    }
+
+    [Fact]
+    public void Theme_transition_preserves_window_identity_status_focus_automation_percentage_and_reset_semantics()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var source = new FakeThemeSource(WindowsTheme.Light); var resources = new System.Windows.ResourceDictionary();
+                using var controller = new WindowsThemeController(resources, source, System.Windows.Threading.Dispatcher.CurrentDispatcher, theme => new() { ["Theme"] = theme });
+                var status = new System.Windows.Controls.TextBlock { Text = "Unavailable" };
+                var percentage = new System.Windows.Controls.TextBlock { Text = "42%" };
+                var reset = new System.Windows.Controls.TextBlock { Text = "Resets in 5h" };
+                var focus = new System.Windows.Controls.Button { Content = "Refresh", Focusable = true };
+                System.Windows.Automation.AutomationProperties.SetName(focus, "Refresh quota");
+                var window = new System.Windows.Window { Content = new System.Windows.Controls.StackPanel { Children = { status, percentage, reset, focus } } };
+                var identity = window; var popover = new WpfPopoverRuntime(window, controller);
+                source.Current = WindowsTheme.Dark; popover.Show();
+                Assert.True(popover.IsVisible); Assert.Same(identity, window); Assert.Equal(WindowsTheme.Dark, ActiveTheme(resources)); Assert.Equal("Unavailable", status.Text); Assert.Equal("42%", percentage.Text); Assert.Equal("Resets in 5h", reset.Text); Assert.True(focus.Focusable); Assert.Equal("Refresh quota", System.Windows.Automation.AutomationProperties.GetName(focus)); window.Close();
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { if (!System.Windows.Threading.Dispatcher.CurrentDispatcher.HasShutdownStarted) System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    private static WindowsTheme ActiveTheme(System.Windows.ResourceDictionary resources) => (WindowsTheme)resources.MergedDictionaries.Last()["Theme"];
+    private sealed class FakeThemeSource(WindowsTheme current) : IWindowsThemeSource
+    {
+        public event EventHandler? Changed;
+        public WindowsTheme Current { get; set; } = current;
+        public int Disposals { get; private set; }
+        public void Raise() => Changed?.Invoke(this, EventArgs.Empty);
+        public void Dispose() => Disposals++;
     }
     private sealed class TestResource : IAsyncDisposable { public int Disposals { get; private set; } public ValueTask DisposeAsync() { Disposals++; return ValueTask.CompletedTask; } }
     private sealed class ThrowingStore : IQuotaSnapshotStore
