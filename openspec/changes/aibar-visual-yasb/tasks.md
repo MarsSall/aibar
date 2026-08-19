@@ -237,19 +237,19 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 ### Behavior-first tests and contracts
 
-- [ ] **1b-clear.1 RED — exact owned-path transaction:** Cover only `yasb-quota.json`, absent idempotence, staged move/delete, rollback when a later owned target fails, reparse rejection, unrelated-path preservation, and retry after failure. <!-- sdd-owner: implementation -->
-- [ ] **1b-clear.2 RED — queued/in-flight coordination and stale suppression:** Block ordinary publication, queue a later write, then clear. Require cancellation/await before path mutation, no stale completion or queued resurrection, and disabled/null recreation or proven safe absence on success and bounded failure paths. <!-- sdd-owner: implementation -->
-- [ ] **1b-clear.3 RED — composition, failure isolation, and disposal order:** Exercise production-shaped synthetic composition, writer failure without cache/UI corruption, clear during initialization/publication, shutdown without recreation, and explicit publisher/writer-facing disposal before coordinator/store dependencies. <!-- sdd-owner: implementation -->
+- [x] **1b-clear.1 RED — exact owned-path transaction:** Cover only `yasb-quota.json`, absent idempotence, staged move/delete, rollback when a later owned target fails, reparse rejection, unrelated-path preservation, and retry after failure. <!-- sdd-owner: implementation -->
+- [x] **1b-clear.2 RED — queued/in-flight coordination and stale suppression:** Block ordinary publication, queue a later write, then clear. Require cancellation/await before path mutation, no stale completion or queued resurrection, and disabled/null recreation or proven safe absence on success and bounded failure paths. <!-- sdd-owner: implementation -->
+- [x] **1b-clear.3 RED — composition, failure isolation, and disposal order:** Exercise production-shaped synthetic composition, writer failure without cache/UI corruption, clear during initialization/publication, shutdown without recreation, and explicit publisher/writer-facing disposal before coordinator/store dependencies. <!-- sdd-owner: implementation -->
 
 ### Production implementation
 
-- [ ] **1b-clear.4 GREEN — exact clear protocol:** Add only the exact snapshot to owned targets, preserve staged rollback/reparse defenses, coordinate current publisher work, suppress stale completion, and recreate only disabled/null or leave proven safe absence. <!-- sdd-owner: implementation -->
-- [ ] **1b-clear.5 GREEN — composition and lifecycle:** Compose the committed writer beside presentation, isolate routine writer failure, wire clear ordering through existing privacy authority, and make disposal order explicit so shutdown cannot recreate or publish after dependencies are disposed. <!-- sdd-owner: implementation -->
+- [x] **1b-clear.4 GREEN — exact clear protocol:** Add only the exact snapshot to owned targets, preserve staged rollback/reparse defenses, coordinate current publisher work, suppress stale completion, and recreate only disabled/null or leave proven safe absence. <!-- sdd-owner: implementation -->
+- [x] **1b-clear.5 GREEN — composition and lifecycle:** Compose the committed writer beside presentation, isolate routine writer failure, wire clear ordering through existing privacy authority, and make disposal order explicit so shutdown cannot recreate or publish after dependencies are disposed. <!-- sdd-owner: implementation -->
 
 ### Focused check and commit boundary
 
-- [ ] **1b-clear.6 CHECK — verify clear independently:** Run only isolated clear/composition tests; inspect exact ownership, rollback, in-flight/queued coordination, stale suppression, disabled/null or safe absence, failure isolation, and disposal order. Use no real profile/network/live process. <!-- sdd-owner: implementation -->
-- [ ] **1b-clear.7 COMMIT BOUNDARY — clear/composition only:** Freeze one clear/composition commit based on committed 1b-writer. Rollback removes clear composition and snapshot ownership while retaining the writer and all Application privacy behavior; first prove the snapshot disabled/null or safely absent. <!-- sdd-owner: implementation -->
+- [x] **1b-clear.6 CHECK — verify clear independently:** Run only isolated clear/composition tests; inspect exact ownership, rollback, in-flight/queued coordination, stale suppression, disabled/null or safe absence, failure isolation, and disposal order. Use no real profile/network/live process. <!-- sdd-owner: implementation -->
+- [x] **1b-clear.7 COMMIT BOUNDARY — clear/composition only:** Freeze one clear/composition commit based on committed 1b-writer. Rollback removes clear composition and snapshot ownership while retaining the writer and all Application privacy behavior; first prove the snapshot disabled/null or safely absent. <!-- sdd-owner: implementation -->
 
 **Hard stop:** Stop at **160 authored source/test lines** and replan before borrowing writer internals or Unit 2 scope. Never reach 400 or use an exception.
 

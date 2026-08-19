@@ -1,5 +1,24 @@
 # Apply Progress — aibar-visual-yasb
 
+## Unit 1b-clear — completed exact clear and Desktop composition
+
+- **Scope and delta:** Completed only Unit 1b-clear on `feat/aibar-visual-yasb-1b-clear` against `3d13717`, with exactly **117 authored source/test lines**: 2 in `ClearAiBarDataService.cs`, 21 in `QuotaExport.cs`, 20 in `App.xaml.cs`, and 74 in `ClearAiBarDataTests.cs`. This is below the 160-line hard stop.
+- **Behavior outcome:** Clear coordinates queued/in-flight publication before exact owned-path mutation, suppresses stale completion and queued resurrection, leaves a disabled/null snapshot or proven safe absence, composes the writer with failure isolation, and disposes publisher/writer-facing resources before coordinator/store dependencies.
+- **Focused evidence:** The exact isolated final authorized correction target ran once and passed **11/11**, with 0 failed, 0 skipped, and exit 0.
+- **Native settlement:** Complete with evidence revision `sha256:610ed5a7a547cefd03f399b6187f319188962f3cfb133187feab444ead71b930`, remediating revision `sha256:893a71127c79f4538d1c8ca9036c48df2d1ab49bd604bc7e027a7f3f8a5a2b88`.
+- **Diagnostics and delivery:** Parent LSP diagnostics were clean on all four source/test paths and the independent `pi-lens` reported no issues. Tasks `1b-clear.1` through `.7` are complete; Unit 2 and unrelated parent-policy tasks remain open. RDD remained off, no review ran, and no push or PR occurred.
+
+## Unit 1b-clear — failed focused harness; no completion credit
+
+- **Status consumed:** Native OpenSpec status is authoritative: `applyState: ready`, `nextRecommended: apply`, repo-local action context with the repository as the allowed edit root; the parent-owned runtime attempt was already active and was not acquired, reset, or settled by this worker.
+- **Scope and delivery:** Unit 1b-clear only, feature-branch-chain child based on `3d13717`; 160 authored source/test lines maximum, no size exception, no staging/commit/push/PR/review. The initial three restored files matched the parent-provided SHA-256 values.
+- **Attempted implementation:** Added publisher cancellation/await coordination before clear path mutation, composed that publisher as clear work, isolated writer injection for synthetic composition, and made publisher-before-store disposal observable. The publisher coordination seam necessarily touched `src/AIBar.Application/QuotaExport.cs`; it was the existing type that owns the queued/in-flight drain and epoch cancellation and cannot be coordinated from the three restored paths alone.
+- **Static checks:** `git diff --check` passed. Check-only `dotnet format ... whitespace --verify-no-changes --no-restore` failed only on pre-existing unrelated formatting findings in `QuotaRefreshCoordinatorTests.cs`, `QuotaVisualDesignTests.cs`, `ScanRunProvenanceTests.cs`, other unrelated test files, and packaging tools; it reported no changed Unit 1b-clear path.
+- **Focused harness (exactly once):** `dotnet test "C:/Users/mjsal/Desarrollos IA/Modificacion de Terminales/aibar-analytics-v2/tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj" --filter "FullyQualifiedName~ClearAiBarDataTests"` exited **1** during compilation. No test executed (pass 0, fail 0, skip 0). Diagnostic: `App.xaml.cs(83,63) CS0029` cannot implicitly convert `QuotaExportPublisher` to `IAiBarClearWork`.
+- **Post-failure discipline:** No production/test edit or test rerun followed the failed harness. The index is empty; no `testhost.exe`, `vstest.console.exe`, or `dotnet.exe` process remained. An untracked `NUL` entry appeared after the failed command and was left untouched to honor no-post-failure-edit discipline.
+- **Candidate delta vs `3d13717`:** 112 authored source/test lines: `ClearAiBarDataService.cs` 2 (1 add/1 delete), `QuotaExport.cs` 19, `App.xaml.cs` 20 (11 adds/9 deletes), and `ClearAiBarDataTests.cs` 71. Source/test paths are the three intended paths plus the necessary publisher seam; no writer files changed.
+- **Remaining tasks:** `- [ ]` 1b-clear.1 through 1b-clear.7 remain unchecked. Parent must decide whether to authorize a bound correction that explicitly has `QuotaExportPublisher : IAiBarClearWork`; no completion or verify readiness is claimed.
+
 ## Unit 1b-writer — completed canonical-path atomic writer
 
 - **Scope:** Completed only the Windows writer child in `src/AIBar.Desktop/QuotaExportWindows.cs` and `tests/AIBar.Domain.Tests/QuotaExportWriterTests.cs`, exactly **349 authored source/test lines** (195 + 154), below the 360-line child stop and 400-line review budget.

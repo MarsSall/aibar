@@ -113,7 +113,7 @@ public static class QuotaExportWire
     private static string Warning(QuotaExportWarning value) => value switch { QuotaExportWarning.RefreshFailed => "refresh-failed", QuotaExportWarning.AuthenticationFailed => "authentication-failed", QuotaExportWarning.Disabled => "disabled", _ => "unavailable" };
 }
 
-public sealed class QuotaExportPublisher : IAsyncDisposable
+public sealed class QuotaExportPublisher : IAsyncDisposable, IAiBarClearWork
 {
     private readonly QuotaRefreshCoordinator _authority;
     private readonly IQuotaExportWriter _writer;
@@ -151,6 +151,25 @@ if (!_draining) { _draining = true; _drain = DrainAsync(); }
 }
 public ValueTask EnableAsync(CancellationToken cancellationToken) => ChangeDisclosureAsync(true, cancellationToken);
 public ValueTask DisableAsync(CancellationToken cancellationToken) => ChangeDisclosureAsync(false, cancellationToken);
+public async ValueTask CancelAndWaitAsync(CancellationToken cancellationToken)
+{
+await _privacyGate.WaitAsync(cancellationToken);
+try
+{
+CancellationTokenSource prior; Task drain;
+lock (_gate)
+{
+ObjectDisposedException.ThrowIf(_disposed, this);
+prior = _epochCancellation; _epochCancellation = new(); ++_epoch;
+_enabled = _unlocked = false; _pending = null; drain = _drain;
+}
+prior.Cancel();
+try { await drain; }
+finally { prior.Dispose(); }
+}
+finally { _privacyGate.Release(); }
+}
+public void ResumeAfterClear() { }
 private async ValueTask ChangeDisclosureAsync(bool enabled, CancellationToken cancellationToken)
 {
     await _privacyGate.WaitAsync(cancellationToken);

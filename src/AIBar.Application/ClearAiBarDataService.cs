@@ -10,7 +10,7 @@ public interface IAiBarClearWork
 public sealed class ClearAiBarDataService : IAiBarDataClearCommand
 {
     private static readonly string[] DefaultOwnedPaths = ["cache", "logs", "aibar.db", "aibar.db-wal", "aibar.db-shm", "quota.db", "quota.db-wal", "quota.db-shm", "analytics.db", "analytics.db-wal", "analytics.db-shm", "settings.json",
-        "local-usage-settings.json", "local-usage-identity-salt.bin", "local-usage.db", "local-usage.db-wal", "local-usage.db-shm"];
+        "local-usage-settings.json", "local-usage-identity-salt.bin", "local-usage.db", "local-usage.db-wal", "local-usage.db-shm", "yasb-quota.json"];
     private readonly string _root;
     private readonly IReadOnlyList<IAiBarClearWork> _work;
     private readonly Func<CancellationToken, ValueTask> _recreateEmptyState;

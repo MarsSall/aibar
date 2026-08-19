@@ -61,6 +61,8 @@ public partial class App : System.Windows.Application
         var codexHome = seams.CodexHome ?? Environment.GetEnvironmentVariable("CODEX_HOME");
         var credentials = new ConsentCredentialSource(policy, new CodexCredentialReader(new ReadOnlyCredentialFileReader()), CodexRootResolver.Resolve(codexHome, userProfile));
         var coordinator = new QuotaRefreshCoordinator(store, new QuotaHttpProvider(policy, credentials), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
+        var exportPath = seams.DataDirectory is null ? WindowsQuotaExportPath.ForCurrentUser() : Path.Combine(dataDirectory, "yasb-quota.json");
+        var publisher = new QuotaExportPublisher(coordinator, seams.ExportWriter ?? new WindowsAtomicQuotaExportWriter(exportPath), clock);
         var localUsageLedger = new SqliteUsageEventLedger(Path.Combine(dataDirectory, "local-usage.db"));
         var localUsageSettings = new LocalUsageSettings(Path.Combine(dataDirectory, "local-usage-settings.json"));
         var localUsage = new LocalUsageCoordinator(localUsageSettings,
@@ -72,16 +74,16 @@ public partial class App : System.Windows.Application
             new SessionFileDiscovery(codexHome, userProfile, 50),
             new AnalyticsScanCoordinator(new SessionJsonlScanner(new SessionCheckpointStore(), "beta-v1", beforeStable: seams.BeforeAnalyticsStability), analyticsStore, new AnalyticsPolicy(new TimeZoneLocalDayPolicy(TimeZoneInfo.Local, "beta-v1"))),
             analyticsStore, () => clock.UtcNow), analytics, analyticsStore, seams.AnalyticsShutdownBound ?? TimeSpan.FromSeconds(2), seams.LifecycleObservation);
-        var betaRuntime = new BetaRuntime(new ConsentSettings(Path.Combine(dataDirectory, "settings.json")), policy, coordinator, clock, credentials, analyticsOwner);
+        var betaRuntime = new BetaRuntime(new ConsentSettings(Path.Combine(dataDirectory, "settings.json")), policy, coordinator, clock, credentials, analyticsOwner, publisher);
         var lifecycleEvents = new WindowsLifecycleEvents();
         var lifecycleAdapter = new QuotaRefreshLifecycleAdapter(lifecycleEvents, coordinator);
         var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents);
         var localUsagePresentation = new LocalUsagePresentationHost(localUsage, new LocalUsagePresentationMapper());
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
-        var clear = new ClearAiBarDataService(dataDirectory, [coordinator, localUsage, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics));
+        var clear = new ClearAiBarDataService(dataDirectory, [publisher, coordinator, localUsage, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics, publisher));
         return new(new BetaAnalyticsPresentation(presentation, analytics, localUsagePresentation), presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy, betaRuntime.RevokeConsentAsync, betaRuntime.GrantConsentAsync,
                 localUsageSettings.LoadAsync, localUsageSettings.SaveAsync, async (value, token) => { await localUsagePresentation.ApplyPolicyAsync(value, token); }),
-            new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, analyticsOwner, store, localUsage, localUsageLedger, seams.LifecycleObservation),
+            new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, publisher, analyticsOwner, store, localUsage, localUsageLedger, seams.LifecycleObservation),
             () => InitializeCompositionAsync(betaRuntime, presentation, localUsagePresentation, default), presentation.ReportUnavailable,
             (trigger, token) => ReevaluateCompositionAsync(coordinator, localUsagePresentation, trigger, token), localUsagePresentation.RefreshAsync);
     }
@@ -99,10 +101,10 @@ public partial class App : System.Windows.Application
     }
     private static async Task InitializePrivateAsync(BetaRuntime runtime, QuotaPresentationHost presentation, CancellationToken cancellationToken)
     { await runtime.InitializeAsync(cancellationToken); presentation.RefreshAvailabilityChanged(); }
-    internal static Func<CancellationToken, ValueTask> CreateEmptyStateFactory(QuotaRefreshCoordinator coordinator, LocalCodexAnalyticsView? analytics = null) => async token =>
+    internal static Func<CancellationToken, ValueTask> CreateEmptyStateFactory(QuotaRefreshCoordinator coordinator, LocalCodexAnalyticsView? analytics = null, QuotaExportPublisher? publisher = null) => async token =>
     {
-        analytics?.ResetAfterClear();
-        await coordinator.ClearAsync(token);
+        analytics?.ResetAfterClear(); await coordinator.ClearAsync(token);
+        if (publisher is not null) await publisher.DisableAsync(token);
     };
     private void StartTray(StartupComposition composition)
     {
@@ -121,15 +123,15 @@ public partial class App : System.Windows.Application
         internal static StartupComposition Unavailable => new(new UnavailableQuotaPresentation(), null, null, new EmptyAsyncResource(), () => Task.CompletedTask, () => { });
     }
 
-    internal sealed record CompositionSeams(string? DataDirectory = null, string? CodexHome = null, TimeSpan? AnalyticsShutdownBound = null, Action<string>? BeforeAnalyticsStability = null, Action<string>? LifecycleObservation = null, string? UserProfile = null);
+    internal sealed record CompositionSeams(string? DataDirectory = null, string? CodexHome = null, TimeSpan? AnalyticsShutdownBound = null, Action<string>? BeforeAnalyticsStability = null, Action<string>? LifecycleObservation = null, string? UserProfile = null, IQuotaExportWriter? ExportWriter = null);
     private sealed class SystemClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.UtcNow; }
-    internal sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, QuotaRefreshLifecycleAdapter lifecycleAdapter, WindowsLifecycleEvents lifecycleEvents, BetaRuntime runtime, AnalyticsLifecycleOwner analyticsOwner, IAsyncDisposable store, LocalUsageCoordinator localUsage, IAsyncDisposable localUsageLedger, Action<string>? observe) : IAsyncDisposable
+    internal sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, QuotaRefreshLifecycleAdapter lifecycleAdapter, WindowsLifecycleEvents lifecycleEvents, BetaRuntime runtime, QuotaExportPublisher publisher, AnalyticsLifecycleOwner analyticsOwner, IAsyncDisposable store, LocalUsageCoordinator localUsage, IAsyncDisposable localUsageLedger, Action<string>? observe) : IAsyncDisposable
     {
         public AnalyticsShutdownOutcome AnalyticsOutcome => analyticsOwner.Outcome;
         public ValueTask DisposeAsync() => DisposeAllAsync([
             lifecycleAdapter.DisposeAsync, presentation.DisposeAsync,
             () => { lifecycleEvents.Dispose(); return ValueTask.CompletedTask; },
-            runtime.DisposeAsync, () => DisposeResourceAsync(localUsage, observe, "local_usage_coordinator_disposed"),
+            () => DisposeResourceAsync(publisher, observe, "quota_export_publisher_disposed"), runtime.DisposeAsync, () => DisposeResourceAsync(localUsage, observe, "local_usage_coordinator_disposed"),
             () => DisposeResourceAsync(localUsageLedger, observe, "local_usage_ledger_disposed"),
             () => DisposeResourceAsync(store, observe, "quota_store_disposed"), analyticsOwner.DisposeAsync]);
 
