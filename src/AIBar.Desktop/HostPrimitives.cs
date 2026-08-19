@@ -1,5 +1,13 @@
 namespace AIBar.Desktop;
 
+public enum StartupIntent { Ordinary, Show }
+
+public static class StartupIntentParser
+{
+    public static StartupIntent Parse(string[] arguments) =>
+        arguments.Length == 1 && arguments[0] == "--show" ? StartupIntent.Show : StartupIntent.Ordinary;
+}
+
 public sealed class SingleInstanceHost : IDisposable
 {
     private static readonly HashSet<string> ProcessOwnedNames = [];

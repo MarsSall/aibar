@@ -1,5 +1,13 @@
 # Apply Progress — aibar-visual-yasb
 
+## Unit 2 — completed payload-free `--show` activation
+
+- **Scope and delta:** Completed only Unit 2 on `feat/aibar-visual-yasb-2` against `bc8d79f`, with exactly **115 authored source/test lines**: 8 in `App.xaml.cs`, 8 in `HostPrimitives.cs`, 20 in `HostRuntime.cs`, 34 in `HostPrimitivesTests.cs`, and 45 in `HostRuntimeTests.cs`; this is below the 290-line unit cap.
+- **Behavior and coverage:** Only exact, case-sensitive `--show` requests one show and forwards no payload. Primary, secondary, readiness/pending, and startup/disposal race paths preserve one authority and the existing fixed activation event.
+- **Focused evidence:** The final exact four-test payload-free activation target passed **4/4**, with 0 failed, 0 skipped, and exit 0.
+- **Native settlement:** Complete with evidence revision `sha256:a43f2a0122b3a008428566228138aa72402e7bc228b63f28a1a7029d4ebd7495`, remediating revision `sha256:3ca3e11bd2908f28b2d43024de511759b78968c11d13c77bfa8d112b9dd1632e`.
+- **Diagnostics and delivery:** Parent LSP diagnostics were clean on all five source/test paths and the independent `pi-lens` reported no issues. Tasks `2.1` through `2.6` are complete; Unit 3 and parent-policy tasks remain untouched. RDD remained off, no review ran, and no push or PR occurred. The failed-attempt history below is preserved.
+
 ## Unit 1b-clear — completed exact clear and Desktop composition
 
 - **Scope and delta:** Completed only Unit 1b-clear on `feat/aibar-visual-yasb-1b-clear` against `3d13717`, with exactly **117 authored source/test lines**: 2 in `ClearAiBarDataService.cs`, 21 in `QuotaExport.cs`, 20 in `App.xaml.cs`, and 74 in `ClearAiBarDataTests.cs`. This is below the 160-line hard stop.
@@ -221,3 +229,14 @@ These positives do not compensate for omitted mandatory cases or authority seria
 - This planning handoff runs no tests/builds/native lifecycle commands and changes no source/test byte.
 
 **Next action:** `await explicit approval for candidate disposition and Unit 1a-contract apply`.
+
+## Unit 2 — failed focused activation harness; no completion credit
+
+- **Status consumed:** Native OpenSpec status was authoritative: `applyState: ready`, `nextRecommended: apply`, and repository-local action context with the repository as the only allowed edit root. The parent-owned runtime attempt was already active and was not acquired, reset, or settled here.
+- **Scope and delta:** Only the Unit 2 source/test paths were changed: `App.xaml.cs` +5/-3, `HostPrimitives.cs` +8/-0, `HostRuntime.cs` +17/-3, `HostPrimitivesTests.cs` +34/-0, and `HostRuntimeTests.cs` +41/-2 — **113 authored source/test lines** total, below the 290-line hard cap.
+- **Attempted behavior:** The candidate adds an exact, case-sensitive payload-free `--show` parser; queues/coalesces a show request until `TrayHostRuntime.Start`; routes secondary activation through the existing fixed auto-reset event; and calls the existing popover without creating another runtime or payload channel. App defers first-instance show until composition initialization succeeds.
+- **Static evidence:** `git diff --check` and `dotnet format "C:/Users/mjsal/Desarrollos IA/Modificacion de Terminales/aibar-analytics-v2/tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj" whitespace --verify-no-changes --no-restore` both exited 0.
+- **Focused harness (exactly once):** `dotnet test "C:/Users/mjsal/Desarrollos IA/Modificacion de Terminales/aibar-analytics-v2/tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj" --no-restore --filter "FullyQualifiedName~Show_activation_parser_accepts_only_the_exact_payload_free_token|FullyQualifiedName~Show_activation_preserves_the_fixed_auto_reset_single_instance_handoff|FullyQualifiedName~Show_activation_queues_one_request_until_host_start_then_activates_the_existing_popover|FullyQualifiedName~Show_activation_from_a_secondary_instance_uses_the_primary_popover_only"` exited **1**: pass 2, fail 2, skip 0, total 4. Both runtime tests failed only while disposing `SingleInstanceHost` with `System.ApplicationException: Object synchronization method was called from an unsynchronized block of code` at `HostPrimitives.cs:60`; the parser and fixed auto-reset handoff tests passed.
+- **Post-failure discipline:** No source/test edit and no test rerun followed the failure. `testhost.exe` and `vstest.console.exe` are absent; the remaining `dotnet.exe` PID 4700 is the shared Roslyn `VBCSCompiler.dll` server, not a test process. The index is unstaged and no task checkbox was changed.
+- **Remaining tasks:** `- [ ]` 2.1 through 2.6 remain unchecked. Parent must authorize a bounded correction to make the asynchronous runtime tests dispose the mutex on its owning thread (or otherwise preserve ownership-thread cleanup) before a new focused harness can run.
+- **Workload / PR boundary:** Unit 2 only on `feat/aibar-visual-yasb-2`, bounded at 290 source/test lines; no size exception, staging, commit, review, push, or PR.

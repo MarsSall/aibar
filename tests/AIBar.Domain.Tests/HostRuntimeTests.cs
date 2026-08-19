@@ -37,6 +37,47 @@ public sealed class HostRuntimeTests
     }
 
     [Fact]
+    public async Task Show_activation_queues_one_request_until_host_start_then_activates_the_existing_popover()
+    {
+        using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
+        var popover = new FakePopover();
+        await using var host = new TrayHostRuntime(instance, new FakeTray(), popover, new FakeRecreationEvents(), _ => Task.CompletedTask, new ProbeResource(), () => { });
+
+        host.RequestShow();
+        host.RequestShow();
+        Assert.Equal(0, popover.Shows);
+
+        host.Start();
+        Assert.Equal(1, popover.Shows);
+        Assert.Equal(1, popover.Activations);
+
+        host.RequestShow();
+        host.RequestShow();
+        Assert.Equal(1, popover.Shows);
+        Assert.Equal(3, popover.Activations);
+        instance.Dispose();
+    }
+
+    [Fact]
+    public async Task Show_activation_from_a_secondary_instance_uses_the_primary_popover_only()
+    {
+        var name = $"AIBar.Tests.{Guid.NewGuid():N}";
+        using var primary = new SingleInstanceHost(name);
+        var popover = new FakePopover();
+        await using var host = new TrayHostRuntime(primary, new FakeTray(), popover, new FakeRecreationEvents(), _ => Task.CompletedTask, new ProbeResource(), () => { });
+        host.Start();
+
+        using var secondary = new SingleInstanceHost(name);
+        Assert.False(secondary.IsPrimary);
+        Assert.True(secondary.RequestActivation());
+        primary.DispatchPendingActivation();
+
+        Assert.Equal(1, popover.Shows);
+        Assert.Equal(1, popover.Activations);
+        secondary.Dispose(); primary.Dispose();
+    }
+
+    [Fact]
     public async Task Exit_cancels_waits_then_disposes_every_resource_once_and_blocks_late_activation()
     {
         using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
@@ -309,8 +350,8 @@ public sealed class HostRuntimeTests
     private sealed class FakePopover : IPopoverRuntime
     {
         public event Action? Deactivated; public bool IsVisible { get; private set; } public bool IsOwnedDialogActive { get; set; }
-        public int Shows { get; private set; } public int Hides { get; private set; }
-        public void Show() { IsVisible = true; Shows++; } public void Hide() { IsVisible = false; Hides++; } public void Activate() { }
+        public int Shows { get; private set; } public int Hides { get; private set; } public int Activations { get; private set; }
+        public void Show() { if (!IsVisible) { IsVisible = true; Shows++; } } public void Hide() { IsVisible = false; Hides++; } public void Activate() => Activations++;
         public void Deactivate() => Deactivated?.Invoke();
     }
 

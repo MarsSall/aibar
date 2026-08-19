@@ -267,12 +267,12 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 **Exclusions:** theme/DWM/layout/YASB launcher, general IPC, path/process discovery, endpoint behavior.
 
-- [ ] **2.1 RED — parser matrix:** Zero args, exact `--show`, case mismatch, assignment, abbreviation, path, URL, multiple and arbitrary args; only Ordinary/Show and no forwarded payload. <!-- sdd-owner: implementation -->
-- [ ] **2.2 RED — host lifecycle matrix:** First show-after-ready, secondary signal/exit, visible popup, pending construction, repeated requests, failed start, disposal, abandoned mutex, access denied, and object-type mismatch. <!-- sdd-owner: implementation -->
-- [ ] **2.3 RED — kernel safety:** Preserve fixed names, zero-time acquisition, AutoReset, abandoned behavior, and minimum current-user/SYSTEM rights with no fallback authority name. <!-- sdd-owner: implementation -->
-- [ ] **2.4 GREEN — bounded activation:** Implement parser and ready/pending show sequencing over the existing fixed event; discard unknown args and preserve ordinary async initialization. <!-- sdd-owner: implementation -->
-- [ ] **2.5 CHECK — verify Unit 2:** Run focused parser/host tests and prove no payload/discovery/duplicate authority. <!-- sdd-owner: implementation -->
-- [ ] **2.6 COMMIT BOUNDARY — activation:** Freeze one activation commit; rollback restores prior startup without changing export authority. <!-- sdd-owner: implementation -->
+- [x] **2.1 RED — parser matrix:** Zero args, exact `--show`, case mismatch, assignment, abbreviation, path, URL, multiple and arbitrary args; only Ordinary/Show and no forwarded payload. <!-- sdd-owner: implementation -->
+- [x] **2.2 RED — host lifecycle matrix:** First show-after-ready, secondary signal/exit, visible popup, pending construction, repeated requests, failed start, disposal, abandoned mutex, access denied, and object-type mismatch. <!-- sdd-owner: implementation -->
+- [x] **2.3 RED — kernel safety:** Preserve fixed names, zero-time acquisition, AutoReset, abandoned behavior, and minimum current-user/SYSTEM rights with no fallback authority name. <!-- sdd-owner: implementation -->
+- [x] **2.4 GREEN — bounded activation:** Implement parser and ready/pending show sequencing over the existing fixed event; discard unknown args and preserve ordinary async initialization. <!-- sdd-owner: implementation -->
+- [x] **2.5 CHECK — verify Unit 2:** Run focused parser/host tests and prove no payload/discovery/duplicate authority. <!-- sdd-owner: implementation -->
+- [x] **2.6 COMMIT BOUNDARY — activation:** Freeze one activation commit; rollback restores prior startup without changing export authority. <!-- sdd-owner: implementation -->
 
 **Hard split trigger:** Replan at 360 if kernel ACL compatibility needs a separate adapter. Do not mix theme work or cross 400.
 

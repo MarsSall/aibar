@@ -20,6 +20,7 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
         if (_suppressHostStartup) return;
+        var showRequested = StartupIntentParser.Parse(e.Args) == StartupIntent.Show;
         _instance = new SingleInstanceHost("AIBar");
         if (!_instance.IsPrimary)
         {
@@ -29,10 +30,10 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        _ = StartPrimary(() => CreateComposition(), StartTray, ReportFault, Shutdown);
+        _ = StartPrimary(() => CreateComposition(), StartTray, ReportFault, Shutdown, showRequested ? RequestShowAfterStartup : null);
     }
 
-    internal static async Task StartPrimary(Func<StartupComposition> compose, Action<StartupComposition> startTray, Action<Exception> report, Action shutdown)
+    internal static async Task StartPrimary(Func<StartupComposition> compose, Action<StartupComposition> startTray, Action<Exception> report, Action shutdown, Action? showWhenReady = null)
     {
         StartupComposition composition;
         try { composition = compose(); }
@@ -45,9 +46,10 @@ public partial class App : System.Windows.Application
             shutdown();
             return;
         }
-        try { await composition.Initialize(); }
+        try { await composition.Initialize(); showWhenReady?.Invoke(); }
         catch (Exception exception) { report(exception); composition.ReportUnavailable(); }
     }
+    private void RequestShowAfterStartup() => _runtime?.RequestShow();
     internal static StartupComposition CreateComposition(CompositionSeams? seams = null)
     {
         seams ??= new();

@@ -77,6 +77,40 @@ public sealed class HostPrimitivesTests
     }
 
     [Fact]
+    public void Show_activation_parser_accepts_only_the_exact_payload_free_token()
+    {
+        Assert.Equal(StartupIntent.Ordinary, StartupIntentParser.Parse([]));
+        Assert.Equal(StartupIntent.Show, StartupIntentParser.Parse(["--show"]));
+
+        foreach (var arguments in new[]
+        {
+            new[] { "--SHOW" }, new[] { "--show=value" }, new[] { "--sho" },
+            new[] { "--show", "payload" }, new[] { "https://example.test" },
+            new[] { "C:\\payload.json" }, new[] { "--unknown" }
+        })
+            Assert.Equal(StartupIntent.Ordinary, StartupIntentParser.Parse(arguments));
+    }
+
+    [Fact]
+    public void Show_activation_preserves_the_fixed_auto_reset_single_instance_handoff()
+    {
+        var name = $"AIBar.Tests.{Guid.NewGuid():N}";
+        using var primary = new SingleInstanceHost(name);
+        using var secondary = new SingleInstanceHost(name);
+        var activations = 0;
+        primary.ActivationRequested += () => activations++;
+
+        Assert.True(primary.IsPrimary);
+        Assert.False(secondary.IsPrimary);
+        Assert.True(secondary.RequestActivation());
+        Assert.True(secondary.RequestActivation());
+        primary.DispatchPendingActivation();
+        primary.DispatchPendingActivation();
+
+        Assert.Equal(1, activations);
+    }
+
+    [Fact]
     public void Placement_uses_taskbar_work_area_and_clamps_to_monitor_edges()
     {
         var result = PopoverPlacement.Place(new(

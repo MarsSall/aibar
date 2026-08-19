@@ -83,6 +83,8 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private Task? _cleanupTask;
     private Task? _exitTask;
     private int _grantingConsent;
+    private bool _started;
+    private bool _showPending;
     private bool _disposed;
 
     public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess, IManualRefreshCommand? refreshCommand = null, NativeSettingsCommands? settings = null, Action? reportSettingsFailure = null, Func<RefreshTrigger, CancellationToken, ValueTask>? reevaluate = null, QuotaPresentationHost? presentation = null, IPrivateIntegrationConsentPrompt? consentPrompt = null, IOpenCodeDataFolderPicker? openCodeFolderPicker = null)
@@ -94,12 +96,18 @@ public sealed class TrayHostRuntime : IAsyncDisposable
         _tray.SetSettingsAvailable(settings is not null);
         _tray.SetPrivateIntegrationEnabled(settings?.PrivateIntegrationEnabled == true);
         _tray.SetLocalUsageAvailable(settings?.LocalUsageAvailable == true); _tray.SetLocalUsagePolicy(settings?.LocalUsagePolicy ?? LocalUsagePolicy.Disabled);
-        _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _tray.RefreshRequested += OnRefreshRequested; _tray.StartupToggleRequested += OnStartupToggleRequested; _tray.ClearAiBarDataRequested += OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested += OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested += OnPrivateIntegrationDisableRequested; _tray.OpenCodeLocalUsageToggleRequested += OnOpenCodeLocalUsageToggleRequested; _tray.PiLocalUsageToggleRequested += OnPiLocalUsageToggleRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += ShowPopover;
+        _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _tray.RefreshRequested += OnRefreshRequested; _tray.StartupToggleRequested += OnStartupToggleRequested; _tray.ClearAiBarDataRequested += OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested += OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested += OnPrivateIntegrationDisableRequested; _tray.OpenCodeLocalUsageToggleRequested += OnOpenCodeLocalUsageToggleRequested; _tray.PiLocalUsageToggleRequested += OnPiLocalUsageToggleRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += RequestShow;
         if (_tray is IOpenCodeDataRootTray rootTray) { rootTray.OpenCodeDataFolderChooseRequested += OnOpenCodeDataFolderChooseRequested; rootTray.OpenCodeDataFolderResetRequested += OnOpenCodeDataFolderResetRequested; }
         _activationTimer.Tick += DispatchPendingActivation;
     }
 
-    public void Start() { if (_disposed) return; RunSafely(_tray.Show); _activationTimer.Start(); _ = LoadLocalUsagePolicySafelyAsync(); }
+    public void Start() { if (_disposed || _started) return; _started = true; RunSafely(_tray.Show); _activationTimer.Start(); ShowPendingRequest(); _ = LoadLocalUsagePolicySafelyAsync(); }
+    public void RequestShow()
+    {
+        if (_disposed) return;
+        _showPending = true;
+        ShowPendingRequest();
+    }
     public bool? StartupEnabled { get; private set; }
     public Task ExitAsync()
     {
@@ -130,6 +138,12 @@ public sealed class TrayHostRuntime : IAsyncDisposable
         if (!_disposed) RunSafely(_instance.DispatchPendingActivation);
     }
 
+    private void ShowPendingRequest()
+    {
+        if (!_started || !_showPending) return;
+        _showPending = false;
+        ShowPopover();
+    }
     private void Toggle()
     {
         if (_disposed) return;
@@ -242,7 +256,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private async Task ExitSafelyAsync() { try { await ExitAsync(); } catch (Exception) { } }
     private void Detach()
     {
-        _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _tray.RefreshRequested -= OnRefreshRequested; _tray.StartupToggleRequested -= OnStartupToggleRequested; _tray.ClearAiBarDataRequested -= OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested -= OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested -= OnPrivateIntegrationDisableRequested; _tray.OpenCodeLocalUsageToggleRequested -= OnOpenCodeLocalUsageToggleRequested; _tray.PiLocalUsageToggleRequested -= OnPiLocalUsageToggleRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= ShowPopover;
+        _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _tray.RefreshRequested -= OnRefreshRequested; _tray.StartupToggleRequested -= OnStartupToggleRequested; _tray.ClearAiBarDataRequested -= OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested -= OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested -= OnPrivateIntegrationDisableRequested; _tray.OpenCodeLocalUsageToggleRequested -= OnOpenCodeLocalUsageToggleRequested; _tray.PiLocalUsageToggleRequested -= OnPiLocalUsageToggleRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= RequestShow;
         if (_tray is IOpenCodeDataRootTray rootTray) { rootTray.OpenCodeDataFolderChooseRequested -= OnOpenCodeDataFolderChooseRequested; rootTray.OpenCodeDataFolderResetRequested -= OnOpenCodeDataFolderResetRequested; }
         if (_refreshCommand is not null) _refreshCommand.CanExecuteChanged -= OnRefreshAvailabilityChanged;
         if (_presentation is not null) _presentation.PropertyChanged -= OnPresentationChanged;
