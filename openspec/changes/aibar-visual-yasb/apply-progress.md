@@ -1,5 +1,13 @@
 # Apply Progress — aibar-visual-yasb
 
+## Unit 1b-writer — completed canonical-path atomic writer
+
+- **Scope:** Completed only the Windows writer child in `src/AIBar.Desktop/QuotaExportWindows.cs` and `tests/AIBar.Domain.Tests/QuotaExportWriterTests.cs`, exactly **349 authored source/test lines** (195 + 154), below the 360-line child stop and 400-line review budget.
+- **Outcome:** The canonical-path, durable same-directory atomic writer now enforces protected minimum-rights ACLs, reparse/race defenses, complete old/new reader views, and exact owned-temp cleanup. The ACL ordering correction was applied before settlement.
+- **Focused evidence:** The isolated writer target passed **18/18** with 0 failed and 0 skipped. LSP diagnostics and the selected independent lens were clean.
+- **Native settlement:** Complete with evidence `sha256:2eadabbcbebf597cdfc448d8df48a59f664b76ee718e71fe625c44ff45de9e01`, remediating `sha256:335227fe919b1374f676155e84e1c4e0c7bdba0948f2d419799596e6762810dd`.
+- **Task and delivery state:** `1b-writer.1` through `.8` are complete. RDD remained off, no review was started, and no push or PR occurred. Unit 1b-clear and parent-owned policy tasks remain open.
+
 ## Unit 1b — failed candidate preserved and split into writer then clear
 
 - **Maintainer decision:** `Dividir writer/clear`. The active chain is now `1a-privacy -> 1b-writer -> 1b-clear -> 2`; 1b-clear may start only from a committed 1b-writer child.
