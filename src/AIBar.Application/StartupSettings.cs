@@ -154,6 +154,7 @@ public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarD
     }
     public async ValueTask ClearAiBarDataAsync(CancellationToken cancellationToken)
     {
+        if (revokePrivate is not null) await revokePrivate(cancellationToken);
         if (!LocalUsageAvailable) { await clear.ClearAsync(cancellationToken); return; }
         await _localUsageGate.WaitAsync(cancellationToken);
         try

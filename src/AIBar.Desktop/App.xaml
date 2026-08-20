@@ -4,19 +4,15 @@
              xmlns:system="clr-namespace:System;assembly=mscorlib"
              ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="Themes/Semantic.Light.xaml" />
+        </ResourceDictionary.MergedDictionaries>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <FontFamily x:Key="AppFont">Segoe UI</FontFamily>
         <system:Double x:Key="SpacingSmall">8</system:Double>
         <system:Double x:Key="SpacingMedium">16</system:Double>
         <CornerRadius x:Key="CardRadius">10</CornerRadius>
-        <SolidColorBrush x:Key="SurfaceBrush" Color="#FFF7F7F7" />
-        <SolidColorBrush x:Key="CardBrush" Color="#FFFFFFFF" />
-        <SolidColorBrush x:Key="TextBrush" Color="#FF1B1B1B" />
-        <SolidColorBrush x:Key="MutedTextBrush" Color="#FF545454" />
-        <SolidColorBrush x:Key="AccentBrush" Color="#FF0078D4" />
-        <SolidColorBrush x:Key="FocusBrush" Color="#FF005FB8" />
-        <SolidColorBrush x:Key="ProgressTrackBrush" Color="#FFD8EAF8" />
-        <SolidColorBrush x:Key="SecondaryBorderBrush" Color="#FFDADADA" />
         <SolidColorBrush x:Key="HighContrastBorderBrush" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}" />
 
         <Style x:Key="KeyboardFocusVisual" TargetType="{x:Type Control}">
@@ -136,5 +132,6 @@
             <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusVisual}" />
             <Setter Property="Padding" Value="12,6" />
         </Style>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

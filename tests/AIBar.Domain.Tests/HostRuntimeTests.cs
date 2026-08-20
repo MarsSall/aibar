@@ -37,6 +37,47 @@ public sealed class HostRuntimeTests
     }
 
     [Fact]
+    public async Task Show_activation_queues_one_request_until_host_start_then_activates_the_existing_popover()
+    {
+        using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
+        var popover = new FakePopover();
+        await using var host = new TrayHostRuntime(instance, new FakeTray(), popover, new FakeRecreationEvents(), _ => Task.CompletedTask, new ProbeResource(), () => { });
+
+        host.RequestShow();
+        host.RequestShow();
+        Assert.Equal(0, popover.Shows);
+
+        host.Start();
+        Assert.Equal(1, popover.Shows);
+        Assert.Equal(1, popover.Activations);
+
+        host.RequestShow();
+        host.RequestShow();
+        Assert.Equal(1, popover.Shows);
+        Assert.Equal(3, popover.Activations);
+        instance.Dispose();
+    }
+
+    [Fact]
+    public async Task Show_activation_from_a_secondary_instance_uses_the_primary_popover_only()
+    {
+        var name = $"AIBar.Tests.{Guid.NewGuid():N}";
+        using var primary = new SingleInstanceHost(name);
+        var popover = new FakePopover();
+        await using var host = new TrayHostRuntime(primary, new FakeTray(), popover, new FakeRecreationEvents(), _ => Task.CompletedTask, new ProbeResource(), () => { });
+        host.Start();
+
+        using var secondary = new SingleInstanceHost(name);
+        Assert.False(secondary.IsPrimary);
+        Assert.True(secondary.RequestActivation());
+        primary.DispatchPendingActivation();
+
+        Assert.Equal(1, popover.Shows);
+        Assert.Equal(1, popover.Activations);
+        secondary.Dispose(); primary.Dispose();
+    }
+
+    [Fact]
     public async Task Exit_cancels_waits_then_disposes_every_resource_once_and_blocks_late_activation()
     {
         using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
@@ -248,7 +289,16 @@ public sealed class HostRuntimeTests
         await using var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), () => policy.IsEnabled);
         using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
         var tray = new FakeTray(); var prompt = new FakeConsentPrompt(true);
-        var settings = new NativeSettingsCommands(new FakeStartupRegistration(), new FakeClearCommand(), policy, beta.RevokeConsentAsync, beta.GrantConsentAsync);
+        var revokeStarted = false; var revokeCompleted = false; Exception? revokeException = null;
+        var revokeElapsed = new System.Diagnostics.Stopwatch();
+        async ValueTask RevokeConsentAsync(CancellationToken cancellationToken)
+        {
+            revokeStarted = true; revokeElapsed.Start();
+            try { await beta.RevokeConsentAsync(cancellationToken); revokeCompleted = true; }
+            catch (Exception exception) { revokeException = exception; throw; }
+            finally { revokeElapsed.Stop(); }
+        }
+        var settings = new NativeSettingsCommands(new FakeStartupRegistration(), new FakeClearCommand(), policy, RevokeConsentAsync, beta.GrantConsentAsync);
         var host = new TrayHostRuntime(instance, tray, new FakePopover(), new FakeRecreationEvents(), _ => Task.CompletedTask, beta, () => { }, settings: settings, presentation: presentation, consentPrompt: prompt);
         instance.Dispose();
         try
@@ -263,7 +313,19 @@ public sealed class HostRuntimeTests
             Assert.Equal(2, document.RootElement.EnumerateObject().Count()); Assert.True(document.RootElement.GetProperty("privateCodexConsent").GetBoolean());
             Assert.Equal("quota_credential_missing", beta.State.Failure!.SafeCode);
 
-            tray.DisablePrivate(); PumpUntil(() => tray.EnablePrivateVisible);
+            tray.DisablePrivate();
+            var menuRestored = PumpUntilObserved(() => tray.EnablePrivateVisible);
+            var persistedConsent = "<not-read>";
+            if (!menuRestored)
+            {
+                try { persistedConsent = (await consent.LoadAsync(default)).ToString(); }
+                catch (Exception exception) { persistedConsent = $"load-error={exception.GetType().Name}: {exception.Message}"; }
+            }
+            var revokeError = revokeException is null ? "<none>" : $"{revokeException.GetType().Name}: {revokeException.Message}";
+            Assert.True(menuRestored, menuRestored ? null :
+                $"Revoke diagnostic: started={revokeStarted}, completed={revokeCompleted}, exception={revokeError}, elapsedMs={revokeElapsed.Elapsed.TotalMilliseconds:F1}, " +
+                $"policyEnabled={policy.IsEnabled}, persistedConsent={persistedConsent}, traySettings={tray.SettingsAvailable}, trayPrivateEnabled={tray.PrivateIntegrationEnabled}, " +
+                $"trayEnableVisible={tray.EnablePrivateVisible}, trayDisableVisible={tray.DisablePrivateVisible}, trayWrites=[{string.Join(",", tray.PrivateIntegrationWrites)}], presentation={presentation.State}");
             Assert.False(await consent.LoadAsync(default)); Assert.True(presentation.State.IsPrivateIntegrationDisabled);
             Assert.False(presentation.State.IsLoading); Assert.False(presentation.State.IsMissingCredential);
         }
@@ -274,12 +336,58 @@ public sealed class HostRuntimeTests
         }
     }
 
-    private static void PumpUntil(Func<bool> condition)
+    [Fact]
+    public void Unit_4a_tray_formatter_keeps_both_truthful_slots_and_a_bounded_status()
+    {
+        var cases = new[]
+        {
+        (Presentation(42, 20), "AIBar: 5h 42% | 7d 20% | Current"), (Presentation(42, null, unavailable: true), "AIBar: 5h 42% | 7d -- | Unavailable"),
+        (Presentation(null, null, unavailable: true), "AIBar: 5h -- | 7d -- | Unavailable"), (Presentation(null, null, loading: true), "AIBar: 5h -- | 7d -- | Loading"),
+        (Presentation(42, 20, cached: true, age: "Cached 00h 00m"), "AIBar: 5h 42% | 7d 20% | Stale | Cached 00h 00m"), (Presentation(null, null, disabled: true), "AIBar: 5h -- | 7d -- | Disabled"),
+        (Presentation(null, null) with { FreshnessLabel = "Error", IsSafeError = true }, "AIBar: 5h -- | 7d -- | Error"),
+        (Presentation(42, null, cached: true, age: "Cached 00h 00m") with { FreshnessLabel = "Stale" }, "AIBar: 5h 42% | 7d -- | Stale | Cached 00h 00m")
+        };
+        Assert.All(cases, item => Assert.Equal(item.Item2, TrayPresentationFormatter.Format(item.Item1)));
+        var now = DateTimeOffset.UtcNow; var future = new QuotaPresentationMapper(new FixedClock(now)).Map(new(new(new(42, now.AddHours(5)), new(20, now.AddDays(7)), now.AddHours(1)), FreshnessState.Stale, false, null, null));
+        Assert.Equal(TimeSpan.Zero, future.CachedAge); Assert.Equal("AIBar: 5h 42% | 7d 20% | Stale | Cached 00h 00m", TrayPresentationFormatter.Format(future));
+        var privateState = Presentation(42, 20) with { QuotaDisclosure = "token", AnalyticsDisclosure = "analytics", CostDisclosure = "cost", PrivateEndpointDisclosure = "endpoint" };
+        Assert.DoesNotContain("token", TrayPresentationFormatter.Format(privateState), StringComparison.Ordinal);
+        Assert.True(TrayPresentationFormatter.Format(Presentation(42, 20, cached: true, age: new string('x', 100))).Length <= 63);
+    }
+
+    [Fact]
+    public async Task Unit_4a_host_passes_initial_and_state_updates_to_the_tray()
+    {
+        using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
+        await using var coordinator = new QuotaRefreshCoordinator(new EmptyQuotaStore(), new NeverQuotaProvider(), new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
+        await using var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)));
+        var tray = new FakeTray();
+        await using var host = new TrayHostRuntime(instance, tray, new FakePopover(), new FakeRecreationEvents(), _ => Task.CompletedTask, new ProbeResource(), () => { }, presentation: presentation);
+
+        Assert.Same(presentation.State, tray.State); Assert.Equal(1, tray.PresentationWrites);
+        var callback = typeof(TrayHostRuntime).GetMethod("OnPresentationChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        callback.Invoke(host, [presentation, new System.ComponentModel.PropertyChangedEventArgs(nameof(QuotaPresentationHost.Primary))]);
+        Assert.Equal(1, tray.PresentationWrites); Assert.Same(presentation.State, tray.State);
+        callback.Invoke(host, [presentation, new System.ComponentModel.PropertyChangedEventArgs(nameof(QuotaPresentationHost.State))]);
+        Assert.Equal(2, tray.PresentationWrites); Assert.Same(presentation.State, tray.State);
+        await coordinator.InitializeAsync(default);
+        Assert.Same(presentation.State, tray.State); Assert.True(tray.PresentationWrites > 2);
+        instance.Dispose();
+    }
+
+    private static BetaPresentationState Presentation(decimal? primary, decimal? weekly, bool loading = false, bool cached = false, bool unavailable = false, bool disabled = false, string? age = null) => new(
+        new("5-hour quota", primary, null), new("Weekly quota", weekly, null), primary is not null, weekly is not null, !loading && !cached && !unavailable,
+        !loading && !cached && !unavailable ? "Current" : unavailable ? "Unavailable" : loading ? "Loading" : "Stale", null, null, "", "", "", "", loading,
+        !loading && !cached && !unavailable, cached, cached, false, false, unavailable, false, cached ? TimeSpan.Zero : null, age, null, "", disabled);
+
+    private static void PumpUntil(Func<bool> condition) => Assert.True(PumpUntilObserved(condition));
+
+    private static bool PumpUntilObserved(Func<bool> condition)
     {
         var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) }; var timeout = DateTime.UtcNow.AddSeconds(2);
         timer.Tick += (_, _) => frame.Continue = !condition() && DateTime.UtcNow < timeout;
         timer.Start(); Dispatcher.PushFrame(frame); timer.Stop();
-        Assert.True(condition());
+        return condition();
     }
 
     private sealed class FakeTray : ITrayRuntime, IOpenCodeDataRootTray
@@ -289,11 +397,13 @@ public sealed class HostRuntimeTests
         public int Shows { get; private set; } public int Disposals { get; private set; } public bool RefreshAvailable { get; private set; }
         public void SetRefreshAvailable(bool available) => RefreshAvailable = available;
         public BetaPresentationState? State { get; private set; }
-        public void SetPresentation(BetaPresentationState state) => State = state;
+        public int PresentationWrites { get; private set; }
+        public void SetPresentation(BetaPresentationState state) { State = state; PresentationWrites++; }
         public bool SettingsAvailable { get; private set; }
         public void SetSettingsAvailable(bool available) => SettingsAvailable = available;
         public bool PrivateIntegrationEnabled { get; private set; }
-        public void SetPrivateIntegrationEnabled(bool enabled) => PrivateIntegrationEnabled = enabled;
+        public List<bool> PrivateIntegrationWrites { get; } = [];
+        public void SetPrivateIntegrationEnabled(bool enabled) { PrivateIntegrationEnabled = enabled; PrivateIntegrationWrites.Add(enabled); }
         public bool EnablePrivateVisible => SettingsAvailable && !PrivateIntegrationEnabled;
         public bool DisablePrivateVisible => SettingsAvailable && PrivateIntegrationEnabled;
         public bool StartupEnabled { get; private set; }
@@ -309,8 +419,8 @@ public sealed class HostRuntimeTests
     private sealed class FakePopover : IPopoverRuntime
     {
         public event Action? Deactivated; public bool IsVisible { get; private set; } public bool IsOwnedDialogActive { get; set; }
-        public int Shows { get; private set; } public int Hides { get; private set; }
-        public void Show() { IsVisible = true; Shows++; } public void Hide() { IsVisible = false; Hides++; } public void Activate() { }
+        public int Shows { get; private set; } public int Hides { get; private set; } public int Activations { get; private set; }
+        public void Show() { if (!IsVisible) { IsVisible = true; Shows++; } } public void Hide() { IsVisible = false; Hides++; } public void Activate() => Activations++;
         public void Deactivate() => Deactivated?.Invoke();
     }
 

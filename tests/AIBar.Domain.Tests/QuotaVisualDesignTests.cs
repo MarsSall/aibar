@@ -8,10 +8,18 @@ public sealed class QuotaVisualDesignTests
     [Fact]
     public void Declares_semantic_tokens_and_an_accessible_compact_card_hierarchy()
     {
+        var x = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
         var resources = ReadProjectFile("src/AIBar.Desktop/App.xaml");
+        var applicationResources = XDocument.Parse(resources);
+        var mergedDictionaries = applicationResources.Descendants().Single(element => element.Name.LocalName == "ResourceDictionary.MergedDictionaries");
+        var mergedSource = mergedDictionaries.Elements().Single(element => element.Name.LocalName == "ResourceDictionary").Attribute("Source")!.Value;
+        Assert.Equal("Themes/Semantic.Light.xaml", mergedSource);
+        var semanticKeys = XDocument.Parse(ReadProjectFile($"src/AIBar.Desktop/{mergedSource}")).Descendants()
+            .Select(element => element.Attribute(x + "Key")?.Value).Where(key => key is not null).Cast<string>().Order().ToArray();
+        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, semanticKeys);
         var window = ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml");
 
-        foreach (var key in new[] { "SurfaceBrush", "CardBrush", "TextBrush", "MutedTextBrush", "AccentBrush", "FocusBrush", "SpacingSmall", "SpacingMedium", "CardRadius" })
+        foreach (var key in new[] { "SpacingSmall", "SpacingMedium", "CardRadius" })
             Assert.Contains($"x:Key=\"{key}\"", resources, StringComparison.Ordinal);
         Assert.Contains("QuotaCardStyle", resources, StringComparison.Ordinal);
         Assert.Contains("HighContrast", resources, StringComparison.Ordinal);
@@ -81,7 +89,7 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal("{StaticResource AccessibleExpanderStyle}", window.Descendants(presentation + "Expander").Single().Attribute("Style")?.Value);
     }
     [Fact]
-    public void Uses_4b_quota_presentation_bindings_without_new_business_state()
+    public void Uses_4a_quota_presentation_bindings_without_new_business_state()
     {
         var window = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml"));
         var values = window.Descendants().Attributes().Select(attribute => attribute.Value).ToArray();
@@ -96,27 +104,22 @@ public sealed class QuotaVisualDesignTests
             Assert.Contains(values, value => value.Contains(branch, StringComparison.Ordinal));
         var primaryCard = window.Descendants().Single(element => element.Attributes().Any(attribute => attribute.Value == "5-hour quota card"));
         var weeklyCard = window.Descendants().Single(element => element.Attributes().Any(attribute => attribute.Value == "Weekly quota card"));
-        Assert.Equal("{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", primaryCard.Attribute("Visibility")?.Value);
-        Assert.Equal("{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", weeklyCard.Attribute("Visibility")?.Value);
+        Assert.Null(primaryCard.Attribute("Visibility"));
+        Assert.Null(weeklyCard.Attribute("Visibility"));
     }
     [Fact]
     public void Runtime_ui_automation_exposes_named_cards_card_availability_and_button_command()
     {
-        Exception? failure = null;
-        var thread = new Thread(() =>
+        WpfTestApplicationHost.Run(app =>
         {
-            App? app = null;
-            var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+            Assert.Equal(System.Windows.ShutdownMode.OnExplicitShutdown, app.ShutdownMode);
+            var provider = new GatedProvider();
+            var coordinator = new QuotaRefreshCoordinator(new EmptyStore(), provider, new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
+            var host = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)));
+            MainWindow? window = null; MainWindow? disabledWindow = null; QuotaPresentationHost? disabled = null;
             try
             {
-                app = new App(suppressHostStartup: true); app.InitializeComponent();
-                app.ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
-                Assert.Equal(System.Windows.ShutdownMode.OnExplicitShutdown, app.ShutdownMode);
-                SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext(dispatcher));
-                var provider = new GatedProvider();
-                var coordinator = new QuotaRefreshCoordinator(new EmptyStore(), provider, new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
-                var host = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)));
-                var window = new MainWindow { DataContext = host }; window.Show();
+                window = new MainWindow { DataContext = host }; window.Show();
                 var cards = FindVisualChildren<System.Windows.Controls.GroupBox>(window).ToArray();
                 Assert.Equal(new[] { "5-hour quota card", "Weekly quota card", "Local Codex data", "OpenCode and Pi local usage" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
                 var button = FindVisualChildren<System.Windows.Controls.Button>(window).Single();
@@ -129,54 +132,48 @@ public sealed class QuotaVisualDesignTests
                 {
                     var snapshot = availability.Primary || availability.Weekly ? new QuotaSnapshot(availability.Primary ? new(42, DateTimeOffset.UtcNow.AddHours(5)) : null, availability.Weekly ? new(20, DateTimeOffset.UtcNow.AddDays(7)) : null, DateTimeOffset.UtcNow) : null;
                     var cardCoordinator = new QuotaRefreshCoordinator(new EmptyStore(snapshot), provider, new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
-                    var cardHost = new QuotaPresentationHost(cardCoordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow))); var initialization = cardCoordinator.InitializeAsync(default).AsTask(); PumpUntil(() => initialization.IsCompleted); Assert.True(initialization.IsCompletedSuccessfully);
-                    var analytics = new LocalCodexAnalyticsView(); var cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics, LocalUsageHost()) }; cardWindow.Show(); cardWindow.UpdateLayout();
-                    System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); cardWindow.UpdateLayout();
-                    var quotaCards = FindVisualChildren<System.Windows.Controls.GroupBox>(cardWindow).Take(2).ToArray();
-                    Assert.Equal(availability.Primary ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, quotaCards[0].Visibility);
-                    Assert.Equal(availability.Weekly ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, quotaCards[1].Visibility);
-                    var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(cardWindow).ToArray(); Assert.Equal(3, usageExpanders.Length);
-                    var openCode = usageExpanders.Single(item => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(item)!.GetName().StartsWith("OpenCode,", StringComparison.Ordinal));
-                    var openCodePeer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(openCode)!;
-                    Assert.Equal("OpenCode, 165 retained tokens, Input 11 · Cache 55 (read 22, write 33) · Output 44 · Reasoning 55, Retained history", openCodePeer.GetName());
-                    Assert.True(openCode.Focusable); Assert.True(openCode.IsTabStop); Assert.DoesNotContain("model-", openCodePeer.GetName(), StringComparison.Ordinal);
-                    var expandCollapse = Assert.IsAssignableFrom<System.Windows.Automation.Provider.IExpandCollapseProvider>(openCodePeer.GetPattern(System.Windows.Automation.Peers.PatternInterface.ExpandCollapse));
-                    expandCollapse.Expand(); cardWindow.UpdateLayout(); System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-                    var visibleDetailText = FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible).ToArray();
-                    Assert.Equal(new[] { "model-alpha", "model-zeta" }, visibleDetailText.Where(text => text.Text.StartsWith("model-", StringComparison.Ordinal)).Select(text => text.Text));
-                    Assert.Contains(visibleDetailText, text => text.Text == "150 retained tokens"); Assert.Contains(visibleDetailText, text => text.Text == "15 retained tokens");
-                    var detailNames = visibleDetailText.Select(text => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(text)?.GetName()).OfType<string>().ToArray();
-                    Assert.Contains("2030-01-02, model-alpha, 150 retained tokens, Input 10 · Cache 50 (read 20, write 30) · Output 40 · Reasoning 50", detailNames);
-                    expandCollapse.Collapse(); cardWindow.UpdateLayout(); Assert.False(openCode.IsExpanded);
-                    Assert.DoesNotContain(FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible), text => text.Text.StartsWith("model-", StringComparison.Ordinal));
-                    cardWindow.Close();
-                    var cardCleanup = DisposeAsync(analytics, cardHost, cardCoordinator); PumpUntil(() => cardCleanup.IsCompleted); Assert.True(cardCleanup.IsCompletedSuccessfully);
+                    var cardHost = new QuotaPresentationHost(cardCoordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow))); var analytics = new LocalCodexAnalyticsView(); MainWindow? cardWindow = null;
+                    try
+                    {
+                        var initialization = cardCoordinator.InitializeAsync(default).AsTask(); PumpUntil(() => initialization.IsCompleted); Assert.True(initialization.IsCompletedSuccessfully);
+                        cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics, LocalUsageHost()) }; cardWindow.Show(); cardWindow.UpdateLayout();
+                        System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); cardWindow.UpdateLayout();
+                        var quotaCards = FindVisualChildren<System.Windows.Controls.GroupBox>(cardWindow).Take(2).ToArray();
+                        Assert.All(quotaCards, card => Assert.Equal(System.Windows.Visibility.Visible, card.Visibility));
+                        var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(cardWindow).ToArray(); Assert.Equal(3, usageExpanders.Length);
+                        var openCode = usageExpanders.Single(item => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(item)!.GetName().StartsWith("OpenCode,", StringComparison.Ordinal));
+                        var openCodePeer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(openCode)!;
+                        Assert.Equal("OpenCode, 165 retained tokens, Input 11 · Cache 55 (read 22, write 33) · Output 44 · Reasoning 55, Retained history", openCodePeer.GetName());
+                        Assert.True(openCode.Focusable); Assert.True(openCode.IsTabStop); Assert.DoesNotContain("model-", openCodePeer.GetName(), StringComparison.Ordinal);
+                        var expandCollapse = Assert.IsAssignableFrom<System.Windows.Automation.Provider.IExpandCollapseProvider>(openCodePeer.GetPattern(System.Windows.Automation.Peers.PatternInterface.ExpandCollapse));
+                        expandCollapse.Expand(); cardWindow.UpdateLayout(); System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                        var visibleDetailText = FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible).ToArray();
+                        Assert.Equal(new[] { "model-alpha", "model-zeta" }, visibleDetailText.Where(text => text.Text.StartsWith("model-", StringComparison.Ordinal)).Select(text => text.Text));
+                        Assert.Contains(visibleDetailText, text => text.Text == "150 retained tokens"); Assert.Contains(visibleDetailText, text => text.Text == "15 retained tokens");
+                        var detailNames = visibleDetailText.Select(text => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(text)?.GetName()).OfType<string>().ToArray();
+                        Assert.Contains("2030-01-02, model-alpha, 150 retained tokens, Input 10 · Cache 50 (read 20, write 30) · Output 40 · Reasoning 50", detailNames);
+                        expandCollapse.Collapse(); cardWindow.UpdateLayout(); Assert.False(openCode.IsExpanded);
+                        Assert.DoesNotContain(FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible), text => text.Text.StartsWith("model-", StringComparison.Ordinal));
+                    }
+                    finally
+                    {
+                        cardWindow?.Close();
+                        var cardCleanup = DisposeAsync(analytics, cardHost, cardCoordinator); PumpUntil(() => cardCleanup.IsCompleted); Assert.True(cardCleanup.IsCompletedSuccessfully);
+                    }
                 }
-                var disabled = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), false);
-                var disabledWindow = new MainWindow { DataContext = disabled };
+                disabled = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), false);
+                disabledWindow = new MainWindow { DataContext = disabled };
                 disabledWindow.Show();
                 Assert.Equal(System.Windows.Visibility.Collapsed, FindVisualChildren<System.Windows.Controls.Button>(disabledWindow).Single().Visibility);
                 provider.Release(); PumpUntil(() => button.IsEnabled);
                 Assert.True(button.IsEnabled); Assert.Equal(1, provider.Calls);
-                disabledWindow.Close(); window.Close();
-                var cleanup = DisposeAsync(disabled, host, coordinator); PumpUntil(() => cleanup.IsCompleted); Assert.True(cleanup.IsCompletedSuccessfully);
-            } catch (Exception exception) { failure = exception; }
+            }
             finally
             {
-                try
-                {
-                    if (app is not null)
-                    {
-                        foreach (System.Windows.Window openWindow in app.Windows.Cast<System.Windows.Window>().ToArray()) openWindow.Close();
-                        app.Shutdown();
-                    }
-                    if (!dispatcher.HasShutdownStarted) dispatcher.InvokeShutdown();
-                }
-                catch (Exception cleanupException) { failure ??= cleanupException; }
+                disabledWindow?.Close(); window?.Close();
+                var cleanup = DisposeAsync(new IAsyncDisposable?[] { disabled, host, coordinator }.OfType<IAsyncDisposable>().ToArray()); PumpUntil(() => cleanup.IsCompleted); Assert.True(cleanup.IsCompletedSuccessfully);
             }
         });
-        thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
-        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
     [Fact]
     public async Task Primary_startup_and_real_coordinator_failures_are_contained_reported_and_cleaned_up()
@@ -198,6 +195,163 @@ public sealed class QuotaVisualDesignTests
         await using var host = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), report: faults.Add);
         await host.InitializeAsync(default);
         Assert.Equal("Unavailable", host.FreshnessLabel); Assert.Equal("quota_refresh_failed", faults[^1].Message); Assert.DoesNotContain("store secret", faults[^1].Message); Assert.Equal(5, faults.Count);
+    }
+    [Fact]
+    public void Semantic_theme_dictionaries_have_exact_key_parity_and_system_high_contrast_colors()
+    {
+        var x = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
+        var dictionaries = new[] { "Light", "Dark", "HighContrast" }
+            .Select(name => XDocument.Parse(ReadProjectFile($"src/AIBar.Desktop/Themes/Semantic.{name}.xaml"))).ToArray();
+        var keySets = dictionaries.Select(dictionary => dictionary.Descendants().Select(element => element.Attribute(x + "Key")?.Value).Where(key => key is not null).Cast<string>().Order().ToArray()).ToArray();
+        Assert.All(keySets.Skip(1), keys => Assert.Equal(keySets[0], keys));
+        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, keySets[0]);
+            var highContrastMappings = new[]
+            {
+                ("SurfaceBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("CardBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("TextBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("MutedTextBrush", "{DynamicResource {x:Static SystemColors.GrayTextColorKey}}"),
+                ("AccentBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("FocusBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("ProgressTrackBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("SecondaryBorderBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}")
+            };
+            foreach (var (key, color) in highContrastMappings)
+                Assert.Equal(color, dictionaries[2].Descendants().Single(element => element.Attribute(x + "Key")?.Value == key).Attribute("Color")?.Value);
+    }
+
+    [Fact]
+    public void Theme_source_keeps_high_contrast_when_registry_lookup_is_invalid_missing_or_failing()
+    {
+        Assert.Equal(WindowsTheme.Dark, WindowsThemeSource.Resolve(false, 0));
+        Assert.Equal(WindowsTheme.Light, WindowsThemeSource.Resolve(false, () => null));
+        Assert.Equal(WindowsTheme.Light, WindowsThemeSource.Resolve(false, "invalid"));
+        Assert.Equal(WindowsTheme.Light, WindowsThemeSource.Resolve(false, () => throw new InvalidOperationException()));
+        Assert.Equal(WindowsTheme.HighContrast, WindowsThemeSource.Resolve(true, () => throw new InvalidOperationException()));
+    }
+
+    [Fact]
+    public void Theme_controller_coalesces_off_dispatcher_changes_skips_duplicates_and_recovers_without_losing_resources()
+    {
+        var resources = new System.Windows.ResourceDictionary { ["Shared"] = "unchanged" };
+        var source = new FakeThemeSource(WindowsTheme.Light); var factories = 0; var fail = false;
+        var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+        using var controller = new WindowsThemeController(resources, source, dispatcher, theme =>
+        {
+            factories++;
+            if (fail) throw new InvalidOperationException();
+            return new System.Windows.ResourceDictionary { ["Theme"] = theme };
+        });
+        var light = resources.MergedDictionaries.Single(); Assert.Equal(1, factories);
+        source.Raise(); Assert.Same(light, resources.MergedDictionaries.Single()); Assert.Equal(1, factories);
+        var raisedOnDispatcher = true;
+        var worker = new Thread(() =>
+        {
+            raisedOnDispatcher = dispatcher.CheckAccess();
+            source.Current = WindowsTheme.Dark; source.Raise();
+            source.Current = WindowsTheme.HighContrast; source.Raise();
+        });
+        worker.Start(); Assert.True(worker.Join(TimeSpan.FromSeconds(2))); Assert.False(raisedOnDispatcher);
+        Assert.Equal(WindowsTheme.HighContrast, source.Current); Assert.Equal(1, factories);
+        PumpUntil(() => ActiveTheme(resources) == WindowsTheme.HighContrast); Assert.Equal(2, factories);
+        var highContrast = resources.MergedDictionaries.Single(); source.Raise(); Assert.Same(highContrast, resources.MergedDictionaries.Single()); Assert.Equal(2, factories);
+        fail = true; source.Current = WindowsTheme.Light; source.Raise(); Assert.Equal(WindowsTheme.HighContrast, ActiveTheme(resources)); Assert.Equal("unchanged", resources["Shared"]);
+        fail = false; source.Current = WindowsTheme.Dark; controller.Reevaluate(); Assert.Equal(WindowsTheme.Dark, ActiveTheme(resources));
+        controller.Dispose(); source.Current = WindowsTheme.Light; source.Raise(); Assert.Equal(WindowsTheme.Dark, ActiveTheme(resources)); Assert.Equal(1, source.Disposals);
+    }
+
+    [Fact]
+    public void Theme_transition_preserves_window_identity_status_focus_automation_percentage_and_reset_semantics()
+    {
+        WpfTestApplicationHost.Run(_ =>
+        {
+            System.Windows.Window? window = null;
+            try
+            {
+                var source = new FakeThemeSource(WindowsTheme.Light); var resources = new System.Windows.ResourceDictionary();
+                using var controller = new WindowsThemeController(resources, source, System.Windows.Threading.Dispatcher.CurrentDispatcher, theme => new() { ["Theme"] = theme });
+                var status = new System.Windows.Controls.TextBlock { Text = "Unavailable" };
+                var percentage = new System.Windows.Controls.TextBlock { Text = "42%" };
+                var reset = new System.Windows.Controls.TextBlock { Text = "Resets in 5h" };
+                var focus = new System.Windows.Controls.Button { Content = "Refresh", Focusable = true };
+                System.Windows.Automation.AutomationProperties.SetName(focus, "Refresh quota");
+                window = new System.Windows.Window { Content = new System.Windows.Controls.StackPanel { Children = { status, percentage, reset, focus } } };
+                var identity = window; var popover = new WpfPopoverRuntime(window, controller);
+                source.Current = WindowsTheme.Dark; popover.Show();
+                Assert.True(popover.IsVisible); Assert.Same(identity, window); Assert.Equal(WindowsTheme.Dark, ActiveTheme(resources)); Assert.Equal("Unavailable", status.Text); Assert.Equal("42%", percentage.Text); Assert.Equal("Resets in 5h", reset.Text); Assert.True(focus.Focusable); Assert.Equal("Refresh quota", System.Windows.Automation.AutomationProperties.GetName(focus));
+            }
+            finally { window?.Close(); }
+        });
+    }
+
+    [Fact]
+    public void Unit_4a_popup_hierarchy_keeps_permanent_slots_and_secondary_scrolling()
+    {
+        var x = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
+        var presentation = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml/presentation");
+        var window = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml"));
+        Assert.Equal("AIBar quota", window.Root!.Attribute("Title")?.Value);
+        var grid = window.Root.Element(presentation + "Grid")!;
+        Assert.Equal(4, grid.Element(presentation + "Grid.RowDefinitions")!.Elements().Count());
+        Assert.Equal(new[] { "0", "1", "2", "3" }, grid.Elements().Where(element => element.Name != presentation + "Grid.RowDefinitions").Select(element => element.Attribute("Grid.Row")?.Value ?? "0"));
+        Assert.Equal("Continue", grid.Attribute("KeyboardNavigation.TabNavigation")?.Value);
+        var cards = window.Descendants(presentation + "GroupBox").Take(2).ToArray();
+        Assert.Equal(new[] { "5-hour quota card", "Weekly quota card" }, cards.Select(card => card.Attribute(presentation + "AutomationProperties.Name")?.Value));
+        Assert.All(cards, card => { Assert.Null(card.Attribute("Visibility")); Assert.Contains("percentage, reset, and state", card.Attribute(presentation + "AutomationProperties.HelpText")?.Value); });
+        var values = window.Descendants().Attributes().Select(attribute => attribute.Value).ToArray();
+        Assert.Equal(2, values.Count(value => value.Contains("TargetNullValue=--", StringComparison.Ordinal)));
+        Assert.Equal(2, values.Count(value => value.Contains("TargetNullValue=unavailable", StringComparison.Ordinal)));
+        Assert.Equal(3, values.Count(value => value == "{Binding FreshnessLabel}"));
+        var scrollers = window.Descendants(presentation + "ScrollViewer").ToArray();
+        Assert.Equal("SecondaryScrollViewer", scrollers[0].Attribute(x + "Name")?.Value);
+        Assert.Equal("2", scrollers[0].Attribute("Grid.Row")?.Value);
+        Assert.Equal("OnSecondaryPreviewGotKeyboardFocus", scrollers[0].Attribute("PreviewGotKeyboardFocus")?.Value);
+        Assert.All(scrollers.Skip(1), scroller => Assert.Contains(scroller.Ancestors(), ancestor => ancestor == scrollers[0]));
+    }
+
+    [Fact]
+    public void Unit_4a_popup_accessibility_keeps_summary_live_status_and_noninteractive_progress()
+    {
+        var x = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
+        var presentation = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml/presentation");
+        var window = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml"));
+        var resources = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/App.xaml"));
+        var summary = window.Descendants(presentation + "Grid").Single(grid => grid.Attribute(presentation + "AutomationProperties.Name")?.Value == "Quota summary");
+        Assert.Equal("0", summary.Attribute("Grid.Row")?.Value);
+        Assert.True(window.Descendants().Count(element => element.Attribute(presentation + "AutomationProperties.LiveSetting")?.Value == "Polite") >= 3);
+        var progress = window.Descendants(presentation + "ProgressBar").ToArray();
+        Assert.Equal(2, progress.Length); Assert.All(progress, item => { Assert.NotNull(item.Attribute(presentation + "AutomationProperties.Name")); Assert.Equal("{StaticResource QuotaProgressStyle}", item.Attribute("Style")?.Value); });
+        var progressStyle = resources.Descendants(presentation + "Style").Single(style => style.Attribute(x + "Key")?.Value == "QuotaProgressStyle");
+        Assert.Equal("False", progressStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "Focusable").Attribute("Value")?.Value);
+        Assert.Equal("False", progressStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "IsHitTestVisible").Attribute("Value")?.Value);
+        var expander = window.Descendants(presentation + "Expander").Single();
+        Assert.Equal("{StaticResource AccessibleExpanderStyle}", expander.Attribute("Style")?.Value);
+        var expanderStyle = resources.Descendants(presentation + "Style").Single(style => style.Attribute(x + "Key")?.Value == "AccessibleExpanderStyle");
+        Assert.Equal("{StaticResource KeyboardFocusVisual}", expanderStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "FocusVisualStyle").Attribute("Value")?.Value);
+        var requested = false; Exception? failure = null;
+        var thread = new Thread(() => { try { var target = new System.Windows.Controls.Border(); target.RequestBringIntoView += (_, _) => requested = true; var args = new System.Windows.Input.KeyboardFocusChangedEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, 0, null, target) { RoutedEvent = System.Windows.Input.Keyboard.PreviewGotKeyboardFocusEvent }; target.RaiseEvent(args); typeof(MainWindow).GetMethod("OnSecondaryPreviewGotKeyboardFocus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow)), [null, args]); } catch (Exception exception) { failure = exception; } finally { System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown(); } });
+        thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+        Assert.True(requested);
+    }
+
+    [Fact]
+    public void Unit_4b_measurement_limits_preserve_the_Unit_3_semantic_surface()
+    {
+        var window = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml")).Root!;
+        Assert.Equal("300", window.Attribute("MinWidth")?.Value); Assert.Equal("260", window.Attribute("MinHeight")?.Value); Assert.Equal("720", window.Attribute("MaxHeight")?.Value);
+        Assert.Contains("SurfaceBrush", ReadProjectFile("src/AIBar.Desktop/Themes/Semantic.Light.xaml"), StringComparison.Ordinal);
+        Assert.Contains("SurfaceBrush", ReadProjectFile("src/AIBar.Desktop/Themes/Semantic.Dark.xaml"), StringComparison.Ordinal);
+    }
+
+    private static WindowsTheme ActiveTheme(System.Windows.ResourceDictionary resources) => (WindowsTheme)resources.MergedDictionaries.Last()["Theme"];
+    private sealed class FakeThemeSource(WindowsTheme current) : IWindowsThemeSource
+    {
+        public event EventHandler? Changed;
+        public WindowsTheme Current { get; set; } = current;
+        public int Disposals { get; private set; }
+        public void Raise() => Changed?.Invoke(this, EventArgs.Empty);
+        public void Dispose() => Disposals++;
     }
     private sealed class TestResource : IAsyncDisposable { public int Disposals { get; private set; } public ValueTask DisposeAsync() { Disposals++; return ValueTask.CompletedTask; } }
     private sealed class ThrowingStore : IQuotaSnapshotStore

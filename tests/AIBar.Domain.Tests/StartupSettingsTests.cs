@@ -83,6 +83,19 @@ public sealed class StartupSettingsTests
     }
 
     [Fact]
+    public async Task Clear_revokes_private_disclosure_first_and_stops_when_revocation_fails()
+    {
+        var events = new List<string>(); var clear = new FakeClearService { OnClear = () => { events.Add("clear"); return ValueTask.CompletedTask; } };
+        var commands = new NativeSettingsCommands(new FakeRegistration(), clear, new(), revokePrivate: _ => { events.Add("revoke"); return ValueTask.CompletedTask; });
+
+        await commands.ClearAiBarDataAsync(default);
+
+        Assert.Equal(new[] { "revoke", "clear" }, events);
+        var untouched = new FakeClearService(); var failing = new NativeSettingsCommands(new FakeRegistration(), untouched, new(), revokePrivate: _ => ValueTask.FromException(new IOException("synthetic")));
+        await Assert.ThrowsAsync<IOException>(() => failing.ClearAiBarDataAsync(default).AsTask()); Assert.Equal(0, untouched.Calls);
+    }
+
+    [Fact]
     public async Task Local_usage_commands_serialize_complete_independent_transactions_without_lost_updates()
     {
         var persisted = LocalUsagePolicy.Disabled;
@@ -257,6 +270,7 @@ public sealed class StartupSettingsTests
     private sealed class FakeClearService : IAiBarDataClearCommand
     {
         public int Calls { get; private set; }
-        public ValueTask ClearAsync(CancellationToken cancellationToken) { Calls++; return ValueTask.CompletedTask; }
+        public Func<ValueTask>? OnClear { get; init; }
+        public async ValueTask ClearAsync(CancellationToken cancellationToken) { Calls++; if (OnClear is not null) await OnClear(); }
     }
 }

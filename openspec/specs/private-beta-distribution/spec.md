@@ -72,6 +72,43 @@ Instructions MUST cover unsigned-warning handling, launch from the extracted dir
 
 This capability MUST NOT authorize packaging authority, MSIX or installer work, code signing, automatic update or uninstall, `aibar-foundation` packaging completion, SBOM or compliance claims, public-release claims, cost/trend/ETA polish, forecasting, or store distribution.
 
+
+### Requirement: Distribution inventory includes the stock YASB integration
+
+The existing unsigned, self-contained Windows x64 ZIP inventory MUST include the bounded YASB reader, sample `yasb.custom.CustomWidget` configuration, CSS example, launcher/setup guidance, and any required fixtures or documentation designated for distribution. The inventory MUST identify these assets without embedding developer-checkout or user-specific absolute paths.
+
+#### Scenario: ZIP contains integration assets
+
+- GIVEN the existing ZIP is built for the change
+- WHEN its contents are compared with the documented inventory
+- THEN the reader, sample configuration, CSS example, and setup documentation are present
+- AND the inventory matches the distributed bytes
+
+#### Scenario: Examples are path-neutral
+
+- GIVEN a user reads the supplied YASB configuration and launcher examples
+- WHEN the examples are inspected
+- THEN they contain no developer-specific or user-specific absolute path
+- AND they direct the user to configure one stable extracted location or equivalent documented convention
+### Requirement: Distribution remains a bounded manual ZIP capability
+
+Adding YASB assets MUST NOT expand distribution into installer, signing, updater, package-manager, native YASB packaging, or public-release behavior. The existing unsigned, self-contained Windows x64 ZIP model and its provenance, checksum, version, and manual-use requirements remain authoritative.
+
+#### Scenario: Tester receives the updated ZIP
+
+- GIVEN a tester receives the updated private-beta ZIP
+- WHEN the tester verifies its platform and distribution guidance
+- THEN it remains explicitly unsigned, self-contained, Windows x64, and manually extracted
+- AND the YASB assets are described as optional stock-widget integration assets
+- AND no installer, signing, updater, or public-support claim is made
+
+#### Scenario: Out-of-scope packaging request appears
+
+- GIVEN a request asks the change to add an installer, code signing, automatic updates, package-manager delivery, or a public release
+- WHEN scope is evaluated
+- THEN that work is rejected as outside this change
+- AND the existing ZIP distribution behavior remains unchanged apart from the bounded asset inventory
+
 ## Acceptance Criteria
 
 - A Windows x64 tester can launch the self-contained unsigned ZIP without .NET installed.

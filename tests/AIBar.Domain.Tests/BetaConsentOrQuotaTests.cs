@@ -69,6 +69,21 @@ public sealed class BetaConsentOrQuotaTests : IDisposable
     }
 
     [Fact]
+    public async Task Persisted_and_manual_consent_gate_export_until_a_new_retrieval()
+    {
+        var settings = new ConsentSettings(Path.Combine(_root, "settings.json")); await settings.SaveAsync(true, default);
+        var cached = Snapshot(Now.AddMinutes(-12)); var fresh = Snapshot(Now); var provider = new ScriptedProvider(new(null, new(QuotaErrorKind.Service, "synthetic")));
+        var coordinator = new QuotaRefreshCoordinator(new MemoryStore(cached), provider, new FixedClock(Now), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
+        var writer = new ExportWriter(); var publisher = new QuotaExportPublisher(coordinator, writer, new FixedClock(Now));
+        await using var runtime = new BetaRuntime(settings, new PrivateIntegrationPolicy(), coordinator, new FixedClock(Now), publisher: publisher);
+        await runtime.InitializeAsync(default); await WaitUntilAsync(() => runtime.State.Failure is not null);
+        Assert.All(writer.Documents, document => Assert.Equal(QuotaExportState.Disabled, document.State));
+        provider.Next = new QuotaProviderResult(fresh, null); await runtime.RefreshAsync(RefreshTrigger.Manual, default); await publisher.PublicationCompletion; Assert.Equal(QuotaExportState.Current, writer.Documents[^1].State);
+        await runtime.RevokeConsentAsync(default); Assert.Equal(QuotaExportState.Disabled, writer.Documents[^1].State);
+        await runtime.GrantConsentAsync(default); await publisher.PublicationCompletion; Assert.Equal(QuotaExportState.Current, writer.Documents[^1].State);
+    }
+
+    [Fact]
     public async Task Runtime_composes_live_windows_cached_fallbacks_and_coalesced_triggers()
     {
         var settings = new ConsentSettings(Path.Combine(_root, "settings.json"));
@@ -185,6 +200,8 @@ public sealed class BetaConsentOrQuotaTests : IDisposable
             return ValueTask.FromResult<Stream>(new MemoryStream(Encoding.UTF8.GetBytes(Content)));
         }
     }
+
+    private sealed class ExportWriter : IQuotaExportWriter { public List<QuotaExportDocument> Documents { get; } = []; public ValueTask WriteAsync(QuotaExportDocument document, DateTimeOffset generatedAt, CancellationToken cancellationToken) { Documents.Add(document); return ValueTask.CompletedTask; } }
 
     private sealed class MemoryStore(QuotaSnapshot? snapshot) : IQuotaSnapshotStore
     {
