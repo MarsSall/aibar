@@ -10,7 +10,7 @@ AIBar remains the only quota authority. The first product slice is delivered thr
 4. **Unit 1b-writer — Windows canonical-path atomic writer** depends on 1a-privacy and owns minimum-rights protected ACLs and readback, reparse defenses, same-directory secure temporary files, durable validated UTF-8 writes, atomic move/replace, complete old/new reader views, and exact cleanup.
 5. **Unit 1b-clear — clear transaction and Desktop composition** depends on the committed 1b-writer child and owns exact snapshot-path clearing, in-flight/queued coordination and stale suppression, disabled/null recreation or safe absence, writer failure isolation, composition, and explicit disposal order.
 
-The current 359-authored-line five-path source/test candidate is preserved, uncommitted and unstaged. Static acceptance found missing minimum-rights ACL behavior, reader atomicity proof, and clear coordination/lifecycle coverage; no test was run. The maintainer selected `Dividir writer/clear`, so no implementation task receives completion credit and candidate preservation still requires explicit parent authorization before any worktree rearrangement.
+The 359-authored-line five-path source/test candidate is historical evidence only: at split-planning time it was recorded as uncommitted and unstaged, static acceptance found missing minimum-rights ACL behavior, reader atomicity proof, and clear coordination/lifecycle coverage, and no test was run. The maintainer selected `Dividir writer/clear`, and at that planning point no implementation task received completion credit. Separate writer (`3d137171a9c6c3a8fd4d079e8d9de6bf819a0043`) and clear (`bc8d79f719989a21f72b5c6cf843117c5001228d`) commits now exist, but no immutable stash object ID, `refs/stash`, named stash/ref, or stash reflog survives; stash/selective-restoration provenance is unavailable and MUST NOT be claimed.
 
 ## Architecture and dependency direction
 
@@ -248,7 +248,7 @@ Mandatory privacy cases remain restart/cache suppression, equal-content retrieva
 6. verifies the resulting descriptor and bytes before success;
 7. deletes only its exact temporary file on every pre-commit failure and never removes an unrelated path.
 
-The preserved writer portion is 308 authored lines. Correcting the permissive `FullControl` contract, its matching tests, and the missing reader-atomicity proof yields a realistic **335–360 authored source/test line** forecast. Stop at **360**; do not omit security cases, cross 400, or use a size exception. Expected paths are primarily `src/AIBar.Desktop/QuotaExportWindows.cs` and `tests/AIBar.Domain.Tests/QuotaExportWriterTests.cs`, plus only unavoidable project metadata.
+At split-planning time, the historical writer portion was recorded as 308 authored lines. Correcting the permissive `FullControl` contract, its matching tests, and the missing reader-atomicity proof yielded a realistic **335–360 authored source/test line** forecast. Stop at **360**; do not omit security cases, cross 400, or use a size exception. Expected paths are primarily `src/AIBar.Desktop/QuotaExportWindows.cs` and `tests/AIBar.Domain.Tests/QuotaExportWriterTests.cs`, plus only unavoidable project metadata.
 
 Rollback first secures and removes the snapshot or atomically publishes a disabled/null snapshot, then removes the writer while leaving the complete 1a-privacy Application boundary intact.
 
@@ -256,7 +256,7 @@ Rollback first secures and removes the snapshot or atomically publishes a disabl
 
 Unit 1b-clear starts only from a committed 1b-writer child. It adds the exact snapshot path to clear-data ownership, coordinates queued and in-flight publisher work before path mutation, suppresses stale completion, and finishes with a disabled/null recreation or proven safe absence. Desktop composition keeps writer failure isolated from authoritative cache and UI state and disposes publisher/writer-facing resources before the dependencies they can call.
 
-The preserved clear/composition portion is 51 authored lines but covers only path inclusion and a narrow happy path. The required coordination, stale-suppression, failure, and disposal matrices yield a realistic **90–140 authored source/test line** forecast with a **160-line hard stop**. Expected paths are `src/AIBar.Application/ClearAiBarDataService.cs`, `src/AIBar.Desktop/App.xaml.cs`, and `tests/AIBar.Domain.Tests/ClearAiBarDataTests.cs`.
+At split-planning time, the historical clear/composition portion was recorded as 51 authored lines and covered only path inclusion and a narrow happy path. The required coordination, stale-suppression, failure, and disposal matrices yielded a realistic **90–140 authored source/test line** forecast with a **160-line hard stop**. Expected paths are `src/AIBar.Application/ClearAiBarDataService.cs`, `src/AIBar.Desktop/App.xaml.cs`, and `tests/AIBar.Domain.Tests/ClearAiBarDataTests.cs`.
 
 Rollback removes 1b-clear composition and exact-path ownership while retaining the committed writer and every 1a Application unit; before rollback completes, the snapshot must be disabled/null or safely absent. No real profile path is used in either child’s tests.
 
@@ -414,7 +414,7 @@ There is no migration of `quota.db`, credentials, sessions, endpoint behavior, r
 
 Rollback follows reverse ownership. Revert 1b-clear only after the snapshot is disabled/null or safely absent, leaving the committed writer and Application privacy intact. Revert 1b-writer only after securing/removing or nulling its snapshot, leaving 1a-privacy intact; then remove privacy before authority and authority before contract. Reverting authority restores the prior coordinator while preserving existing quota refresh/cache/presentation behavior. Reverting contract removes only projection types after dependents are gone. Theme/popup changes can revert independently. Installed YASB rollback must stop AIBar and successfully remove or replace the snapshot with disabled/null before assets are removed.
 
-The current 359-line five-path candidate is not eligible to land or earn completion credit. It remains unchanged until the parent explicitly authorizes the documented stash-based preservation and selective child restoration; this planning handoff does not execute that mechanism.
+At planning time, the historical 359-line five-path candidate was not eligible to land or earn completion credit. The later writer (`3d137171a9c6c3a8fd4d079e8d9de6bf819a0043`) and clear (`bc8d79f719989a21f72b5c6cf843117c5001228d`) commits exist as separate child boundaries, but no immutable stash object ID or surviving stash ref/reflog proves the proposed selective restoration; that provenance is unavailable and is not claimed.
 
 ## Eleven review units and forecasts
 

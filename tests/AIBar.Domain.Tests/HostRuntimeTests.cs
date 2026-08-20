@@ -289,7 +289,16 @@ public sealed class HostRuntimeTests
         await using var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), () => policy.IsEnabled);
         using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
         var tray = new FakeTray(); var prompt = new FakeConsentPrompt(true);
-        var settings = new NativeSettingsCommands(new FakeStartupRegistration(), new FakeClearCommand(), policy, beta.RevokeConsentAsync, beta.GrantConsentAsync);
+        var revokeStarted = false; var revokeCompleted = false; Exception? revokeException = null;
+        var revokeElapsed = new System.Diagnostics.Stopwatch();
+        async ValueTask RevokeConsentAsync(CancellationToken cancellationToken)
+        {
+            revokeStarted = true; revokeElapsed.Start();
+            try { await beta.RevokeConsentAsync(cancellationToken); revokeCompleted = true; }
+            catch (Exception exception) { revokeException = exception; throw; }
+            finally { revokeElapsed.Stop(); }
+        }
+        var settings = new NativeSettingsCommands(new FakeStartupRegistration(), new FakeClearCommand(), policy, RevokeConsentAsync, beta.GrantConsentAsync);
         var host = new TrayHostRuntime(instance, tray, new FakePopover(), new FakeRecreationEvents(), _ => Task.CompletedTask, beta, () => { }, settings: settings, presentation: presentation, consentPrompt: prompt);
         instance.Dispose();
         try
@@ -304,7 +313,19 @@ public sealed class HostRuntimeTests
             Assert.Equal(2, document.RootElement.EnumerateObject().Count()); Assert.True(document.RootElement.GetProperty("privateCodexConsent").GetBoolean());
             Assert.Equal("quota_credential_missing", beta.State.Failure!.SafeCode);
 
-            tray.DisablePrivate(); PumpUntil(() => tray.EnablePrivateVisible);
+            tray.DisablePrivate();
+            var menuRestored = PumpUntilObserved(() => tray.EnablePrivateVisible);
+            var persistedConsent = "<not-read>";
+            if (!menuRestored)
+            {
+                try { persistedConsent = (await consent.LoadAsync(default)).ToString(); }
+                catch (Exception exception) { persistedConsent = $"load-error={exception.GetType().Name}: {exception.Message}"; }
+            }
+            var revokeError = revokeException is null ? "<none>" : $"{revokeException.GetType().Name}: {revokeException.Message}";
+            Assert.True(menuRestored, menuRestored ? null :
+                $"Revoke diagnostic: started={revokeStarted}, completed={revokeCompleted}, exception={revokeError}, elapsedMs={revokeElapsed.Elapsed.TotalMilliseconds:F1}, " +
+                $"policyEnabled={policy.IsEnabled}, persistedConsent={persistedConsent}, traySettings={tray.SettingsAvailable}, trayPrivateEnabled={tray.PrivateIntegrationEnabled}, " +
+                $"trayEnableVisible={tray.EnablePrivateVisible}, trayDisableVisible={tray.DisablePrivateVisible}, trayWrites=[{string.Join(",", tray.PrivateIntegrationWrites)}], presentation={presentation.State}");
             Assert.False(await consent.LoadAsync(default)); Assert.True(presentation.State.IsPrivateIntegrationDisabled);
             Assert.False(presentation.State.IsLoading); Assert.False(presentation.State.IsMissingCredential);
         }
@@ -359,12 +380,14 @@ public sealed class HostRuntimeTests
         !loading && !cached && !unavailable ? "Current" : unavailable ? "Unavailable" : loading ? "Loading" : "Stale", null, null, "", "", "", "", loading,
         !loading && !cached && !unavailable, cached, cached, false, false, unavailable, false, cached ? TimeSpan.Zero : null, age, null, "", disabled);
 
-    private static void PumpUntil(Func<bool> condition)
+    private static void PumpUntil(Func<bool> condition) => Assert.True(PumpUntilObserved(condition));
+
+    private static bool PumpUntilObserved(Func<bool> condition)
     {
         var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) }; var timeout = DateTime.UtcNow.AddSeconds(2);
         timer.Tick += (_, _) => frame.Continue = !condition() && DateTime.UtcNow < timeout;
         timer.Start(); Dispatcher.PushFrame(frame); timer.Stop();
-        Assert.True(condition());
+        return condition();
     }
 
     private sealed class FakeTray : ITrayRuntime, IOpenCodeDataRootTray
@@ -379,7 +402,8 @@ public sealed class HostRuntimeTests
         public bool SettingsAvailable { get; private set; }
         public void SetSettingsAvailable(bool available) => SettingsAvailable = available;
         public bool PrivateIntegrationEnabled { get; private set; }
-        public void SetPrivateIntegrationEnabled(bool enabled) => PrivateIntegrationEnabled = enabled;
+        public List<bool> PrivateIntegrationWrites { get; } = [];
+        public void SetPrivateIntegrationEnabled(bool enabled) { PrivateIntegrationEnabled = enabled; PrivateIntegrationWrites.Add(enabled); }
         public bool EnablePrivateVisible => SettingsAvailable && !PrivateIntegrationEnabled;
         public bool DisablePrivateVisible => SettingsAvailable && PrivateIntegrationEnabled;
         public bool StartupEnabled { get; private set; }

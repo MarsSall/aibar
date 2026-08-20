@@ -47,11 +47,24 @@ public sealed class WindowsAtomicQuotaExportWriter : IQuotaExportWriter
     private readonly string _path;
     private readonly string _directory;
     private readonly QuotaExportWriterSeams _seams;
+    private readonly bool _protectDirectoryAcl;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private long _requested;
 
     public WindowsAtomicQuotaExportWriter() : this(WindowsQuotaExportPath.ForCurrentUser()) { }
     public WindowsAtomicQuotaExportWriter(string path) : this(path, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), new()) { }
+    internal static WindowsAtomicQuotaExportWriter ForOwnedSyntheticDataDirectory(string dataDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
+        return new(new DirectoryInfo(Path.GetFullPath(dataDirectory)));
+    }
+    private WindowsAtomicQuotaExportWriter(DirectoryInfo dataDirectory)
+    {
+        _directory = Path.TrimEndingDirectorySeparator(dataDirectory.FullName);
+        _path = Path.Combine(_directory, "yasb-quota.json");
+        _seams = new();
+        _protectDirectoryAcl = false;
+    }
     internal WindowsAtomicQuotaExportWriter(string localApplicationData, QuotaExportWriterSeams seams)
         : this(WindowsQuotaExportPath.ForRoot(localApplicationData), localApplicationData, seams) { }
     internal WindowsAtomicQuotaExportWriter(string path, string localApplicationData, QuotaExportWriterSeams seams)
@@ -62,6 +75,7 @@ public sealed class WindowsAtomicQuotaExportWriter : IQuotaExportWriter
         _path = expected;
         _directory = Path.GetDirectoryName(_path) ?? throw new ArgumentException("Quota export requires a parent directory.", nameof(localApplicationData));
         _seams = seams ?? throw new ArgumentNullException(nameof(seams));
+        _protectDirectoryAcl = true;
     }
 
     public async ValueTask WriteAsync(QuotaExportDocument document, DateTimeOffset generatedAt, CancellationToken cancellationToken)
@@ -77,7 +91,8 @@ public sealed class WindowsAtomicQuotaExportWriter : IQuotaExportWriter
             var replacing = File.Exists(_path);
             if (Directory.Exists(_path)) throw new IOException("Quota export destination is not a file.");
             if (replacing) SecureFile(_path, QuotaExportWritePoint.BeforeDestinationAcl, QuotaExportWritePoint.AfterDestinationAcl);
-            SecureDirectory();
+            if (_protectDirectoryAcl) SecureDirectory();
+            else RejectAncestors();
 
             temporary = Path.Combine(_directory, $".aibar-quota-{Guid.NewGuid():N}.tmp");
             Point(QuotaExportWritePoint.BeforeTemporaryAcl, temporary);

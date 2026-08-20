@@ -311,10 +311,14 @@ public async Task Concurrent_reentrant_and_replayed_transitions_remain_ordered()
     coordinator.AuthorityUpdated += update =>
     {
         if (update.EventSequence == 1) { clock.UtcNow = Now.AddMinutes(20); Assert.True(coordinator.ReevaluateAsync(RefreshTrigger.Sleep, default).IsCompletedSuccessfully); }
-        if (update.EventSequence == 3) { entered.Set(); Assert.True(release.Wait(TimeSpan.FromSeconds(2))); }
+        if (update.EventSequence == 3) { entered.Set(); release.Wait(); }
     };
     await coordinator.InitializeAsync(default); Assert.Equal(new long[] { 1, 2 }, updates.Select(update => update.EventSequence));
-    var refresh = Task.Run(async () => await coordinator.RefreshAsync(RefreshTrigger.Manual, default));
+    var refresh = Task.Factory.StartNew(
+        () => coordinator.RefreshAsync(RefreshTrigger.Manual, default).AsTask(),
+        CancellationToken.None,
+        TaskCreationOptions.LongRunning,
+        TaskScheduler.Default).Unwrap();
     Assert.True(entered.Wait(TimeSpan.FromSeconds(2))); clock.UtcNow = Now;
     var reevaluations = Task.WhenAll(Task.Run(async () => await coordinator.ReevaluateAsync(RefreshTrigger.Sleep, default)), Task.Run(async () => await coordinator.ReevaluateAsync(RefreshTrigger.Sleep, default)));
     var replay = coordinator.RefreshAsync(RefreshTrigger.Manual, default).AsTask(); Assert.Same(replay, coordinator.RefreshAsync(RefreshTrigger.Manual, default).AsTask());

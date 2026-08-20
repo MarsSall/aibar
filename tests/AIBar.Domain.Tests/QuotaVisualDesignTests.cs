@@ -110,21 +110,16 @@ public sealed class QuotaVisualDesignTests
     [Fact]
     public void Runtime_ui_automation_exposes_named_cards_card_availability_and_button_command()
     {
-        Exception? failure = null;
-        var thread = new Thread(() =>
+        WpfTestApplicationHost.Run(app =>
         {
-            App? app = null;
-            var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+            Assert.Equal(System.Windows.ShutdownMode.OnExplicitShutdown, app.ShutdownMode);
+            var provider = new GatedProvider();
+            var coordinator = new QuotaRefreshCoordinator(new EmptyStore(), provider, new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
+            var host = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)));
+            MainWindow? window = null; MainWindow? disabledWindow = null; QuotaPresentationHost? disabled = null;
             try
             {
-                app = new App(suppressHostStartup: true); app.InitializeComponent();
-                app.ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
-                Assert.Equal(System.Windows.ShutdownMode.OnExplicitShutdown, app.ShutdownMode);
-                SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext(dispatcher));
-                var provider = new GatedProvider();
-                var coordinator = new QuotaRefreshCoordinator(new EmptyStore(), provider, new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
-                var host = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)));
-                var window = new MainWindow { DataContext = host }; window.Show();
+                window = new MainWindow { DataContext = host }; window.Show();
                 var cards = FindVisualChildren<System.Windows.Controls.GroupBox>(window).ToArray();
                 Assert.Equal(new[] { "5-hour quota card", "Weekly quota card", "Local Codex data", "OpenCode and Pi local usage" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
                 var button = FindVisualChildren<System.Windows.Controls.Button>(window).Single();
@@ -137,53 +132,48 @@ public sealed class QuotaVisualDesignTests
                 {
                     var snapshot = availability.Primary || availability.Weekly ? new QuotaSnapshot(availability.Primary ? new(42, DateTimeOffset.UtcNow.AddHours(5)) : null, availability.Weekly ? new(20, DateTimeOffset.UtcNow.AddDays(7)) : null, DateTimeOffset.UtcNow) : null;
                     var cardCoordinator = new QuotaRefreshCoordinator(new EmptyStore(snapshot), provider, new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
-                    var cardHost = new QuotaPresentationHost(cardCoordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow))); var initialization = cardCoordinator.InitializeAsync(default).AsTask(); PumpUntil(() => initialization.IsCompleted); Assert.True(initialization.IsCompletedSuccessfully);
-                    var analytics = new LocalCodexAnalyticsView(); var cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics, LocalUsageHost()) }; cardWindow.Show(); cardWindow.UpdateLayout();
-                    System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); cardWindow.UpdateLayout();
-                    var quotaCards = FindVisualChildren<System.Windows.Controls.GroupBox>(cardWindow).Take(2).ToArray();
-                    Assert.All(quotaCards, card => Assert.Equal(System.Windows.Visibility.Visible, card.Visibility));
-                    var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(cardWindow).ToArray(); Assert.Equal(3, usageExpanders.Length);
-                    var openCode = usageExpanders.Single(item => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(item)!.GetName().StartsWith("OpenCode,", StringComparison.Ordinal));
-                    var openCodePeer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(openCode)!;
-                    Assert.Equal("OpenCode, 165 retained tokens, Input 11 · Cache 55 (read 22, write 33) · Output 44 · Reasoning 55, Retained history", openCodePeer.GetName());
-                    Assert.True(openCode.Focusable); Assert.True(openCode.IsTabStop); Assert.DoesNotContain("model-", openCodePeer.GetName(), StringComparison.Ordinal);
-                    var expandCollapse = Assert.IsAssignableFrom<System.Windows.Automation.Provider.IExpandCollapseProvider>(openCodePeer.GetPattern(System.Windows.Automation.Peers.PatternInterface.ExpandCollapse));
-                    expandCollapse.Expand(); cardWindow.UpdateLayout(); System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-                    var visibleDetailText = FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible).ToArray();
-                    Assert.Equal(new[] { "model-alpha", "model-zeta" }, visibleDetailText.Where(text => text.Text.StartsWith("model-", StringComparison.Ordinal)).Select(text => text.Text));
-                    Assert.Contains(visibleDetailText, text => text.Text == "150 retained tokens"); Assert.Contains(visibleDetailText, text => text.Text == "15 retained tokens");
-                    var detailNames = visibleDetailText.Select(text => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(text)?.GetName()).OfType<string>().ToArray();
-                    Assert.Contains("2030-01-02, model-alpha, 150 retained tokens, Input 10 · Cache 50 (read 20, write 30) · Output 40 · Reasoning 50", detailNames);
-                    expandCollapse.Collapse(); cardWindow.UpdateLayout(); Assert.False(openCode.IsExpanded);
-                    Assert.DoesNotContain(FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible), text => text.Text.StartsWith("model-", StringComparison.Ordinal));
-                    cardWindow.Close();
-                    var cardCleanup = DisposeAsync(analytics, cardHost, cardCoordinator); PumpUntil(() => cardCleanup.IsCompleted); Assert.True(cardCleanup.IsCompletedSuccessfully);
+                    var cardHost = new QuotaPresentationHost(cardCoordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow))); var analytics = new LocalCodexAnalyticsView(); MainWindow? cardWindow = null;
+                    try
+                    {
+                        var initialization = cardCoordinator.InitializeAsync(default).AsTask(); PumpUntil(() => initialization.IsCompleted); Assert.True(initialization.IsCompletedSuccessfully);
+                        cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics, LocalUsageHost()) }; cardWindow.Show(); cardWindow.UpdateLayout();
+                        System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); cardWindow.UpdateLayout();
+                        var quotaCards = FindVisualChildren<System.Windows.Controls.GroupBox>(cardWindow).Take(2).ToArray();
+                        Assert.All(quotaCards, card => Assert.Equal(System.Windows.Visibility.Visible, card.Visibility));
+                        var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(cardWindow).ToArray(); Assert.Equal(3, usageExpanders.Length);
+                        var openCode = usageExpanders.Single(item => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(item)!.GetName().StartsWith("OpenCode,", StringComparison.Ordinal));
+                        var openCodePeer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(openCode)!;
+                        Assert.Equal("OpenCode, 165 retained tokens, Input 11 · Cache 55 (read 22, write 33) · Output 44 · Reasoning 55, Retained history", openCodePeer.GetName());
+                        Assert.True(openCode.Focusable); Assert.True(openCode.IsTabStop); Assert.DoesNotContain("model-", openCodePeer.GetName(), StringComparison.Ordinal);
+                        var expandCollapse = Assert.IsAssignableFrom<System.Windows.Automation.Provider.IExpandCollapseProvider>(openCodePeer.GetPattern(System.Windows.Automation.Peers.PatternInterface.ExpandCollapse));
+                        expandCollapse.Expand(); cardWindow.UpdateLayout(); System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                        var visibleDetailText = FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible).ToArray();
+                        Assert.Equal(new[] { "model-alpha", "model-zeta" }, visibleDetailText.Where(text => text.Text.StartsWith("model-", StringComparison.Ordinal)).Select(text => text.Text));
+                        Assert.Contains(visibleDetailText, text => text.Text == "150 retained tokens"); Assert.Contains(visibleDetailText, text => text.Text == "15 retained tokens");
+                        var detailNames = visibleDetailText.Select(text => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(text)?.GetName()).OfType<string>().ToArray();
+                        Assert.Contains("2030-01-02, model-alpha, 150 retained tokens, Input 10 · Cache 50 (read 20, write 30) · Output 40 · Reasoning 50", detailNames);
+                        expandCollapse.Collapse(); cardWindow.UpdateLayout(); Assert.False(openCode.IsExpanded);
+                        Assert.DoesNotContain(FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible), text => text.Text.StartsWith("model-", StringComparison.Ordinal));
+                    }
+                    finally
+                    {
+                        cardWindow?.Close();
+                        var cardCleanup = DisposeAsync(analytics, cardHost, cardCoordinator); PumpUntil(() => cardCleanup.IsCompleted); Assert.True(cardCleanup.IsCompletedSuccessfully);
+                    }
                 }
-                var disabled = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), false);
-                var disabledWindow = new MainWindow { DataContext = disabled };
+                disabled = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), false);
+                disabledWindow = new MainWindow { DataContext = disabled };
                 disabledWindow.Show();
                 Assert.Equal(System.Windows.Visibility.Collapsed, FindVisualChildren<System.Windows.Controls.Button>(disabledWindow).Single().Visibility);
                 provider.Release(); PumpUntil(() => button.IsEnabled);
                 Assert.True(button.IsEnabled); Assert.Equal(1, provider.Calls);
-                disabledWindow.Close(); window.Close();
-                var cleanup = DisposeAsync(disabled, host, coordinator); PumpUntil(() => cleanup.IsCompleted); Assert.True(cleanup.IsCompletedSuccessfully);
-            } catch (Exception exception) { failure = exception; }
+            }
             finally
             {
-                try
-                {
-                    if (app is not null)
-                    {
-                        foreach (System.Windows.Window openWindow in app.Windows.Cast<System.Windows.Window>().ToArray()) openWindow.Close();
-                        app.Shutdown();
-                    }
-                    if (!dispatcher.HasShutdownStarted) dispatcher.InvokeShutdown();
-                }
-                catch (Exception cleanupException) { failure ??= cleanupException; }
+                disabledWindow?.Close(); window?.Close();
+                var cleanup = DisposeAsync(new IAsyncDisposable?[] { disabled, host, coordinator }.OfType<IAsyncDisposable>().ToArray()); PumpUntil(() => cleanup.IsCompleted); Assert.True(cleanup.IsCompletedSuccessfully);
             }
         });
-        thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
-        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
     [Fact]
     public async Task Primary_startup_and_real_coordinator_failures_are_contained_reported_and_cleaned_up()
@@ -273,9 +263,9 @@ public sealed class QuotaVisualDesignTests
     [Fact]
     public void Theme_transition_preserves_window_identity_status_focus_automation_percentage_and_reset_semantics()
     {
-        Exception? failure = null;
-        var thread = new Thread(() =>
+        WpfTestApplicationHost.Run(_ =>
         {
+            System.Windows.Window? window = null;
             try
             {
                 var source = new FakeThemeSource(WindowsTheme.Light); var resources = new System.Windows.ResourceDictionary();
@@ -285,16 +275,13 @@ public sealed class QuotaVisualDesignTests
                 var reset = new System.Windows.Controls.TextBlock { Text = "Resets in 5h" };
                 var focus = new System.Windows.Controls.Button { Content = "Refresh", Focusable = true };
                 System.Windows.Automation.AutomationProperties.SetName(focus, "Refresh quota");
-                var window = new System.Windows.Window { Content = new System.Windows.Controls.StackPanel { Children = { status, percentage, reset, focus } } };
+                window = new System.Windows.Window { Content = new System.Windows.Controls.StackPanel { Children = { status, percentage, reset, focus } } };
                 var identity = window; var popover = new WpfPopoverRuntime(window, controller);
                 source.Current = WindowsTheme.Dark; popover.Show();
-                Assert.True(popover.IsVisible); Assert.Same(identity, window); Assert.Equal(WindowsTheme.Dark, ActiveTheme(resources)); Assert.Equal("Unavailable", status.Text); Assert.Equal("42%", percentage.Text); Assert.Equal("Resets in 5h", reset.Text); Assert.True(focus.Focusable); Assert.Equal("Refresh quota", System.Windows.Automation.AutomationProperties.GetName(focus)); window.Close();
+                Assert.True(popover.IsVisible); Assert.Same(identity, window); Assert.Equal(WindowsTheme.Dark, ActiveTheme(resources)); Assert.Equal("Unavailable", status.Text); Assert.Equal("42%", percentage.Text); Assert.Equal("Resets in 5h", reset.Text); Assert.True(focus.Focusable); Assert.Equal("Refresh quota", System.Windows.Automation.AutomationProperties.GetName(focus));
             }
-            catch (Exception exception) { failure = exception; }
-            finally { if (!System.Windows.Threading.Dispatcher.CurrentDispatcher.HasShutdownStarted) System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown(); }
+            finally { window?.Close(); }
         });
-        thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
-        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     [Fact]

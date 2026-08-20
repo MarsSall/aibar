@@ -14,13 +14,12 @@ public sealed class PopupRenderedTests
     [Fact]
     public void Unit_4b_rendered_popup_keeps_layout_scroll_focus_automation_and_themes_intact()
     {
-        Exception? failure = null;
-        var thread = new Thread(() =>
+        WpfTestApplicationHost.Run(app =>
         {
-            App? app = null; MainWindow? window = null;
+            MainWindow? window = null;
+            var originalTheme = app.Resources.MergedDictionaries[0];
             try
             {
-                app = new App(true); app.InitializeComponent();
                 var rows = Enumerable.Range(0, 10).Select(index => new { AutomationLabel = $"Usage row {index}", ScopeLabel = $"Scope {index}", TotalLabel = "165 retained tokens", TokenBreakdownLabel = "Input 11 · Output 44", StatusLabel = "Retained history", Details = Array.Empty<object>() }).ToArray();
                 var state = new { CachedAgeLabel = "Cached 00h 05m", WarningLabel = "Network unavailable", IsLoading = false, IsMissingCredential = false, IsOffline = false, IsDegraded = true, IsUnavailable = false, IsPrivateIntegrationDisabled = false, IsSafeError = false, Disclosure = "Quota disclosure" };
                 window = new MainWindow { Width = 420, Height = 720, SizeToContent = SizeToContent.Manual, DataContext = new { IsRefreshAvailable = true, FreshnessLabel = "Stale", Primary = new QuotaCardFixture("5-hour", 42m, "01h 00m"), Weekly = new QuotaCardFixture("Weekly", 73m, "06d 00h"), State = state, PrivateEndpointDisclosure = "Private endpoint disclosure", Analytics = new { SourceDetail = "Local", TotalTokensLabel = "100", ModelTotalsLabel = "model", CoverageLabel = "complete", LastScanLabel = "now", WarningLabel = "", IsLoading = false }, LocalUsage = new { Description = "Local usage", StatusLabel = "Current", Rows = rows } } };
@@ -45,11 +44,12 @@ public sealed class PopupRenderedTests
                     var image = new RenderTargetBitmap(420, 720, 96, 96, PixelFormats.Pbgra32); image.Render(root); var pixels = new byte[420 * 720 * 4]; image.CopyPixels(pixels, 420 * 4, 0); Assert.Contains(pixels.Where((_, index) => index % 4 == 3), alpha => alpha > 0);
                 }
             }
-            catch (Exception exception) { failure = exception; }
-            finally { try { window?.Close(); app?.Shutdown(); } catch (Exception exception) { failure ??= exception; } if (!System.Windows.Threading.Dispatcher.CurrentDispatcher.HasShutdownStarted) System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown(); }
+            finally
+            {
+                try { window?.Close(); }
+                finally { app.Resources.MergedDictionaries[0] = originalTheme; }
+            }
         });
-        thread.SetApartmentState(ApartmentState.STA); thread.Start(); thread.Join();
-        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
     [Fact]

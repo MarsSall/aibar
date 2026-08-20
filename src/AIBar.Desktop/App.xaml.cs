@@ -64,8 +64,10 @@ public partial class App : System.Windows.Application
         var codexHome = seams.CodexHome ?? Environment.GetEnvironmentVariable("CODEX_HOME");
         var credentials = new ConsentCredentialSource(policy, new CodexCredentialReader(new ReadOnlyCredentialFileReader()), CodexRootResolver.Resolve(codexHome, userProfile));
         var coordinator = new QuotaRefreshCoordinator(store, new QuotaHttpProvider(policy, credentials), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
-        var exportPath = seams.DataDirectory is null ? WindowsQuotaExportPath.ForCurrentUser() : Path.Combine(dataDirectory, "yasb-quota.json");
-        var publisher = new QuotaExportPublisher(coordinator, seams.ExportWriter ?? new WindowsAtomicQuotaExportWriter(exportPath), clock);
+        var exportWriter = seams.ExportWriter ?? (seams.DataDirectory is null
+            ? new WindowsAtomicQuotaExportWriter()
+            : WindowsAtomicQuotaExportWriter.ForOwnedSyntheticDataDirectory(dataDirectory));
+        var publisher = new QuotaExportPublisher(coordinator, exportWriter, clock);
         var localUsageLedger = new SqliteUsageEventLedger(Path.Combine(dataDirectory, "local-usage.db"));
         var localUsageSettings = new LocalUsageSettings(Path.Combine(dataDirectory, "local-usage-settings.json"));
         var localUsage = new LocalUsageCoordinator(localUsageSettings,
