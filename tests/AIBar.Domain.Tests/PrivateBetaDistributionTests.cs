@@ -73,6 +73,12 @@ public sealed class PrivateBetaDistributionTests
         using var archive = ZipFile.OpenRead(Path.Combine(output, "AIBar-win-x64-private-beta.zip"));
         Assert.Equal(archive.Entries.Select(entry => entry.FullName).OrderBy(path => path, StringComparer.Ordinal), archive.Entries.Select(entry => entry.FullName));
         Assert.Contains(archive.Entries, entry => entry.FullName == "PRIVATE-BETA.txt");
+        foreach (var relative in new[] { "yasb/read-aibar-quota.ps1", "yasb/remove-aibar-quota.ps1", "yasb/show-aibar.cmd", "yasb/custom-widget.example.yaml", "yasb/custom-widget.example.css", "yasb/README.txt" })
+        {
+            var entry = archive.Entries.Single(item => item.FullName == relative);
+            using var stream = entry.Open(); using var bytes = new MemoryStream(); stream.CopyTo(bytes);
+            Assert.Equal(File.ReadAllBytes(Path.Combine(RepositoryRoot(), relative.Replace('/', Path.DirectorySeparatorChar))), bytes.ToArray());
+        }
         var instructions = File.ReadAllText(Path.Combine(output, "private-beta-instructions.txt"));
         Assert.Contains($"AIBar private beta {version}", instructions, StringComparison.Ordinal);
         Assert.Contains($"Baseline ancestor: {baseline}.", instructions, StringComparison.Ordinal);
@@ -81,6 +87,24 @@ public sealed class PrivateBetaDistributionTests
         var repeat = fixture.Output("repeat");
         Assert.Equal(0, fixture.Run(repeat, publisher: fixture.Publisher("stay")).ExitCode);
         Assert.Equal(File.ReadAllBytes(Path.Combine(output, "AIBar-win-x64-private-beta.zip")), File.ReadAllBytes(Path.Combine(repeat, "AIBar-win-x64-private-beta.zip")));
+    }
+
+    [Fact]
+    public void Distribution_guidance_is_path_neutral_and_requires_cleanup_before_asset_removal()
+    {
+        var documentation = File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "private-beta.md"));
+        var readme = File.ReadAllText(Path.Combine(RepositoryRoot(), "yasb", "README.txt"));
+        foreach (var text in new[] { documentation, readme })
+        {
+            Assert.Contains("<AIBarRoot>", text, StringComparison.Ordinal);
+            Assert.Contains("unsigned", text, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Windows x64", text, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Stop AIBar", text, StringComparison.Ordinal);
+            Assert.Contains("exits 0", text, StringComparison.Ordinal);
+            Assert.Contains("no installer", text, StringComparison.OrdinalIgnoreCase);
+        }
+        Assert.Contains("unsupported private integration", documentation, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("absent or is schema-v1 `disabled`", documentation, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -112,7 +136,10 @@ public sealed class PrivateBetaDistributionTests
             Root = Path.Combine(_temporary.Path, "repository");
             Directory.CreateDirectory(Path.Combine(Root, "scripts"));
             Directory.CreateDirectory(Path.Combine(Root, "src", "AIBar.Desktop"));
+            Directory.CreateDirectory(Path.Combine(Root, "yasb"));
             File.Copy(Path.Combine(RepositoryRoot(), "scripts", "Publish-Deterministic.ps1"), Path.Combine(Root, "scripts", "Publish-Deterministic.ps1"));
+            foreach (var name in new[] { "read-aibar-quota.ps1", "remove-aibar-quota.ps1", "show-aibar.cmd", "custom-widget.example.yaml", "custom-widget.example.css", "README.txt" })
+                File.Copy(Path.Combine(RepositoryRoot(), "yasb", name), Path.Combine(Root, "yasb", name));
             File.WriteAllText(Path.Combine(Root, "src", "AIBar.Desktop", "AIBar.Desktop.csproj"), "<Project><PropertyGroup><Version>0.1.0-beta.4</Version></PropertyGroup></Project>");
             File.WriteAllText(Path.Combine(Root, "README.md"), "baseline");
             Git("init"); Git("add", "."); Git("-c", "user.name=tests", "-c", "user.email=tests@example.invalid", "commit", "-m", "baseline");

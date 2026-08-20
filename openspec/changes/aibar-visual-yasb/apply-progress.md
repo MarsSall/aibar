@@ -1,5 +1,13 @@
 # Apply Progress — aibar-visual-yasb
 
+## Unit 6 — completed distribution cleanup and verification; commit boundary pending
+
+- **Scope and baseline:** Completed tasks `6.1` through `6.5` on branch `feat/aibar-visual-yasb-6` against `39d50b9`. The final candidate scope is exactly `docs/private-beta.md`, `scripts/Publish-Deterministic.ps1`, `tests/AIBar.Domain.Tests/PrivateBetaDistributionTests.cs`, `yasb/tests/read-aibar-quota.Tests.ps1`, `yasb/README.txt`, and `yasb/remove-aibar-quota.ps1`.
+- **Correction and guarantees:** The final correction validates the raw JSON `schemaVersion` literal as `1` before Windows PowerShell object conversion can coerce it to `Int32`. It retains exact BOM-less UTF-8, ordinal snapshot equality, raw canonical UTC `generatedAt`, reparse and replacement-race checks, bounded atomic backup cleanup, and rollback behavior; prior failure history remains preserved below rather than being relabeled as passing evidence.
+- **Focused evidence:** The corrected final Pester target passed **11/11**, including causal assertions for post-replacement reparse and exact-readback mutation, at `sha256:e815621230a8bf1beacb2eb4ed9f0aa3115db955bd2c3bf2a1c977dabfa629dd`. The unchanged filtered C# `PrivateBetaDistributionTests` target remains **5/5**, exit 0 with no skipped tests, at `sha256:c62f57d03027fb7d1afd56b3cb110604b9d0b76b533e37dfe3ae6145b92c2366`.
+- **Gate, integrity, and size:** Fresh phase-contract reverification passed tasks `6.1` through `6.5` with no blockers at `sha256:9d2d92220eaa729a8424bb2260d418ce53f0aac969b63415b88432c47fe91ee3`. The candidate is **270 authored lines** against the **330-line** Unit 6 cap. The parser and `git diff --check` passed; pre/post-validation Git status was identical; no temporary or Git-visible artifact remained; and the preserved backup was untouched.
+- **Lifecycle boundary:** Task `6.6` is completed by the authorized local Unit 6 work-unit commit; review, push, PR, publish, and release remain unperformed and unauthorized.
+
 ## Unit 4b — completed after final manual remediation
 
 - **Gate history/remediation:** The automatic gate exhausted on the preserved compile ambiguity; final independent manual remediation was VERIFIED. Legacy `Place` behavior remains distinct from `PlaceInContext`; production edge detection covers bottom/top/left/right/default with the full edge×DPI/negative/cursor/primary/narrow/min260/nonfinite/overflow/clamp matrix.

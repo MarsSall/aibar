@@ -384,12 +384,12 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 **Exclusions:** installer/signing/updater/package manager/public release/native YASB/live smoke.
 
-- [ ] **6.1 RED — cleanup seam:** Valued deletion, denied-delete disabled replacement, nullable reset-safe schema, reparse/replacement/read-back failure, absent no-op, temp cleanup, fixed path, empty params, argument rejection. <!-- sdd-owner: implementation -->
-- [ ] **6.2 RED — inventory/docs:** Exact ZIP assets and bytes, path-neutral examples, unsigned/self-contained/Windows x64/manual/private-beta wording, no unsupported delivery claims. <!-- sdd-owner: implementation -->
-- [ ] **6.3 RED — rollback order:** Stop AIBar; run fixed no-argument cleanup; continue only on exit 0; remove/replace assets; verify absent-or-disabled/null; failure stops removal and changes no consent/cache/credential/db. <!-- sdd-owner: implementation -->
-- [ ] **6.4 GREEN — cleanup/package/docs:** Implement fixed cleanup and read-back, deterministic inventory inclusion, `<AIBarRoot>` setup, unsupported-service caveat, upgrade stop rule, and exact rollback order. <!-- sdd-owner: implementation -->
-- [ ] **6.5 CHECK — verify Unit 6:** Run isolated cleanup and deterministic inventory tests; inspect ZIP/manifest/docs; no release/sign/install/live process/network. <!-- sdd-owner: implementation -->
-- [ ] **6.6 COMMIT BOUNDARY — distribution:** Freeze one docs/package/cleanup commit; rollback requires successful still-installed cleanup first. <!-- sdd-owner: implementation -->
+- [x] **6.1 RED — cleanup seam:** Valued deletion, denied-delete disabled replacement, nullable reset-safe schema, reparse/replacement/read-back failure, absent no-op, temp cleanup, fixed path, empty params, argument rejection. <!-- sdd-owner: implementation -->
+- [x] **6.2 RED — inventory/docs:** Exact ZIP assets and bytes, path-neutral examples, unsigned/self-contained/Windows x64/manual/private-beta wording, no unsupported delivery claims. <!-- sdd-owner: implementation -->
+- [x] **6.3 RED — rollback order:** Stop AIBar; run fixed no-argument cleanup; continue only on exit 0; remove/replace assets; verify absent-or-disabled/null; failure stops removal and changes no consent/cache/credential/db. <!-- sdd-owner: implementation -->
+- [x] **6.4 GREEN — cleanup/package/docs:** Implement fixed cleanup and read-back, deterministic inventory inclusion, `<AIBarRoot>` setup, unsupported-service caveat, upgrade stop rule, and exact rollback order. <!-- sdd-owner: implementation -->
+- [x] **6.5 CHECK — verify Unit 6:** Run isolated cleanup and deterministic inventory tests; inspect ZIP/manifest/docs; no release/sign/install/live process/network. <!-- sdd-owner: implementation -->
+- [x] **6.6 COMMIT BOUNDARY — distribution:** Freeze one docs/package/cleanup commit; rollback requires successful still-installed cleanup first. <!-- sdd-owner: implementation -->
 
 **Hard split trigger:** At 330 keep cleanup, absent-or-disabled proof, and rollback ordering together; replan packaging breadth before 400.
 

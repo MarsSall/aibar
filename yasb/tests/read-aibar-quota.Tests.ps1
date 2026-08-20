@@ -126,3 +126,84 @@ aibar_quota:
         $css | Should Match 'warning-authentication-failed'
     }
 }
+
+Describe 'AIBar YASB rollback cleanup' {
+    BeforeEach {
+        $script:cleanupRoot = Join-Path ([IO.Path]::GetTempPath()) ('aibar-yasb-cleanup-' + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $script:cleanupRoot | Out-Null
+        $script:cleanupPath = Join-Path $script:cleanupRoot 'yasb-quota.json'
+        . (Join-Path $root 'remove-aibar-quota.ps1')
+        $script:AIBarQuotaCleanupFixturePath = $script:cleanupPath
+        $script:AIBarQuotaCleanupTestDelete = $null
+        $script:AIBarQuotaCleanupTestReplace = $null
+        $script:AIBarQuotaCleanupTestReparse = $null
+    }
+
+    AfterEach { if (Test-Path -LiteralPath $script:cleanupRoot) { Remove-Item -LiteralPath $script:cleanupRoot -Recurse -Force } }
+
+    It 'uses no public parameters and rejects arguments before fixed-path access' {
+        $cleanup = Join-Path $root 'remove-aibar-quota.ps1'
+        $tokens = $null; $errors = $null; $ast = [Management.Automation.Language.Parser]::ParseFile($cleanup, [ref]$tokens, [ref]$errors)
+        $errors.Count | Should Be 0
+        $ast.ParamBlock.Parameters.Count | Should Be 0
+        $source = Get-Content -LiteralPath $cleanup -Raw
+        $source.IndexOf('if ($args.Count -ne 0)') | Should BeLessThan $source.IndexOf('if (Invoke-AiBarQuotaCleanup)')
+        & powershell.exe -NoProfile -NonInteractive -File $cleanup unexpected
+        $LASTEXITCODE | Should Be 64
+    }
+
+    It 'deletes a valued nullable-reset snapshot and treats absence as a no-op' {
+        '{"schemaVersion":1,"generatedAt":"2026-07-12T12:00:00Z","state":"current","warning":null,"sourceRetrievedAt":"2026-07-12T11:00:00Z","fiveHour":{"percentageUsed":12.5,"resetAt":null},"weekly":null}' | Set-Content -LiteralPath $script:cleanupPath -NoNewline
+        (Invoke-AiBarQuotaCleanup) | Should Be $true
+        (Test-Path -LiteralPath $script:cleanupPath) | Should Be $false
+        (Invoke-AiBarQuotaCleanup) | Should Be $true
+    }
+
+    It 'atomically replaces a delete-denied snapshot with exact BOM-less canonical bytes' {
+        '{"valued":true}' | Set-Content -LiteralPath $script:cleanupPath -NoNewline
+        $script:AIBarQuotaCleanupTestDelete = { param($Path) throw 'denied' }
+        (Invoke-AiBarQuotaCleanup) | Should Be $true
+        $bytes = [IO.File]::ReadAllBytes($script:cleanupPath)
+        ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) | Should Be $true
+        $snapshot = [Text.UTF8Encoding]::new($false, $true).GetString($bytes)
+        (Test-DisabledSnapshot $script:cleanupPath $snapshot) | Should Be $true
+        @(Get-ChildItem -LiteralPath $script:cleanupRoot -Filter '.yasb-quota-cleanup-*.tmp').Count | Should Be 0
+        @(Get-ChildItem -LiteralPath $script:cleanupRoot -Filter '.yasb-quota-cleanup-*.bak').Count | Should Be 0
+    }
+
+    It 'rejects byte-equal boolean schema and malformed or non-UTC generatedAt snapshots' {
+        foreach ($snapshot in @(
+        '{"schemaVersion":true,"generatedAt":"2026-07-12T12:00:00.0000000+00:00","state":"disabled","warning":"disabled","sourceRetrievedAt":null,"fiveHour":null,"weekly":null}',
+        '{"schemaVersion":1,"generatedAt":"invalid","state":"disabled","warning":"disabled","sourceRetrievedAt":null,"fiveHour":null,"weekly":null}',
+        '{"schemaVersion":1,"generatedAt":"2026-07-12T12:00:00.0000000+01:00","state":"disabled","warning":"disabled","sourceRetrievedAt":null,"fiveHour":null,"weekly":null}'
+        )) {
+        [IO.File]::WriteAllText($script:cleanupPath, $snapshot, [Text.UTF8Encoding]::new($false))
+        (Test-DisabledSnapshot $script:cleanupPath $snapshot) | Should Be $false
+        }
+    }
+
+    It 'fails closed after post-replacement reparse substitution and cleans bounded temps' {
+        '{"valued":true}' | Set-Content -LiteralPath $script:cleanupPath -NoNewline
+        $script:AIBarQuotaCleanupTestDelete = { param($Path) throw 'denied' }
+        $script:destinationChecks = 0
+        $script:AIBarQuotaCleanupTestReplace = { param($Temporary, $Path) [IO.File]::Delete($Path); [IO.File]::Move($Temporary, $Path) }
+        $script:AIBarQuotaCleanupTestReparse = { param($Path) if ($Path -ceq $script:cleanupPath) { $script:destinationChecks++; return $script:destinationChecks -ge 3 }; return $false }
+        (Invoke-AiBarQuotaCleanup) | Should Be $false
+        $script:destinationChecks | Should Be 3
+        (Test-Path -LiteralPath $script:cleanupPath) | Should Be $true
+        @(Get-ChildItem -LiteralPath $script:cleanupRoot -Filter '.yasb-quota-cleanup-*.tmp').Count | Should Be 0
+        @(Get-ChildItem -LiteralPath $script:cleanupRoot -Filter '.yasb-quota-cleanup-*.bak').Count | Should Be 0
+    }
+
+    It 'fails closed and cleans bounded temps for precommit replacement and exact read-back mutation' {
+        '{"valued":true}' | Set-Content -LiteralPath $script:cleanupPath -NoNewline
+        $script:AIBarQuotaCleanupTestDelete = { param($Path) throw 'denied' }
+        $script:AIBarQuotaCleanupTestReplace = { param($Temporary, $Path) throw 'replace failed' }
+        (Invoke-AiBarQuotaCleanup) | Should Be $false
+        $script:AIBarQuotaCleanupTestReplace = { param($Temporary, $Path) [IO.File]::Delete($Path); [IO.File]::Move($Temporary, $Path); [IO.File]::AppendAllText($Path, ' ') }
+        (Invoke-AiBarQuotaCleanup) | Should Be $false
+        [IO.File]::ReadAllText($script:cleanupPath).EndsWith(' ') | Should Be $true
+        @(Get-ChildItem -LiteralPath $script:cleanupRoot -Filter '.yasb-quota-cleanup-*.tmp').Count | Should Be 0
+        @(Get-ChildItem -LiteralPath $script:cleanupRoot -Filter '.yasb-quota-cleanup-*.bak').Count | Should Be 0
+    }
+}

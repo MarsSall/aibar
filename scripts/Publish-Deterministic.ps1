@@ -207,6 +207,19 @@ function Invoke-OwnedProcess([string]$FileName, [string[]]$Arguments, [string]$S
         if ($null -ne $process) { $process.Dispose() }
     }
 }
+function Copy-PrivateBetaYasbAssets([string]$Repository, [string]$Publish) {
+    $paths = @("yasb/read-aibar-quota.ps1", "yasb/remove-aibar-quota.ps1", "yasb/show-aibar.cmd", "yasb/custom-widget.example.yaml", "yasb/custom-widget.example.css", "yasb/README.txt")
+    foreach ($relative in $paths) {
+        $source = Join-Path $Repository ($relative -replace '/', '\\')
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "BETA_YASB_ASSET_MISSING" }
+        $destination = Join-Path $Publish ($relative -replace '/', '\\')
+        $directory = [IO.Path]::GetDirectoryName($destination)
+        if ([string]::IsNullOrWhiteSpace($directory)) { throw "BETA_YASB_ASSET_INVALID" }
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+        [IO.File]::Copy($source, $destination, $false)
+        if ((Get-Item -LiteralPath $source).Length -ne (Get-Item -LiteralPath $destination).Length -or (Sha $source) -ne (Sha $destination)) { throw "BETA_YASB_ASSET_MISMATCH" }
+    }
+}
 function Invoke-PrivateBeta {
     $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
     $canonical = (& git -C $projectRoot rev-parse --show-toplevel).Trim()
@@ -229,6 +242,7 @@ function Invoke-PrivateBeta {
         New-Item -ItemType Directory -Path $outputRoot -ErrorAction Stop | Out-Null; $created = $true
         $publish = Join-Path $outputRoot "publish"; New-Item -ItemType Directory -Path $publish -ErrorAction Stop | Out-Null
         Invoke-OwnedProcess $PublishCommand @("publish", (Join-Path $projectRoot "src\AIBar.Desktop\AIBar.Desktop.csproj"), "--disable-build-servers", "--configuration", "Release", "--runtime", "win-x64", "--self-contained", "true", "--output", $publish, "/p:ContinuousIntegrationBuild=true", "/p:Deterministic=true", "/p:DebugType=None") "BETA_PUBLISH_FAILED"
+        Copy-PrivateBetaYasbAssets $projectRoot $publish
         $notice = "AIBar $version is an unsigned private beta for Windows x64. It is manually distributed and has no updater or installer.`nBaseline ancestor: $baseline`nSource commit: $source`n"
         [IO.File]::WriteAllText((Join-Path $publish "PRIVATE-BETA.txt"), $notice, [Text.UTF8Encoding]::new($false))
         $files = @{}; Get-ChildItem -LiteralPath $publish -Recurse -File | ForEach-Object { $relative = $_.FullName.Substring($publish.Length).TrimStart('\','/') -replace '\\','/'; if ($relative.StartsWith('/') -or $relative.Split('/') -contains '..' -or $files.ContainsKey($relative)) { throw "BETA_INVENTORY_INVALID" }; $files[$relative] = [ordered]@{ path=$relative; length=$_.Length; sha256=(Sha $_.FullName) } }
