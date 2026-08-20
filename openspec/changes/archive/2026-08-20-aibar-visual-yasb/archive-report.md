@@ -7,7 +7,7 @@
 - Change: `aibar-visual-yasb`
 - Artifact store: `openspec`
 - Archive date: `2026-08-20`
-- Final implementation/remediation commit: `2f0982edaaa609762bb3926b741cc34dc50b299d` (`fix(desktop): stabilize final integration verification`)
+- Final implementation/remediation commit: `3eaa02fb37f4d85889ebd444db0d989b25c71880` (`fix(desktop): stabilize final integration verification`)
 - Final verification: `584/584` passed, `0` failed, `0` skipped
 - Verification evidence: `sha256:28d8b5058a043b521d69c42277917ee957f4226a78603e25c8a00170b86eadb2`
 - Requirements/scenarios/tasks: `33/33`, `73/73`, `84/84`

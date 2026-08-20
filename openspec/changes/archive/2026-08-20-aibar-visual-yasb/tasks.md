@@ -420,7 +420,7 @@ The tracker remains draft/no-merge until all children are integrated. Child 1a-c
 
 - [x] Maintainer selected `feature-branch-chain`; no `size:exception` is authorized. <!-- sdd-owner: parent -->
 - [x] Maintainer selected `Dividir writer/clear`; the prior five-path Unit 1b candidate earns no completion credit. <!-- sdd-owner: parent -->
-- [x] Reconcile the superseded Unit 1b stash plan: the writer (`3d137171...`) and clear (`bc8d79f7...`) children exist as separate commits, but no immutable stash object ID or surviving named stash/ref/reflog is recorded; selective-restoration provenance is unavailable and MUST NOT be claimed. <!-- sdd-owner: parent -->
+- [x] Reconcile the superseded Unit 1b stash plan: the writer (`df881905...`) and clear (`dd561053...`) children exist as separate commits, but no immutable stash object ID or surviving named stash/ref/reflog is recorded; selective-restoration provenance is unavailable and MUST NOT be claimed. <!-- sdd-owner: parent -->
 - [x] After each applied unit, use the repository-owned bounded validation/review policy for that exact below-400 unit. <!-- sdd-owner: parent -->
 
 **Archive gate — PENDING; not an apply or verify dependency: After final sdd-verify, confirm all eleven committed units and re-confirm final cleanup/inventory evidence against the final integrated tree; focused target counts alone are insufficient.**

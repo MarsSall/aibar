@@ -4,7 +4,7 @@
 
 Build this change as two bounded product paths sharing one existing quota authority: (1) redesign the WPF popup around semantic, automatically themed Windows resources, and (2) have AIBar publish a minimal atomic JSON projection that a stock `yasb.custom.CustomWidget` reads. Do not let YASB inspect AIBar databases, credentials, logs, analytics sources, session data, or user paths. Use an explicit `AIBar.Desktop.exe --show` activation contract so the same command starts and opens a new instance or signals the existing instance.
 
-The current quota-first baseline at `c6acb10` is a sound accessibility and semantic-resource foundation, not a reference-finish UI. It has two clear quota cards, focus visuals, high-contrast triggers, non-interactive progress tracks, state labels, and automation names. It remains a dense, fixed-light, chrome-free WPF window containing several secondary analytics sections; it has no automatic dark palette, no polished popup placement/surface treatment, and no external sanitized state contract.
+The current quota-first baseline at `9406852` is a sound accessibility and semantic-resource foundation, not a reference-finish UI. It has two clear quota cards, focus visuals, high-contrast triggers, non-interactive progress tracks, state labels, and automation names. It remains a dense, fixed-light, chrome-free WPF window containing several secondary analytics sections; it has no automatic dark palette, no polished popup placement/surface treatment, and no external sanitized state contract.
 
 ## Evidence and constraints
 
@@ -236,7 +236,7 @@ If any slice forecasts above 400 lines, split tests/assets from runtime by a dep
 
 ## Risks and unresolved design checks
 
-- The exact `c6acb10` diff was not available through a Git command in this executor; the current files and supplied baseline identity were used. Proposal/design should verify the clean baseline and ancestry before planning edits.
+- The exact `9406852` diff was not available through a Git command in this executor; the current files and supplied baseline identity were used. Proposal/design should verify the clean baseline and ancestry before planning edits.
 - Windows dark-mode/DWM APIs vary by OS build. Treat them as optional and preserve an opaque fallback.
 - Registry/theme notifications can be missed or arrive off-dispatcher; startup and popup-open reevaluation are required.
 - Named kernel object scope and ACLs need an explicit same-user decision before changing activation names.

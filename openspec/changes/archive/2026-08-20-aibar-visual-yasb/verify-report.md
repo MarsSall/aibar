@@ -24,25 +24,25 @@ The final evidence includes the authorized uncommitted remediations and OpenSpec
 
 ## Task, commit-chain, and provenance reconciliation
 
-The eleven ordered work-unit commits culminate at implementation HEAD `4132a43794e4c82904f2c7eec9a79d0fb9248bee`:
+The eleven ordered work-unit commits culminate at implementation HEAD `d28a61691bb15548c1a291d3499321e216e29802`:
 
 | Order | Commit | Work unit |
 |---:|---|---|
-| 1 | `7c6887983302ecfd8e06fbeab5c2c618931c76bb` | 1a-contract |
-| 2 | `130c626be2a704a930531de4c7f3dd9df94cbdc2` | 1a-authority |
-| 3 | `05dc48e0b3d4329aa6684b8cb0d3c5f404934916` | 1a-privacy |
-| 4 | `3d137171a9c6c3a8fd4d079e8d9de6bf819a0043` | 1b-writer |
-| 5 | `bc8d79f719989a21f72b5c6cf843117c5001228d` | 1b-clear |
-| 6 | `ff6dfd913a5f5186e6c8acbe377edfc3656cfbd8` | Unit 2 |
-| 7 | `9e88f4db350a90316e255efabaca82f28de6fca7` | Unit 3 |
-| 8 | `f2716d254d4a56da60b776cc4ce6d1bbbc813c26` | Unit 4a |
-| 9 | `29001615f4a2cca6250bd9370bbb2774f01b2347` | Unit 4b |
-| 10 | `39d50b9b5717fa154e329543b16ec579dcc31e0e` | Unit 5 |
-| 11 | `4132a43794e4c82904f2c7eec9a79d0fb9248bee` | Unit 6 |
+| 1 | `f3c75c737830405b082f0f41c6897247918f629c` | 1a-contract |
+| 2 | `d77bba70650e535124171aba065d403b2f89a84b` | 1a-authority |
+| 3 | `ab5db66e12e0d9fd3130019c587db9a0cf79d4a1` | 1a-privacy |
+| 4 | `df88190526257e94c97977d26705b64ddd98c87f` | 1b-writer |
+| 5 | `dd561053e83d266d55acf09e44e3b97bc671107c` | 1b-clear |
+| 6 | `3186c0d6522ab49312a0e60ad4e967a4ee66271c` | Unit 2 |
+| 7 | `4b7e794161adac86f476c1b0ff1daeada371f70c` | Unit 3 |
+| 8 | `9dacc34807e0fdddf6138f5b0990b549494f7ebd` | Unit 4a |
+| 9 | `fd1ed463e0b37629e2cbcea75e3178440392dd57` | Unit 4b |
+| 10 | `cdc2de69c170c8dc3fadbbd300b21c28f9ad7220` | Unit 5 |
+| 11 | `d28a61691bb15548c1a291d3499321e216e29802` | Unit 6 |
 
-All eleven work units remained below the 400-line review boundary. The planning-only commit `ea49652aeec156a208e33a43760e099f3b2e8e47` remains intentionally interposed between 1a-privacy and 1b-writer.
+All eleven work units remained below the 400-line review boundary. The planning-only commit `ce050920bdaed63b5471fff322be551c612c4984` remains intentionally interposed between 1a-privacy and 1b-writer.
 
-Unit 1b provenance is reconciled without fabrication: the separate writer and clear commits `3d137171...` and `bc8d79f7...` exist, but stash provenance is unavailable. No stash creation, OID, reflog, or selective restoration is claimed.
+Unit 1b provenance is reconciled without fabrication: the separate writer and clear commits `df881905...` and `dd561053...` exist, but stash provenance is unavailable. No stash creation, OID, reflog, or selective restoration is claimed.
 
 ## Acceptance matrix
 
