@@ -15,20 +15,54 @@
         <SolidColorBrush x:Key="MutedTextBrush" Color="#FF545454" />
         <SolidColorBrush x:Key="AccentBrush" Color="#FF0078D4" />
         <SolidColorBrush x:Key="FocusBrush" Color="#FF005FB8" />
+        <SolidColorBrush x:Key="ProgressTrackBrush" Color="#FFD8EAF8" />
+        <SolidColorBrush x:Key="SecondaryBorderBrush" Color="#FFDADADA" />
         <SolidColorBrush x:Key="HighContrastBorderBrush" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}" />
 
         <Style x:Key="KeyboardFocusVisual" TargetType="{x:Type Control}">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Control}">
-                        <Border BorderBrush="{DynamicResource FocusBrush}" BorderThickness="2" CornerRadius="3" Margin="-2" />
+                        <Border x:Name="FocusBorder" BorderBrush="{DynamicResource FocusBrush}" BorderThickness="2" CornerRadius="3" Margin="-2" />
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Source={x:Static SystemParameters.HighContrast}}" Value="True">
+                                <Setter TargetName="FocusBorder" Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="ChromeLessGroupBoxStyle" TargetType="{x:Type GroupBox}">
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type GroupBox}">
+                        <Grid>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition /></Grid.RowDefinitions>
+                            <ContentPresenter x:Name="HeaderPresenter" ContentSource="Header" RecognizesAccessKey="True" TextElement.FontWeight="SemiBold" Margin="0,0,0,8" />
+                            <ContentPresenter Grid.Row="1" ContentSource="Content" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Header" Value="{x:Null}"><Setter TargetName="HeaderPresenter" Property="Visibility" Value="Collapsed" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SecondaryGroupBoxStyle" TargetType="{x:Type GroupBox}" BasedOn="{StaticResource ChromeLessGroupBoxStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Source={x:Static SystemParameters.HighContrast}}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="QuotaCardStyle" TargetType="{x:Type Border}">
             <Setter Property="Background" Value="{DynamicResource CardBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="{DynamicResource CardRadius}" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
@@ -40,11 +74,65 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-<Style x:Key="QuotaCardSecondaryTextStyle" TargetType="{x:Type TextBlock}">
-                <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
-                <Style.Triggers><DataTrigger Binding="{Binding Source={x:Static SystemParameters.HighContrast}}" Value="True"><Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" /></DataTrigger></Style.Triggers>
-            </Style>
-            <Style TargetType="{x:Type Button}">
+        <Style x:Key="SecondaryCardStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource QuotaCardStyle}">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SecondaryBorderBrush}" />
+        </Style>
+        <Style x:Key="MutedTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Source={x:Static SystemParameters.HighContrast}}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.WindowTextBrushKey}}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="QuotaTitleTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="QuotaStatusTextStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource MutedTextStyle}">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="QuotaLabelTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="QuotaPercentageTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="QuotaCardSecondaryTextStyle" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource MutedTextStyle}" />
+        <Style x:Key="QuotaProgressStyle" TargetType="{x:Type ProgressBar}">
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="100" />
+            <Setter Property="Height" Value="6" />
+            <Setter Property="IsIndeterminate" Value="False" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Background" Value="{DynamicResource ProgressTrackBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ProgressBar}">
+                        <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3" SnapsToDevicePixels="True">
+                            <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="3" HorizontalAlignment="Left" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Source={x:Static SystemParameters.HighContrast}}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" />
+                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="AccessibleExpanderStyle" TargetType="{x:Type Expander}">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusVisual}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style TargetType="{x:Type Button}">
             <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusVisual}" />
             <Setter Property="Padding" Value="12,6" />
         </Style>

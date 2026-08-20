@@ -8,13 +8,18 @@ using AIBar.Domain;
 namespace AIBar.Desktop;
 public partial class App : System.Windows.Application
 {
+    private readonly bool _suppressHostStartup;
     private SingleInstanceHost? _instance;
     private TaskbarRecreationMonitor? _taskbar;
     private TrayHostRuntime? _runtime;
 
+    public App() : this(false) { }
+    internal App(bool suppressHostStartup) => _suppressHostStartup = suppressHostStartup;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (_suppressHostStartup) return;
         _instance = new SingleInstanceHost("AIBar");
         if (!_instance.IsPrimary)
         {
@@ -48,60 +53,87 @@ public partial class App : System.Windows.Application
         seams ??= new();
         var dataDirectory = seams.DataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AIBar");
         Directory.CreateDirectory(dataDirectory);
+        var userProfile = seams.UserProfile ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var localUsageRoots = LocalUsageSourceRootResolver.Resolve(new(userProfile));
         var store = new SqliteQuotaSnapshotStore(Path.Combine(dataDirectory, "quota.db"));
         var policy = new PrivateIntegrationPolicy();
         var clock = new SystemClock();
         var codexHome = seams.CodexHome ?? Environment.GetEnvironmentVariable("CODEX_HOME");
-        var credentials = new ConsentCredentialSource(policy, new CodexCredentialReader(new ReadOnlyCredentialFileReader()), CodexRootResolver.Resolve(codexHome, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+        var credentials = new ConsentCredentialSource(policy, new CodexCredentialReader(new ReadOnlyCredentialFileReader()), CodexRootResolver.Resolve(codexHome, userProfile));
         var coordinator = new QuotaRefreshCoordinator(store, new QuotaHttpProvider(policy, credentials), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
+        var localUsageLedger = new SqliteUsageEventLedger(Path.Combine(dataDirectory, "local-usage.db"));
+        var localUsageSettings = new LocalUsageSettings(Path.Combine(dataDirectory, "local-usage-settings.json"));
+        var localUsage = new LocalUsageCoordinator(localUsageSettings,
+            new(Path.Combine(dataDirectory, "local-usage-identity-salt.bin")), localUsageLedger,
+            localUsageRoots.OpenCodeDataRoot, localUsageRoots.PiSessionsRoot, new(TimeZoneInfo.Local, "local-usage-v1"));
         var analyticsStore = new SqliteDailyModelUsageStore(Path.Combine(dataDirectory, "analytics.db"));
         var analytics = new LocalCodexAnalyticsView();
         var analyticsOwner = new AnalyticsLifecycleOwner(new LocalCodexAnalyticsAdapter(
-            new SessionFileDiscovery(codexHome, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), 50),
+            new SessionFileDiscovery(codexHome, userProfile, 50),
             new AnalyticsScanCoordinator(new SessionJsonlScanner(new SessionCheckpointStore(), "beta-v1", beforeStable: seams.BeforeAnalyticsStability), analyticsStore, new AnalyticsPolicy(new TimeZoneLocalDayPolicy(TimeZoneInfo.Local, "beta-v1"))),
             analyticsStore, () => clock.UtcNow), analytics, analyticsStore, seams.AnalyticsShutdownBound ?? TimeSpan.FromSeconds(2), seams.LifecycleObservation);
         var betaRuntime = new BetaRuntime(new ConsentSettings(Path.Combine(dataDirectory, "settings.json")), policy, coordinator, clock, credentials, analyticsOwner);
         var lifecycleEvents = new WindowsLifecycleEvents();
         var lifecycleAdapter = new QuotaRefreshLifecycleAdapter(lifecycleEvents, coordinator);
         var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents);
+        var localUsagePresentation = new LocalUsagePresentationHost(localUsage, new LocalUsagePresentationMapper());
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
-        var clear = new ClearAiBarDataService(dataDirectory, [coordinator], CreateEmptyStateFactory(coordinator));
-        return new(new BetaAnalyticsPresentation(presentation, analytics), presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy, betaRuntime.RevokeConsentAsync, betaRuntime.GrantConsentAsync), new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, analyticsOwner, store, seams.LifecycleObservation), () => InitializeCompositionAsync(betaRuntime, presentation, default), presentation.ReportUnavailable, coordinator.ReevaluateAsync);
+        var clear = new ClearAiBarDataService(dataDirectory, [coordinator, localUsage, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics));
+        return new(new BetaAnalyticsPresentation(presentation, analytics, localUsagePresentation), presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy, betaRuntime.RevokeConsentAsync, betaRuntime.GrantConsentAsync,
+                localUsageSettings.LoadAsync, localUsageSettings.SaveAsync, async (value, token) => { await localUsagePresentation.ApplyPolicyAsync(value, token); }),
+            new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, analyticsOwner, store, localUsage, localUsageLedger, seams.LifecycleObservation),
+            () => InitializeCompositionAsync(betaRuntime, presentation, localUsagePresentation, default), presentation.ReportUnavailable,
+            (trigger, token) => ReevaluateCompositionAsync(coordinator, localUsagePresentation, trigger, token), localUsagePresentation.RefreshAsync);
     }
-    internal static async Task InitializeCompositionAsync(BetaRuntime runtime, QuotaPresentationHost presentation, CancellationToken cancellationToken)
+    internal static async Task InitializeCompositionAsync(BetaRuntime runtime, QuotaPresentationHost presentation, LocalUsagePresentationHost localUsage, CancellationToken cancellationToken)
     {
-        await runtime.InitializeAsync(cancellationToken);
-        presentation.RefreshAvailabilityChanged();
+        var privateInitialization = InitializePrivateAsync(runtime, presentation, cancellationToken);
+        await Task.WhenAll(privateInitialization, localUsage.StartAsync(cancellationToken).AsTask());
     }
-    internal static Func<CancellationToken, ValueTask> CreateEmptyStateFactory(QuotaRefreshCoordinator coordinator) => coordinator.ClearAsync;
+    internal static Task InitializeCompositionAsync(BetaRuntime runtime, QuotaPresentationHost presentation, CancellationToken cancellationToken) =>
+        InitializePrivateAsync(runtime, presentation, cancellationToken);
+    internal static async ValueTask ReevaluateCompositionAsync(QuotaRefreshCoordinator quota, LocalUsagePresentationHost localUsage, RefreshTrigger trigger, CancellationToken cancellationToken)
+    {
+        await quota.ReevaluateAsync(trigger, cancellationToken);
+        if (trigger == RefreshTrigger.PopoverOpened) await localUsage.RefreshAsync(cancellationToken);
+    }
+    private static async Task InitializePrivateAsync(BetaRuntime runtime, QuotaPresentationHost presentation, CancellationToken cancellationToken)
+    { await runtime.InitializeAsync(cancellationToken); presentation.RefreshAvailabilityChanged(); }
+    internal static Func<CancellationToken, ValueTask> CreateEmptyStateFactory(QuotaRefreshCoordinator coordinator, LocalCodexAnalyticsView? analytics = null) => async token =>
+    {
+        analytics?.ResetAfterClear();
+        await coordinator.ClearAsync(token);
+    };
     private void StartTray(StartupComposition composition)
     {
         var window = new MainWindow { DataContext = composition.Presentation, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
         _taskbar = new TaskbarRecreationMonitor(window);
         var trayPresentation = composition.Presentation is BetaAnalyticsPresentation analyticsPresentation ? analyticsPresentation.QuotaPresentation : composition.Presentation as QuotaPresentationHost;
         _runtime = new TrayHostRuntime(_instance!, new WindowsTrayRuntime(), new WpfPopoverRuntime(window), _taskbar,
-            _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation, new WindowsPrivateIntegrationConsentPrompt());
+            _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation, new WindowsPrivateIntegrationConsentPrompt(), new WindowsOpenCodeDataFolderPicker());
         _runtime.Start();
     }
     private static void ReportFault(Exception exception) => Trace.TraceError("AIBar unavailable: {0}", exception.GetType().Name);
-    internal sealed record StartupComposition(object Presentation, IManualRefreshCommand? RefreshCommand, NativeSettingsCommands? Settings, IAsyncDisposable Resource, Func<Task> Initialize, Action ReportUnavailable, Func<RefreshTrigger, CancellationToken, ValueTask>? Reevaluate = null)
+    internal sealed record StartupComposition(object Presentation, IManualRefreshCommand? RefreshCommand, NativeSettingsCommands? Settings, IAsyncDisposable Resource, Func<Task> Initialize, Action ReportUnavailable, Func<RefreshTrigger, CancellationToken, ValueTask>? Reevaluate = null, Func<CancellationToken, ValueTask<LocalUsageCoordinatorResult>>? RefreshLocalUsage = null)
     {
         internal StartupComposition(object presentation, IManualRefreshCommand? refreshCommand, IAsyncDisposable resource, Func<Task> initialize, Action reportUnavailable)
             : this(presentation, refreshCommand, null, resource, initialize, reportUnavailable) { }
         internal static StartupComposition Unavailable => new(new UnavailableQuotaPresentation(), null, null, new EmptyAsyncResource(), () => Task.CompletedTask, () => { });
     }
 
-    internal sealed record CompositionSeams(string? DataDirectory = null, string? CodexHome = null, TimeSpan? AnalyticsShutdownBound = null, Action<string>? BeforeAnalyticsStability = null, Action<string>? LifecycleObservation = null);
+    internal sealed record CompositionSeams(string? DataDirectory = null, string? CodexHome = null, TimeSpan? AnalyticsShutdownBound = null, Action<string>? BeforeAnalyticsStability = null, Action<string>? LifecycleObservation = null, string? UserProfile = null);
     private sealed class SystemClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.UtcNow; }
-    internal sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, QuotaRefreshLifecycleAdapter lifecycleAdapter, WindowsLifecycleEvents lifecycleEvents, BetaRuntime runtime, AnalyticsLifecycleOwner analyticsOwner, IAsyncDisposable store, Action<string>? observe) : IAsyncDisposable
+    internal sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, QuotaRefreshLifecycleAdapter lifecycleAdapter, WindowsLifecycleEvents lifecycleEvents, BetaRuntime runtime, AnalyticsLifecycleOwner analyticsOwner, IAsyncDisposable store, LocalUsageCoordinator localUsage, IAsyncDisposable localUsageLedger, Action<string>? observe) : IAsyncDisposable
     {
         public AnalyticsShutdownOutcome AnalyticsOutcome => analyticsOwner.Outcome;
         public ValueTask DisposeAsync() => DisposeAllAsync([
             lifecycleAdapter.DisposeAsync, presentation.DisposeAsync,
             () => { lifecycleEvents.Dispose(); return ValueTask.CompletedTask; },
-            runtime.DisposeAsync, () => DisposeStoreAsync(store, observe), analyticsOwner.DisposeAsync]);
+            runtime.DisposeAsync, () => DisposeResourceAsync(localUsage, observe, "local_usage_coordinator_disposed"),
+            () => DisposeResourceAsync(localUsageLedger, observe, "local_usage_ledger_disposed"),
+            () => DisposeResourceAsync(store, observe, "quota_store_disposed"), analyticsOwner.DisposeAsync]);
 
-        private static async ValueTask DisposeStoreAsync(IAsyncDisposable store, Action<string>? observe) { await store.DisposeAsync(); observe?.Invoke("quota_store_disposed"); }
+        private static async ValueTask DisposeResourceAsync(IAsyncDisposable resource, Action<string>? observe, string label) { await resource.DisposeAsync(); observe?.Invoke(label); }
 
         internal static async ValueTask DisposeAllAsync(IEnumerable<Func<ValueTask>> disposals)
         {

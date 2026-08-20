@@ -17,7 +17,7 @@ public sealed class QuotaPresentationTests
         var unavailable = mapper.Map(new(null, FreshnessState.Unavailable, false, null, null));
 
         Assert.Equal(42, current.Primary.PercentageUsed); Assert.Equal(20, current.Weekly.PercentageUsed);
-        Assert.True(current.IsCurrent); Assert.Equal("01:00:00", current.Primary.ResetCountdown);
+        Assert.True(current.IsCurrent); Assert.Equal("01h 00m", current.Primary.ResetCountdown);
         Assert.False(stale.IsCurrent); Assert.Equal("Stale", stale.FreshnessLabel); Assert.Equal(42, stale.Primary.PercentageUsed);
         Assert.False(loading.IsCurrent); Assert.Equal("Loading", loading.FreshnessLabel); Assert.Equal(42, loading.Primary.PercentageUsed);
         Assert.Null(unavailable.Primary.PercentageUsed); Assert.Equal("Unavailable", unavailable.FreshnessLabel);
@@ -48,8 +48,36 @@ public sealed class QuotaPresentationTests
         var snapshot = new QuotaSnapshot(new(42, Now.AddMinutes(-1)), new(20, Now.AddDays(7)), Now.AddMinutes(-11));
         var view = new QuotaPresentationMapper(new FixedClock(Now)).Map(new(snapshot, FreshnessState.Current, false, new(QuotaErrorKind.Network, "quota_network"), null));
 
-        Assert.Equal(42, view.Primary.PercentageUsed); Assert.Equal("00:00:00", view.Primary.ResetCountdown);
+        Assert.Equal(42, view.Primary.PercentageUsed); Assert.Equal("00h 00m", view.Primary.ResetCountdown);
         Assert.False(view.IsCurrent); Assert.Equal("Stale", view.FreshnessLabel); Assert.Equal("Network unavailable", view.ErrorLabel);
+    }
+
+    [Theory]
+    [InlineData(5, 30, 59, "05h 30m")]
+    [InlineData(24, 0, 0, "1d 00h 00m")]
+    [InlineData(53, 30, 59, "2d 05h 30m")]
+    public void Formats_quota_reset_countdowns_with_days_hours_and_minutes_only(int hours, int minutes, int seconds, string expected)
+    {
+        var duration = TimeSpan.FromHours(hours) + TimeSpan.FromMinutes(minutes) + TimeSpan.FromSeconds(seconds);
+        var snapshot = new QuotaSnapshot(new(42, Now.Add(duration)), null, Now);
+
+        var view = new QuotaPresentationMapper(new FixedClock(Now)).Map(new(snapshot, FreshnessState.Current, false, null, null));
+
+        Assert.Equal(expected, view.Primary.ResetCountdown);
+    }
+
+    [Theory]
+    [InlineData(53, 30, 59, "2d 05h 30m")]
+    [InlineData(0, -1, 0, "00h 00m")]
+    public void Formats_cached_age_consistently_and_clamps_negative_durations(int hours, int minutes, int seconds, string expected)
+    {
+        var duration = TimeSpan.FromHours(hours) + TimeSpan.FromMinutes(minutes) + TimeSpan.FromSeconds(seconds);
+        var snapshot = new QuotaSnapshot(new(42, Now.Add(duration)), null, Now.Subtract(duration));
+
+        var view = new QuotaPresentationMapper(new FixedClock(Now)).Map(new(snapshot, FreshnessState.Stale, false, null, null));
+
+        Assert.Equal(expected, view.Primary.ResetCountdown);
+        Assert.Equal($"Cached {expected}", view.CachedAgeLabel);
     }
 
     [Theory]

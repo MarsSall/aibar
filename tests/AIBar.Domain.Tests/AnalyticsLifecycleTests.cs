@@ -109,14 +109,110 @@ public sealed class AnalyticsLifecycleTests
         Assert.Equal(2, events.Count(item => item == "analytics_awaited"));
     }
 
+    [Fact]
+    public async Task Production_clear_cooperatively_stops_analytics_deletes_its_database_family_clears_stale_totals_and_preserves_codex_source()
+    {
+        await using var harness = await ProductionHarness.CreateAsync(TimeSpan.FromSeconds(2), blockScanNumber: 2);
+        var presentation = (BetaAnalyticsPresentation)harness.Composition.Presentation;
+        await harness.Composition.Initialize();
+        await harness.ScanFinished.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(new TokenTotals(1, 0, 1), presentation.Analytics.Totals);
+
+        await harness.Composition.Settings!.DisablePrivateIntegrationAsync(default);
+        await File.AppendAllTextAsync(harness.SourcePath, "{\"timestamp\":\"2026-01-02T00:00:00Z\",\"model\":\"gpt-5\",\"usage\":{\"input_tokens\":2,\"cached_input_tokens\":0,\"output_tokens\":2}}\n");
+        harness.Cancelled.Reset();
+        await harness.Composition.Settings.EnablePrivateIntegrationAsync(default);
+        Assert.True(harness.Entered.Wait(TimeSpan.FromSeconds(2)));
+        Assert.Equal(new TokenTotals(1, 0, 1), presentation.Analytics.Totals);
+        await File.WriteAllTextAsync(harness.AnalyticsWalPath, "analytics-wal");
+        await File.WriteAllTextAsync(harness.AnalyticsShmPath, "analytics-shm");
+        var sourceBefore = await File.ReadAllBytesAsync(harness.SourcePath);
+
+        var clear = harness.Composition.Settings.ClearAiBarDataAsync(default).AsTask();
+        Assert.True(harness.Cancelled.Wait(TimeSpan.FromSeconds(2)));
+        harness.Release.Set();
+        await clear;
+
+        Assert.False(File.Exists(harness.AnalyticsDatabasePath));
+        Assert.False(File.Exists(harness.AnalyticsWalPath));
+        Assert.False(File.Exists(harness.AnalyticsShmPath));
+        Assert.Equal(AnalyticsScanStatus.Unavailable, presentation.Analytics.Status);
+        Assert.Null(presentation.Analytics.Totals);
+        Assert.Empty(presentation.Analytics.Models);
+        Assert.Contains("local_scan_not_started", presentation.Analytics.WarningCodes);
+        Assert.Equal(sourceBefore, await File.ReadAllBytesAsync(harness.SourcePath));
+    }
+
+    [Fact]
+    public async Task Production_clear_times_out_fail_closed_without_deleting_analytics_database_family_or_codex_source()
+    {
+        await using var harness = await ProductionHarness.CreateAsync(TimeSpan.FromMilliseconds(50));
+        await harness.Composition.Initialize();
+        Assert.True(harness.Entered.Wait(TimeSpan.FromSeconds(2)));
+        await File.WriteAllTextAsync(harness.AnalyticsWalPath, "analytics-wal");
+        await File.WriteAllTextAsync(harness.AnalyticsShmPath, "analytics-shm");
+        var databaseBefore = await File.ReadAllBytesAsync(harness.AnalyticsDatabasePath);
+        var sourceBefore = await File.ReadAllBytesAsync(harness.SourcePath);
+
+        var clear = harness.Composition.Settings!.ClearAiBarDataAsync(default).AsTask();
+        Assert.True(harness.Cancelled.Wait(TimeSpan.FromSeconds(2)));
+        await Assert.ThrowsAsync<TimeoutException>(async () => await clear);
+
+        Assert.Equal(databaseBefore, await File.ReadAllBytesAsync(harness.AnalyticsDatabasePath));
+        Assert.Equal("analytics-wal", await File.ReadAllTextAsync(harness.AnalyticsWalPath));
+        Assert.Equal("analytics-shm", await File.ReadAllTextAsync(harness.AnalyticsShmPath));
+        Assert.Equal(sourceBefore, await File.ReadAllBytesAsync(harness.SourcePath));
+        harness.Release.Set();
+        await harness.ScanFinished.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task Production_clear_fails_closed_on_failed_analytics_shutdown_without_mutating_database_family_source_or_stale_totals()
+    {
+        await using var harness = await ProductionHarness.CreateAsync(TimeSpan.FromSeconds(2), blockScanNumber: 2, failBlockedScan: true);
+        var presentation = (BetaAnalyticsPresentation)harness.Composition.Presentation;
+        await harness.Composition.Initialize();
+        await harness.ScanFinished.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(new TokenTotals(1, 0, 1), presentation.Analytics.Totals);
+
+        await harness.Composition.Settings!.DisablePrivateIntegrationAsync(default);
+        await File.AppendAllTextAsync(harness.SourcePath, "{\"timestamp\":\"2026-01-02T00:00:00Z\",\"model\":\"gpt-5\",\"usage\":{\"input_tokens\":2,\"cached_input_tokens\":0,\"output_tokens\":2}}\n");
+        harness.Cancelled.Reset();
+        await harness.Composition.Settings.EnablePrivateIntegrationAsync(default);
+        Assert.True(harness.Entered.Wait(TimeSpan.FromSeconds(2)));
+        Assert.Equal(AnalyticsScanStatus.Loading, presentation.Analytics.Status);
+        Assert.Equal(new TokenTotals(1, 0, 1), presentation.Analytics.Totals);
+        var displayedBefore = presentation.Analytics;
+        await File.WriteAllTextAsync(harness.AnalyticsWalPath, "analytics-wal");
+        await File.WriteAllTextAsync(harness.AnalyticsShmPath, "analytics-shm");
+        var databaseBefore = await File.ReadAllBytesAsync(harness.AnalyticsDatabasePath);
+        var walBefore = await File.ReadAllBytesAsync(harness.AnalyticsWalPath);
+        var shmBefore = await File.ReadAllBytesAsync(harness.AnalyticsShmPath);
+        var sourceBefore = await File.ReadAllBytesAsync(harness.SourcePath);
+
+        var clear = harness.Composition.Settings.ClearAiBarDataAsync(default).AsTask();
+        Assert.True(harness.Cancelled.Wait(TimeSpan.FromSeconds(2)));
+        harness.Release.Set();
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () => await clear);
+
+        Assert.Equal("analytics_shutdown_failed", failure.Message);
+        Assert.Equal(AnalyticsShutdownKind.Failed, harness.Outcome.Kind);
+        Assert.Equal(databaseBefore, await File.ReadAllBytesAsync(harness.AnalyticsDatabasePath));
+        Assert.Equal(walBefore, await File.ReadAllBytesAsync(harness.AnalyticsWalPath));
+        Assert.Equal(shmBefore, await File.ReadAllBytesAsync(harness.AnalyticsShmPath));
+        Assert.Equal(sourceBefore, await File.ReadAllBytesAsync(harness.SourcePath));
+        Assert.Same(displayedBefore, presentation.Analytics);
+        Assert.Equal(new TokenTotals(1, 0, 1), presentation.Analytics.Totals);
+    }
+
     private sealed class ProductionHarness : IAsyncDisposable
     {
         private readonly string _root;
         private readonly TrayHostRuntime _host;
 
-        private ProductionHarness(string root, TrayHostRuntime host, App.StartupComposition composition, List<string> events, ManualResetEventSlim entered, ManualResetEventSlim cancelled, ManualResetEventSlim release, TaskCompletionSource scanFinished)
+        private ProductionHarness(string root, string sourcePath, TrayHostRuntime host, App.StartupComposition composition, List<string> events, ManualResetEventSlim entered, ManualResetEventSlim cancelled, ManualResetEventSlim release, TaskCompletionSource scanFinished)
         {
-            _root = root; _host = host; Composition = composition; Events = events; Entered = entered; Cancelled = cancelled; Release = release; ScanFinished = scanFinished;
+            _root = root; SourcePath = sourcePath; _host = host; Composition = composition; Events = events; Entered = entered; Cancelled = cancelled; Release = release; ScanFinished = scanFinished;
         }
 
         public App.StartupComposition Composition { get; }
@@ -125,27 +221,38 @@ public sealed class AnalyticsLifecycleTests
         public ManualResetEventSlim Cancelled { get; }
         public ManualResetEventSlim Release { get; }
         public TaskCompletionSource ScanFinished { get; }
+        public string SourcePath { get; }
+        public string AnalyticsDatabasePath => Path.Combine(_root, "analytics.db");
+        public string AnalyticsWalPath => Path.Combine(_root, "analytics.db-wal");
+        public string AnalyticsShmPath => Path.Combine(_root, "analytics.db-shm");
         public AnalyticsShutdownOutcome Outcome => ((App.QuotaRuntimeResource)Composition.Resource).AnalyticsOutcome;
 
-        public static async Task<ProductionHarness> CreateAsync(TimeSpan shutdownBound, bool partial = false)
+        public static async Task<ProductionHarness> CreateAsync(TimeSpan shutdownBound, bool partial = false, int blockScanNumber = 1, bool failBlockedScan = false)
         {
             var root = Path.Combine(Path.GetTempPath(), $"aibar-lifecycle-{Guid.NewGuid():N}");
             var codex = Path.Combine(root, "codex");
             Directory.CreateDirectory(Path.Combine(codex, "sessions"));
             await File.WriteAllTextAsync(Path.Combine(root, "settings.json"), "{\"schema\":1,\"privateCodexConsent\":true}");
-            await File.WriteAllTextAsync(Path.Combine(codex, "sessions", "scan.jsonl"), "{\"timestamp\":\"2026-01-01T00:00:00Z\",\"model\":\"gpt-5\",\"usage\":{\"input_tokens\":1,\"cached_input_tokens\":0,\"output_tokens\":1}}\n" + (partial ? "{\n" : ""));
+            var sourcePath = Path.Combine(codex, "sessions", "scan.jsonl");
+            await File.WriteAllTextAsync(sourcePath, "{\"timestamp\":\"2026-01-01T00:00:00Z\",\"model\":\"gpt-5\",\"usage\":{\"input_tokens\":1,\"cached_input_tokens\":0,\"output_tokens\":1}}\n" + (partial ? "{\n" : ""));
             var events = new List<string>(); var entered = new ManualResetEventSlim(); var cancelled = new ManualResetEventSlim(); var release = new ManualResetEventSlim();
             var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var composition = App.CreateComposition(new(root, codex, shutdownBound, _ => { entered.Set(); release.Wait(); }, item =>
+            var scanNumber = 0;
+            var composition = App.CreateComposition(new(root, codex, shutdownBound, _ =>
+            {
+                if (Interlocked.Increment(ref scanNumber) != blockScanNumber) return;
+                entered.Set(); release.Wait();
+                if (failBlockedScan) throw new InvalidOperationException("Simulated analytics scan failure.");
+            }, item =>
             {
                 lock (events) events.Add(item);
                 if (item == "analytics_cancelled") cancelled.Set();
                 if (item == "analytics_scan_finished") finished.TrySetResult();
-            }));
+            }, Path.Combine(root, "home")));
             var instance = new SingleInstanceHost($"AIBar.lifecycle.{Guid.NewGuid():N}");
             var host = new TrayHostRuntime(instance, new FakeTray(), new FakePopover(), new FakeTaskbar(), _ => Task.CompletedTask, composition.Resource, () => { });
             instance.Dispose();
-            return new(root, host, composition, events, entered, cancelled, release, finished);
+            return new(root, sourcePath, host, composition, events, entered, cancelled, release, finished);
         }
 
         public Task ExitAsync() => _host.ExitAsync();
@@ -160,8 +267,8 @@ public sealed class AnalyticsLifecycleTests
 
     private sealed class FakeTray : ITrayRuntime
     {
-        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationEnableRequested; public event Action? PrivateIntegrationDisableRequested;
-        public void SetRefreshAvailable(bool available) { } public void SetPresentation(BetaPresentationState state) { } public void SetSettingsAvailable(bool available) { } public void SetPrivateIntegrationEnabled(bool enabled) { } public void SetStartupEnabled(bool enabled) { } public void Show() { } public void Hide() { }
+        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationEnableRequested; public event Action? PrivateIntegrationDisableRequested; public event Action? OpenCodeLocalUsageToggleRequested { add { } remove { } } public event Action? PiLocalUsageToggleRequested { add { } remove { } }
+        public void SetRefreshAvailable(bool available) { } public void SetPresentation(BetaPresentationState state) { } public void SetSettingsAvailable(bool available) { } public void SetPrivateIntegrationEnabled(bool enabled) { } public void SetStartupEnabled(bool enabled) { } public void SetLocalUsageAvailable(bool available) { } public void SetLocalUsagePolicy(LocalUsagePolicy policy) { } public void Show() { } public void Hide() { }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
     private sealed class FakePopover : IPopoverRuntime { public event Action? Deactivated; public bool IsVisible => false; public bool IsOwnedDialogActive => false; public void Show() { } public void Hide() { } public void Activate() { } }

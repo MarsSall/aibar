@@ -26,7 +26,7 @@ public sealed class BetaPresentationTests
         Assert.True(loading.IsLoading); Assert.False(loading.IsFresh); Assert.Equal("Loading", loading.FreshnessLabel);
         Assert.True(missing.IsMissingCredential); Assert.True(missing.IsUnavailable); Assert.Equal("Credential unavailable", missing.WarningLabel);
         Assert.True(offlineCached.IsOffline); Assert.True(offlineCached.IsDegraded); Assert.Equal(TimeSpan.FromMinutes(11), offlineCached.CachedAge);
-        Assert.Equal("Cached 00:11:00", offlineCached.CachedAgeLabel); Assert.Equal("Network unavailable", offlineCached.WarningLabel);
+        Assert.Equal("Cached 00h 11m", offlineCached.CachedAgeLabel); Assert.Equal("Network unavailable", offlineCached.WarningLabel);
         Assert.True(safeError.IsSafeError); Assert.Equal("Service unavailable", safeError.WarningLabel); Assert.DoesNotContain("secret", safeError.WarningLabel, StringComparison.OrdinalIgnoreCase);
         Assert.NotEmpty(fresh.Disclosure); Assert.NotEmpty(fresh.QuotaDisclosure); Assert.NotEmpty(fresh.PrivateEndpointDisclosure);
     }
@@ -42,14 +42,14 @@ public sealed class BetaPresentationTests
         await coordinator.InitializeAsync(default);
 
         var trayState = host.State;
-        Assert.Equal("01:00:00", trayState.Primary.ResetCountdown);
+        Assert.Equal("01h 00m", trayState.Primary.ResetCountdown);
         clock.Advance(TimeSpan.FromMinutes(15)); lifecycle.RaiseClockChanged();
-        Assert.Equal("00:45:00", host.State.Primary.ResetCountdown);
+        Assert.Equal("00h 45m", host.State.Primary.ResetCountdown);
         Assert.NotSame(trayState, host.State);
 
         await host.DisposeAsync();
         clock.Advance(TimeSpan.FromMinutes(15)); lifecycle.RaiseClockChanged();
-        Assert.Equal("00:45:00", host.State.Primary.ResetCountdown);
+        Assert.Equal("00h 45m", host.State.Primary.ResetCountdown);
     }
 
     [Fact]
@@ -84,6 +84,29 @@ public sealed class BetaPresentationTests
     }
 
     [Fact]
+    public async Task Forwards_local_usage_changes_without_changing_quota_or_legacy_analytics_bindings()
+    {
+        var clock = new MutableClock(Now);
+        await using var coordinator = new QuotaRefreshCoordinator(new SnapshotStore(Snapshot(Now)), new NeverProvider(), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromDays(1));
+        await using var quota = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock));
+        var analytics = new LocalCodexAnalyticsView();
+        var result = new LocalUsageCoordinatorResult(
+            [new(UsageTool.OpenCode, LocalUsageSourceStatus.Completed, 0), new(UsageTool.Pi, LocalUsageSourceStatus.Completed, 0)],
+            LocalUsageProjectionStatus.Completed, []);
+        var local = new LocalUsagePresentationHost(new(), _ => ValueTask.FromResult(result), (_, _) => ValueTask.FromResult(result), _ => ValueTask.FromResult(result));
+        var presentation = new BetaAnalyticsPresentation(quota, analytics, local);
+        string? changed = null; presentation.PropertyChanged += (_, args) => changed = args.PropertyName;
+
+        await local.StartAsync();
+
+        Assert.Equal(nameof(BetaAnalyticsPresentation.LocalUsage), changed);
+        Assert.Same(local.State, presentation.LocalUsage);
+        Assert.Same(analytics.State, presentation.Analytics);
+        Assert.Same(quota.State, presentation.State);
+        await analytics.DisposeAsync();
+    }
+
+    [Fact]
     public void Popup_display_remaps_countdowns_below_freshness_threshold_and_publishes_one_state_to_both_observers()
     {
         var clock = new MutableClock(Now);
@@ -102,7 +125,7 @@ public sealed class BetaPresentationTests
         {
             tray.Toggle();
 
-            Assert.Equal("00:55:00", presentation.State.Primary.ResetCountdown);
+            Assert.Equal("00h 55m", presentation.State.Primary.ResetCountdown);
             Assert.Same(presentation.State, popupState);
             Assert.Same(presentation.State, tray.State);
             Assert.Equal(0, provider.Calls);
@@ -148,8 +171,8 @@ public sealed class BetaPresentationTests
     }
     private sealed class Tray : ITrayRuntime
     {
-        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationEnableRequested; public event Action? PrivateIntegrationDisableRequested;
-        public void SetRefreshAvailable(bool available) { } public void SetSettingsAvailable(bool available) { } public void SetPrivateIntegrationEnabled(bool enabled) { } public void SetStartupEnabled(bool enabled) { } public void Show() { } public void Hide() { }
+        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationEnableRequested; public event Action? PrivateIntegrationDisableRequested; public event Action? OpenCodeLocalUsageToggleRequested { add { } remove { } } public event Action? PiLocalUsageToggleRequested { add { } remove { } }
+        public void SetRefreshAvailable(bool available) { } public void SetSettingsAvailable(bool available) { } public void SetPrivateIntegrationEnabled(bool enabled) { } public void SetStartupEnabled(bool enabled) { } public void SetLocalUsageAvailable(bool available) { } public void SetLocalUsagePolicy(LocalUsagePolicy policy) { } public void Show() { } public void Hide() { }
         public BetaPresentationState? State { get; private set; }
         public void SetPresentation(BetaPresentationState state) => State = state;
         public void Toggle() => Toggled?.Invoke(); public ValueTask DisposeAsync() => ValueTask.CompletedTask;

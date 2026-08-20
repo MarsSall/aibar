@@ -77,17 +77,73 @@ public sealed class HostRuntimeTests
     public void Native_settings_events_read_back_startup_and_execute_clear_without_live_windows_state()
     {
         using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
-        var tray = new FakeTray(); var startup = new FakeStartupRegistration(); var clear = new FakeClearCommand();
-        var settings = new NativeSettingsCommands(startup, clear, new PrivateIntegrationPolicy());
+        var tray = new FakeTray(); var startup = new FakeStartupRegistration(); var local = new FakeLocalUsageControl(new(true, false));
+        var clear = new FakeClearCommand { OnClear = () => local.Persisted = LocalUsagePolicy.Disabled };
+        var settings = new NativeSettingsCommands(startup, clear, new PrivateIntegrationPolicy(),
+            loadLocalUsage: local.LoadAsync, saveLocalUsage: local.SaveAsync, applyLocalUsage: local.ApplyAsync);
         var host = new TrayHostRuntime(instance, tray, new FakePopover(), new FakeRecreationEvents(), _ => Task.CompletedTask, new ProbeResource(), () => { }, settings: settings);
 
-        host.Start(); tray.StartupToggle();
+        host.Start(); Assert.True(tray.LocalUsageAvailable); Assert.Equal(new(true, false), tray.LocalUsagePolicy); tray.StartupToggle();
         Assert.True(host.StartupEnabled); Assert.True(tray.StartupEnabled); Assert.True(startup.Enabled);
         tray.StartupToggle();
         Assert.False(host.StartupEnabled); Assert.False(tray.StartupEnabled); Assert.False(startup.Enabled);
+        tray.TogglePiLocalUsage();
+        Assert.Equal(new(true, true), tray.LocalUsagePolicy); Assert.Equal(1, local.PiAccesses);
         tray.ClearAiBarData();
-        Assert.Equal(1, clear.Calls);
+        Assert.Equal(1, clear.Calls); Assert.Equal(LocalUsagePolicy.Disabled, tray.LocalUsagePolicy);
         instance.Dispose(); _ = host.ExitAsync();
+    }
+
+    [Fact]
+    public async Task Failed_local_usage_apply_keeps_tray_truthful_and_disposal_detaches_toggle_handlers()
+    {
+        using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
+        var tray = new FakeTray(); var local = new FakeLocalUsageControl(LocalUsagePolicy.Disabled) { ApplyFailure = new IOException("synthetic") };
+        var settings = new NativeSettingsCommands(new FakeStartupRegistration(), new FakeClearCommand(), new(),
+            loadLocalUsage: local.LoadAsync, saveLocalUsage: local.SaveAsync, applyLocalUsage: local.ApplyAsync);
+        var host = new TrayHostRuntime(instance, tray, new FakePopover(), new FakeRecreationEvents(), _ => Task.CompletedTask,
+            new ProbeResource(), () => { }, settings: settings);
+        host.Start();
+
+        tray.ToggleOpenCodeLocalUsage();
+        Assert.Equal(LocalUsagePolicy.Disabled, tray.LocalUsagePolicy);
+        Assert.Equal(new(true, false), local.Persisted);
+        instance.Dispose(); await host.ExitAsync();
+        var saves = local.Saves;
+        tray.TogglePiLocalUsage();
+        Assert.Equal(saves, local.Saves);
+    }
+
+    [Fact]
+    public async Task Folder_picker_choose_cancel_invalid_unavailable_and_reset_keep_disabled_opt_in_and_safe_tray_state()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"aibar-picker-{Guid.NewGuid():N}"); Directory.CreateDirectory(root);
+        using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
+        var tray = new FakeTray(); var picker = new FakeFolderPicker(); var local = new FakeLocalUsageControl(LocalUsagePolicy.Disabled);
+        var settings = new NativeSettingsCommands(new FakeStartupRegistration(), new FakeClearCommand(), new(),
+            loadLocalUsage: local.LoadAsync, saveLocalUsage: local.SaveAsync, applyLocalUsage: local.ApplyAsync);
+        await using var host = new TrayHostRuntime(instance, tray, new FakePopover(), new FakeRecreationEvents(), _ => Task.CompletedTask,
+            new ProbeResource(), () => { }, settings: settings, openCodeFolderPicker: picker);
+        try
+        {
+            host.Start(); picker.Results.Enqueue(root); tray.ChooseOpenCodeDataFolder(); PumpUntil(() => tray.LocalUsagePolicy.OpenCodeDataRoot == root);
+
+            Assert.False(tray.LocalUsagePolicy.OpenCodeEnabled); Assert.Equal(0, local.OpenCodeAccesses);
+            foreach (var result in new object?[] { null, Path.Combine(root, "missing"), new IOException("synthetic unavailable") })
+            {
+                var failures = picker.Failures; picker.Results.Enqueue(result); tray.ChooseOpenCodeDataFolder(); PumpUntil(() => picker.Failures == failures + 1);
+                Assert.Equal(root, local.Persisted.OpenCodeDataRoot); Assert.Equal(root, tray.LocalUsagePolicy.OpenCodeDataRoot);
+            }
+            Assert.Equal(LocalUsageSourceRootResolver.InvalidOpenCodeDataRootMessage, OpenCodeDataFolderCopy.Failure);
+            Assert.DoesNotContain(root, string.Join('|', OpenCodeDataFolderCopy.Choose, OpenCodeDataFolderCopy.Reset, OpenCodeDataFolderCopy.Guidance, OpenCodeDataFolderCopy.Failure));
+            Assert.DoesNotContain(root, tray.LocalUsagePolicy.ToString());
+
+            tray.ResetOpenCodeDataFolder(); PumpUntil(() => tray.LocalUsagePolicy.OpenCodeDataRoot is null);
+            Assert.Equal(new(false, false), local.Persisted); Assert.Equal(0, local.OpenCodeAccesses);
+        }
+        finally { instance.Dispose(); }
+        await host.ExitAsync();
+        Directory.Delete(root, true);
     }
 
     [Fact]
@@ -140,7 +196,7 @@ public sealed class HostRuntimeTests
     public async Task Fresh_production_composition_identifies_disabled_private_integration_and_exposes_enable_only()
     {
         var root = Path.Combine(Path.GetTempPath(), $"aibar-onboarding-{Guid.NewGuid():N}");
-        var composition = App.CreateComposition(new(root, Path.Combine(root, "codex")));
+        var composition = App.CreateComposition(new(root, Path.Combine(root, "codex"), UserProfile: Path.Combine(root, "home")));
         var presentation = ((BetaAnalyticsPresentation)composition.Presentation).QuotaPresentation;
         using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
         var tray = new FakeTray();
@@ -226,9 +282,10 @@ public sealed class HostRuntimeTests
         Assert.True(condition());
     }
 
-    private sealed class FakeTray : ITrayRuntime
+    private sealed class FakeTray : ITrayRuntime, IOpenCodeDataRootTray
     {
-        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationEnableRequested; public event Action? PrivateIntegrationDisableRequested; public event Action? Recreated;
+        public event Action? Toggled; public event Action? ExitRequested; public event Action? RefreshRequested; public event Action? StartupToggleRequested; public event Action? ClearAiBarDataRequested; public event Action? PrivateIntegrationEnableRequested; public event Action? PrivateIntegrationDisableRequested; public event Action? OpenCodeLocalUsageToggleRequested; public event Action? PiLocalUsageToggleRequested; public event Action? Recreated;
+        public event Action? OpenCodeDataFolderChooseRequested; public event Action? OpenCodeDataFolderResetRequested;
         public int Shows { get; private set; } public int Disposals { get; private set; } public bool RefreshAvailable { get; private set; }
         public void SetRefreshAvailable(bool available) => RefreshAvailable = available;
         public BetaPresentationState? State { get; private set; }
@@ -241,7 +298,11 @@ public sealed class HostRuntimeTests
         public bool DisablePrivateVisible => SettingsAvailable && PrivateIntegrationEnabled;
         public bool StartupEnabled { get; private set; }
         public void SetStartupEnabled(bool enabled) => StartupEnabled = enabled;
-        public void Show() => Shows++; public void Hide() { } public void Click() => Toggled?.Invoke(); public void Exit() => ExitRequested?.Invoke(); public void Refresh() { if (RefreshAvailable) RefreshRequested?.Invoke(); } public void StartupToggle() => StartupToggleRequested?.Invoke(); public void ClearAiBarData() => ClearAiBarDataRequested?.Invoke(); public void EnablePrivate() => PrivateIntegrationEnableRequested?.Invoke(); public void DisablePrivate() => PrivateIntegrationDisableRequested?.Invoke(); public void Recreate() => Recreated?.Invoke();
+        public bool LocalUsageAvailable { get; private set; }
+        public LocalUsagePolicy LocalUsagePolicy { get; private set; } = LocalUsagePolicy.Disabled;
+        public void SetLocalUsageAvailable(bool available) => LocalUsageAvailable = available;
+        public void SetLocalUsagePolicy(LocalUsagePolicy policy) => LocalUsagePolicy = policy;
+        public void Show() => Shows++; public void Hide() { } public void Click() => Toggled?.Invoke(); public void Exit() => ExitRequested?.Invoke(); public void Refresh() { if (RefreshAvailable) RefreshRequested?.Invoke(); } public void StartupToggle() => StartupToggleRequested?.Invoke(); public void ClearAiBarData() => ClearAiBarDataRequested?.Invoke(); public void EnablePrivate() => PrivateIntegrationEnableRequested?.Invoke(); public void DisablePrivate() => PrivateIntegrationDisableRequested?.Invoke(); public void ToggleOpenCodeLocalUsage() => OpenCodeLocalUsageToggleRequested?.Invoke(); public void TogglePiLocalUsage() => PiLocalUsageToggleRequested?.Invoke(); public void ChooseOpenCodeDataFolder() => OpenCodeDataFolderChooseRequested?.Invoke(); public void ResetOpenCodeDataFolder() => OpenCodeDataFolderResetRequested?.Invoke(); public void Recreate() => Recreated?.Invoke();
         public ValueTask DisposeAsync() { Disposals++; return ValueTask.CompletedTask; }
     }
 
@@ -273,7 +334,22 @@ public sealed class HostRuntimeTests
     {
         public int Calls { get; private set; }
         public Exception? Failure { get; init; }
-        public ValueTask ClearAsync(CancellationToken cancellationToken) { Calls++; return Failure is null ? ValueTask.CompletedTask : ValueTask.FromException(Failure); }
+        public Action? OnClear { get; init; }
+        public ValueTask ClearAsync(CancellationToken cancellationToken) { Calls++; if (Failure is not null) return ValueTask.FromException(Failure); OnClear?.Invoke(); return ValueTask.CompletedTask; }
+    }
+    private sealed class FakeLocalUsageControl(LocalUsagePolicy policy)
+    {
+        public LocalUsagePolicy Persisted { get; set; } = policy;
+        public int Saves { get; private set; } public int OpenCodeAccesses { get; private set; } public int PiAccesses { get; private set; }
+        public Exception? ApplyFailure { get; init; }
+        public ValueTask<LocalUsagePolicy> LoadAsync(CancellationToken token) => ValueTask.FromResult(Persisted);
+        public ValueTask SaveAsync(LocalUsagePolicy value, CancellationToken token) { Saves++; Persisted = value; return ValueTask.CompletedTask; }
+        public ValueTask ApplyAsync(LocalUsagePolicy value, CancellationToken token)
+        {
+            if (ApplyFailure is not null) return ValueTask.FromException(ApplyFailure);
+            if (value.OpenCodeEnabled) OpenCodeAccesses++; if (value.PiEnabled) PiAccesses++;
+            return ValueTask.CompletedTask;
+        }
     }
     private sealed class FakeQuotaStore(QuotaSnapshot snapshot) : IQuotaSnapshotStore
     {
@@ -290,6 +366,12 @@ public sealed class HostRuntimeTests
     {
         public int Calls { get; private set; }
         public bool Confirm() { Calls++; return accepted; }
+    }
+    private sealed class FakeFolderPicker : IOpenCodeDataFolderPicker
+    {
+        public Queue<object?> Results { get; } = new(); public int Failures { get; private set; }
+        public string? Choose() { var result = Results.Dequeue(); if (result is Exception error) throw error; return (string?)result; }
+        public void ShowFailure() => Failures++;
     }
     private sealed class MissingCredentialFiles : ICredentialFileReader
     {

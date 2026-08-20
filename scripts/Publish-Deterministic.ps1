@@ -129,26 +129,51 @@ function Write-IsolationProps($Isolation) {
     $xml = "<Project><PropertyGroup><BaseIntermediateOutputPath>$($Isolation.intermediate)\`$(MSBuildProjectName)\</BaseIntermediateOutputPath><MSBuildProjectExtensionsPath>$($Isolation.restore)\`$(MSBuildProjectName)\</MSBuildProjectExtensionsPath><RestoreOutputPath>$($Isolation.restore)\`$(MSBuildProjectName)\</RestoreOutputPath><BaseOutputPath>$($Isolation.build)\`$(MSBuildProjectName)\</BaseOutputPath><RestorePackagesPath>$($Isolation.packages)</RestorePackagesPath><PathMap>$($Isolation.parent)=/_/isolation</PathMap><DefaultItemExcludes>`$(DefaultItemExcludes);`$(MSBuildProjectDirectory)\obj\**;`$(MSBuildProjectDirectory)\bin\**</DefaultItemExcludes></PropertyGroup></Project>"
     $path = Join-Path $Isolation.restore "aibar-isolation.props"; [IO.File]::WriteAllText($path, $xml, [Text.UTF8Encoding]::new($false)); return $path
 }
-function Invoke-OwnedProcess([string]$FileName, [string[]]$Arguments, [string]$Failure) {
+function Get-SafeProcessTail($Task, [string]$Name) {
+    if ($null -eq $Task) { return "$Name=[not-started]" }
+    if (-not $Task.IsCompleted) { return "$Name=[pending]" }
+    if ($Task.IsFaulted -or $Task.IsCanceled) { return "$Name=[faulted]" }
+    try { $text = $Task.GetAwaiter().GetResult() } catch { return "$Name=[faulted]" }
+    $text = [Text.RegularExpressions.Regex]::Replace($text, '(?i)\b(https?://)[^/\s:@]+:[^@/\s]+@', '$1[redacted]@')
+    $text = [Text.RegularExpressions.Regex]::Replace($text, '(?i)\b(password|passwd|pwd|token|secret|api[_-]?key)\s*[:=]\s*[^\s;]+', '$1=[redacted]')
+    $limit = 2048
+    if ($text.Length -gt $limit) { return ("$Name=[truncated discarded_chars=$($text.Length - $limit)]`n" + $text.Substring($text.Length - $limit)) }
+    return "$Name=[complete]`n$text"
+}
+function New-OwnedProcessFailure([string]$Kind, [string]$Stage, $Process, $Stdout, $Stderr) {
+    $exitCode = if ($null -ne $Process -and $Process.HasExited) { $Process.ExitCode } else { "unavailable" }
+    $safeStage = $Stage.Replace("`r", " ").Replace("`n", " ")
+    $stdoutTail = Get-SafeProcessTail $Stdout "stdout_tail"; $stderrTail = Get-SafeProcessTail $Stderr "stderr_tail"
+    return "OWNED_PROCESS_FAILURE kind=$Kind stage=$safeStage exit_code=$exitCode operation_deadline_seconds=$ProcessTimeoutSeconds termination_grace_seconds=2`n$stdoutTail`n$stderrTail"
+}
+function Invoke-OwnedProcess([string]$FileName, [string[]]$Arguments, [string]$Stage) {
     $start = [Diagnostics.ProcessStartInfo]::new($FileName)
     $start.UseShellExecute = $false; $start.RedirectStandardOutput = $true; $start.RedirectStandardError = $true
     foreach ($argument in $Arguments) { $start.ArgumentList.Add($argument) }
-    $process = $null; $timeout = [Threading.CancellationTokenSource]::new(); $linked = $null; $known = @()
+    $process = $null; $stdout = $null; $stderr = $null; $timeout = [Threading.CancellationTokenSource]::new(); $linked = $null; $known = @()
+    $operationLimit = [TimeSpan]::FromSeconds($ProcessTimeoutSeconds); $terminationGrace = [TimeSpan]::FromSeconds(2); $clock = [Diagnostics.Stopwatch]::StartNew()
     try {
-        $timeout.CancelAfter([TimeSpan]::FromSeconds($ProcessTimeoutSeconds))
+        $timeout.CancelAfter($operationLimit)
         $linked = [Threading.CancellationTokenSource]::CreateLinkedTokenSource($timeout.Token, $PSCmdlet.PipelineStopToken)
         if ($CancelAfterMilliseconds -gt 0) { $linked.CancelAfter($CancelAfterMilliseconds) }
-        $process = [Diagnostics.Process]::Start($start)
-        if ($null -eq $process) { throw $Failure }
+        try { $process = [Diagnostics.Process]::Start($start) } catch { throw (New-OwnedProcessFailure "process-start" $Stage $null $null $null) }
+        if ($null -eq $process) { throw (New-OwnedProcessFailure "process-start" $Stage $null $null $null) }
         $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
         try { $process.WaitForExitAsync($linked.Token).GetAwaiter().GetResult() }
         catch [OperationCanceledException] {
-            if (-not $process.HasExited) { $process.Kill($true) }
-            try { $process.WaitForExitAsync().WaitAsync([TimeSpan]::FromSeconds($ProcessTimeoutSeconds)).GetAwaiter().GetResult() }
-            catch [TimeoutException] { throw $Failure }
-            throw $Failure
+            $kind = if ($timeout.IsCancellationRequested) { "timeout" } else { "cancelled" }; $graceClock = [Diagnostics.Stopwatch]::StartNew()
+            if (-not $process.HasExited) { try { $process.Kill($true) } catch { } }
+            try { if (-not $process.HasExited) { $process.WaitForExitAsync().WaitAsync($terminationGrace).GetAwaiter().GetResult() } } catch { }
+            $remainingGrace = $terminationGrace - $graceClock.Elapsed
+            if ($remainingGrace -gt [TimeSpan]::Zero) { try { [Threading.Tasks.Task]::WhenAll($stdout, $stderr).WaitAsync($remainingGrace).GetAwaiter().GetResult() } catch { } }
+            throw (New-OwnedProcessFailure $kind $Stage $process $stdout $stderr)
         }
-        if ($process.ExitCode -ne 0) { throw $Failure }
+        $remaining = $operationLimit - $clock.Elapsed
+        if ($process.ExitCode -ne 0) {
+            if ($remaining -gt [TimeSpan]::Zero) { try { [Threading.Tasks.Task]::WhenAll($stdout, $stderr).WaitAsync($remaining).GetAwaiter().GetResult() } catch { } }
+            throw (New-OwnedProcessFailure "nonzero-exit" $Stage $process $stdout $stderr)
+        }
+        if ($remaining -le [TimeSpan]::Zero) { throw (New-OwnedProcessFailure "timeout" $Stage $process $stdout $stderr) }
         if (-not [string]::IsNullOrWhiteSpace($KnownDescendantIdentityPath)) {
             try {
                 $identity = Get-Content -LiteralPath $KnownDescendantIdentityPath -Raw | ConvertFrom-Json
@@ -159,17 +184,22 @@ function Invoke-OwnedProcess([string]$FileName, [string[]]$Arguments, [string]$F
                     if ($known[-1].StartTime.ToUniversalTime().Ticks -ne [long]$record.startTicks) { throw "identity changed" }
                 }
             }
-            catch { throw $Failure }
+            catch { throw (New-OwnedProcessFailure "ownership-identity" $Stage $process $stdout $stderr) }
             foreach ($descendant in $known) {
                 if (-not $descendant.HasExited) {
-                    try { $descendant.Kill($true); $descendant.WaitForExitAsync().WaitAsync([TimeSpan]::FromSeconds($ProcessTimeoutSeconds)).GetAwaiter().GetResult() }
+                    $graceClock = [Diagnostics.Stopwatch]::StartNew()
+                    try { $descendant.Kill($true); $descendant.WaitForExitAsync().WaitAsync($terminationGrace).GetAwaiter().GetResult() }
                     catch { }
-                    throw $Failure
+                    $remainingGrace = $terminationGrace - $graceClock.Elapsed
+                    if ($remainingGrace -gt [TimeSpan]::Zero) { try { [Threading.Tasks.Task]::WhenAll($stdout, $stderr).WaitAsync($remainingGrace).GetAwaiter().GetResult() } catch { } }
+                    throw (New-OwnedProcessFailure "ownership-identity" $Stage $process $stdout $stderr)
                 }
             }
         }
-        try { [Threading.Tasks.Task]::WhenAll($stdout, $stderr).WaitAsync([TimeSpan]::FromSeconds($ProcessTimeoutSeconds)).GetAwaiter().GetResult() }
-        catch { throw $Failure }
+        $remaining = $operationLimit - $clock.Elapsed
+        if ($remaining -le [TimeSpan]::Zero) { throw (New-OwnedProcessFailure "stream-drain" $Stage $process $stdout $stderr) }
+        try { [Threading.Tasks.Task]::WhenAll($stdout, $stderr).WaitAsync($remaining).GetAwaiter().GetResult() }
+        catch { throw (New-OwnedProcessFailure "stream-drain" $Stage $process $stdout $stderr) }
     }
     finally {
         foreach ($descendant in $known) { $descendant.Dispose() }

@@ -134,17 +134,51 @@ public interface IAiBarDataClearCommand { ValueTask ClearAsync(CancellationToken
 
 public sealed record PrivacyDefaults(bool TelemetryEnabled = false, bool RemoteCrashReportingEnabled = false);
 
-public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarDataClearCommand clear, PrivateIntegrationPolicy privateIntegration, Func<CancellationToken, ValueTask>? revokePrivate = null, Func<CancellationToken, ValueTask>? grantPrivate = null)
+public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarDataClearCommand clear, PrivateIntegrationPolicy privateIntegration,
+    Func<CancellationToken, ValueTask>? revokePrivate = null, Func<CancellationToken, ValueTask>? grantPrivate = null,
+    Func<CancellationToken, ValueTask<LocalUsagePolicy>>? loadLocalUsage = null,
+    Func<LocalUsagePolicy, CancellationToken, ValueTask>? saveLocalUsage = null,
+    Func<LocalUsagePolicy, CancellationToken, ValueTask>? applyLocalUsage = null)
 {
+    private readonly SemaphoreSlim _localUsageGate = new(1, 1);
+    private LocalUsagePolicy _localUsagePolicy = LocalUsagePolicy.Disabled;
     public PrivacyDefaults Privacy { get; } = new();
     public bool PrivateIntegrationEnabled => privateIntegration.IsEnabled;
     public bool LocalAnalyticsEnabled => true;
+    public bool LocalUsageAvailable => loadLocalUsage is not null && saveLocalUsage is not null && applyLocalUsage is not null;
+    public LocalUsagePolicy LocalUsagePolicy => Volatile.Read(ref _localUsagePolicy);
     public async ValueTask<bool> ToggleStartupAsync(CancellationToken cancellationToken)
     {
         var enabled = await startup.IsEnabledAsync(cancellationToken);
         return await startup.SetEnabledAsync(!enabled, cancellationToken);
     }
-    public ValueTask ClearAiBarDataAsync(CancellationToken cancellationToken) => clear.ClearAsync(cancellationToken);
+    public async ValueTask ClearAiBarDataAsync(CancellationToken cancellationToken)
+    {
+        if (!LocalUsageAvailable) { await clear.ClearAsync(cancellationToken); return; }
+        await _localUsageGate.WaitAsync(cancellationToken);
+        try
+        {
+            await clear.ClearAsync(cancellationToken);
+            var policy = await loadLocalUsage!(cancellationToken);
+            await applyLocalUsage!(policy, cancellationToken);
+            Volatile.Write(ref _localUsagePolicy, policy);
+        }
+        finally { _localUsageGate.Release(); }
+    }
+    public ValueTask<LocalUsagePolicy> LoadLocalUsagePolicyAsync(CancellationToken cancellationToken) =>
+        ChangeLocalUsageAsync(null, cancellationToken);
+    public ValueTask<LocalUsagePolicy> ToggleOpenCodeLocalUsageAsync(CancellationToken cancellationToken) =>
+        ChangeLocalUsageAsync(policy => policy with { OpenCodeEnabled = !policy.OpenCodeEnabled }, cancellationToken);
+    public ValueTask<LocalUsagePolicy> TogglePiLocalUsageAsync(CancellationToken cancellationToken) =>
+        ChangeLocalUsageAsync(policy => policy with { PiEnabled = !policy.PiEnabled }, cancellationToken);
+    public ValueTask<LocalUsagePolicy> ChooseOpenCodeDataRootAsync(string selectedRoot, CancellationToken cancellationToken)
+    {
+        if (!LocalUsageSourceRootResolver.TryNormalizeOpenCodeDataRoot(selectedRoot, true, out var normalized))
+            return ValueTask.FromException<LocalUsagePolicy>(new InvalidOperationException(LocalUsageSourceRootResolver.InvalidOpenCodeDataRootMessage));
+        return ChangeLocalUsageAsync(policy => policy with { OpenCodeDataRoot = normalized }, cancellationToken);
+    }
+    public ValueTask<LocalUsagePolicy> ResetOpenCodeDataRootAsync(CancellationToken cancellationToken) =>
+        ChangeLocalUsageAsync(policy => policy with { OpenCodeDataRoot = null }, cancellationToken);
     public ValueTask EnablePrivateIntegrationAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -157,4 +191,20 @@ public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarD
     }
     private ValueTask EnableAsync() { privateIntegration.Enable(); return ValueTask.CompletedTask; }
     private ValueTask DisableAsync() { privateIntegration.Disable(); return ValueTask.CompletedTask; }
+    private async ValueTask<LocalUsagePolicy> ChangeLocalUsageAsync(Func<LocalUsagePolicy, LocalUsagePolicy>? change, CancellationToken cancellationToken)
+    {
+        if (!LocalUsageAvailable) return LocalUsagePolicy.Disabled;
+        await _localUsageGate.WaitAsync(cancellationToken);
+        try
+        {
+            var current = await loadLocalUsage!(cancellationToken);
+            if (change is null) { Volatile.Write(ref _localUsagePolicy, current); return current; }
+            var updated = change(current);
+            await saveLocalUsage!(updated, cancellationToken);
+            await applyLocalUsage!(updated, cancellationToken);
+            Volatile.Write(ref _localUsagePolicy, updated);
+            return updated;
+        }
+        finally { _localUsageGate.Release(); }
+    }
 }

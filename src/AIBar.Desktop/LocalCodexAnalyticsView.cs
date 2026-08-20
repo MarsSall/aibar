@@ -17,6 +17,7 @@ public sealed class LocalCodexAnalyticsView : INotifyPropertyChanged, IAsyncDisp
     public event Action<LocalAnalyticsState>? StateChanged;
 
     internal void ShowLoading() => Publish(State.WithStatus(AnalyticsScanStatus.Loading));
+    internal void ResetAfterClear() => Publish(LocalAnalyticsState.Unavailable(DateTimeOffset.UtcNow, ["local_scan_not_started"]));
     internal void Publish(LocalAnalyticsState state)
     {
         if (_disposed) return;
@@ -35,7 +36,7 @@ public sealed class LocalCodexAnalyticsView : INotifyPropertyChanged, IAsyncDisp
 public enum AnalyticsShutdownKind { Completed, TimedOut, Failed }
 public sealed record AnalyticsShutdownOutcome(AnalyticsShutdownKind Kind, string SafeCode, Exception? FirstFailure = null);
 
-public sealed class AnalyticsLifecycleOwner : ILocalAnalyticsLifecycle, IAsyncDisposable
+public sealed class AnalyticsLifecycleOwner : ILocalAnalyticsLifecycle, IAiBarClearWork, IAsyncDisposable
 {
     private readonly ILocalCodexAnalyticsScanner _scanner; private readonly LocalCodexAnalyticsView _view; private readonly IAsyncDisposable _store;
     private readonly TimeSpan _shutdownBound; private readonly Action<string>? _observe; private CancellationTokenSource? _cancellation; private Task? _scan;
@@ -51,6 +52,13 @@ public sealed class AnalyticsLifecycleOwner : ILocalAnalyticsLifecycle, IAsyncDi
         var generation = ++_generation; _scan = Task.Run(() => ScanAsync(generation)); return ValueTask.CompletedTask;
     }
     public async ValueTask StopAsync(CancellationToken cancellationToken) => await EndAsync(cancellationToken, false);
+    public async ValueTask CancelAndWaitAsync(CancellationToken cancellationToken)
+    {
+        await EndAsync(cancellationToken, false);
+        if (_outcome is { Kind: AnalyticsShutdownKind.TimedOut } timedOut) throw new TimeoutException(timedOut.SafeCode);
+        if (_outcome is { Kind: AnalyticsShutdownKind.Failed } failed) throw new InvalidOperationException(failed.SafeCode, failed.FirstFailure);
+    }
+    public void ResumeAfterClear() { }
     public async ValueTask DisposeAsync() => await EndAsync(CancellationToken.None, true);
 
     private async ValueTask EndAsync(CancellationToken cancellationToken, bool disposeDependencies)
@@ -87,12 +95,14 @@ public sealed class BetaAnalyticsPresentation : INotifyPropertyChanged
 {
     private readonly QuotaPresentationHost _quota;
     private readonly LocalCodexAnalyticsView _analytics;
+    private readonly LocalUsagePresentationHost _localUsage;
 
-    public BetaAnalyticsPresentation(QuotaPresentationHost quota, LocalCodexAnalyticsView analytics)
+    public BetaAnalyticsPresentation(QuotaPresentationHost quota, LocalCodexAnalyticsView analytics, LocalUsagePresentationHost localUsage)
     {
-        _quota = quota; _analytics = analytics;
+        _quota = quota; _analytics = analytics; _localUsage = localUsage;
         _quota.PropertyChanged += OnQuotaChanged;
         _analytics.PropertyChanged += OnAnalyticsChanged;
+        _localUsage.PropertyChanged += OnLocalUsageChanged;
     }
 
     public QuotaWindowPresentation Primary => _quota.Primary;
@@ -103,8 +113,10 @@ public sealed class BetaAnalyticsPresentation : INotifyPropertyChanged
     public IManualRefreshCommand RefreshCommand => _quota.RefreshCommand;
     public BetaPresentationState State => _quota.State;
     public LocalAnalyticsState Analytics => _analytics.State;
+    public LocalUsagePresentationState LocalUsage => _localUsage.State;
     public QuotaPresentationHost QuotaPresentation => _quota;
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnQuotaChanged(object? sender, PropertyChangedEventArgs args) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
     private void OnAnalyticsChanged(object? sender, PropertyChangedEventArgs args) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Analytics)));
+    private void OnLocalUsageChanged(object? sender, PropertyChangedEventArgs args) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LocalUsage)));
 }
