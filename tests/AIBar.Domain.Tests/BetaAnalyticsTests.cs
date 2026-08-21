@@ -70,6 +70,28 @@ public sealed class BetaAnalyticsTests : IDisposable
     }
 
     [Fact]
+    public async Task Adapter_classifies_failure_stages_without_exposing_raw_exception_text()
+    {
+        const string sensitive = "C:/private/session.jsonl token=secret model=gpt-private";
+        var files = new SessionDiscoveryResult([new SessionFileBatch(["synthetic.jsonl"])], new(1, 0, []));
+        var discoveryFailure = new LocalCodexAnalyticsAdapter(_ => throw new UnauthorizedAccessException(sensitive), (_, _) => ValueTask.FromResult(new AnalyticsScanResult([], [], false)), _ => ValueTask.FromResult<IReadOnlyList<DailyUsage>>([]), () => Now);
+        var scanFailure = new LocalCodexAnalyticsAdapter(_ => files, (_, _) => ValueTask.FromException<AnalyticsScanResult>(new IOException(sensitive)), _ => ValueTask.FromResult<IReadOnlyList<DailyUsage>>([]), () => Now);
+        var loadFailure = new LocalCodexAnalyticsAdapter(_ => files, (_, _) => ValueTask.FromResult(new AnalyticsScanResult([], [], false)), _ => ValueTask.FromException<IReadOnlyList<DailyUsage>>(new InvalidDataException(sensitive)), () => Now);
+
+        var failures = new[]
+        {
+            await Assert.ThrowsAsync<LocalCodexAnalyticsScanException>(() => discoveryFailure.ScanAsync(default).AsTask()),
+            await Assert.ThrowsAsync<LocalCodexAnalyticsScanException>(() => scanFailure.ScanAsync(default).AsTask()),
+            await Assert.ThrowsAsync<LocalCodexAnalyticsScanException>(() => loadFailure.ScanAsync(default).AsTask())
+        };
+
+        Assert.Equal(["local_discovery_failed", "local_session_scan_failed", "local_store_load_failed"], failures.Select(failure => failure.SafeCode));
+        Assert.All(failures, failure => Assert.DoesNotContain("private", failure.Message, StringComparison.OrdinalIgnoreCase));
+        Assert.All(failures, failure => Assert.DoesNotContain("secret", failure.SafeCode, StringComparison.OrdinalIgnoreCase));
+        Assert.All(failures, failure => Assert.Null(failure.InnerException));
+    }
+
+    [Fact]
     public async Task Scan_honors_cancellation_without_promoting_a_result()
     {
         await using var store = Store("cancelled");

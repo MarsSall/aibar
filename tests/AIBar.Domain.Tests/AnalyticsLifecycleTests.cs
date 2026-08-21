@@ -89,6 +89,24 @@ public sealed class AnalyticsLifecycleTests
     }
 
     [Fact]
+    public async Task Failed_scan_publishes_only_the_allowlisted_stage_code_and_preserves_failed_lifecycle()
+    {
+        var view = new LocalCodexAnalyticsView();
+        var published = new TaskCompletionSource<LocalAnalyticsState>(TaskCreationOptions.RunContinuationsAsynchronously);
+        view.StateChanged += state => { if (state.Status == AnalyticsScanStatus.Failed) published.TrySetResult(state); };
+        await using var owner = new AnalyticsLifecycleOwner(new FailingScanner(), view, new EmptyResource(), TimeSpan.FromSeconds(1));
+
+        await owner.StartAsync(default);
+        var state = await published.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await owner.StopAsync(default);
+
+        Assert.Equal(AnalyticsShutdownKind.Failed, owner.Outcome.Kind);
+        Assert.Equal(["local_session_scan_failed"], state.WarningCodes);
+        Assert.DoesNotContain("private", state.WarningLabel, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("secret", state.WarningLabel, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Cooperative_stop_then_reenable_starts_exactly_one_fresh_scan_generation()
     {
         var scanner = new GenerationScanner();
@@ -275,6 +293,12 @@ public sealed class AnalyticsLifecycleTests
     }
     private sealed class FakePopover : IPopoverRuntime { public event Action? Deactivated; public bool IsVisible => false; public bool IsOwnedDialogActive => false; public void Show() { } public void Hide() { } public void Activate() { } }
     private sealed class FakeTaskbar : ITaskbarRecreationEvents { public event Action? Recreated; }
+
+    private sealed class FailingScanner : ILocalCodexAnalyticsScanner
+    {
+        public ValueTask<LocalAnalyticsState> ScanAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromException<LocalAnalyticsState>(new LocalCodexAnalyticsScanException("local_session_scan_failed", new IOException("C:/private/session.jsonl?token=secret")));
+    }
 
     private sealed class GenerationScanner : ILocalCodexAnalyticsScanner
     {

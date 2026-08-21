@@ -128,6 +128,7 @@ public sealed class QuotaExportPublisher : IAsyncDisposable, IAiBarClearWork
     private long _baseline;
     private bool _enabled;
     private bool _unlocked;
+    private bool _attemptObserved;
     private bool _draining;
     private bool _disposed;
     public QuotaExportPublisher(QuotaRefreshCoordinator authority, IQuotaExportWriter writer, IClock clock)
@@ -143,7 +144,11 @@ internal void Accept(QuotaAuthorityUpdate update)
 if (_disposed || _latest is { } latest && update.EventSequence <= latest.EventSequence) return;
 _latest = update;
 if (!_enabled) return;
-if (!_unlocked && update.RetrievalGeneration > _baseline) _unlocked = true;
+if (!_unlocked)
+{
+if (update.State.IsLoading) _attemptObserved = true;
+if (update.RetrievalGeneration > _baseline || _attemptObserved && !update.State.IsLoading && update.State.Snapshot is null) _unlocked = true;
+}
 if (!_unlocked) return;
 _pending = (update, _epoch, _epochCancellation.Token);
 if (!_draining) { _draining = true; _drain = DrainAsync(); }
@@ -161,7 +166,7 @@ lock (_gate)
 {
 ObjectDisposedException.ThrowIf(_disposed, this);
 prior = _epochCancellation; _epochCancellation = new(); ++_epoch;
-_enabled = _unlocked = false; _pending = null; drain = _drain;
+_enabled = _unlocked = _attemptObserved = false; _pending = null; drain = _drain;
 }
 prior.Cancel();
 try { await drain; }
@@ -180,7 +185,7 @@ lock (_gate)
 {
 ObjectDisposedException.ThrowIf(_disposed, this);
 prior = _epochCancellation; current = _epochCancellation = new(); epoch = ++_epoch;
-_enabled = _unlocked = false; _pending = null; drain = _drain;
+_enabled = _unlocked = _attemptObserved = false; _pending = null; drain = _drain;
 }
 prior.Cancel();
 try
@@ -225,7 +230,7 @@ lock (_gate)
 {
 if (_disposed) return;
 _disposed = true; prior = _epochCancellation; current = _epochCancellation = new(); ++_epoch;
-_enabled = _unlocked = false; _pending = null; drain = _drain;
+_enabled = _unlocked = _attemptObserved = false; _pending = null; drain = _drain;
 }
 _authority.AuthorityUpdated -= Accept; prior.Cancel();
 try { await drain; var now = _clock.UtcNow; await _writer.WriteAsync(QuotaExportWire.Disabled(now), now, current.Token); }

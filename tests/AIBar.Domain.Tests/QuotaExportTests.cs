@@ -144,6 +144,21 @@ public async Task Generation_is_an_exclusive_post_enable_unlock_not_freshness()
 }
 
 [Fact]
+public async Task Enabled_attempt_without_snapshot_replaces_disabled_export_with_sanitized_unavailable()
+{
+    await using var authority = Authority(); var writer = new MemoryWriter(); await using var publisher = new QuotaExportPublisher(authority, writer, new FixedClock(Now));
+    await publisher.EnableAsync(default);
+
+    publisher.Accept(new(new(null, FreshnessState.Unavailable, true, null, null), 1, 0));
+    publisher.Accept(new(new(null, FreshnessState.Unavailable, false, new(QuotaErrorKind.Redirect, "https://secret.example/path?token=private"), null), 2, 0));
+    await publisher.PublicationCompletion;
+
+    Assert.Equal(QuotaExportState.Unavailable, writer.Documents[^1].State);
+    Assert.Equal(QuotaExportWarning.Unavailable, writer.Documents[^1].Warning);
+    Assert.DoesNotContain("secret", QuotaExportWire.Serialize(writer.Documents[^1], Now), StringComparison.OrdinalIgnoreCase);
+}
+
+[Fact]
 public async Task Concurrent_bursts_coalesce_intermediates_but_retain_sequence_latest_freshness()
 {
     var provider = new ProbeProvider(); await using var authority = Authority(provider); var writer = new MemoryWriter(); await using var publisher = new QuotaExportPublisher(authority, writer, new FixedClock(Now));
