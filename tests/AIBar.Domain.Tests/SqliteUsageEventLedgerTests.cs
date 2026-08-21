@@ -4,6 +4,10 @@ using Microsoft.Data.Sqlite;
 
 namespace AIBar.Domain.Tests;
 
+[CollectionDefinition("SqliteUsageEventLedger", DisableParallelization = true)]
+public sealed class SqliteUsageEventLedgerCollection;
+
+[Collection("SqliteUsageEventLedger")]
 public sealed class SqliteUsageEventLedgerTests : IDisposable
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"aibar-ledger-{Guid.NewGuid():N}.db");
