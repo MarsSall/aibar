@@ -52,16 +52,16 @@ public sealed class AnalyticsLifecycleTests
         Assert.True(harness.Entered.Wait(TimeSpan.FromSeconds(2)));
 
         var exit = harness.ExitAsync();
-        Assert.True(harness.Cancelled.Wait(TimeSpan.FromSeconds(2)));
+        await harness.CancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(2));
         harness.Release.Set();
         await exit;
 
         Assert.Equal(AnalyticsShutdownKind.Completed, harness.Outcome.Kind);
         Assert.Equal(1, harness.Events.Count(item => item == "analytics_cancelled"));
         Assert.Equal(1, harness.Events.Count(item => item == "analytics_awaited"));
-        Assert.Contains("analytics_view_disposed", harness.Events);
-        Assert.Contains("analytics_store_disposed", harness.Events);
-        Assert.Contains("quota_store_disposed", harness.Events);
+        Assert.Equal(1, harness.Events.Count(item => item == "analytics_view_disposed"));
+        Assert.Equal(1, harness.Events.Count(item => item == "analytics_store_disposed"));
+        Assert.Equal(1, harness.Events.Count(item => item == "quota_store_disposed"));
     }
 
     [Fact]
@@ -210,9 +210,9 @@ public sealed class AnalyticsLifecycleTests
         private readonly string _root;
         private readonly TrayHostRuntime _host;
 
-        private ProductionHarness(string root, string sourcePath, TrayHostRuntime host, App.StartupComposition composition, List<string> events, ManualResetEventSlim entered, ManualResetEventSlim cancelled, ManualResetEventSlim release, TaskCompletionSource scanFinished)
+        private ProductionHarness(string root, string sourcePath, TrayHostRuntime host, App.StartupComposition composition, List<string> events, ManualResetEventSlim entered, ManualResetEventSlim cancelled, ManualResetEventSlim release, TaskCompletionSource scanFinished, TaskCompletionSource cancellationObserved)
         {
-            _root = root; SourcePath = sourcePath; _host = host; Composition = composition; Events = events; Entered = entered; Cancelled = cancelled; Release = release; ScanFinished = scanFinished;
+            _root = root; SourcePath = sourcePath; _host = host; Composition = composition; Events = events; Entered = entered; Cancelled = cancelled; Release = release; ScanFinished = scanFinished; CancellationObserved = cancellationObserved;
         }
 
         public App.StartupComposition Composition { get; }
@@ -221,6 +221,7 @@ public sealed class AnalyticsLifecycleTests
         public ManualResetEventSlim Cancelled { get; }
         public ManualResetEventSlim Release { get; }
         public TaskCompletionSource ScanFinished { get; }
+        public TaskCompletionSource CancellationObserved { get; }
         public string SourcePath { get; }
         public string AnalyticsDatabasePath => Path.Combine(_root, "analytics.db");
         public string AnalyticsWalPath => Path.Combine(_root, "analytics.db-wal");
@@ -237,6 +238,7 @@ public sealed class AnalyticsLifecycleTests
             await File.WriteAllTextAsync(sourcePath, "{\"timestamp\":\"2026-01-01T00:00:00Z\",\"model\":\"gpt-5\",\"usage\":{\"input_tokens\":1,\"cached_input_tokens\":0,\"output_tokens\":1}}\n" + (partial ? "{\n" : ""));
             var events = new List<string>(); var entered = new ManualResetEventSlim(); var cancelled = new ManualResetEventSlim(); var release = new ManualResetEventSlim();
             var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var scanNumber = 0;
             var composition = App.CreateComposition(new(root, codex, shutdownBound, _ =>
             {
@@ -246,13 +248,13 @@ public sealed class AnalyticsLifecycleTests
             }, item =>
             {
                 lock (events) events.Add(item);
-                if (item == "analytics_cancelled") cancelled.Set();
+                if (item == "analytics_cancelled") { cancelled.Set(); cancellationObserved.TrySetResult(); }
                 if (item == "analytics_scan_finished") finished.TrySetResult();
             }, Path.Combine(root, "home")));
             var instance = new SingleInstanceHost($"AIBar.lifecycle.{Guid.NewGuid():N}");
             var host = new TrayHostRuntime(instance, new FakeTray(), new FakePopover(), new FakeTaskbar(), _ => Task.CompletedTask, composition.Resource, () => { });
             instance.Dispose();
-            return new(root, sourcePath, host, composition, events, entered, cancelled, release, finished);
+            return new(root, sourcePath, host, composition, events, entered, cancelled, release, finished, cancellationObserved);
         }
 
         public Task ExitAsync() => _host.ExitAsync();
