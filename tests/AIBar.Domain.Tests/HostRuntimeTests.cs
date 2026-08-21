@@ -308,7 +308,7 @@ public sealed class HostRuntimeTests
             await provider.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
             Assert.Equal(1, prompt.Calls); Assert.Equal(1, provider.Calls); Assert.Equal(1, files.Calls);
-            provider.Release.TrySetResult(); PumpUntil(() => tray.DisablePrivateVisible);
+            provider.Release.TrySetResult(); PumpUntil(() => tray.DisablePrivateVisible && beta.State.Failure?.SafeCode == "quota_credential_missing");
             using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(settingsFile));
             Assert.Equal(2, document.RootElement.EnumerateObject().Count()); Assert.True(document.RootElement.GetProperty("privateCodexConsent").GetBoolean());
             Assert.Equal("quota_credential_missing", beta.State.Failure!.SafeCode);

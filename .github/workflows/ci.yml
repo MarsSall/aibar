@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    name: .NET build and tests (Windows)
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore AIBar.sln --nologo
+
+      - name: Build
+        shell: pwsh
+        run: dotnet build AIBar.sln --no-restore --configuration Debug --nologo
+
+      - name: Test
+        shell: pwsh
+        run: >-
+          dotnet test AIBar.sln --no-build --no-restore --configuration Debug
+          --logger "console;verbosity=normal"
+          --logger "trx;LogFileName=AIBar.Tests.trx"
+          --results-directory "$env:RUNNER_TEMP\aibar-test-results"
+
+      - name: Upload .NET test results
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dotnet-test-results
+          path: ${{ runner.temp }}\aibar-test-results\*.trx
+          if-no-files-found: ignore
+          retention-days: 7
+
+  yasb-pester:
+    name: YASB Pester 5 (Windows)
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Run YASB tests with pinned Pester
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $packageUri = 'https://www.powershellgallery.com/api/v2/package/Pester/5.7.1'
+          $packagePath = Join-Path $env:RUNNER_TEMP 'Pester.5.7.1.nupkg'
+          $extractPath = Join-Path $env:RUNNER_TEMP 'Pester.5.7.1'
+          $expectedHash = '4a27904c6814a5fbe4758f8e49861f6a1994aee77b71165a5c43c0371ba6c580'
+
+          Invoke-WebRequest -Uri $packageUri -OutFile $packagePath
+          $actualHash = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualHash -cne $expectedHash) {
+              throw "Pester package hash mismatch. Expected $expectedHash but received $actualHash."
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [IO.Compression.ZipFile]::ExtractToDirectory($packagePath, $extractPath)
+          $manifestPath = Join-Path $extractPath 'Pester.psd1'
+          Import-Module -Name $manifestPath -Force -ErrorAction Stop
+          $expectedModuleBase = (Resolve-Path -LiteralPath $extractPath).ProviderPath
+          $importedPester = Get-Module -Name Pester |
+              Where-Object { $_.ModuleBase -ceq $expectedModuleBase }
+          if ($null -eq $importedPester -or $importedPester.Version.ToString() -cne '5.7.1') {
+              throw "Expected imported Pester version 5.7.1 from module base $expectedModuleBase."
+          }
+
+          $resultDirectory = Join-Path $env:RUNNER_TEMP 'aibar-pester-results'
+          $resultPath = Join-Path $resultDirectory 'yasb-pester-results.xml'
+          New-Item -ItemType Directory -Path $resultDirectory -Force | Out-Null
+
+          $configuration = New-PesterConfiguration
+          $configuration.Run.Path = Join-Path $env:GITHUB_WORKSPACE 'yasb/tests/read-aibar-quota.Tests.ps1'
+          $configuration.Run.PassThru = $true
+          $configuration.Output.Verbosity = 'Detailed'
+          $configuration.TestResult.Enabled = $true
+          $configuration.TestResult.OutputPath = $resultPath
+          $configuration.TestResult.OutputFormat = 'NUnitXml'
+
+          $result = Invoke-Pester -Configuration $configuration
+          if ($result.FailedCount -ne 0 -or $result.SkippedCount -ne 0 -or $result.TotalCount -ne 11) {
+              Write-Error "Expected 11 passing YASB tests, but total=$($result.TotalCount) failed=$($result.FailedCount) skipped=$($result.SkippedCount)."
+              exit 1
+          }
+
+      - name: Upload YASB Pester test results
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: yasb-pester-results
+          path: ${{ runner.temp }}\aibar-pester-results\*.xml
+          if-no-files-found: ignore
+          retention-days: 7

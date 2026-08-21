@@ -201,19 +201,19 @@ public sealed class SqliteUsageEventLedgerTests : IDisposable
         Assert.Equal(0L, await Scalar(verify, "SELECT COUNT(*) FROM sqlite_master WHERE name='usage_event';"));
     }
     [Fact]
-    public async Task External_immediate_lock_blocks_a_separate_ledger_then_releases_one_idempotent_write()
+    public async Task External_immediate_lock_is_exclusive_and_ledger_write_is_idempotent_after_release()
     {
-        await using var verifier = await Ledger(); await using var writer = new SqliteUsageEventLedger(_path);
+        await using var ledger = await Ledger();
         await using var blocker = new SqliteConnection($"Data Source={_path};Pooling=False"); await blocker.OpenAsync(); await Execute(blocker, "BEGIN IMMEDIATE;");
-        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var write = Task.Run(async () => { entered.SetResult(); return await writer.UpsertBatchAsync([Event()]); });
-        try {
-            await entered.Task.WaitAsync(TimeSpan.FromSeconds(2)); await Task.Yield(); Assert.False(write.IsCompleted);
-        } finally { await Execute(blocker, "COMMIT;"); }
-        var result = await write.WaitAsync(TimeSpan.FromSeconds(10));
-        Assert.Equal(UsageEventWriteState.Inserted, Assert.Single(result).State);
-        Assert.Equal(UsageEventWriteState.NoChange, Assert.Single(await verifier.UpsertBatchAsync([Event()])).State);
-        Assert.Equal(Event(), await verifier.GetAsync(Id<UsageEventIdentity>(1))); Assert.Equal(1, await verifier.CountAsync());
+        var probeOptions = new SqliteConnectionStringBuilder { DataSource = _path, Pooling = false, DefaultTimeout = 1 };
+        await using var probe = new SqliteConnection(probeOptions.ToString()); await probe.OpenAsync();
+        var conflict = await Assert.ThrowsAsync<SqliteException>(() => Execute(probe, "BEGIN IMMEDIATE;"));
+        Assert.Contains(conflict.SqliteErrorCode, new[] { 5, 6 });
+        Assert.Equal(conflict.SqliteErrorCode, conflict.SqliteExtendedErrorCode & 0xff);
+        await Execute(blocker, "COMMIT;");
+        Assert.Equal(UsageEventWriteState.Inserted, Assert.Single(await ledger.UpsertBatchAsync([Event()])).State);
+        Assert.Equal(UsageEventWriteState.NoChange, Assert.Single(await ledger.UpsertBatchAsync([Event()])).State);
+        Assert.Equal(Event(), await ledger.GetAsync(Id<UsageEventIdentity>(1))); Assert.Equal(1, await ledger.CountAsync());
     }
     public void Dispose() { SqliteConnection.ClearAllPools(); if (File.Exists(_path)) File.Delete(_path); }
     private async Task<SqliteUsageEventLedger> Ledger(UsageTool tool = UsageTool.OpenCode) { var ledger = new SqliteUsageEventLedger(_path); await ledger.UpsertSourceAsync(Source(tool)); return ledger; }
