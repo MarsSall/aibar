@@ -169,7 +169,11 @@ public sealed class WindowsDwmSurfaceHints : IDwmSurfaceHints
 
 public sealed class WpfOpaquePopupSurface(Window window) : IOpaquePopupSurface
 {
-    public void UseOpaqueBase() { window.AllowsTransparency = false; window.Opacity = 1; }
+    public void UseOpaqueBase()
+    {
+        if (window.AllowsTransparency) window.AllowsTransparency = false;
+        window.Opacity = 1;
+    }
     public void SetDarkMode() => Set(20, 1);
     public void SetCorners() => Set(33, 2);
     public void SetBackdrop() => Set(38, 2);

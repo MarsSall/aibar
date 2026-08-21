@@ -81,6 +81,7 @@ public sealed class AnalyticsLifecycleOwner : ILocalAnalyticsLifecycle, IAiBarCl
     {
         try { var result = await _scanner.ScanAsync(_cancellation!.Token); if (!_publicationClosed && !_cancellation.IsCancellationRequested && generation == _generation) _view.Publish(result); }
         catch (OperationCanceledException) when (_cancellation!.IsCancellationRequested) { }
+        catch (LocalCodexAnalyticsScanException exception) { if (!_publicationClosed) _view.Publish(LocalAnalyticsState.Failed(DateTimeOffset.UtcNow, exception.SafeCode)); throw; }
         catch (Exception) { if (!_publicationClosed) _view.Publish(LocalAnalyticsState.Failed(DateTimeOffset.UtcNow)); throw; }
         finally { _observe?.Invoke("analytics_scan_finished"); }
     }

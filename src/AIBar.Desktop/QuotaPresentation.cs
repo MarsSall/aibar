@@ -31,7 +31,8 @@ public sealed record BetaPresentationState(
     string? CachedAgeLabel,
     string? WarningLabel,
     string Disclosure,
-    bool IsPrivateIntegrationDisabled = false);
+    bool IsPrivateIntegrationDisabled = false,
+    string? DiagnosticCode = null);
 
 public sealed class QuotaPresentationMapper(IClock clock)
 {
@@ -74,7 +75,9 @@ public sealed class QuotaPresentationMapper(IClock clock)
             cachedAge,
             cachedAge is null ? null : $"Cached {FormatCountdown(cachedAge.Value)}",
             warning,
-            "Private quota access is optional, disabled by default, and can be revoked at any time.");
+            "Private quota access is optional, disabled by default, and can be revoked at any time.",
+            false,
+            DiagnosticCode(failure));
     }
 
     private QuotaWindowPresentation Window(string label, QuotaWindow? window) => new(
@@ -99,8 +102,24 @@ public sealed class QuotaPresentationMapper(IClock clock)
         QuotaErrorKind.MalformedResponse => "Service response unavailable",
         QuotaErrorKind.Network => "Network unavailable",
         QuotaErrorKind.Service => "Service unavailable",
-        QuotaErrorKind.Unavailable or QuotaErrorKind.Redirect => "Quota unavailable",
+        QuotaErrorKind.Redirect => "Redirect rejected",
+        QuotaErrorKind.Unavailable when failure.SafeCode == "quota_refresh_failed" => "Refresh failed",
+        QuotaErrorKind.Unavailable => "Quota unavailable",
         _ => null
+    };
+
+    private static string? DiagnosticCode(QuotaFailure? failure) => failure?.Kind switch
+    {
+        QuotaErrorKind.Authentication => "quota_authentication",
+        QuotaErrorKind.Permission => "quota_permission",
+        QuotaErrorKind.MalformedResponse => "quota_malformed_response",
+        QuotaErrorKind.Network => "quota_network",
+        QuotaErrorKind.Service => "quota_service",
+        QuotaErrorKind.Redirect => "quota_redirect",
+        QuotaErrorKind.Unavailable when failure.SafeCode is "quota_credential_missing" or "quota_credential_unusable" or "quota_credentials_unavailable" => failure.SafeCode,
+        QuotaErrorKind.Unavailable when failure.SafeCode == "quota_refresh_failed" => "quota_refresh_failed",
+        QuotaErrorKind.Unavailable => "quota_unavailable",
+        _ => "quota_refresh_failed"
     };
 }
 

@@ -81,17 +81,31 @@ public sealed class QuotaPresentationTests
     }
 
     [Theory]
-    [InlineData(QuotaErrorKind.Authentication, "Authentication required")]
-    [InlineData(QuotaErrorKind.Permission, "Permission denied")]
-    [InlineData(QuotaErrorKind.MalformedResponse, "Service response unavailable")]
-    [InlineData(QuotaErrorKind.Network, "Network unavailable")]
-    [InlineData(QuotaErrorKind.Service, "Service unavailable")]
-    public void Maps_safe_failure_states_without_sensitive_details(QuotaErrorKind kind, string label)
+    [InlineData(QuotaErrorKind.Authentication, "raw authentication secret", "Authentication required", "quota_authentication")]
+    [InlineData(QuotaErrorKind.Permission, "raw permission secret", "Permission denied", "quota_permission")]
+    [InlineData(QuotaErrorKind.MalformedResponse, "raw response body", "Service response unavailable", "quota_malformed_response")]
+    [InlineData(QuotaErrorKind.Network, "https://secret.example/path?token=private", "Network unavailable", "quota_network")]
+    [InlineData(QuotaErrorKind.Service, "raw service response", "Service unavailable", "quota_service")]
+    [InlineData(QuotaErrorKind.Redirect, "https://secret.example/redirect?credential=private", "Redirect rejected", "quota_redirect")]
+    [InlineData(QuotaErrorKind.Unavailable, "raw unavailable secret", "Quota unavailable", "quota_unavailable")]
+    public void Maps_safe_failure_states_without_sensitive_details(QuotaErrorKind kind, string rawCode, string label, string diagnosticCode)
     {
-        var state = new QuotaRefreshState(null, FreshnessState.Unavailable, false, new(kind, "safe_code"), null);
+        var state = new QuotaRefreshState(null, FreshnessState.Unavailable, false, new(kind, rawCode), null);
         var view = new QuotaPresentationMapper(new FixedClock(Now)).Map(state);
 
-        Assert.Equal(label, view.ErrorLabel); Assert.Null(view.Primary.PercentageUsed); Assert.False(view.IsCurrent);
+        Assert.Equal(label, view.ErrorLabel); Assert.Equal(diagnosticCode, view.DiagnosticCode);
+        Assert.DoesNotContain("secret", $"{view.ErrorLabel} {view.DiagnosticCode}", StringComparison.OrdinalIgnoreCase);
+        Assert.Null(view.Primary.PercentageUsed); Assert.False(view.IsCurrent);
+    }
+
+    [Fact]
+    public void Generic_refresh_failure_has_an_allowlisted_diagnostic_distinct_from_unavailable()
+    {
+        var failure = new QuotaFailure(QuotaErrorKind.Unavailable, "quota_refresh_failed");
+        var view = new QuotaPresentationMapper(new FixedClock(Now)).Map(new(null, FreshnessState.Unavailable, false, failure, null));
+
+        Assert.Equal("Refresh failed", view.ErrorLabel);
+        Assert.Equal("quota_refresh_failed", view.DiagnosticCode);
     }
 
     [Fact]

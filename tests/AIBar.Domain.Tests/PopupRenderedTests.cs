@@ -3,6 +3,7 @@ using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AIBar.Desktop;
@@ -11,6 +12,29 @@ namespace AIBar.Domain.Tests;
 
 public sealed class PopupRenderedTests
 {
+    [Fact]
+    public void Popover_show_succeeds_after_a_native_handle_was_created_while_hidden()
+    {
+        WpfTestApplicationHost.Run(_ =>
+        {
+            Window? window = null;
+            try
+            {
+                window = new Window();
+                new WindowInteropHelper(window).EnsureHandle();
+                var popover = new WpfPopoverRuntime(window, surfaceHints: new FakeHints(supports: false));
+
+                popover.Show();
+
+                Assert.True(popover.IsVisible);
+            }
+            finally
+            {
+                window?.Close();
+            }
+        });
+    }
+
     [Fact]
     public void Unit_4b_rendered_popup_keeps_layout_scroll_focus_automation_and_themes_intact()
     {
