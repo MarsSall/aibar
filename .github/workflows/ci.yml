@@ -82,6 +82,7 @@ jobs:
               throw "Pester package hash mismatch. Expected $expectedHash but received $actualHash."
           }
 
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
           [IO.Compression.ZipFile]::ExtractToDirectory($packagePath, $extractPath)
           $manifestPath = Join-Path $extractPath 'Pester.psd1'
           Import-Module -Name $manifestPath -Force -ErrorAction Stop

@@ -599,7 +599,7 @@ ready.Set();
 Environment.Exit(release.WaitOne(10000) ? 0 : 4);
 """, Encoding.UTF8);
             var build = new ProcessStartInfo("dotnet") { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true, WorkingDirectory = root };
-            build.ArgumentList.Add("build"); build.ArgumentList.Add(project); build.ArgumentList.Add("--nologo"); build.ArgumentList.Add("-v:q");
+            build.ArgumentList.Add("build"); build.ArgumentList.Add(project); build.ArgumentList.Add("--nologo"); build.ArgumentList.Add("-v:q"); build.ArgumentList.Add("--disable-build-servers");
             var nonce = Guid.NewGuid().ToString("N");
             using var compiler = Process.Start(build)!;
             var stdout = compiler.StandardOutput.ReadToEndAsync(); var stderr = compiler.StandardError.ReadToEndAsync();
