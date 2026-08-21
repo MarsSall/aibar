@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseAppHost>true</UseAppHost>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Harness</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+  </PropertyGroup>
+
+  <Import Project="..\..\eng\signing\AIBar.Signing.props" />
+
+  <Target Name="RefuseTestDistribution" BeforeTargets="Pack;Publish">
+    <Error Text="AIBar.Packaging.ProcessHarness is test-only and cannot be packaged or published." />
+  </Target>
+</Project>

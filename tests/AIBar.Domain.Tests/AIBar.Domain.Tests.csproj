@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\AIBar.Domain\AIBar.Domain.csproj" />
     <ProjectReference Include="..\..\src\AIBar.Application\AIBar.Application.csproj" />
     <ProjectReference Include="..\..\src\AIBar.Desktop\AIBar.Desktop.csproj" />
+    <ProjectReference Include="..\AIBar.Packaging.ProcessHarness\AIBar.Packaging.ProcessHarness.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\AIBar.Packaging.Supervisor.Authority.Testing\AIBar.Packaging.Supervisor.Authority.Testing.csproj" />
   </ItemGroup>
 
