@@ -8,8 +8,9 @@ using AIBar.Desktop;
 namespace AIBar.Domain.Tests;
 public sealed class QuotaExportWriterTests : IDisposable
 {
-    private const FileSystemRights DirectoryRights = FileSystemRights.ListDirectory | FileSystemRights.CreateFiles | FileSystemRights.Traverse | FileSystemRights.DeleteSubdirectoriesAndFiles | FileSystemRights.ReadAttributes | FileSystemRights.ReadPermissions | FileSystemRights.ChangePermissions | FileSystemRights.Synchronize;
+    private const FileSystemRights DirectoryRights = FileSystemRights.FullControl;
     private const FileSystemRights SnapshotRights = FileSystemRights.Read | FileSystemRights.Write | FileSystemRights.Delete | FileSystemRights.ChangePermissions | FileSystemRights.Synchronize;
+    private const InheritanceFlags DirectoryInheritance = InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit;
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"aibar-export-{Guid.NewGuid():N}");
     private string ExportDirectory => Path.Combine(_root, "AIBar");
@@ -35,6 +36,35 @@ public sealed class QuotaExportWriterTests : IDisposable
         var expected = Bytes(20, Now.AddMinutes(1)); Assert.Equal(expected, File.ReadAllBytes(Destination)); Assert.False(expected.AsSpan().StartsWith(new byte[] { 0xef, 0xbb, 0xbf }));
         AssertDocument(20); AssertAcl(ExportDirectory, true); AssertAcl(Destination, false); AssertNoTemporary();
         Assert.All(new[] { QuotaExportWritePoint.AfterDirectoryAcl, QuotaExportWritePoint.AfterDestinationAcl, QuotaExportWritePoint.AfterTemporaryAcl, QuotaExportWritePoint.AfterResultAcl }, point => Assert.Contains(point, reads));
+    }
+
+    [Fact]
+    public async Task Secure_directory_repairs_existing_and_new_sibling_file_lifecycle_without_broad_principals()
+    {
+        Directory.CreateDirectory(ExportDirectory);
+        var existing = Path.Combine(ExportDirectory, "quota.db");
+        await File.WriteAllTextAsync(existing, "existing");
+
+        await new WindowsAtomicQuotaExportWriter(_root, new()).WriteAsync(Document(10), Now, default);
+
+        AssertDescendantAcl(existing);
+        await File.AppendAllTextAsync(existing, "-updated");
+        Assert.Equal("existing-updated", await File.ReadAllTextAsync(existing));
+        var renamedExisting = Path.Combine(ExportDirectory, "quota-renamed.db");
+        File.Move(existing, renamedExisting);
+        File.Delete(renamedExisting);
+
+        var created = Path.Combine(ExportDirectory, "analytics.db");
+        await File.WriteAllTextAsync(created, "created");
+        AssertDescendantAcl(created);
+        await File.AppendAllTextAsync(created, "-updated");
+        Assert.Equal("created-updated", await File.ReadAllTextAsync(created));
+        var renamedCreated = Path.Combine(ExportDirectory, "analytics-renamed.db");
+        File.Move(created, renamedCreated);
+        File.Delete(renamedCreated);
+
+        AssertAcl(ExportDirectory, true);
+        AssertAcl(Destination, false);
     }
 
     [Theory]
@@ -139,9 +169,17 @@ public sealed class QuotaExportWriterTests : IDisposable
     private static void AssertAcl(string path, bool directory)
     {
         var security = ReadAcl(path, directory); Assert.True(security.AreAccessRulesProtected); var rules = security.GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>().ToArray(); var rights = directory ? DirectoryRights : SnapshotRights;
-        Assert.Equal(2, rules.Length); Assert.All(rules, rule => { Assert.Equal(AccessControlType.Allow, rule.AccessControlType); Assert.Equal(rights, rule.FileSystemRights); Assert.Equal(InheritanceFlags.None, rule.InheritanceFlags); Assert.Equal(PropagationFlags.None, rule.PropagationFlags); Assert.NotEqual(FileSystemRights.FullControl, rule.FileSystemRights); });
-        Assert.Equal(new[] { WindowsIdentity.GetCurrent().User!.Value, new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null).Value }.Order(), rules.Select(rule => rule.IdentityReference.Value).Order());
+        var inheritance = directory ? DirectoryInheritance : InheritanceFlags.None;
+        Assert.Equal(2, rules.Length); Assert.All(rules, rule => { Assert.Equal(AccessControlType.Allow, rule.AccessControlType); Assert.Equal(rights, rule.FileSystemRights); Assert.Equal(inheritance, rule.InheritanceFlags); Assert.Equal(PropagationFlags.None, rule.PropagationFlags); if (!directory) Assert.NotEqual(FileSystemRights.FullControl, rule.FileSystemRights); });
+        Assert.Equal(ExpectedSids(), rules.Select(rule => rule.IdentityReference.Value).Order());
     }
+    private static void AssertDescendantAcl(string path)
+    {
+        var security = ReadAcl(path, false); var rules = security.GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>().ToArray();
+        Assert.False(security.AreAccessRulesProtected); Assert.Equal(2, rules.Length); Assert.All(rules, rule => { Assert.Equal(AccessControlType.Allow, rule.AccessControlType); Assert.Equal(DirectoryRights, rule.FileSystemRights); Assert.True(rule.IsInherited); });
+        Assert.Equal(ExpectedSids(), rules.Select(rule => rule.IdentityReference.Value).Order());
+    }
+    private static IOrderedEnumerable<string> ExpectedSids() => new[] { WindowsIdentity.GetCurrent().User!.Value, new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null).Value }.Order();
     private static void AddWorldAccess(string path, bool directory)
     {
         var security = ReadAcl(path, directory); var inheritance = directory ? InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit : InheritanceFlags.None;

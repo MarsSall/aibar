@@ -37,11 +37,10 @@ internal sealed record QuotaExportWriterSeams(
 [SupportedOSPlatform("windows")]
 public sealed class WindowsAtomicQuotaExportWriter : IQuotaExportWriter
 {
-    private const FileSystemRights DirectoryRights = FileSystemRights.ListDirectory | FileSystemRights.CreateFiles | FileSystemRights.Traverse |
-        FileSystemRights.DeleteSubdirectoriesAndFiles | FileSystemRights.ReadAttributes | FileSystemRights.ReadPermissions |
-        FileSystemRights.ChangePermissions | FileSystemRights.Synchronize;
+    private const FileSystemRights DirectoryRights = FileSystemRights.FullControl;
     private const FileSystemRights SnapshotRights = FileSystemRights.Read | FileSystemRights.Write | FileSystemRights.Delete |
         FileSystemRights.ChangePermissions | FileSystemRights.Synchronize;
+    private const InheritanceFlags DirectoryInheritance = InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit;
     private const FileSystemRights TemporaryOpenRights = FileSystemRights.Write | FileSystemRights.Synchronize;
     private static readonly SecurityIdentifier SystemSid = new(WellKnownSidType.LocalSystemSid, null);
     private readonly string _path;
@@ -149,14 +148,14 @@ public sealed class WindowsAtomicQuotaExportWriter : IQuotaExportWriter
         RejectReparse(path); Point(before, path); SetAcl(path, false); Point(after, path); VerifyAcl(path, false, after);
     }
 
-    private static DirectorySecurity DirectoryAcl() => (DirectorySecurity)Acl(new DirectorySecurity(), DirectoryRights);
-    private static FileSecurity FileAcl() => (FileSecurity)Acl(new FileSecurity(), SnapshotRights);
-    private static FileSystemSecurity Acl(FileSystemSecurity security, FileSystemRights rights)
+    private static DirectorySecurity DirectoryAcl() => (DirectorySecurity)Acl(new DirectorySecurity(), DirectoryRights, DirectoryInheritance);
+    private static FileSecurity FileAcl() => (FileSecurity)Acl(new FileSecurity(), SnapshotRights, InheritanceFlags.None);
+    private static FileSystemSecurity Acl(FileSystemSecurity security, FileSystemRights rights, InheritanceFlags inheritance)
     {
         var user = WindowsIdentity.GetCurrent().User ?? throw new UnauthorizedAccessException("Current Windows user SID is unavailable.");
         security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
         foreach (var sid in new[] { user, SystemSid })
-            security.AddAccessRule(new(sid, rights, InheritanceFlags.None, PropagationFlags.None, AccessControlType.Allow));
+            security.AddAccessRule(new(sid, rights, inheritance, PropagationFlags.None, AccessControlType.Allow));
         return security;
     }
 
@@ -173,9 +172,10 @@ public sealed class WindowsAtomicQuotaExportWriter : IQuotaExportWriter
         var user = WindowsIdentity.GetCurrent().User ?? throw new UnauthorizedAccessException("Current Windows user SID is unavailable.");
         var expectedSids = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { user.Value, SystemSid.Value };
         var expectedRights = directory ? DirectoryRights : SnapshotRights;
+        var expectedInheritance = directory ? DirectoryInheritance : InheritanceFlags.None;
         var rules = security.GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<FileSystemAccessRule>().ToArray();
         if (rules.Length != 2 || rules.Any(rule => rule.AccessControlType != AccessControlType.Allow ||
-            rule.FileSystemRights != expectedRights || rule.InheritanceFlags != InheritanceFlags.None ||
+            rule.FileSystemRights != expectedRights || rule.InheritanceFlags != expectedInheritance ||
             rule.PropagationFlags != PropagationFlags.None || !expectedSids.Remove(rule.IdentityReference.Value)) || expectedSids.Count != 0)
             throw new UnauthorizedAccessException("Quota export ACL readback is not exact and minimum-rights.");
     }
