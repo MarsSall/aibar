@@ -208,7 +208,9 @@ public sealed class SqliteUsageEventLedgerTests : IDisposable
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var write = Task.Run(async () => { entered.SetResult(); return await writer.UpsertBatchAsync([Event()]); });
         try {
-            await entered.Task.WaitAsync(TimeSpan.FromSeconds(2)); await Task.Yield(); Assert.False(write.IsCompleted);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            var observation = Task.Delay(TimeSpan.FromMilliseconds(250));
+            Assert.Same(observation, await Task.WhenAny(write, observation));
         } finally { await Execute(blocker, "COMMIT;"); }
         var result = await write.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal(UsageEventWriteState.Inserted, Assert.Single(result).State);
