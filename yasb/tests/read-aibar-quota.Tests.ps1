@@ -2,12 +2,19 @@ BeforeAll {
     $root = Split-Path -Parent $PSScriptRoot
     $reader = Join-Path $root 'read-aibar-quota.ps1'
     $now = [DateTimeOffset]'2026-07-12T12:00:00Z'
-    . $reader
+    $readerModule = New-Module -ScriptBlock {
+        param([string]$readerPath)
+        . $readerPath
+    } -ArgumentList $reader
 
     function Read-Fixture([string]$name, [DateTimeOffset]$at = $now) {
-        $script:AIBarQuotaFixturePath = Join-Path $root "fixtures/$name"
-        $script:AIBarQuotaFixtureNow = $at
-        Invoke-AiBarQuotaReader
+        $fixturePath = Join-Path $root "fixtures/$name"
+        & $readerModule {
+param([string]$path, [DateTimeOffset]$fixtureNow)
+$script:AIBarQuotaFixturePath = $path
+$script:AIBarQuotaFixtureNow = $fixtureNow
+Invoke-AiBarQuotaReader
+        } $fixturePath $at
     }
 
     function Assert-SafeFields($result) {
@@ -17,6 +24,10 @@ BeforeAll {
         $names[1] | Should -Be 'tooltip'
         $names[2] | Should -Be 'className'
     }
+}
+
+AfterAll {
+    Remove-Module $readerModule -Force
 }
 
 Describe 'AIBar YASB reader' {

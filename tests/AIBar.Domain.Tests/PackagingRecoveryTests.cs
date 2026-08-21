@@ -519,7 +519,7 @@ public sealed class PackagingRecoveryTests
             var root = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"aibar descendant {Guid.NewGuid():N} café")).FullName;
             var project = Path.Combine(root, "Harness.csproj");
             var program = Path.Combine(root, "Program.cs");
-            File.WriteAllText(project, "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><UseAppHost>true</UseAppHost><ImplicitUsings>enable</ImplicitUsings></PropertyGroup></Project>", Encoding.UTF8);
+            File.WriteAllText(project, "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseAppHost>true</UseAppHost><ImplicitUsings>enable</ImplicitUsings></PropertyGroup></Project>", Encoding.UTF8);
             File.WriteAllText(program, """
 using System.Diagnostics;
 using System.Text.Json;
@@ -614,7 +614,7 @@ Environment.Exit(release.WaitOne(10000) ? 0 : 4);
             var readyName = $"Local\\aibar-ready-{nonce}"; var releaseName = $"Local\\aibar-release-{nonce}";
             var ready = new EventWaitHandle(false, EventResetMode.ManualReset, readyName);
             var release = new EventWaitHandle(false, EventResetMode.ManualReset, releaseName);
-            return new(root, Path.Combine(root, "bin", "Debug", "net8.0", "Harness.exe"), Path.Combine(root, "identity.json"), Path.Combine(root, "arguments.txt"), Path.Combine(root, ".owned-marker"), nonce, readyName, releaseName, ready, release);
+            return new(root, Path.Combine(root, "bin", "Debug", "net8.0-windows", "Harness.exe"), Path.Combine(root, "identity.json"), Path.Combine(root, "arguments.txt"), Path.Combine(root, ".owned-marker"), nonce, readyName, releaseName, ready, release);
         }
 
         public Process StartChild(int exitCode = 0)
@@ -775,7 +775,7 @@ Environment.Exit(release.WaitOne(10000) ? 0 : 4);
         private static string Bounded(Task<string> stdout, Task<string> stderr)
         {
             var output = (stdout.IsCompletedSuccessfully ? stdout.Result : string.Empty) + (stderr.IsCompletedSuccessfully ? stderr.Result : string.Empty);
-            return output.Length <= 4096 ? output : output[..4096];
+            return output.Length <= 4096 ? output : $"[truncated discarded_chars={output.Length - 4096}]\n{output[^4096..]}";
         }
     }
     private sealed class IsolationRoot : IDisposable

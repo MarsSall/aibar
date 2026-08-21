@@ -68,7 +68,7 @@ jobs:
           persist-credentials: false
 
       - name: Run YASB tests with pinned Pester
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $packageUri = 'https://www.powershellgallery.com/api/v2/package/Pester/5.7.1'
