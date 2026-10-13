@@ -139,21 +139,96 @@ public sealed class PackagingRecoveryTests
         Assert.Equal(["child-stderr", "grandchild-stderr"], child.StandardError.ReadToEnd().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).Order());
     }
 
-    [Theory]
-    [InlineData(1, 0)]
-    [InlineData(30, 5000)]
-    public async Task Owned_lifecycle_terminates_known_descendant_on_timeout_or_cancellation(int timeoutSeconds, int cancelAfterMilliseconds)
+    [Fact]
+    public async Task Owned_lifecycle_terminates_known_descendants_after_readiness_on_cancellation()
+    {
+        var result = await RunOwnedLifecycle(30, 5000);
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("kind=cancelled", result.Output);
+        Assert.Contains("stage=Self-contained win-x64 publish failed.", result.Output);
+        Assert.Contains("operation_deadline_seconds=30 termination_grace_seconds=2", result.Output);
+        Assert.Contains("PUBLISH_INCOMPLETE_OUTPUT=", result.Output);
+    }
+
+    private static async Task<RunResult> RunOwnedLifecycle(int timeoutSeconds, int cancelAfterMilliseconds,
+        bool requireReadiness = true, string? mode = null)
     {
         using var harness = DescendantHarness.Create(); var output = Path.Combine(harness.Root, "recovery");
-        using var run = StartRun(output, harness.Executable, timeoutSeconds: timeoutSeconds, cancelAfterMilliseconds: cancelAfterMilliseconds, environment: harness.PublisherEnvironment());
-        Assert.True(harness.Ready.WaitOne(10_000), "The known grandchild did not signal readiness.");
-        using var child = harness.OpenRecordedChild();
-        using var grandchild = harness.OpenRecordedGrandchild();
-        var result = await run.CompleteAsync(TimeSpan.FromSeconds(8));
+        var environment = new Dictionary<string, string>(harness.PublisherEnvironment());
+        if (mode is not null) environment["AIBAR_PUBLISH_MODE"] = mode;
+        using var run = StartRun(output, harness.Executable, timeoutSeconds: timeoutSeconds,
+            cancelAfterMilliseconds: cancelAfterMilliseconds, environment: environment);
+        RunResult result;
+        if (requireReadiness)
+        {
+            Assert.True(harness.Ready.WaitOne(10_000), "The known grandchild did not signal readiness.");
+            using var child = harness.OpenRecordedChild();
+            using var grandchild = harness.OpenRecordedGrandchild();
+            result = await run.CompleteAsync();
+            Assert.True(child.HasExited, "The known child was still alive when publisher termination returned.");
+            Assert.True(grandchild.HasExited, "The known grandchild was still alive when publisher termination returned.");
+        }
+        else
+        {
+            result = await run.CompleteAsync();
+            Assert.False(harness.Ready.WaitOne(0), "The no-readiness diagnostic fixture unexpectedly signaled readiness.");
+            Assert.False(File.Exists(harness.IdentityRecord));
+        }
         Assert.NotEqual(0, result.ExitCode);
-        Assert.True(child.HasExited, "The known child was still alive when publisher termination returned.");
-        Assert.True(grandchild.HasExited, "The known grandchild was still alive when publisher termination returned.");
         Assert.True(Directory.Exists(output));
+        return result;
+    }
+
+    [Fact]
+    public async Task Deadline_before_readiness_preserves_output_and_failure_classification()
+    {
+        var result = await RunOwnedLifecycle(1, 0, requireReadiness: false, mode: "diagnostic-timeout");
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("kind=timeout", result.Output);
+        Assert.Contains("stage=Self-contained win-x64 publish failed.", result.Output);
+        Assert.Contains("operation_deadline_seconds=1 termination_grace_seconds=2", result.Output);
+        Assert.Contains("PUBLISH_INCOMPLETE_OUTPUT=", result.Output);
+        Assert.Contains("timeout-stdout", result.Output); Assert.Contains("timeout-stderr", result.Output);
+    }
+
+    [Fact]
+    public async Task Async_completion_uses_the_existing_operation_budget()
+    {
+        using var harness = DescendantHarness.Create();
+        var output = Path.Combine(harness.Root, "budget");
+        var environment = new Dictionary<string, string>(harness.PublisherEnvironment()) { ["AIBAR_PUBLISH_MODE"] = "diagnostic-timeout" };
+        using var run = StartRun(output, harness.Executable, timeoutSeconds: 9, environment: environment);
+        var result = await run.CompleteAsync();
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("kind=timeout", result.Output);
+        Assert.Contains("operation_deadline_seconds=9 termination_grace_seconds=2", result.Output);
+        Assert.Contains("timeout-stdout", result.Output); Assert.Contains("timeout-stderr", result.Output);
+        Assert.Contains("PUBLISH_INCOMPLETE_OUTPUT=", result.Output);
+        Assert.True(Directory.Exists(output));
+        Assert.False(harness.Ready.WaitOne(0));
+        var reacquired = PublishLock.Wait(TimeSpan.Zero);
+        try { Assert.True(reacquired); }
+        finally { if (reacquired) PublishLock.Release(); }
+    }
+
+    [Fact]
+    public void Known_grandchild_remains_live_until_explicit_release()
+    {
+        using var harness = DescendantHarness.Create();
+        using var child = harness.StartChild();
+        Assert.True(harness.Ready.WaitOne(10_000));
+        using var grandchild = harness.OpenRecordedGrandchild();
+        _ = grandchild.Handle; // Retain the validated process handle for ExitCode after termination.
+        Assert.True(child.WaitForExit(10_000));
+        Assert.Equal(0, child.ExitCode);
+        // Cross the former natural-expiry boundary without releasing the owned fixture.
+        Assert.False(grandchild.WaitForExit(11_000));
+        Assert.True(Directory.Exists(harness.Root));
+        harness.Release.Set();
+        Assert.True(grandchild.WaitForExit(10_000));
+        Assert.Equal(0, grandchild.ExitCode);
+        Assert.Equal(["child-stdout", "grandchild-stdout"], child.StandardOutput.ReadToEnd().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).Order());
+        Assert.Equal(["child-stderr", "grandchild-stderr"], child.StandardError.ReadToEnd().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).Order());
     }
 
     [Theory]
@@ -430,9 +505,9 @@ public sealed class PackagingRecoveryTests
             finally { Dispose(); }
         }
 
-        public async Task<RunResult> CompleteAsync(TimeSpan bound)
+        public async Task<RunResult> CompleteAsync(TimeSpan? bound = null)
         {
-            try { return await CompleteCoreAsync(bound); }
+            try { return await CompleteCoreAsync(bound ?? _completionDeadline); }
             finally { Dispose(); }
         }
 

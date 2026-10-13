@@ -73,4 +73,6 @@ File.WriteAllText(args[5], args[6]);
 File.WriteAllText(args[3], $"owned-marker:{args[7]}");
 Console.Out.WriteLine("grandchild-stdout"); Console.Error.WriteLine("grandchild-stderr");
 ready.Set();
-Environment.Exit(release.WaitOne(10000) ? 0 : 4);
+// Only the owning fixture's explicit release or process termination ends this lifetime.
+release.WaitOne();
+Environment.Exit(0);
