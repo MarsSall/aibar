@@ -31,7 +31,7 @@ public sealed class HostPrimitivesTests
     }
 
     [Fact]
-    public async Task Named_mutex_supports_cross_process_handoff_and_abandoned_owner_takeover()
+    public void Named_mutex_supports_cross_process_handoff_and_abandoned_owner_takeover()
     {
         var name = $"AIBar.Tests.{Guid.NewGuid():N}";
         using var ready = OpenEvent(name, "ready"); using var dispatch = OpenEvent(name, "dispatch");
@@ -44,7 +44,7 @@ public sealed class HostPrimitivesTests
         dispatch.Set();
         Assert.True(activated.WaitOne(TimeSpan.FromSeconds(5)));
         release.Set();
-        await owner.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(owner.WaitForExit(10000));
         Assert.Equal(0, owner.ExitCode);
         using var takeover = new SingleInstanceHost(name);
         Assert.True(takeover.IsPrimary);
@@ -52,10 +52,54 @@ public sealed class HostPrimitivesTests
         var abandonedName = $"AIBar.Tests.{Guid.NewGuid():N}";
         using var abandonedReady = OpenEvent(abandonedName, "ready"); using var abandoned = StartChild(abandonedName);
         Assert.True(abandonedReady.WaitOne(TimeSpan.FromSeconds(10)));
+        using var witness = new SingleInstanceHost(abandonedName);
+        Assert.False(witness.IsPrimary);
         abandoned.Kill(true);
-        await abandoned.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
-        using var recovered = new SingleInstanceHost(abandonedName);
+        var exitBudget = Stopwatch.StartNew();
+        Assert.True(abandoned.WaitForExit(5000));
+        using var recovered = WaitForPrimary(abandonedName,
+            TimeSpan.FromSeconds(5) - exitBudget.Elapsed);
         Assert.True(recovered.IsPrimary);
+    }
+
+    [Fact]
+    public void Recovery_waits_for_actual_mutex_availability()
+    {
+        var name = $"AIBar.Tests.{Guid.NewGuid():N}";
+        using var ready = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        Exception? ownerError = null;
+        var wasPrimary = false;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var owner = new SingleInstanceHost(name);
+                wasPrimary = owner.IsPrimary;
+                ready.Set();
+                if (!release.Wait(TimeSpan.FromSeconds(5)))
+                    throw new TimeoutException("Controlled owner was not released.");
+            }
+            catch (Exception error) { ownerError = error; }
+        });
+        thread.Start();
+        try
+        {
+            Assert.True(ready.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(wasPrimary);
+            using var recovered = WaitForPrimary(name, TimeSpan.FromSeconds(5), () =>
+            {
+                release.Set();
+                Assert.True(thread.Join(5000));
+            });
+            Assert.True(recovered.IsPrimary);
+            Assert.Null(ownerError);
+        }
+        finally
+        {
+            release.Set();
+            Assert.True(thread.Join(5000));
+        }
     }
 
     [Fact]
@@ -64,6 +108,7 @@ public sealed class HostPrimitivesTests
         var name = Environment.GetEnvironmentVariable("AIBAR_MUTEX_TEST_CHILD");
         if (name is null) return;
         using var host = new SingleInstanceHost(name);
+        Assert.True(host.IsPrimary);
         var wasActivated = false;
         host.ActivationRequested += () => wasActivated = true;
         using var ready = OpenEvent(name, "ready"); using var dispatch = OpenEvent(name, "dispatch");
@@ -205,6 +250,21 @@ public sealed class HostPrimitivesTests
         }
         Assert.Throws<ArgumentOutOfRangeException>(() => PopoverPlacement.Place(valid with { MonitorBounds = new(0, 0, 0, 1) }));
         Assert.Throws<ArgumentOutOfRangeException>(() => PopoverPlacement.Place(valid with { LogicalWidth = double.MaxValue, DpiScale = 2 }));
+    }
+
+    private static SingleInstanceHost WaitForPrimary(string name, TimeSpan timeout, Action? unavailable = null)
+    {
+        SingleInstanceHost? acquired = null;
+        var available = SpinWait.SpinUntil(() =>
+        {
+            var candidate = new SingleInstanceHost(name);
+            if (candidate.IsPrimary) { acquired = candidate; return true; }
+            candidate.Dispose();
+            unavailable?.Invoke();
+            return false;
+        }, timeout > TimeSpan.Zero ? timeout : TimeSpan.Zero);
+        Assert.True(available, "Mutex did not become available within the existing exit budget.");
+        return acquired!;
     }
 
     private static Process StartChild(string name)
