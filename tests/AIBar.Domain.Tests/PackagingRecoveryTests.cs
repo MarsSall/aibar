@@ -230,6 +230,47 @@ public sealed class PackagingRecoveryTests
         finally { if (reacquired) PublishLock.Release(); }
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Partial_identity_final_cleanup_preserves_primary_exception_and_uncertain_evidence(bool lockAssembly)
+    {
+        var harness = DescendantHarness.Create();
+        var root = harness.Root;
+        var expected = Directory.GetFiles(root).ToDictionary(path => path, File.ReadAllBytes);
+        FileStream? held = null;
+        try
+        {
+            if (lockAssembly)
+                held = new FileStream(Path.Combine(root, "Harness.dll"), FileMode.Open, FileAccess.Read, FileShare.Read);
+            var primary = new InvalidOperationException("original test failure");
+            Action fail = () =>
+            {
+                try { throw primary; }
+                finally { DisposePartialIdentityFixture(harness, null); }
+            };
+            Assert.Same(primary, Assert.Throws<InvalidOperationException>(fail));
+            Assert.Equal("original test failure", primary.Message);
+            Assert.True(Directory.Exists(root));
+            Assert.Equal(expected.Keys.Order(), Directory.GetFiles(root).Order());
+            foreach (var file in expected)
+                Assert.Equal(file.Value, File.ReadAllBytes(file.Key));
+        }
+        finally
+        {
+            held?.Dispose();
+            harness.Dispose();
+            // This regression never launches a process; its own unlocked root is safe to remove.
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
+    }
+
+    private static void DisposePartialIdentityFixture(DescendantHarness harness, Process? child)
+    {
+        harness.Dispose();
+        child?.Dispose();
+    }
+
     [Fact]
     public void Partial_identity_cleanup_preserves_primary_failure_and_harness_root()
     {
@@ -250,8 +291,7 @@ public sealed class PackagingRecoveryTests
         }
         finally
         {
-            child?.Dispose();
-            if (Directory.Exists(root)) Directory.Delete(root, true);
+            DisposePartialIdentityFixture(harness, child);
         }
     }
 
