@@ -139,10 +139,14 @@ public static class AuthorityTestingBridge
                 for (var inner = 0; inner < 16; inner++) Directory.CreateDirectory(Path.Combine(first, $"a{outer:D2}", $"b{inner:D2}"));
         });
         var cancelled = RunGuardedCleanup(CleanupFaultPoint.None, null, true);
-        var passed = !depth.Succeeded && depth.CompletedDeletes == 0 && depth.QuarantineRetained && depth.Status == SupervisorStatus.CleanupPartial
-            && !entries.Succeeded && entries.CompletedDeletes == 0 && entries.QuarantineRetained && entries.Status == SupervisorStatus.CleanupPartial
-            && !cancelled.Succeeded && cancelled.CompletedDeletes == 0 && cancelled.QuarantineRetained && cancelled.Status == SupervisorStatus.CleanupPartial;
-        return new(passed, passed ? "guarded-cleanup-bounds-verified" : "guarded-cleanup-bounds-refused");
+        var depthPassed = !depth.Succeeded && depth.CompletedDeletes == 0 && depth.QuarantineRetained && depth.Status == SupervisorStatus.CleanupPartial;
+        var entriesPassed = !entries.Succeeded && entries.CompletedDeletes == 0 && entries.QuarantineRetained && entries.Status == SupervisorStatus.CleanupPartial;
+        var cancellationPassed = !cancelled.Succeeded && cancelled.CompletedDeletes == 0 && cancelled.QuarantineRetained && cancelled.Status == SupervisorStatus.CleanupPartial;
+        var passed = depthPassed && entriesPassed && cancellationPassed;
+        return new(passed, passed ? "guarded-cleanup-bounds-verified"
+            : $"guarded-cleanup-bounds-refused: depth[passed={depthPassed},succeeded={depth.Succeeded},deletes={depth.CompletedDeletes},retained={depth.QuarantineRetained},status={depth.Status},gate={depth.Gate}]; "
+            + $"entries[passed={entriesPassed},succeeded={entries.Succeeded},deletes={entries.CompletedDeletes},retained={entries.QuarantineRetained},status={entries.Status},gate={entries.Gate}]; "
+            + $"cancellation[passed={cancellationPassed},succeeded={cancelled.Succeeded},deletes={cancelled.CompletedDeletes},retained={cancelled.QuarantineRetained},status={cancelled.Status},gate={cancelled.Gate}]");
     }
     public static AuthorityTestingOutcome VerifyGuardedCleanupDescendantIdentityMismatch()
         => VerifyFailClosedFault(CleanupFaultPoint.DescendantIdentityMismatch, "guarded-cleanup-descendant-identity-mismatch-verified");
