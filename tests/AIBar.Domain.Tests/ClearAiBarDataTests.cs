@@ -3,10 +3,11 @@ using System.Text.Json;
 using AIBar.Application;
 using AIBar.Desktop;
 using AIBar.Domain;
+using Xunit.Abstractions;
 
 namespace AIBar.Domain.Tests;
 
-public sealed class ClearAiBarDataTests : IDisposable
+public sealed class ClearAiBarDataTests(ITestOutputHelper output) : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"aibar-clear-{Guid.NewGuid():N}");
     private readonly string _codex = Path.Combine(Path.GetTempPath(), $"codex-clear-{Guid.NewGuid():N}");
@@ -137,14 +138,22 @@ public sealed class ClearAiBarDataTests : IDisposable
     public async Task Synthetic_production_composition_publishes_and_clear_recreates_only_a_disabled_snapshot()
     {
         var disposal = new List<string>(); var dataDirectory = Path.Combine(_root, "AIBar");
-        var writer = new WindowsAtomicQuotaExportWriter(_root, new());
-        var composition = App.CreateComposition(new(dataDirectory, Path.Combine(_root, "codex"), LifecycleObservation: disposal.Add, UserProfile: Path.Combine(_root, "home"), ExportWriter: writer));
+        var phase = "initialization";
+        var realWriter = new WindowsAtomicQuotaExportWriter(_root, new(Point: (point, _) =>
+            output.WriteLine($"export-point testPhase={phase} point={point}")));
+        var writer = new ObservedWriter(realWriter, () => phase, output);
+        var composition = App.CreateComposition(new(dataDirectory, Path.Combine(_root, "codex"), LifecycleObservation: item =>
+        {
+            disposal.Add(item);
+            output.WriteLine($"lifecycle testPhase={phase} event={item}");
+        }, UserProfile: Path.Combine(_root, "home"), ExportWriter: writer));
         try
         {
             await composition.Initialize(); AssertDisabledSnapshot();
+            phase = "clear";
             await composition.Settings!.ClearAiBarDataAsync(default); AssertDisabledSnapshot();
         }
-        finally { await composition.Resource.DisposeAsync(); }
+        finally { phase = "disposal"; await composition.Resource.DisposeAsync(); }
         AssertDisabledSnapshot(); Assert.True(disposal.IndexOf("quota_export_publisher_disposed") < disposal.IndexOf("quota_store_disposed"));
 
         void AssertDisabledSnapshot()
@@ -204,6 +213,26 @@ public sealed class ClearAiBarDataTests : IDisposable
         {
             if (document.State != QuotaExportState.Disabled) { await File.WriteAllTextAsync(path, "valued", token); Started.TrySetResult(); await Task.Delay(Timeout.InfiniteTimeSpan, token); }
             await File.WriteAllTextAsync(path, QuotaExportWire.Serialize(document, now), token);
+        }
+    }
+    private sealed class ObservedWriter(IQuotaExportWriter inner, Func<string> phase, ITestOutputHelper output) : IQuotaExportWriter
+    {
+        private int _writes;
+        public async ValueTask WriteAsync(QuotaExportDocument document, DateTimeOffset now, CancellationToken token)
+        {
+            var write = Interlocked.Increment(ref _writes);
+            var caller = phase();
+            output.WriteLine($"export-write id={write} caller={caller} event=start state={document.State}");
+            try
+            {
+                await inner.WriteAsync(document, now, token);
+                output.WriteLine($"export-write id={write} caller={caller} event=complete");
+            }
+            catch (Exception exception)
+            {
+                output.WriteLine($"export-write id={write} caller={caller} event=failed type={exception.GetType().FullName} hresult=0x{unchecked((uint)exception.HResult):X8}");
+                throw;
+            }
         }
     }
     private sealed class FailingWriter : IQuotaExportWriter { public ValueTask WriteAsync(QuotaExportDocument document, DateTimeOffset _, CancellationToken __) => document.State == QuotaExportState.Disabled ? ValueTask.CompletedTask : ValueTask.FromException(new IOException("synthetic writer failure")); }
