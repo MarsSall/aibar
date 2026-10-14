@@ -210,7 +210,11 @@ aibar_quota:
 .aibar-quota.warning-authentication-failed { border-bottom: 2px solid #e07b45; }
 .aibar-quota.warning-unavailable { border-bottom: 2px solid #e0ad45; }
 '@
-        ($css -replace "`r`n", "`n").TrimEnd() | Should -Be $expectedCss
+        foreach ($actualCss in @(($css -replace "`r`n", "`n"), ($css -replace "`r?`n", "`r`n"))) {
+            foreach ($expected in @(($expectedCss -replace "`r`n", "`n"), ($expectedCss -replace "`r?`n", "`r`n"))) {
+                ($actualCss -replace "`r`n", "`n").TrimEnd() | Should -Be ($expected -replace "`r`n", "`n")
+            }
+        }
         $css | Should -Not -Match '\.partial|opacity'
     }
 }
