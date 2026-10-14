@@ -45,7 +45,7 @@ public sealed class PopupRenderedTests
             try
             {
                 var rows = Enumerable.Range(0, 10).Select(index => new { AutomationLabel = $"Usage row {index}", ScopeLabel = $"Scope {index}", TotalLabel = "165 retained tokens", TokenBreakdownLabel = "Input 11 · Output 44", StatusLabel = "Retained history", Details = Array.Empty<object>() }).ToArray();
-                var state = new { CachedAgeLabel = "Cached 00h 05m", WarningLabel = "Network unavailable", IsLoading = false, IsMissingCredential = false, IsOffline = false, IsDegraded = true, IsUnavailable = false, IsPrivateIntegrationDisabled = false, IsSafeError = false, Disclosure = "Quota disclosure" };
+                var state = new { CachedAgeLabel = "Cached 00h 05m", WarningLabel = "Network unavailable", IsLoading = false, IsMissingCredential = false, IsOffline = false, IsDegraded = true, IsUnavailable = false, IsPrimaryAvailable = true, IsWeeklyAvailable = true, IsPrivateIntegrationDisabled = false, IsSafeError = false, Disclosure = "Quota disclosure" };
                 window = new MainWindow { Width = 420, Height = 720, SizeToContent = SizeToContent.Manual, DataContext = new { IsRefreshAvailable = true, FreshnessLabel = "Stale", Primary = new QuotaCardFixture("5-hour", 42m, "01h 00m"), Weekly = new QuotaCardFixture("Weekly", 73m, "06d 00h"), State = state, PrivateEndpointDisclosure = "Private endpoint disclosure", Analytics = new { SourceDetail = "Local", TotalTokensLabel = "100", ModelTotalsLabel = "model", CoverageLabel = "complete", LastScanLabel = "now", WarningLabel = "", IsLoading = false }, LocalUsage = new { Description = "Local usage", StatusLabel = "Current", Rows = rows } } };
                 var root = Assert.IsType<Grid>(window.Content);
                 void Layout() { root.Measure(new Size(420, 720)); root.Arrange(new Rect(0, 0, 420, 720)); root.UpdateLayout(); System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.DataBind); root.UpdateLayout(); }
@@ -61,9 +61,9 @@ public sealed class PopupRenderedTests
                     Assert.Same(root, window.Content); Assert.Equal(children, root.Children.Cast<UIElement>()); Assert.Equal(rows.Select(row => row.AutomationLabel), expanders.Select(AutomationProperties.GetName)); Assert.All(expanders.Cast<Control>().Append(refresh), control => Assert.NotNull(control.FocusVisualStyle)); Assert.IsAssignableFrom<Brush>(window.TryFindResource("SurfaceBrush")); Assert.Contains($"Semantic.{theme}.xaml", app.Resources.MergedDictionaries[0].Source!.OriginalString, StringComparison.Ordinal);
                     Assert.InRange(root.ActualWidth, 1, 420); Assert.InRange(root.ActualHeight, 1, 720);
                     foreach (var item in children.Cast<FrameworkElement>()) { var bounds = item.TransformToAncestor(root).TransformBounds(new Rect(item.RenderSize)); Assert.True(item.ActualHeight > 0 && bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= root.ActualWidth + .1 && bounds.Bottom <= root.ActualHeight + .1); }
-                    Assert.Equal(new[] { "5-hour quota card", "Weekly quota card" }, quotaCards.Select(card => new GroupBoxAutomationPeer(card).GetName())); Assert.All(quotaCards, card => Assert.Contains("percentage, reset, and state", new GroupBoxAutomationPeer(card).GetHelpText(), StringComparison.Ordinal));
-                    Assert.Equal(new[] { 42d, 73d }, progress.Select(item => item.Value)); Assert.Equal(new[] { "5-hour quota progress", "Weekly quota progress" }, progress.Select(item => new ProgressBarAutomationPeer(item).GetName())); Assert.All(progress, item => { Assert.False(item.Focusable || item.IsHitTestVisible); Assert.Equal(item.Value, Assert.IsAssignableFrom<System.Windows.Automation.Provider.IRangeValueProvider>(new ProgressBarAutomationPeer(item).GetPattern(PatternInterface.RangeValue)).Value); });
-                    var cardText = Visuals<TextBlock>(cards).ToArray(); Assert.Equal(new[] { "Reset 01h 00m", "Reset 06d 00h" }, cardText.Where(item => item.Text.StartsWith("Reset ", StringComparison.Ordinal)).Select(item => new TextBlockAutomationPeer(item).GetName())); Assert.Equal(2, cardText.Count(item => new TextBlockAutomationPeer(item).GetName() == "Stale"));
+                    Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" }, quotaCards.Select(card => new GroupBoxAutomationPeer(card).GetName())); Assert.All(quotaCards, card => Assert.Contains("percentage, reset, and state", new GroupBoxAutomationPeer(card).GetHelpText(), StringComparison.Ordinal));
+                    Assert.Equal(new[] { 73d, 42d }, progress.Select(item => item.Value)); Assert.Equal(new[] { "Weekly quota progress", "5-hour quota progress" }, progress.Select(item => new ProgressBarAutomationPeer(item).GetName())); Assert.All(progress, item => { Assert.False(item.Focusable || item.IsHitTestVisible); Assert.Equal(item.Value, Assert.IsAssignableFrom<System.Windows.Automation.Provider.IRangeValueProvider>(new ProgressBarAutomationPeer(item).GetPattern(PatternInterface.RangeValue)).Value); });
+                    var cardText = Visuals<TextBlock>(cards).ToArray(); Assert.Equal(new[] { "Reset 06d 00h", "Reset 01h 00m" }, cardText.Where(item => item.Text.StartsWith("Reset ", StringComparison.Ordinal)).Select(item => new TextBlockAutomationPeer(item).GetName())); Assert.Equal(2, cardText.Count(item => new TextBlockAutomationPeer(item).GetName() == "Stale"));
                     Assert.Equal("Refresh quota", new ButtonAutomationPeer(refresh).GetName()); var footerText = Visuals<TextBlock>(footer).Where(item => item.Visibility == Visibility.Visible && item.ActualHeight > 0).Select(item => new TextBlockAutomationPeer(item).GetName()).ToArray(); Assert.Contains("Cached 00h 05m", footerText); Assert.Contains("Network unavailable", footerText); Assert.True(secondary.ScrollableHeight > 0);
                     var image = new RenderTargetBitmap(420, 720, 96, 96, PixelFormats.Pbgra32); image.Render(root); var pixels = new byte[420 * 720 * 4]; image.CopyPixels(pixels, 420 * 4, 0); Assert.Contains(pixels.Where((_, index) => index % 4 == 3), alpha => alpha > 0);
                 }
@@ -72,6 +72,59 @@ public sealed class PopupRenderedTests
             {
                 try { window?.Close(); }
                 finally { app.Resources.MergedDictionaries[0] = originalTheme; }
+            }
+        });
+    }
+
+    [Fact]
+    public void Unit_1a_rendered_popup_omits_absent_quota_cards_from_layout_and_automation()
+    {
+        WpfTestApplicationHost.Run(_ =>
+        {
+            foreach (var scenario in new[] { (Primary: false, Weekly: true), (Primary: true, Weekly: false), (Primary: true, Weekly: true), (Primary: false, Weekly: false) })
+            {
+                MainWindow? window = null;
+                try
+                {
+                    var state = new QuotaAvailabilityFixture(scenario.Primary, scenario.Weekly);
+                    window = new MainWindow
+                    {
+                        Width = 420,
+                        Height = 720,
+                        SizeToContent = SizeToContent.Manual,
+                        DataContext = new
+                        {
+                            IsRefreshAvailable = true,
+                            FreshnessLabel = scenario.Primary || scenario.Weekly ? "Current" : "Unavailable",
+                            Primary = new QuotaCardFixture("5-hour", 12m, "01h 00m"),
+                            Weekly = new QuotaCardFixture("Weekly", 25m, "06d 00h"),
+                            State = state,
+                            PrivateEndpointDisclosure = "Private endpoint disclosure",
+                            Analytics = new { SourceDetail = "Local", TotalTokensLabel = "0", ModelTotalsLabel = "", CoverageLabel = "", LastScanLabel = "", WarningLabel = "", IsLoading = false },
+                            LocalUsage = new { Description = "Local usage", StatusLabel = "Unavailable", Rows = Array.Empty<object>() }
+                        }
+                    };
+                    window.Show();
+                    var root = Assert.IsType<Grid>(window.Content);
+                    root.Measure(new Size(420, 720)); root.Arrange(new Rect(0, 0, 420, 720)); root.UpdateLayout();
+                    System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); root.UpdateLayout();
+                    var cards = Assert.IsType<StackPanel>(root.Children[1]);
+                    var quotaCards = cards.Children.OfType<GroupBox>().ToArray();
+                    Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" }, quotaCards.Select(card => AutomationProperties.GetName(card)));
+                    Assert.Equal(new[] { scenario.Weekly ? Visibility.Visible : Visibility.Collapsed, scenario.Primary ? Visibility.Visible : Visibility.Collapsed }, quotaCards.Select(card => card.Visibility));
+                    Assert.All(quotaCards.Where(card => card.Visibility == Visibility.Collapsed), card => { Assert.False(card.IsVisible); Assert.Equal(0, card.ActualHeight); });
+                    var automationRoot = AutomationElement.FromHandle(new WindowInteropHelper(window).EnsureHandle());
+                    var automationCards = new[] { "Weekly quota card", "5-hour quota card" }.Where(name => automationRoot.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, name)) is not null).ToArray();
+                    var expectedAutomationCards = new[] { (scenario.Weekly, "Weekly quota card"), (scenario.Primary, "5-hour quota card") }.Where(item => item.Item1).Select(item => item.Item2).ToArray();
+                    Assert.Equal(expectedAutomationCards, automationCards);
+                    var visibleText = Visuals<TextBlock>(cards).Where(text => text.IsVisible).Select(text => new TextBlockAutomationPeer(text).GetName()).ToArray();
+                    if (!scenario.Primary) Assert.DoesNotContain(visibleText, name => name.Contains("5-hour", StringComparison.Ordinal));
+                    if (!scenario.Weekly) Assert.DoesNotContain(visibleText, name => name.Contains("Weekly", StringComparison.Ordinal));
+                }
+                finally
+                {
+                    window?.Close();
+                }
             }
         });
     }
@@ -102,6 +155,13 @@ public sealed class PopupRenderedTests
     }
 
     private sealed class QuotaCardFixture(string label, decimal? percentageUsed, string resetCountdown) { public string Label { get; set; } = label; public decimal? PercentageUsed { get; set; } = percentageUsed; public string ResetCountdown { get; set; } = resetCountdown; }
+    private sealed class QuotaAvailabilityFixture(bool primary, bool weekly)
+    {
+        public string CachedAgeLabel { get; } = ""; public string WarningLabel { get; } = ""; public bool IsLoading { get; } = false;
+        public bool IsMissingCredential { get; } = false; public bool IsOffline { get; } = false; public bool IsDegraded { get; } = false;
+        public bool IsUnavailable { get; } = !primary && !weekly; public bool IsPrimaryAvailable { get; } = primary; public bool IsWeeklyAvailable { get; } = weekly;
+        public bool IsPrivateIntegrationDisabled { get; } = false; public bool IsSafeError { get; } = false; public string Disclosure { get; } = "Quota disclosure";
+    }
 
     private sealed class FakeSurface : IOpaquePopupSurface
     {

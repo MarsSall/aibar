@@ -18,9 +18,17 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
         if ($reset -le $Now) { return "$Name reset: due" }
         return "$Name reset: $($reset.UtcDateTime.ToString('u').TrimEnd('Z'))Z"
     }
-    $partial = ($null -eq $Five) -xor ($null -eq $Weekly)
+    $slots = @()
+    $resets = @()
+    if ($null -ne $Five) {
+        $slots += Slot '5h' $Five
+        $resets += Reset '5h' $Five
+    }
+    if ($null -ne $Weekly) {
+        $slots += Slot '7d' $Weekly
+        $resets += Reset '7d' $Weekly
+    }
     $status = $State
-    if ($partial) { $status += ' partial' }
     if ($null -ne $Warning) { $status += " | warning: $Warning" }
     $age = '--'
     if ($null -ne $Source) {
@@ -30,9 +38,9 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
         else { $age = ('{0}m' -f [math]::Max(0, [math]::Floor($span.TotalMinutes))) }
     }
     [pscustomobject][ordered]@{
-        label = "$(Slot '5h' $Five) | $(Slot '7d' $Weekly) | $status"
-        tooltip = "state: $State$(if ($partial) { ' partial' })$(if ($null -ne $Warning) { " | warning: $Warning" }) | $(Reset '5h' $Five) | $(Reset '7d' $Weekly) | age: $age"
-        className = "aibar-quota state-$State$(if ($null -ne $Warning) { " warning-$Warning" })$(if ($partial) { ' partial' })"
+        label = ($slots + @($status)) -join ' | '
+        tooltip = (@("state: $status") + $resets + @("age: $age")) -join ' | '
+        className = "aibar-quota state-$State$(if ($null -ne $Warning) { " warning-$Warning" })"
     }
 }
 
