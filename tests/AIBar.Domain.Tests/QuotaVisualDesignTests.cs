@@ -79,7 +79,7 @@ public sealed class QuotaVisualDesignTests
         Assert.All(textBlocks.Where(text => text.Attribute("Text")?.Value.Contains("PercentageUsed", StringComparison.Ordinal) == true), text => Assert.Equal("{StaticResource QuotaPercentageTextStyle}", text.Attribute("Style")?.Value));
         var progressBars = window.Descendants(presentation + "ProgressBar").ToArray();
         Assert.Equal(2, progressBars.Length);
-        Assert.Equal(new[] { "{Binding Primary.PercentageUsed}", "{Binding Weekly.PercentageUsed}" }, progressBars.Select(track => track.Attribute("Value")?.Value));
+        Assert.Equal(new[] { "{Binding Weekly.PercentageUsed}", "{Binding Primary.PercentageUsed}" }, progressBars.Select(track => track.Attribute("Value")?.Value));
         Assert.All(progressBars, track => Assert.Equal("{StaticResource QuotaProgressStyle}", track.Attribute("Style")?.Value));
         var groups = window.Descendants(presentation + "GroupBox").ToArray();
         Assert.Equal(4, groups.Length);
@@ -104,8 +104,8 @@ public sealed class QuotaVisualDesignTests
             Assert.Contains(values, value => value.Contains(branch, StringComparison.Ordinal));
         var primaryCard = window.Descendants().Single(element => element.Attributes().Any(attribute => attribute.Value == "5-hour quota card"));
         var weeklyCard = window.Descendants().Single(element => element.Attributes().Any(attribute => attribute.Value == "Weekly quota card"));
-        Assert.Null(primaryCard.Attribute("Visibility"));
-        Assert.Null(weeklyCard.Attribute("Visibility"));
+        Assert.Equal("{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", primaryCard.Attribute("Visibility")?.Value);
+        Assert.Equal("{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", weeklyCard.Attribute("Visibility")?.Value);
     }
     [Fact]
     public void Runtime_ui_automation_exposes_named_cards_card_availability_and_button_command()
@@ -121,7 +121,7 @@ public sealed class QuotaVisualDesignTests
             {
                 window = new MainWindow { DataContext = host }; window.Show();
                 var cards = FindVisualChildren<System.Windows.Controls.GroupBox>(window).ToArray();
-                Assert.Equal(new[] { "5-hour quota card", "Weekly quota card", "Local Codex data", "OpenCode and Pi local usage" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
+                Assert.Equal(new[] { "Weekly quota card", "5-hour quota card", "Local Codex data", "OpenCode and Pi local usage" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
                 var button = FindVisualChildren<System.Windows.Controls.Button>(window).Single();
                 Assert.IsAssignableFrom<System.Windows.Input.ICommand>(button.Command);
                 Assert.True(button.IsEnabled);
@@ -139,7 +139,13 @@ public sealed class QuotaVisualDesignTests
                         cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics, LocalUsageHost()) }; cardWindow.Show(); cardWindow.UpdateLayout();
                         System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); cardWindow.UpdateLayout();
                         var quotaCards = FindVisualChildren<System.Windows.Controls.GroupBox>(cardWindow).Take(2).ToArray();
-                        Assert.All(quotaCards, card => Assert.Equal(System.Windows.Visibility.Visible, card.Visibility));
+                        Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" }, quotaCards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
+                        Assert.Equal(new[] { availability.Weekly ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, availability.Primary ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed }, quotaCards.Select(card => card.Visibility));
+                        Assert.All(quotaCards.Where(card => card.Visibility == System.Windows.Visibility.Collapsed), card => { Assert.False(card.IsVisible); Assert.Equal(0, card.ActualHeight); });
+                        var automationRoot = System.Windows.Automation.AutomationElement.FromHandle(new System.Windows.Interop.WindowInteropHelper(cardWindow).EnsureHandle());
+                        var automationCards = new[] { "Weekly quota card", "5-hour quota card" }.Where(name => automationRoot.FindFirst(System.Windows.Automation.TreeScope.Descendants, new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.NameProperty, name)) is not null).ToArray();
+                        var expectedAutomationCards = new[] { (availability.Weekly, "Weekly quota card"), (availability.Primary, "5-hour quota card") }.Where(item => item.Item1).Select(item => item.Item2).ToArray();
+                        Assert.Equal(expectedAutomationCards, automationCards);
                         var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(cardWindow).ToArray(); Assert.Equal(3, usageExpanders.Length);
                         var openCode = usageExpanders.Single(item => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(item)!.GetName().StartsWith("OpenCode,", StringComparison.Ordinal));
                         var openCodePeer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(openCode)!;
@@ -285,7 +291,7 @@ public sealed class QuotaVisualDesignTests
     }
 
     [Fact]
-    public void Unit_4a_popup_hierarchy_keeps_permanent_slots_and_secondary_scrolling()
+    public void Unit_1a_popup_hierarchy_orders_weekly_first_and_collapses_absent_slots()
     {
         var x = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml");
         var presentation = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml/presentation");
@@ -296,8 +302,10 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal(new[] { "0", "1", "2", "3" }, grid.Elements().Where(element => element.Name != presentation + "Grid.RowDefinitions").Select(element => element.Attribute("Grid.Row")?.Value ?? "0"));
         Assert.Equal("Continue", grid.Attribute("KeyboardNavigation.TabNavigation")?.Value);
         var cards = window.Descendants(presentation + "GroupBox").Take(2).ToArray();
-        Assert.Equal(new[] { "5-hour quota card", "Weekly quota card" }, cards.Select(card => card.Attribute(presentation + "AutomationProperties.Name")?.Value));
-        Assert.All(cards, card => { Assert.Null(card.Attribute("Visibility")); Assert.Contains("percentage, reset, and state", card.Attribute(presentation + "AutomationProperties.HelpText")?.Value); });
+        Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" }, cards.Select(card => card.Attribute(presentation + "AutomationProperties.Name")?.Value));
+        Assert.Equal(new[] { "0,0,0,8", null }, cards.Select(card => card.Attribute("Margin")?.Value));
+        Assert.Equal(new[] { "{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", "{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" }, cards.Select(card => card.Attribute("Visibility")?.Value));
+        Assert.All(cards, card => Assert.Contains("percentage, reset, and state", card.Attribute(presentation + "AutomationProperties.HelpText")?.Value));
         var values = window.Descendants().Attributes().Select(attribute => attribute.Value).ToArray();
         Assert.Equal(2, values.Count(value => value.Contains("TargetNullValue=--", StringComparison.Ordinal)));
         Assert.Equal(2, values.Count(value => value.Contains("TargetNullValue=unavailable", StringComparison.Ordinal)));

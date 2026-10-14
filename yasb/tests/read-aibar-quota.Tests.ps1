@@ -17,6 +17,22 @@ Invoke-AiBarQuotaReader
         } $fixturePath $at
     }
 
+    function Read-Document($document, [DateTimeOffset]$at = $now) {
+        $documentPath = [IO.Path]::GetTempFileName()
+        try {
+            $json = ConvertTo-Json -InputObject $document -Depth 5 -Compress
+            [IO.File]::WriteAllText($documentPath, $json, [Text.UTF8Encoding]::new($false))
+            & $readerModule {
+param([string]$path, [DateTimeOffset]$fixtureNow)
+$script:AIBarQuotaFixturePath = $path
+$script:AIBarQuotaFixtureNow = $fixtureNow
+Invoke-AiBarQuotaReader
+            } $documentPath $at
+        } finally {
+            Remove-Item -LiteralPath $documentPath -Force
+        }
+    }
+
     function Assert-SafeFields($result) {
         $names = @($result.PSObject.Properties.Name)
         $names.Count | Should -Be 3
@@ -53,14 +69,14 @@ Describe 'AIBar YASB reader' {
     It 'renders every valid fixture as its exact state, warning, text, and class' {
         $cases = @(
             @{ Name = 'current.json'; Label = '5h: 12.5% | 7d: 40% | current'; Tooltip = 'state: current | 5h reset: 2026-07-12 13:00:00Z | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'refreshing.json'; Label = '5h: 12% | 7d: -- | refreshing partial'; Tooltip = 'state: refreshing partial | 5h reset: 2026-07-12 13:00:00Z | 7d reset: -- | age: 2h'; ClassName = 'aibar-quota state-refreshing partial' },
+            @{ Name = 'refreshing.json'; Label = '5h: 12% | refreshing'; Tooltip = 'state: refreshing | 5h reset: 2026-07-12 13:00:00Z | age: 2h'; ClassName = 'aibar-quota state-refreshing' },
             @{ Name = 'stale-refresh.json'; Label = '5h: 12% | 7d: 40% | stale | warning: refresh-failed'; Tooltip = 'state: stale | warning: refresh-failed | 5h reset: due | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-stale warning-refresh-failed' },
             @{ Name = 'stale-auth.json'; Label = '5h: 12% | 7d: 40% | stale | warning: authentication-failed'; Tooltip = 'state: stale | warning: authentication-failed | 5h reset: -- | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-stale warning-authentication-failed' },
-            @{ Name = 'unavailable.json'; Label = '5h: -- | 7d: -- | unavailable | warning: unavailable'; Tooltip = 'state: unavailable | warning: unavailable | 5h reset: -- | 7d reset: -- | age: --'; ClassName = 'aibar-quota state-unavailable warning-unavailable' },
-            @{ Name = 'disabled.json'; Label = '5h: -- | 7d: -- | disabled | warning: disabled'; Tooltip = 'state: disabled | warning: disabled | 5h reset: -- | 7d reset: -- | age: --'; ClassName = 'aibar-quota state-disabled warning-disabled' },
-            @{ Name = 'partial.json'; Label = '5h: -- | 7d: 40% | current partial'; Tooltip = 'state: current partial | 5h reset: -- | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current partial' },
+            @{ Name = 'unavailable.json'; Label = 'unavailable | warning: unavailable'; Tooltip = 'state: unavailable | warning: unavailable | age: --'; ClassName = 'aibar-quota state-unavailable warning-unavailable' },
+            @{ Name = 'disabled.json'; Label = 'disabled | warning: disabled'; Tooltip = 'state: disabled | warning: disabled | age: --'; ClassName = 'aibar-quota state-disabled warning-disabled' },
+            @{ Name = 'partial.json'; Label = '7d: 40% | current'; Tooltip = 'state: current | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
             @{ Name = 'nullable-reset.json'; Label = '5h: 12% | 7d: 40% | current'; Tooltip = 'state: current | 5h reset: -- | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'reset-equal.json'; Label = '5h: 12% | 7d: -- | current partial'; Tooltip = 'state: current partial | 5h reset: due | 7d reset: -- | age: 0m'; ClassName = 'aibar-quota state-current partial' }
+            @{ Name = 'reset-equal.json'; Label = '5h: 12% | current'; Tooltip = 'state: current | 5h reset: due | age: 0m'; ClassName = 'aibar-quota state-current' }
         )
         foreach ($case in $cases) {
             $result = Read-Fixture $case.Name
@@ -68,6 +84,43 @@ Describe 'AIBar YASB reader' {
             $result.label | Should -Be $case.Label
             $result.tooltip | Should -Be $case.Tooltip
             $result.className | Should -Be $case.ClassName
+        }
+
+        $five = [ordered]@{ percentageUsed = 12.5; resetAt = '2026-07-12T13:00:00Z' }
+        $weekly35 = [ordered]@{ percentageUsed = 35; resetAt = '2026-07-14T10:00:00Z' }
+        $weekly25 = [ordered]@{ percentageUsed = 25; resetAt = '2026-07-14T10:00:00Z' }
+        $source = '2026-07-12T10:00:00Z'
+        $nullableCases = @(
+            @{ Name = 'both windows'; Five = $five; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = '5h: 12.5% | 7d: 35% | current'; Tooltip = 'state: current | 5h reset: 2026-07-12 13:00:00Z | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'weekly-only 35'; Five = $null; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = '7d: 35% | current'; Tooltip = 'state: current | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'weekly-only 25'; Five = $null; Weekly = $weekly25; State = 'current'; Warning = $null; Source = $source; Label = '7d: 25% | current'; Tooltip = 'state: current | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'five-hour-only'; Five = $five; Weekly = $null; State = 'current'; Warning = $null; Source = $source; Label = '5h: 12.5% | current'; Tooltip = 'state: current | 5h reset: 2026-07-12 13:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'stale weekly-only'; Five = $null; Weekly = $weekly35; State = 'stale'; Warning = 'refresh-failed'; Source = $source; Label = '7d: 35% | stale | warning: refresh-failed'; Tooltip = 'state: stale | warning: refresh-failed | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-stale warning-refresh-failed' },
+            @{ Name = 'stale five-hour-only'; Five = $five; Weekly = $null; State = 'stale'; Warning = 'authentication-failed'; Source = $source; Label = '5h: 12.5% | stale | warning: authentication-failed'; Tooltip = 'state: stale | warning: authentication-failed | 5h reset: 2026-07-12 13:00:00Z | age: 2h'; ClassName = 'aibar-quota state-stale warning-authentication-failed' },
+            @{ Name = 'refreshing without windows'; Five = $null; Weekly = $null; State = 'refreshing'; Warning = $null; Source = $null; Label = 'refreshing'; Tooltip = 'state: refreshing | age: --'; ClassName = 'aibar-quota state-refreshing' },
+            @{ Name = 'unavailable without warning'; Five = $null; Weekly = $null; State = 'unavailable'; Warning = $null; Source = $null; Label = 'unavailable'; Tooltip = 'state: unavailable | age: --'; ClassName = 'aibar-quota state-unavailable' },
+            @{ Name = 'zero-window current fails closed'; Five = $null; Weekly = $null; State = 'current'; Warning = $null; Source = $source; Label = 'unavailable | warning: unavailable'; Tooltip = 'state: unavailable | warning: unavailable | age: --'; ClassName = 'aibar-quota state-unavailable warning-unavailable' },
+            @{ Name = 'malformed-present sibling fails closed'; Five = [ordered]@{ percentageUsed = -1; resetAt = $null }; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = 'unavailable | warning: unavailable'; Tooltip = 'state: unavailable | warning: unavailable | age: --'; ClassName = 'aibar-quota state-unavailable warning-unavailable' }
+        )
+        foreach ($case in $nullableCases) {
+            $document = [ordered]@{
+                schemaVersion = 1
+                generatedAt = '2026-07-12T12:00:00Z'
+                state = $case.State
+                warning = $case.Warning
+                sourceRetrievedAt = $case.Source
+                fiveHour = $case.Five
+                weekly = $case.Weekly
+            }
+            $result = Read-Document $document
+            Assert-SafeFields $result
+            $result.label | Should -Be $case.Label
+            $result.tooltip | Should -Be $case.Tooltip
+            $result.className | Should -Be $case.ClassName
+            $result.label | Should -Not -Match '5h: --|7d: --|partial'
+            $result.className | Should -Not -Match 'partial'
+            if ($null -eq $case.Five) { $result.tooltip | Should -Not -Match '5h reset:' }
+            if ($null -eq $case.Weekly) { $result.tooltip | Should -Not -Match '7d reset:' }
         }
     }
 
@@ -81,14 +134,14 @@ Describe 'AIBar YASB reader' {
         foreach ($name in $invalid) {
             $result = Read-Fixture $name
             Assert-SafeFields $result
-            $result.label | Should -Be '5h: -- | 7d: -- | unavailable | warning: unavailable'
-            $result.tooltip | Should -Be 'state: unavailable | warning: unavailable | 5h reset: -- | 7d reset: -- | age: --'
+            $result.label | Should -Be 'unavailable | warning: unavailable'
+            $result.tooltip | Should -Be 'state: unavailable | warning: unavailable | age: --'
             $result.className | Should -Be 'aibar-quota state-unavailable warning-unavailable'
         }
         $rollback = Read-Fixture 'clock-rollback.json' ([DateTimeOffset]'2026-07-12T08:00:00Z')
         Assert-SafeFields $rollback
-        $rollback.label | Should -Be '5h: -- | 7d: -- | unavailable | warning: unavailable'
-        $rollback.tooltip | Should -Be 'state: unavailable | warning: unavailable | 5h reset: -- | 7d reset: -- | age: --'
+        $rollback.label | Should -Be 'unavailable | warning: unavailable'
+        $rollback.tooltip | Should -Be 'state: unavailable | warning: unavailable | age: --'
         $rollback.className | Should -Be 'aibar-quota state-unavailable warning-unavailable'
     }
 

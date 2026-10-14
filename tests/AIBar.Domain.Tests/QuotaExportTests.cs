@@ -52,6 +52,19 @@ public sealed class QuotaExportTests
     }
 
     [Fact]
+    public void Schema_v1_current_keeps_an_absent_sibling_as_a_null_window()
+    {
+        foreach (var (snapshot, present, absent) in new[] { (Snapshot(false, true), "weekly", "fiveHour"), (Snapshot(true, false), "fiveHour", "weekly") })
+        {
+            var root = Root(QuotaExportProjector.Project(new(new QuotaRefreshState(snapshot, FreshnessState.Current, false, null, null)), Now));
+            Assert.Equal("current", root.GetProperty("state").GetString());
+            Assert.Equal(JsonValueKind.Object, root.GetProperty(present).ValueKind);
+            Assert.Equal(JsonValueKind.Null, root.GetProperty(absent).ValueKind);
+            Assert.Equal(new[] { "schemaVersion", "generatedAt", "state", "warning", "sourceRetrievedAt", "fiveHour", "weekly" }, root.EnumerateObject().Select(property => property.Name));
+        }
+    }
+
+    [Fact]
     public void Values_times_and_nullable_resets_validate_and_normalize_as_one_document()
     {
         foreach (var percentage in new[] { 0m, 100m, 12.5m }) Assert.Equal(percentage, Root(Valid(window: new(percentage, null))).GetProperty("fiveHour").GetProperty("percentageUsed").GetDecimal());

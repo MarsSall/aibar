@@ -34,6 +34,19 @@ public sealed class QuotaHttpProviderTests
     }
 
     [Fact]
+    public async Task Distinguishes_omitted_or_null_siblings_from_malformed_present_siblings_and_zero_windows()
+    {
+        var omitted = await Provider(new StubHandler(Json("""{"rate_limit":{"primary_window":{"used_percent":12,"reset_at":1893459600,"limit_window_seconds":18000}}}"""), Json("{}"))).GetQuotaAsync(CancellationToken.None);
+        Assert.Null(omitted.Failure); Assert.Equal(12m, omitted.Snapshot!.Primary!.PercentageUsed); Assert.Null(omitted.Snapshot.Weekly);
+        var nullSibling = await Provider(new StubHandler(Json("""{"rate_limit":{"primary_window":{"used_percent":12,"reset_at":1893459600,"limit_window_seconds":18000},"secondary_window":null}}"""), Json("{}"))).GetQuotaAsync(CancellationToken.None);
+        Assert.Null(nullSibling.Failure); Assert.Equal(12m, nullSibling.Snapshot!.Primary!.PercentageUsed); Assert.Null(nullSibling.Snapshot.Weekly);
+        var malformedSibling = await Provider(new StubHandler(Json("""{"rate_limit":{"primary_window":{"used_percent":12,"reset_at":1893459600,"limit_window_seconds":18000},"secondary_window":{"used_percent":"not-a-number"}}}"""), Json("{}"))).GetQuotaAsync(CancellationToken.None);
+        Assert.Equal("quota_malformed", malformedSibling.Failure!.SafeCode); Assert.Null(malformedSibling.Snapshot);
+        var zeroWindows = await Provider(new StubHandler(Json("""{"rate_limit":{"primary_window":null,"secondary_window":null}}"""), Json("{}"))).GetQuotaAsync(CancellationToken.None);
+        Assert.Equal("quota_malformed", zeroWindows.Failure!.SafeCode); Assert.Null(zeroWindows.Snapshot);
+    }
+
+    [Fact]
     public async Task Classifies_official_windows_by_duration_not_position()
     {
         var result = await Provider(new StubHandler(

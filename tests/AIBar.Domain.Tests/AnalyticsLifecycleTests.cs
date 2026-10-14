@@ -34,7 +34,8 @@ public sealed class AnalyticsLifecycleTests
         await harness.Composition.Initialize();
         Assert.True(harness.Entered.Wait(TimeSpan.FromSeconds(2)));
         var revoke = harness.Composition.Settings!.DisablePrivateIntegrationAsync(CancellationToken.None).AsTask();
-        Assert.True(harness.Cancelled.Wait(TimeSpan.FromSeconds(2)));
+        await harness.CancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(harness.Cancelled.IsSet);
         harness.Release.Set();
         await revoke;
 
