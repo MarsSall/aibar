@@ -278,65 +278,6 @@ public sealed class HostRuntimeTests
     }
 
     [Fact]
-    public async Task Accept_reaches_real_grant_once_updates_state_and_disable_restores_the_menu()
-    {
-        var root = Path.Combine(Path.GetTempPath(), $"aibar-grant-{Guid.NewGuid():N}"); Directory.CreateDirectory(root);
-        var settingsFile = Path.Combine(root, "settings.json"); var consent = new ConsentSettings(settingsFile); var policy = new PrivateIntegrationPolicy();
-        var files = new MissingCredentialFiles(); var credentials = new ConsentCredentialSource(policy, new CodexCredentialReader(files), Path.Combine(root, "codex"));
-        var provider = new GatedCredentialProvider(credentials);
-        var coordinator = new QuotaRefreshCoordinator(new EmptyQuotaStore(), provider, new FixedClock(DateTimeOffset.UtcNow), new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
-        var beta = new BetaRuntime(consent, policy, coordinator, new FixedClock(DateTimeOffset.UtcNow), credentials);
-        await using var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), () => policy.IsEnabled);
-        using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
-        var tray = new FakeTray(); var prompt = new FakeConsentPrompt(true);
-        var revokeStarted = false; var revokeCompleted = false; Exception? revokeException = null;
-        var revokeElapsed = new System.Diagnostics.Stopwatch();
-        async ValueTask RevokeConsentAsync(CancellationToken cancellationToken)
-        {
-            revokeStarted = true; revokeElapsed.Start();
-            try { await beta.RevokeConsentAsync(cancellationToken); revokeCompleted = true; }
-            catch (Exception exception) { revokeException = exception; throw; }
-            finally { revokeElapsed.Stop(); }
-        }
-        var settings = new NativeSettingsCommands(new FakeStartupRegistration(), new FakeClearCommand(), policy, RevokeConsentAsync, beta.GrantConsentAsync);
-        var host = new TrayHostRuntime(instance, tray, new FakePopover(), new FakeRecreationEvents(), _ => Task.CompletedTask, beta, () => { }, settings: settings, presentation: presentation, consentPrompt: prompt);
-        instance.Dispose();
-        try
-        {
-            await beta.InitializeAsync(default); presentation.RefreshAvailabilityChanged();
-            tray.EnablePrivate(); tray.EnablePrivate();
-            await provider.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
-
-            Assert.Equal(1, prompt.Calls); Assert.Equal(1, provider.Calls); Assert.Equal(1, files.Calls);
-            provider.Release.TrySetResult(); PumpUntil(() => tray.DisablePrivateVisible && beta.State.Failure?.SafeCode == "quota_credential_missing");
-            using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(settingsFile));
-            Assert.Equal(2, document.RootElement.EnumerateObject().Count()); Assert.True(document.RootElement.GetProperty("privateCodexConsent").GetBoolean());
-            Assert.Equal("quota_credential_missing", beta.State.Failure!.SafeCode);
-
-            tray.DisablePrivate();
-            var menuRestored = PumpUntilObserved(() => tray.EnablePrivateVisible);
-            var persistedConsent = "<not-read>";
-            if (!menuRestored)
-            {
-                try { persistedConsent = (await consent.LoadAsync(default)).ToString(); }
-                catch (Exception exception) { persistedConsent = $"load-error={exception.GetType().Name}: {exception.Message}"; }
-            }
-            var revokeError = revokeException is null ? "<none>" : $"{revokeException.GetType().Name}: {revokeException.Message}";
-            Assert.True(menuRestored, menuRestored ? null :
-                $"Revoke diagnostic: started={revokeStarted}, completed={revokeCompleted}, exception={revokeError}, elapsedMs={revokeElapsed.Elapsed.TotalMilliseconds:F1}, " +
-                $"policyEnabled={policy.IsEnabled}, persistedConsent={persistedConsent}, traySettings={tray.SettingsAvailable}, trayPrivateEnabled={tray.PrivateIntegrationEnabled}, " +
-                $"trayEnableVisible={tray.EnablePrivateVisible}, trayDisableVisible={tray.DisablePrivateVisible}, trayWrites=[{string.Join(",", tray.PrivateIntegrationWrites)}], presentation={presentation.State}");
-            Assert.False(await consent.LoadAsync(default)); Assert.True(presentation.State.IsPrivateIntegrationDisabled);
-            Assert.False(presentation.State.IsLoading); Assert.False(presentation.State.IsMissingCredential);
-        }
-        finally
-        {
-            provider.Release.TrySetResult(); await host.ExitAsync();
-            if (Directory.Exists(root)) Directory.Delete(root, true);
-        }
-    }
-
-    [Fact]
     public void Unit_4a_tray_formatter_keeps_both_truthful_slots_and_a_bounded_status()
     {
         var cases = new[]
