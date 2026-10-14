@@ -6,5 +6,4 @@
 .aibar-quota.state-unavailable, .aibar-quota.state-disabled { background: #5b3030; }
 .aibar-quota.warning-refresh-failed { border-bottom: 2px solid #e0ad45; }
 .aibar-quota.warning-authentication-failed { border-bottom: 2px solid #e07b45; }
-.aibar-quota.warning-unavailable, .aibar-quota.warning-disabled { opacity: .82; }
-.aibar-quota.partial { font-style: italic; }
+.aibar-quota.warning-unavailable { border-bottom: 2px solid #e0ad45; }

@@ -18,18 +18,20 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
         if ($reset -le $Now) { return "$Name reset: due" }
         return "$Name reset: $($reset.UtcDateTime.ToString('u').TrimEnd('Z'))Z"
     }
-    $slots = @()
-    $resets = @()
-    if ($null -ne $Five) {
-        $slots += Slot '5h' $Five
-        $resets += Reset '5h' $Five
+    $stateText = switch -CaseSensitive ($State) {
+        'current' { 'current' }; 'refreshing' { 'refreshing' }; 'stale' { 'stale' }
+        'unavailable' { 'unavailable' }; 'disabled' { 'disabled' }
     }
-    if ($null -ne $Weekly) {
-        $slots += Slot '7d' $Weekly
-        $resets += Reset '7d' $Weekly
+    $warningText = switch -CaseSensitive ($Warning) {
+        'refresh-failed' { 'refresh failed' }; 'authentication-failed' { 'authentication failed' }
+        'unavailable' { 'service unavailable' }; 'disabled' { 'disabled' }
     }
-    $status = $State
-    if ($null -ne $Warning) { $status += " | warning: $Warning" }
+    $distinctWarning = $null -ne $Warning -and $Warning -cne $State
+    $label = @()
+    if ($null -ne $Five) { $label += Slot '5h' $Five }
+    if ($null -ne $Weekly) { $label += Slot '7d' $Weekly }
+    $label += $stateText
+    if ($distinctWarning) { $label += $warningText }
     $age = '--'
     if ($null -ne $Source) {
         $span = $Now - ([DateTimeOffset]$Source)
@@ -37,9 +39,14 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
         elseif ($span.TotalHours -ge 1) { $age = ('{0}h' -f [math]::Floor($span.TotalHours)) }
         else { $age = ('{0}m' -f [math]::Max(0, [math]::Floor($span.TotalMinutes))) }
     }
+    $tooltip = @($stateText)
+    if ($distinctWarning) { $tooltip += $warningText }
+    if ($null -ne $Five) { $tooltip += Reset '5h' $Five }
+    if ($null -ne $Weekly) { $tooltip += Reset '7d' $Weekly }
+    $tooltip += "age: $age"
     [pscustomobject][ordered]@{
-        label = ($slots + @($status)) -join ' | '
-        tooltip = (@("state: $status") + $resets + @("age: $age")) -join ' | '
+        label = ($label -join ' | ')
+        tooltip = ($tooltip -join ' | ')
         className = "aibar-quota state-$State$(if ($null -ne $Warning) { " warning-$Warning" })"
     }
 }
