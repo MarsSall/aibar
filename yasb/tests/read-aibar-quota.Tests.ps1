@@ -233,7 +233,7 @@ aibar_quota:
       run_interval: 60000
       return_format: "json"
     callbacks:
-      on_left: 'exec cmd /c "<AIBarRoot>\yasb\show-aibar.cmd"'
+      on_left: 'exec "<AIBarRoot>\AIBar.Desktop.exe" --show'
 '@
         $actualYaml = ($yaml -replace "`r`n", "`n").TrimEnd()
         $expectedYaml = ($expected -replace "`r`n", "`n").TrimEnd()
@@ -256,7 +256,7 @@ aibar_quota:
             $parsed['aibar_quota']['options']['exec_options']['run_interval'] | Should -Be 60000
             $parsed['aibar_quota']['options']['exec_options']['return_format'] | Should -Be 'json'
             $parsed['aibar_quota']['options']['exec_options']['run_cmd'] | Should -Be 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "<AIBarRoot>\yasb\read-aibar-quota.ps1"'
-            $parsed['aibar_quota']['options']['callbacks']['on_left'] | Should -Be 'exec cmd /c "<AIBarRoot>\yasb\show-aibar.cmd"'
+            $parsed['aibar_quota']['options']['callbacks']['on_left'] | Should -Be 'exec "<AIBarRoot>\AIBar.Desktop.exe" --show'
         }
     }
 

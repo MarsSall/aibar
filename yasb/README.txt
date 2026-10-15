@@ -6,7 +6,8 @@ Setup
 1. Manually extract the unsigned, self-contained Windows x64 private-beta ZIP to one stable location you choose: <AIBarRoot>.
 2. Copy custom-widget.example.yaml into your YASB configuration and retain <AIBarRoot> as the location you configure once.
 3. Copy or customize custom-widget.example.css in your YASB stylesheet.
-4. Start AIBar normally. The widget reads its local sanitized snapshot; left-click uses only AIBar.Desktop.exe --show.
+4. Start AIBar normally. The widget reads its local sanitized snapshot; left-click invokes AIBar.Desktop.exe --show directly, without an extra cmd /c or show-aibar.cmd layer. The legacy CMD launcher remains available for manual use.
+The secondary launch makes one best-effort foreground grant to a unique existing AIBar window belonging to the same executable and Windows session, then sends the existing show signal. Windows can refuse the grant; missing/ambiguous targets or refusal do not suppress showing the popup. No focus retries are performed. After opening from YASB, verify that clicking outside dismisses the popup without first clicking inside; also check the tray path. Source/unit checks alone cannot establish foreground behavior on the interactive desktop.
 
 Presentation
 Only supplied quota windows appear, in 5h then 7d order. Weekly-only input can display "7d: 35% | current" without an empty 5h slot.
