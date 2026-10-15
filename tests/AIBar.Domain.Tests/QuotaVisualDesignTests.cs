@@ -32,7 +32,7 @@ public sealed class QuotaVisualDesignTests
         Assert.Contains("AutomationProperties.Name=\"OpenCode and Pi local usage\"", window, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"{Binding AutomationLabel}\"", window, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding LocalUsage.Rows}\" Focusable=\"False\"", window, StringComparison.Ordinal);
-        var localUsage = XDocument.Parse(window); var expander = localUsage.Descendants().Single(element => element.Name.LocalName == "Expander");
+        var localUsage = XDocument.Parse(window); var expander = localUsage.Descendants().Single(element => element.Name.LocalName == "Expander" && element.Attributes().Any(attribute => attribute.Value == "{Binding AutomationLabel}"));
         Assert.Equal("False", expander.Attribute("IsExpanded")?.Value); Assert.Equal("True", expander.Attribute("Focusable")?.Value); Assert.Equal("True", expander.Attribute("IsTabStop")?.Value);
         var detailScroller = expander.Descendants().Single(element => element.Name.LocalName == "ScrollViewer");
         Assert.Equal("180", detailScroller.Attribute("MaxHeight")?.Value); Assert.Equal("Auto", detailScroller.Attribute("VerticalScrollBarVisibility")?.Value);
@@ -86,7 +86,7 @@ public sealed class QuotaVisualDesignTests
         Assert.All(groups.Take(2), group => Assert.Equal("{StaticResource ChromeLessGroupBoxStyle}", group.Attribute("Style")?.Value));
         Assert.All(groups.Skip(2), group => Assert.Equal("{StaticResource SecondaryGroupBoxStyle}", group.Attribute("Style")?.Value));
         Assert.Equal(2, window.Descendants(presentation + "Border").Count(border => border.Attribute("Style")?.Value == "{StaticResource SecondaryCardStyle}"));
-        Assert.Equal("{StaticResource AccessibleExpanderStyle}", window.Descendants(presentation + "Expander").Single().Attribute("Style")?.Value);
+        Assert.Equal("{StaticResource AccessibleExpanderStyle}", window.Descendants(presentation + "Expander").Single(element => element.Attributes().Any(attribute => attribute.Value == "{Binding AutomationLabel}")).Attribute("Style")?.Value);
     }
     [Fact]
     public void Uses_4a_quota_presentation_bindings_without_new_business_state()
@@ -120,6 +120,8 @@ public sealed class QuotaVisualDesignTests
             try
             {
                 window = new MainWindow { DataContext = host }; window.Show();
+                ((System.Windows.Controls.Expander)window.FindName("AnalyticsDetailsExpander")).IsExpanded = true;
+                window.UpdateLayout();
                 var cards = FindVisualChildren<System.Windows.Controls.GroupBox>(window).ToArray();
                 Assert.Equal(new[] { "Weekly quota card", "5-hour quota card", "Local Codex data", "OpenCode and Pi local usage" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
                 var button = FindVisualChildren<System.Windows.Controls.Button>(window).Single();
@@ -136,7 +138,9 @@ public sealed class QuotaVisualDesignTests
                     try
                     {
                         var initialization = cardCoordinator.InitializeAsync(default).AsTask(); PumpUntil(() => initialization.IsCompleted); Assert.True(initialization.IsCompletedSuccessfully);
-                        cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics, LocalUsageHost()) }; cardWindow.Show(); cardWindow.UpdateLayout();
+                        cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics, LocalUsageHost()) }; cardWindow.Show();
+                        ((System.Windows.Controls.Expander)cardWindow.FindName("AnalyticsDetailsExpander")).IsExpanded = true;
+                        cardWindow.UpdateLayout();
                         System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); cardWindow.UpdateLayout();
                         var quotaCards = FindVisualChildren<System.Windows.Controls.GroupBox>(cardWindow).Take(2).ToArray();
                         Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" }, quotaCards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
@@ -146,7 +150,7 @@ public sealed class QuotaVisualDesignTests
                         var automationCards = new[] { "Weekly quota card", "5-hour quota card" }.Where(name => automationRoot.FindFirst(System.Windows.Automation.TreeScope.Descendants, new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.NameProperty, name)) is not null).ToArray();
                         var expectedAutomationCards = new[] { (availability.Weekly, "Weekly quota card"), (availability.Primary, "5-hour quota card") }.Where(item => item.Item1).Select(item => item.Item2).ToArray();
                         Assert.Equal(expectedAutomationCards, automationCards);
-                        var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(cardWindow).ToArray(); Assert.Equal(3, usageExpanders.Length);
+                        var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(cardWindow).Where(item => item.Name != "AnalyticsDetailsExpander").ToArray(); Assert.Equal(3, usageExpanders.Length);
                         var openCode = usageExpanders.Single(item => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(item)!.GetName().StartsWith("OpenCode,", StringComparison.Ordinal));
                         var openCodePeer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(openCode)!;
                         Assert.Equal("OpenCode, 165 retained tokens, Input 11 · Cache 55 (read 22, write 33) · Output 44 · Reasoning 55, Retained history", openCodePeer.GetName());
@@ -332,7 +336,7 @@ public sealed class QuotaVisualDesignTests
         var progressStyle = resources.Descendants(presentation + "Style").Single(style => style.Attribute(x + "Key")?.Value == "QuotaProgressStyle");
         Assert.Equal("False", progressStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "Focusable").Attribute("Value")?.Value);
         Assert.Equal("False", progressStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "IsHitTestVisible").Attribute("Value")?.Value);
-        var expander = window.Descendants(presentation + "Expander").Single();
+        var expander = window.Descendants(presentation + "Expander").Single(element => element.Attributes().Any(attribute => attribute.Value == "{Binding AutomationLabel}"));
         Assert.Equal("{StaticResource AccessibleExpanderStyle}", expander.Attribute("Style")?.Value);
         var expanderStyle = resources.Descendants(presentation + "Style").Single(style => style.Attribute(x + "Key")?.Value == "AccessibleExpanderStyle");
         Assert.Equal("{StaticResource KeyboardFocusVisual}", expanderStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "FocusVisualStyle").Attribute("Value")?.Value);
