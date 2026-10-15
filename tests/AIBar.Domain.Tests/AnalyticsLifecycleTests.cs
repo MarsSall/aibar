@@ -3,7 +3,7 @@ using AIBar.Desktop;
 
 namespace AIBar.Domain.Tests;
 
-public sealed class AnalyticsLifecycleTests
+public sealed class AnalyticsLifecycleTests(Xunit.Abstractions.ITestOutputHelper output)
 {
     [Fact]
     public async Task Production_view_publishes_local_totals_partial_coverage_warning_and_scan_time_after_loading()
@@ -131,35 +131,70 @@ public sealed class AnalyticsLifecycleTests
     [Fact]
     public async Task Production_clear_cooperatively_stops_analytics_deletes_its_database_family_clears_stale_totals_and_preserves_codex_source()
     {
-        await using var harness = await ProductionHarness.CreateAsync(TimeSpan.FromSeconds(2), blockScanNumber: 2);
-        var presentation = (BetaAnalyticsPresentation)harness.Composition.Presentation;
-        await harness.Composition.Initialize();
-        await harness.ScanFinished.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        Assert.Equal(new TokenTotals(1, 0, 1), presentation.Analytics.Totals);
+        // Diagnostic branch only: buffer in memory; emit after disposal, outside the timed wait.
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        var marks = new System.Collections.Concurrent.ConcurrentQueue<(long Timestamp, int Thread, string Stage, int AvailableWorkers, long Pending)>();
+        void Mark(string stage)
+        {
+            var timestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+            ThreadPool.GetAvailableThreads(out var workers, out _);
+            marks.Enqueue((timestamp, Environment.CurrentManagedThreadId, stage, workers, ThreadPool.PendingWorkItemCount));
+        }
+        Mark("test_begin");
+        try
+        {
+            await using var harness = await ProductionHarness.CreateAsync(TimeSpan.FromSeconds(2), blockScanNumber: 2, timing: Mark);
+            var presentation = (BetaAnalyticsPresentation)harness.Composition.Presentation;
+            Mark("initialize_begin");
+            await harness.Composition.Initialize();
+            Mark("initialize_return");
+            Mark("initial_wait_begin");
+            try
+            {
+                await harness.ScanFinished.Task.WaitAsync(TimeSpan.FromSeconds(2));
+                Mark("initial_wait_completed");
+            }
+            catch (TimeoutException)
+            {
+                Mark("initial_wait_timeout");
+                throw;
+            }
+            Assert.Equal(new TokenTotals(1, 0, 1), presentation.Analytics.Totals);
 
-        await harness.Composition.Settings!.DisablePrivateIntegrationAsync(default);
-        await File.AppendAllTextAsync(harness.SourcePath, "{\"timestamp\":\"2026-01-02T00:00:00Z\",\"model\":\"gpt-5\",\"usage\":{\"input_tokens\":2,\"cached_input_tokens\":0,\"output_tokens\":2}}\n");
-        harness.Cancelled.Reset();
-        await harness.Composition.Settings.EnablePrivateIntegrationAsync(default);
-        Assert.True(harness.Entered.Wait(TimeSpan.FromSeconds(2)));
-        Assert.Equal(new TokenTotals(1, 0, 1), presentation.Analytics.Totals);
-        await File.WriteAllTextAsync(harness.AnalyticsWalPath, "analytics-wal");
-        await File.WriteAllTextAsync(harness.AnalyticsShmPath, "analytics-shm");
-        var sourceBefore = await File.ReadAllBytesAsync(harness.SourcePath);
+            await harness.Composition.Settings!.DisablePrivateIntegrationAsync(default);
+            await File.AppendAllTextAsync(harness.SourcePath, "{\"timestamp\":\"2026-01-02T00:00:00Z\",\"model\":\"gpt-5\",\"usage\":{\"input_tokens\":2,\"cached_input_tokens\":0,\"output_tokens\":2}}\n");
+            harness.Cancelled.Reset();
+            await harness.Composition.Settings.EnablePrivateIntegrationAsync(default);
+            Assert.True(harness.Entered.Wait(TimeSpan.FromSeconds(2)));
+            Assert.Equal(new TokenTotals(1, 0, 1), presentation.Analytics.Totals);
+            await File.WriteAllTextAsync(harness.AnalyticsWalPath, "analytics-wal");
+            await File.WriteAllTextAsync(harness.AnalyticsShmPath, "analytics-shm");
+            var sourceBefore = await File.ReadAllBytesAsync(harness.SourcePath);
 
-        var clear = harness.Composition.Settings.ClearAiBarDataAsync(default).AsTask();
-        Assert.True(harness.Cancelled.Wait(TimeSpan.FromSeconds(2)));
-        harness.Release.Set();
-        await clear;
+            var clear = harness.Composition.Settings.ClearAiBarDataAsync(default).AsTask();
+            Assert.True(harness.Cancelled.Wait(TimeSpan.FromSeconds(2)));
+            harness.Release.Set();
+            await clear;
 
-        Assert.False(File.Exists(harness.AnalyticsDatabasePath));
-        Assert.False(File.Exists(harness.AnalyticsWalPath));
-        Assert.False(File.Exists(harness.AnalyticsShmPath));
-        Assert.Equal(AnalyticsScanStatus.Unavailable, presentation.Analytics.Status);
-        Assert.Null(presentation.Analytics.Totals);
-        Assert.Empty(presentation.Analytics.Models);
-        Assert.Contains("local_scan_not_started", presentation.Analytics.WarningCodes);
-        Assert.Equal(sourceBefore, await File.ReadAllBytesAsync(harness.SourcePath));
+            Assert.False(File.Exists(harness.AnalyticsDatabasePath));
+            Assert.False(File.Exists(harness.AnalyticsWalPath));
+            Assert.False(File.Exists(harness.AnalyticsShmPath));
+            Assert.Equal(AnalyticsScanStatus.Unavailable, presentation.Analytics.Status);
+            Assert.Null(presentation.Analytics.Totals);
+            Assert.Empty(presentation.Analytics.Models);
+            Assert.Contains("local_scan_not_started", presentation.Analytics.WarningCodes);
+            Assert.Equal(sourceBefore, await File.ReadAllBytesAsync(harness.SourcePath));
+        }
+        finally
+        {
+            Mark("test_cleanup_finished");
+            foreach (var mark in marks.OrderBy(entry => entry.Timestamp))
+            {
+                var milliseconds = (mark.Timestamp - started) * 1000d / System.Diagnostics.Stopwatch.Frequency;
+                output.WriteLine(System.FormattableString.Invariant(
+                    $"ANALYTICS_TIMING ms={milliseconds:F3} thread={mark.Thread} available_workers={mark.AvailableWorkers} pending={mark.Pending} stage={mark.Stage}"));
+            }
+        }
     }
 
     [Fact]
@@ -247,7 +282,7 @@ public sealed class AnalyticsLifecycleTests
         public string AnalyticsShmPath => Path.Combine(_root, "analytics.db-shm");
         public AnalyticsShutdownOutcome Outcome => ((App.QuotaRuntimeResource)Composition.Resource).AnalyticsOutcome;
 
-        public static async Task<ProductionHarness> CreateAsync(TimeSpan shutdownBound, bool partial = false, int blockScanNumber = 1, bool failBlockedScan = false)
+        public static async Task<ProductionHarness> CreateAsync(TimeSpan shutdownBound, bool partial = false, int blockScanNumber = 1, bool failBlockedScan = false, Action<string>? timing = null)
         {
             var root = Path.Combine(Path.GetTempPath(), $"aibar-lifecycle-{Guid.NewGuid():N}");
             var codex = Path.Combine(root, "codex");
@@ -261,15 +296,18 @@ public sealed class AnalyticsLifecycleTests
             var scanNumber = 0;
             var composition = App.CreateComposition(new(root, codex, shutdownBound, _ =>
             {
+                timing?.Invoke("stability_hook");
                 if (Interlocked.Increment(ref scanNumber) != blockScanNumber) return;
+                timing?.Invoke("blocked_scan_wait");
                 entered.Set(); release.Wait();
+                timing?.Invoke("blocked_scan_released");
                 if (failBlockedScan) throw new InvalidOperationException("Simulated analytics scan failure.");
             }, item =>
             {
                 lock (events) events.Add(item);
                 if (item == "analytics_cancelled") { cancelled.Set(); cancellationObserved.TrySetResult(); }
                 if (item == "analytics_scan_finished") finished.TrySetResult();
-            }, Path.Combine(root, "home")));
+            }, Path.Combine(root, "home"), AnalyticsScanTiming: timing));
             var instance = new SingleInstanceHost($"AIBar.lifecycle.{Guid.NewGuid():N}");
             var host = new TrayHostRuntime(instance, new FakeTray(), new FakePopover(), new FakeTaskbar(), _ => Task.CompletedTask, composition.Resource, () => { });
             instance.Dispose();

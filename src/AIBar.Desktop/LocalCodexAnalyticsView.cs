@@ -41,15 +41,19 @@ public sealed class AnalyticsLifecycleOwner : ILocalAnalyticsLifecycle, IAiBarCl
     private readonly ILocalCodexAnalyticsScanner _scanner; private readonly LocalCodexAnalyticsView _view; private readonly IAsyncDisposable _store;
     private readonly TimeSpan _shutdownBound; private readonly Action<string>? _observe; private CancellationTokenSource? _cancellation; private Task? _scan;
     private long _generation; private bool _publicationClosed; private bool _dependenciesDisposed; private AnalyticsShutdownOutcome? _outcome;
-    public AnalyticsLifecycleOwner(ILocalCodexAnalyticsScanner scanner, LocalCodexAnalyticsView view, IAsyncDisposable store, TimeSpan shutdownBound, Action<string>? observe = null)
-    { _scanner = scanner; _view = view; _store = store; _shutdownBound = shutdownBound; _observe = observe; }
+    private readonly Action<string>? _scanTiming;
+    public AnalyticsLifecycleOwner(ILocalCodexAnalyticsScanner scanner, LocalCodexAnalyticsView view, IAsyncDisposable store, TimeSpan shutdownBound, Action<string>? observe = null, Action<string>? scanTiming = null)
+    { _scanner = scanner; _view = view; _store = store; _shutdownBound = shutdownBound; _observe = observe; _scanTiming = scanTiming; }
+    private void MarkScan(long generation, string stage) => _scanTiming?.Invoke($"scan-{generation}:{stage}");
     public AnalyticsShutdownOutcome Outcome => _outcome ?? new(AnalyticsShutdownKind.Completed, "analytics_shutdown_completed");
 
     public ValueTask StartAsync(CancellationToken cancellationToken)
     {
         if (_dependenciesDisposed || _scan is not null || _outcome is not null) return ValueTask.CompletedTask;
         _publicationClosed = false; _cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); _view.ShowLoading();
-        var generation = ++_generation; _scan = Task.Run(() => ScanAsync(generation)); return ValueTask.CompletedTask;
+        var generation = ++_generation;
+        MarkScan(generation, "queued");
+        _scan = Task.Run(() => ScanAsync(generation)); return ValueTask.CompletedTask;
     }
     public async ValueTask StopAsync(CancellationToken cancellationToken) => await EndAsync(cancellationToken, false);
     public async ValueTask CancelAndWaitAsync(CancellationToken cancellationToken)
@@ -79,11 +83,27 @@ public sealed class AnalyticsLifecycleOwner : ILocalAnalyticsLifecycle, IAiBarCl
     }
     private async Task ScanAsync(long generation)
     {
-        try { var result = await _scanner.ScanAsync(_cancellation!.Token); if (!_publicationClosed && !_cancellation.IsCancellationRequested && generation == _generation) _view.Publish(result); }
-        catch (OperationCanceledException) when (_cancellation!.IsCancellationRequested) { }
-        catch (LocalCodexAnalyticsScanException exception) { if (!_publicationClosed) _view.Publish(LocalAnalyticsState.Failed(DateTimeOffset.UtcNow, exception.SafeCode)); throw; }
-        catch (Exception) { if (!_publicationClosed) _view.Publish(LocalAnalyticsState.Failed(DateTimeOffset.UtcNow)); throw; }
-        finally { _observe?.Invoke("analytics_scan_finished"); }
+        try
+        {
+            MarkScan(generation, "worker_entry");
+            var result = await _scanner.ScanAsync(_cancellation!.Token);
+            MarkScan(generation, "scanner_return");
+            if (!_publicationClosed && !_cancellation.IsCancellationRequested && generation == _generation)
+            {
+                MarkScan(generation, "publication_begin");
+                _view.Publish(result);
+                MarkScan(generation, "publication_end");
+            }
+        }
+        catch (OperationCanceledException) when (_cancellation!.IsCancellationRequested) { MarkScan(generation, "cancelled"); }
+        catch (LocalCodexAnalyticsScanException exception) { MarkScan(generation, "scan_exception"); if (!_publicationClosed) _view.Publish(LocalAnalyticsState.Failed(DateTimeOffset.UtcNow, exception.SafeCode)); throw; }
+        catch (Exception) { MarkScan(generation, "exception"); if (!_publicationClosed) _view.Publish(LocalAnalyticsState.Failed(DateTimeOffset.UtcNow)); throw; }
+        finally
+        {
+            MarkScan(generation, "finish_observer_begin");
+            _observe?.Invoke("analytics_scan_finished");
+            MarkScan(generation, "finish_observer_end");
+        }
     }
     private async ValueTask DisposeDependenciesAsync()
     {
