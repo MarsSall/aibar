@@ -112,6 +112,7 @@ public sealed class BetaAnalyticsPresentation : INotifyPropertyChanged
     public string? PrivateEndpointDisclosure => _quota.PrivateEndpointDisclosure;
     public bool IsRefreshAvailable => _quota.IsRefreshAvailable;
     public IManualRefreshCommand RefreshCommand => _quota.RefreshCommand;
+    public QuotaSummaryCopyCommand CopySummaryCommand => _quota.CopySummaryCommand;
     public BetaPresentationState State => _quota.State;
     public LocalAnalyticsState Analytics => _analytics.State;
     public LocalUsagePresentationState LocalUsage => _localUsage.State;

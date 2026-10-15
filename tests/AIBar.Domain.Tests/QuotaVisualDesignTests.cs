@@ -124,7 +124,7 @@ public sealed class QuotaVisualDesignTests
                 window.UpdateLayout();
                 var cards = FindVisualChildren<System.Windows.Controls.GroupBox>(window).ToArray();
                 Assert.Equal(new[] { "Weekly quota card", "5-hour quota card", "Local Codex data", "OpenCode and Pi local usage" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
-                var button = FindVisualChildren<System.Windows.Controls.Button>(window).Single();
+                var button = FindVisualChildren<System.Windows.Controls.Button>(window).Single(item => System.Windows.Automation.AutomationProperties.GetName(item) == "Refresh quota");
                 Assert.IsAssignableFrom<System.Windows.Input.ICommand>(button.Command);
                 Assert.True(button.IsEnabled);
                 button.GetType().GetMethod("OnClick", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(button, null);
@@ -174,7 +174,7 @@ public sealed class QuotaVisualDesignTests
                 disabled = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), false);
                 disabledWindow = new MainWindow { DataContext = disabled };
                 disabledWindow.Show();
-                Assert.Equal(System.Windows.Visibility.Collapsed, FindVisualChildren<System.Windows.Controls.Button>(disabledWindow).Single().Visibility);
+                Assert.Equal(System.Windows.Visibility.Collapsed, FindVisualChildren<System.Windows.Controls.Button>(disabledWindow).Single(item => System.Windows.Automation.AutomationProperties.GetName(item) == "Refresh quota").Visibility);
                 provider.Release(); PumpUntil(() => button.IsEnabled);
                 Assert.True(button.IsEnabled); Assert.Equal(1, provider.Calls);
             }
