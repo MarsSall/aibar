@@ -1,10 +1,11 @@
 aibar_quota:
   type: "yasb.custom.CustomWidget"
   options:
-    label: "{data[label]}"
+    label: "<font color='{data[progressColor]}'>{data[progressGlyph]}</font> {data[compactText]}"
     label_alt: "{data[label]}"
-    class_name: "{data[className]}"
-    tooltip: "{data[tooltip]}"
+    class_name: "aibar-quota"
+    tooltip: true
+    tooltip_label: "{data[tooltip]}"
     exec_options:
       run_cmd: 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "<AIBarRoot>\yasb\read-aibar-quota.ps1"'
       run_interval: 60000

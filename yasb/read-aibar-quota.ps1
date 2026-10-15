@@ -44,8 +44,28 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
     if ($null -ne $Five) { $tooltip += Reset '5h' $Five }
     if ($null -ne $Weekly) { $tooltip += Reset '7d' $Weekly }
     $tooltip += "age: $age"
+    $hero = if ($null -ne $Weekly) { $Weekly } else { $Five }
+    $glyphCodes = @(0xF0766, 0xF0A9E, 0xF0A9F, 0xF0AA0, 0xF0AA1, 0xF0AA2, 0xF0AA3, 0xF0AA4, 0xF0AA5)
+    $glyphIndex = 0
+    $color = '#8995A4'
+    $compact = @()
+    if ($null -ne $hero) {
+        $used = [double]$hero.percentageUsed
+        $glyphIndex = [int][math]::Min(8, [math]::Floor($used / 12.5))
+        $color = if ($used -lt 50) { '#58A6FF' } elseif ($used -lt 75) { '#E3B341' } elseif ($used -lt 90) { '#F0883E' } else { '#FF7B72' }
+        $compact += $used.ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%'
+    }
+    if ($null -eq $hero -or $State -ceq 'stale') {
+        $compact += $stateText
+        if ($distinctWarning) { $compact += $warningText }
+    }
+    $compactText = $compact -join ' | '
+    if ($compactText.Length -gt 64 -or $compactText -cmatch '[<>&{}]') { return Get-SafeOutput -Now $Now }
     [pscustomobject][ordered]@{
         label = ($label -join ' | ')
+        compactText = $compactText
+        progressGlyph = [char]::ConvertFromUtf32($glyphCodes[$glyphIndex])
+        progressColor = $color
         tooltip = ($tooltip -join ' | ')
         className = "aibar-quota state-$State$(if ($null -ne $Warning) { " warning-$Warning" })"
     }
@@ -124,6 +144,7 @@ function Invoke-AiBarQuotaReader {
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
+    [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
     if ($args.Count -ne 0) { Get-SafeOutput -Now (Get-ReaderNow) | ConvertTo-Json -Compress; exit 1 }
     Invoke-AiBarQuotaReader | ConvertTo-Json -Compress
 }

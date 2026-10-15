@@ -9,12 +9,16 @@ BeforeAll {
 
     function Read-Fixture([string]$name, [DateTimeOffset]$at = $now) {
         $fixturePath = Join-Path $root "fixtures/$name"
-        & $readerModule {
+        $before = if (Test-Path -LiteralPath $fixturePath) { (Get-FileHash -LiteralPath $fixturePath).Hash } else { $null }
+        $result = & $readerModule {
 param([string]$path, [DateTimeOffset]$fixtureNow)
 $script:AIBarQuotaFixturePath = $path
 $script:AIBarQuotaFixtureNow = $fixtureNow
 Invoke-AiBarQuotaReader
         } $fixturePath $at
+        $after = if (Test-Path -LiteralPath $fixturePath) { (Get-FileHash -LiteralPath $fixturePath).Hash } else { $null }
+        $after | Should -Be $before
+        return $result
     }
 
     function Read-Document($document, [DateTimeOffset]$at = $now) {
@@ -22,12 +26,14 @@ Invoke-AiBarQuotaReader
         try {
             $json = ConvertTo-Json -InputObject $document -Depth 5 -Compress
             [IO.File]::WriteAllText($documentPath, $json, [Text.UTF8Encoding]::new($false))
-            & $readerModule {
+            $result = & $readerModule {
 param([string]$path, [DateTimeOffset]$fixtureNow)
 $script:AIBarQuotaFixturePath = $path
 $script:AIBarQuotaFixtureNow = $fixtureNow
 Invoke-AiBarQuotaReader
             } $documentPath $at
+            [IO.File]::ReadAllText($documentPath) | Should -BeExactly $json
+            return $result
         } finally {
             Remove-Item -LiteralPath $documentPath -Force
         }
@@ -35,10 +41,17 @@ Invoke-AiBarQuotaReader
 
     function Assert-SafeFields($result) {
         $names = @($result.PSObject.Properties.Name)
-        $names.Count | Should -Be 3
-        $names[0] | Should -Be 'label'
-        $names[1] | Should -Be 'tooltip'
-        $names[2] | Should -Be 'className'
+        ($names -join ',') | Should -Be 'label,compactText,progressGlyph,progressColor,tooltip,className'
+        $result.compactText.Length | Should -BeLessOrEqual 64
+        $result.compactText | Should -Not -Match '[<>&{}]'
+        ($result.progressColor -cin @('#58A6FF', '#E3B341', '#F0883E', '#FF7B72', '#8995A4')) | Should -Be $true
+    }
+    function Assert-Compact($result, [string]$text) {
+        $result.compactText | Should -BeExactly $text
+        if ($text -notmatch '%') {
+            $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0766))
+            $result.progressColor | Should -BeExactly '#8995A4'
+        }
     }
 }
 
@@ -64,12 +77,24 @@ Describe 'AIBar YASB reader' {
         $source | Should -Match 'switch -CaseSensitive'
         $source | Should -Match '-cnotin'
         $source | Should -Not -Match 'Start-Process|Invoke-WebRequest|Remove-Item|Set-Content|Add-Content|WriteAll|CreateDirectory'
+        $ci = Get-Content -Raw (Join-Path (Split-Path -Parent $root) '.github/workflows/ci.yml')
+        $ci | Should -Match '\$result.TotalCount -ne 11'
+        $ci | Should -Match 'Expected 11 passing YASB tests'
+        ([regex]::Matches((Get-Content -Raw (Join-Path $root 'tests/read-aibar-quota.Tests.ps1')), '(?m)^\s*It\s+')).Count | Should -Be 11
         $stderrPath = [IO.Path]::GetTempFileName()
         try {
-            $output = & powershell.exe -NoProfile -NonInteractive -File $reader unexpected 2> $stderrPath
-            $LASTEXITCODE | Should -Be 1
-            $output | Should -Be '{"label":"unavailable","tooltip":"unavailable | age: --","className":"aibar-quota state-unavailable warning-unavailable"}'
-            [IO.File]::ReadAllText($stderrPath) | Should -Be ''
+            $start = [Diagnostics.ProcessStartInfo]::new('powershell.exe', ('-NoProfile -NonInteractive -File "{0}" unexpected' -f $reader))
+            $start.UseShellExecute = $false
+            $start.RedirectStandardOutput = $true; $start.RedirectStandardError = $true
+            $start.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
+            $process = [Diagnostics.Process]::Start($start)
+            $output = $process.StandardOutput.ReadToEnd(); $errors = $process.StandardError.ReadToEnd()
+            $process.WaitForExit()
+            $process.ExitCode | Should -Be 1
+            $fallback = '{"label":"unavailable","compactText":"unavailable","progressGlyph":"' + [char]::ConvertFromUtf32(0xF0766) + '","progressColor":"#8995A4","tooltip":"unavailable | age: --","className":"aibar-quota state-unavailable warning-unavailable"}'
+            $output | Should -BeExactly ($fallback + "`r`n")
+            $errors | Should -Be ''
+            $process.Dispose()
         } finally { Remove-Item -LiteralPath $stderrPath -Force }
     }
 
@@ -85,8 +110,11 @@ Describe 'AIBar YASB reader' {
             @{ Name = 'nullable-reset.json'; Label = '5h: 12% | 7d: 40% | current'; Tooltip = 'current | 5h reset: -- | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
             @{ Name = 'reset-equal.json'; Label = '5h: 12% | current'; Tooltip = 'current | 5h reset: due | age: 0m'; ClassName = 'aibar-quota state-current' }
         )
+        $compact = @('40%', '12%', '40% | stale | refresh failed', '40% | stale | authentication failed', 'unavailable', 'disabled', '40%', '40%', '12%')
+        $index = 0
         foreach ($case in $cases) {
             $result = Read-Fixture $case.Name
+            Assert-Compact $result $compact[$index++]
             Assert-SafeFields $result
             $result.label | Should -Be $case.Label
             $result.tooltip | Should -Be $case.Tooltip
@@ -110,6 +138,8 @@ Describe 'AIBar YASB reader' {
             @{ Name = 'zero-window current fails closed'; Five = $null; Weekly = $null; State = 'current'; Warning = $null; Source = $source; Label = 'unavailable'; Tooltip = 'unavailable | age: --'; ClassName = 'aibar-quota state-unavailable warning-unavailable' },
             @{ Name = 'malformed-present sibling fails closed'; Five = [ordered]@{ percentageUsed = -1; resetAt = $null }; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = 'unavailable'; Tooltip = 'unavailable | age: --'; ClassName = 'aibar-quota state-unavailable warning-unavailable' }
         )
+        $compact = @('35%', '35%', '25%', '12.5%', '35% | stale | refresh failed', '35% | stale | service unavailable', '12.5% | stale | authentication failed', 'refreshing', 'unavailable', 'unavailable', 'unavailable')
+        $index = 0
         foreach ($case in $nullableCases) {
             $document = [ordered]@{
                 schemaVersion = 1
@@ -121,6 +151,7 @@ Describe 'AIBar YASB reader' {
                 weekly = $case.Weekly
             }
             $result = Read-Document $document
+            Assert-Compact $result $compact[$index++]
             Assert-SafeFields $result
             $result.label | Should -Be $case.Label
             $result.tooltip | Should -Be $case.Tooltip
@@ -131,6 +162,36 @@ Describe 'AIBar YASB reader' {
             if ($null -eq $case.Five) { $result.tooltip | Should -Not -Match '5h reset:' }
             if ($null -eq $case.Weekly) { $result.tooltip | Should -Not -Match '7d reset:' }
         }
+        $stages = @(
+            @(0, 12.5, 0xF0766), @(12.5, 25, 0xF0A9E), @(25, 37.5, 0xF0A9F),
+            @(37.5, 50, 0xF0AA0), @(50, 62.5, 0xF0AA1), @(62.5, 75, 0xF0AA2),
+            @(75, 87.5, 0xF0AA3), @(87.5, 100, 0xF0AA4), @(100, 100, 0xF0AA5)
+        )
+        $culture = [Threading.Thread]::CurrentThread.CurrentCulture
+        try {
+            [Threading.Thread]::CurrentThread.CurrentCulture = [Globalization.CultureInfo]'fr-FR'
+            foreach ($stage in $stages) {
+                $values = if ($stage[0] -eq 100) { @(100) } else { @($stage[0], ($stage[0] + 0.000001), ($stage[1] - 0.000001)) }
+                foreach ($value in $values) {
+                    $color = if ($value -lt 50) { '#58A6FF' } elseif ($value -lt 75) { '#E3B341' } elseif ($value -lt 90) { '#F0883E' } else { '#FF7B72' }
+                    foreach ($weeklyHero in @($true, $false)) {
+                        $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'refreshing'; warning = $null; sourceRetrievedAt = $source; fiveHour = [ordered]@{ percentageUsed = $value; resetAt = $null }; weekly = $null }
+                        if ($weeklyHero) { $document.weekly = $document.fiveHour; $document.fiveHour = $five }
+                        $result = Read-Document $document
+                        Assert-SafeFields $result
+                        Assert-Compact $result (([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%')
+                        $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32($stage[2]))
+                        $result.progressColor | Should -BeExactly $color
+                    }
+                }
+            }
+        } finally { [Threading.Thread]::CurrentThread.CurrentCulture = $culture }
+        foreach ($value in @(89.999999, 90, 90.000001)) {
+            $document.fiveHour.percentageUsed = $value
+            (Read-Document $document).progressColor | Should -BeExactly $(if ($value -lt 90) { '#F0883E' } else { '#FF7B72' })
+        }
+        $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'unavailable'; warning = 'authentication-failed'; sourceRetrievedAt = $null; fiveHour = $null; weekly = $null }
+        Assert-Compact (Read-Document $document) 'unavailable | authentication failed'
     }
 
     It 'fails closed with the exact fallback for malformed or unsupported contracts' {
@@ -144,12 +205,14 @@ Describe 'AIBar YASB reader' {
             $result = Read-Fixture $name
             Assert-SafeFields $result
             $result.label | Should -Be 'unavailable'
+            Assert-Compact $result 'unavailable'
             $result.tooltip | Should -Be 'unavailable | age: --'
             $result.className | Should -Be 'aibar-quota state-unavailable warning-unavailable'
         }
         $rollback = Read-Fixture 'clock-rollback.json' ([DateTimeOffset]'2026-07-12T08:00:00Z')
         Assert-SafeFields $rollback
         $rollback.label | Should -Be 'unavailable'
+        Assert-Compact $rollback 'unavailable'
         $rollback.tooltip | Should -Be 'unavailable | age: --'
         $rollback.className | Should -Be 'aibar-quota state-unavailable warning-unavailable'
     }
@@ -160,10 +223,11 @@ Describe 'AIBar YASB reader' {
 aibar_quota:
   type: "yasb.custom.CustomWidget"
   options:
-    label: "{data[label]}"
+    label: "<font color='{data[progressColor]}'>{data[progressGlyph]}</font> {data[compactText]}"
     label_alt: "{data[label]}"
-    class_name: "{data[className]}"
-    tooltip: "{data[tooltip]}"
+    class_name: "aibar-quota"
+    tooltip: true
+    tooltip_label: "{data[tooltip]}"
     exec_options:
       run_cmd: 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "<AIBarRoot>\yasb\read-aibar-quota.ps1"'
       run_interval: 60000
@@ -185,6 +249,10 @@ aibar_quota:
         if ($null -ne $module) {
             Import-Module $module.Path -ErrorAction Stop
             $parsed = ConvertFrom-Yaml $yaml
+            $parsed['aibar_quota']['options']['tooltip'] | Should -BeOfType [bool]
+            $parsed['aibar_quota']['options']['tooltip'] | Should -Be $true
+            $parsed['aibar_quota']['options']['tooltip_label'] | Should -Be '{data[tooltip]}'
+            $parsed['aibar_quota']['options']['class_name'] | Should -Be 'aibar-quota'
             $parsed['aibar_quota']['options']['exec_options']['run_interval'] | Should -Be 60000
             $parsed['aibar_quota']['options']['exec_options']['return_format'] | Should -Be 'json'
             $parsed['aibar_quota']['options']['exec_options']['run_cmd'] | Should -Be 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "<AIBarRoot>\yasb\read-aibar-quota.ps1"'
