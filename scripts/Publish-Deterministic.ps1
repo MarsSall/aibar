@@ -26,12 +26,18 @@ param(
     [int]$CancelAfterMilliseconds = 0,
     [string]$KnownDescendantIdentityPath,
     [switch]$PrivateBeta,
+    [string]$ExpectedSourceCommit,
+    [switch]$PrepareOnly,
     [string]$BetaBaselineCommit,
     [string]$BetaParentCommit,
     [ValidateRange(1, 30000)]
     [int]$SmokeStartupMilliseconds = 1000
 )
 $ErrorActionPreference = "Stop"
+if (($PSBoundParameters.ContainsKey('ExpectedSourceCommit') -or $PSBoundParameters.ContainsKey('PrepareOnly')) -and
+    (-not $PrivateBeta -or $CapabilityPlan -or $GraphProjection)) {
+    throw "BETA_OPTIONS_REQUIRE_PRIVATE_BETA"
+}
 function Write-CapabilityPlan {
     $publisher = "CN=AIBar Development"
     $hasMakeAppx = -not [string]::IsNullOrWhiteSpace($MakeAppxPath)
@@ -231,17 +237,29 @@ function Invoke-PrivateBeta {
     if ($LASTEXITCODE -ne 0) { throw "BETA_SOURCE_MISSING" }
     $baseline = if ([string]::IsNullOrWhiteSpace($BetaBaselineCommit)) { "c4e35c01d5ed9cff30b136802a39196a3b2ed91d" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaBaselineCommit }
     $requiredParent = if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { "816c28b6747a6e9aa62c5c23c216cd4feb7a55fd" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaParentCommit }
-    if ($parent -cne $requiredParent) { throw "BETA_PARENT_MISMATCH" }
+    # Explicit source pinning admits reviewed later commits without weakening legacy defaults.
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedSourceCommit)) {
+        if ($ExpectedSourceCommit -cnotmatch '^(?:[0-9a-f]{40}|[0-9a-f]{64})$' -or $source -cne $ExpectedSourceCommit) { throw "BETA_SOURCE_MISMATCH" }
+    } elseif ($parent -cne $requiredParent) { throw "BETA_PARENT_MISMATCH" }
+    if ($PrepareOnly -and [string]::IsNullOrWhiteSpace($ExpectedSourceCommit)) { throw "BETA_PREPARATION_REQUIRES_SOURCE_PIN" }
     & git -C $projectRoot merge-base --is-ancestor $baseline $source
     if ($LASTEXITCODE -ne 0) { throw "BETA_BASELINE_MISMATCH" }
     [xml]$projectXml = Get-Content -LiteralPath (Join-Path $projectRoot "src\AIBar.Desktop\AIBar.Desktop.csproj") -Raw
     $version = [string]($projectXml.Project.PropertyGroup.Version | Select-Object -First 1)
     if ([string]::IsNullOrWhiteSpace($version)) { throw "BETA_VERSION_MISSING" }
-    $outputRoot = Assert-FreshLeaf $OutputDirectory $projectRoot; $created = $false
+    $outputRoot = Assert-FreshLeaf $OutputDirectory $projectRoot
+    $isolation = Get-IsolationRoots $projectRoot $outputRoot
+    $created = $false
     try {
         New-Item -ItemType Directory -Path $outputRoot -ErrorAction Stop | Out-Null; $created = $true
         $publish = Join-Path $outputRoot "publish"; New-Item -ItemType Directory -Path $publish -ErrorAction Stop | Out-Null
-        Invoke-OwnedProcess $PublishCommand @("publish", (Join-Path $projectRoot "src\AIBar.Desktop\AIBar.Desktop.csproj"), "--disable-build-servers", "--configuration", "Release", "--runtime", "win-x64", "--self-contained", "true", "--output", $publish, "/p:ContinuousIntegrationBuild=true", "/p:Deterministic=true", "/p:DebugType=None") "BETA_PUBLISH_FAILED"
+        $publishArguments = @("publish", (Join-Path $projectRoot "src\AIBar.Desktop\AIBar.Desktop.csproj"), "--disable-build-servers", "--configuration", "Release", "--runtime", "win-x64", "--self-contained", "true", "--output", $publish, "/p:ContinuousIntegrationBuild=true", "/p:Deterministic=true", "/p:DebugType=None")
+        if ($null -ne $isolation) {
+            foreach ($root in @($isolation.intermediate,$isolation.build,$isolation.restore,$isolation.packages)) { New-Item -ItemType Directory -Path $root -ErrorAction Stop | Out-Null }
+            Assert-IsolationReady $isolation $IsolationMarker $projectRoot
+            $publishArguments += "/p:DirectoryBuildPropsPath=$(Write-IsolationProps $isolation)"
+        }
+        Invoke-OwnedProcess $PublishCommand $publishArguments "BETA_PUBLISH_FAILED"
         Copy-PrivateBetaYasbAssets $projectRoot $publish
         $notice = "AIBar $version is an unsigned private beta for Windows x64. It is manually distributed and has no updater or installer.`nBaseline ancestor: $baseline`nSource commit: $source`n"
         [IO.File]::WriteAllText((Join-Path $publish "PRIVATE-BETA.txt"), $notice, [Text.UTF8Encoding]::new($false))
@@ -250,11 +268,20 @@ function Invoke-PrivateBeta {
         Add-Type -AssemblyName System.IO.Compression; Add-Type -AssemblyName System.IO.Compression.FileSystem
         $zipPath = Join-Path $outputRoot "AIBar-win-x64-private-beta.zip"; $stream = [IO.File]::Open($zipPath, [IO.FileMode]::CreateNew); $zip = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create, $false)
         try { foreach ($relative in $paths) { $entry = $zip.CreateEntry($relative, [IO.Compression.CompressionLevel]::Optimal); $entry.LastWriteTime = [DateTimeOffset]::FromUnixTimeSeconds([long]$SourceDateEpoch); $entry.ExternalAttributes = 0; $input = [IO.File]::OpenRead((Join-Path $publish ($relative -replace '/','\'))); try { $target = $entry.Open(); try { $input.CopyTo($target) } finally { $target.Dispose() } } finally { $input.Dispose() } } } finally { $zip.Dispose(); $stream.Dispose() }
-        $smoke = Join-Path $outputRoot "smoke"; $process = $null
-        try { Expand-Archive -LiteralPath $zipPath -DestinationPath $smoke; $executable = Join-Path $smoke "AIBar.Desktop.exe"; if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "BETA_SMOKE_EXECUTABLE_MISSING" }; $process = Start-Process -FilePath $executable -WorkingDirectory $smoke -PassThru; if ($process.WaitForExit($SmokeStartupMilliseconds)) { throw "BETA_SMOKE_EARLY_EXIT" }; $process.Kill($true); if (-not $process.WaitForExit($ProcessTimeoutSeconds * 1000)) { throw "BETA_SMOKE_TIMEOUT" } } finally { if ($null -ne $process) { if (-not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }; $process.Dispose() }; if (Test-Path -LiteralPath $smoke) { Remove-Item -LiteralPath $smoke -Recurse -Force } }
+        $startupSmoke = "not-run"
+        if (-not $PrepareOnly) {
+            $smoke = Join-Path $outputRoot "smoke"; $process = $null
+            try { Expand-Archive -LiteralPath $zipPath -DestinationPath $smoke; $executable = Join-Path $smoke "AIBar.Desktop.exe"; if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "BETA_SMOKE_EXECUTABLE_MISSING" }; $process = Start-Process -FilePath $executable -WorkingDirectory $smoke -PassThru; if ($process.WaitForExit($SmokeStartupMilliseconds)) { throw "BETA_SMOKE_EARLY_EXIT" }; $process.Kill($true); if (-not $process.WaitForExit($ProcessTimeoutSeconds * 1000)) { throw "BETA_SMOKE_TIMEOUT" } } finally { if ($null -ne $process) { if (-not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }; $process.Dispose() }; if (Test-Path -LiteralPath $smoke) { Remove-Item -LiteralPath $smoke -Recurse -Force } }
+            $startupSmoke = "passed"
+        }
         $zipSha = Sha $zipPath
-        [ordered]@{ schemaVersion="aibar-private-beta-1"; target="win-x64"; selfContained=$true; unsigned=$true; baselineCommit=$baseline; parentCommit=$parent; sourceCommit=$source; version=$version; inventory=$inventory; zipSha256=$zipSha } | ConvertTo-Json -Compress -Depth 8 | Set-Content -LiteralPath (Join-Path $outputRoot "private-beta-manifest.json") -NoNewline
+        [ordered]@{ schemaVersion="aibar-private-beta-1"; target="win-x64"; selfContained=$true; unsigned=$true; baselineCommit=$baseline; parentCommit=$parent; sourceCommit=$source; version=$version; startupSmoke=$startupSmoke; inventory=$inventory; zipSha256=$zipSha } | ConvertTo-Json -Compress -Depth 8 | Set-Content -LiteralPath (Join-Path $outputRoot "private-beta-manifest.json") -NoNewline
         $instructions = "AIBar private beta $version is unsigned. Extract the ZIP, verify `$((Get-FileHash .\AIBar-win-x64-private-beta.zip -Algorithm SHA256).Hash) equals $zipSha, then launch AIBar.Desktop.exe from the extracted directory. Replace an older beta by exiting it and replacing its extracted directory manually; no updater or uninstall is provided. Baseline ancestor: $baseline. Parent commit: $parent. Source commit: $source."
+        if ($PrepareOnly) {
+            $instructions += " Startup smoke not run; this package has not been application-startup tested."
+            # Keep one archive, not a second extracted application tree.
+            Remove-Item -LiteralPath $publish -Recurse -Force
+        }
         [IO.File]::WriteAllText((Join-Path $outputRoot "private-beta-instructions.txt"), $instructions + "`n", [Text.UTF8Encoding]::new($false))
     } catch { if ($created -and (Test-Path -LiteralPath $outputRoot)) { Remove-Item -LiteralPath $outputRoot -Recurse -Force }; throw }
 }
