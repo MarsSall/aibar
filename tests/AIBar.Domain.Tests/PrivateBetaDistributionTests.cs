@@ -123,6 +123,88 @@ public sealed class PrivateBetaDistributionTests
         Assert.False(Directory.Exists(timeout));
     }
 
+    [Fact]
+    public void Explicit_source_pin_rejects_mismatch_before_creating_output()
+    {
+        using var fixture = new SyntheticRepository();
+        var output = fixture.Output("source-mismatch");
+        var result = fixture.Run(output, expectedSource: new string('0', 40), prepareOnly: true);
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("BETA_SOURCE_MISMATCH", result.Output);
+        Assert.False(Directory.Exists(output));
+        Assert.False(File.Exists(fixture.PublishMarker));
+        Assert.Equal(fixture.Source, fixture.Git("rev-parse", "HEAD").Output.Trim());
+        Assert.Empty(fixture.Git("status", "--porcelain").Output);
+    }
+
+    [Fact]
+    public void Preparation_pins_source_without_launching_or_retaining_an_extracted_application()
+    {
+        using var fixture = new SyntheticRepository();
+        var output = fixture.Output("prepared");
+        var result = fixture.Run(output, publisher: fixture.Publisher("invalid"),
+            parent: new string('0', 40), expectedSource: fixture.Source, prepareOnly: true);
+        Assert.True(result.ExitCode == 0, result.Output);
+        Assert.False(Directory.Exists(Path.Combine(output, "smoke")));
+        Assert.False(Directory.Exists(Path.Combine(output, "publish")));
+        using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "private-beta-manifest.json")));
+        Assert.Equal(fixture.Source, manifest.RootElement.GetProperty("sourceCommit").GetString());
+        Assert.Equal(fixture.Parent, manifest.RootElement.GetProperty("parentCommit").GetString());
+        Assert.Equal("not-run", manifest.RootElement.GetProperty("startupSmoke").GetString());
+        Assert.Contains("Startup smoke not run", File.ReadAllText(Path.Combine(output, "private-beta-instructions.txt")));
+        var zip = Path.Combine(output, "AIBar-win-x64-private-beta.zip");
+        Assert.Equal(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(zip))).ToLowerInvariant(), manifest.RootElement.GetProperty("zipSha256").GetString());
+        using var archive = ZipFile.OpenRead(zip);
+        foreach (var item in manifest.RootElement.GetProperty("inventory").EnumerateArray())
+        {
+            var entry = Assert.Single(archive.Entries, entry => entry.FullName == item.GetProperty("path").GetString());
+            using var stream = entry.Open();
+            Assert.Equal(item.GetProperty("length").GetInt64(), entry.Length);
+            Assert.Equal(item.GetProperty("sha256").GetString(), Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant());
+        }
+        Assert.Equal(6, archive.Entries.Count(entry => entry.FullName.StartsWith("yasb/", StringComparison.Ordinal)));
+        var repeat = fixture.Output("prepared-repeat");
+        Assert.Equal(0, fixture.Run(repeat, publisher: fixture.Publisher("invalid"), expectedSource: fixture.Source, prepareOnly: true).ExitCode);
+        Assert.Equal(File.ReadAllBytes(zip), File.ReadAllBytes(Path.Combine(repeat, "AIBar-win-x64-private-beta.zip")));
+    }
+
+    [Fact]
+    public void Preparation_keeps_dirty_source_and_test_override_guards()
+    {
+        using var fixture = new SyntheticRepository();
+        var denied = fixture.Output("override-denied");
+        var result = fixture.Run(denied, expectedSource: fixture.Source, prepareOnly: true, testMode: false);
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("BETA_TEST_OVERRIDE_DENIED", result.Output);
+        Assert.False(Directory.Exists(denied));
+        Assert.False(File.Exists(fixture.PublishMarker));
+        File.AppendAllText(Path.Combine(fixture.Root, "README.md"), "dirty");
+        var dirty = fixture.Output("prepared-dirty");
+        var rejected = fixture.Run(dirty, expectedSource: fixture.Source, prepareOnly: true);
+        Assert.NotEqual(0, rejected.ExitCode);
+        Assert.Contains("BETA_SOURCE_UNCOMMITTED", rejected.Output);
+        Assert.False(Directory.Exists(dirty));
+        Assert.False(File.Exists(fixture.PublishMarker));
+        Assert.EndsWith("dirty", File.ReadAllText(Path.Combine(fixture.Root, "README.md")));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("-CapabilityPlan")]
+    [InlineData("-GraphProjection")]
+    public void Preparation_options_require_private_beta_before_any_output(string mode)
+    {
+        using var fixture = new SyntheticRepository();
+        var output = fixture.Output("wrong-mode");
+        var result = fixture.Run(output, publisher: fixture.Publisher("invalid"),
+            expectedSource: fixture.Source, prepareOnly: true, privateBeta: false, mode: mode);
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("BETA_OPTIONS_REQUIRE_PRIVATE_BETA", result.Output);
+        Assert.False(Directory.Exists(output));
+        Assert.False(File.Exists(fixture.PublishMarker));
+        Assert.Empty(fixture.Git("status", "--porcelain").Output);
+    }
+
     private sealed class SyntheticRepository : IDisposable
     {
         private readonly TemporaryRoot _temporary = new("private-beta");
@@ -150,20 +232,34 @@ public sealed class PrivateBetaDistributionTests
             Source = Git("rev-parse", "HEAD").Output.Trim();
         }
 
+        public string PublishMarker => Path.Combine(_temporary.Path, "publisher-started");
         public string Output(string name) => Path.Combine(_temporary.Path, $"output-{name}");
         public string Publisher(string mode)
         {
             var path = Path.Combine(_temporary.Path, $"publish-{mode}.cmd");
             var source = mode switch { "stay" => "%ComSpec%", "exit" => "%SystemRoot%\\System32\\whoami.exe", _ => "" };
+            if (mode == "invalid")
+            {
+                File.WriteAllText(path, $"@echo started>\"{PublishMarker}\"\r\n@set output=\r\n:args\r\n@if \"%~1\"==\"\" goto done\r\n@if \"%~1\"==\"--output\" (set output=%~2&shift)\r\n@shift\r\n@goto args\r\n:done\r\n@echo not-an-executable>\"%output%\\AIBar.Desktop.exe\"\r\n");
+                return path;
+            }
             File.WriteAllText(path, mode == "timeout" ? "@for /l %%A in (1,1,1000000000) do @set /a 1+1 > nul\r\n" : $"@set output=\r\n:args\r\n@if \"%~1\"==\"\" goto done\r\n@if \"%~1\"==\"--output\" (set output=%~2&shift)\r\n@shift\r\n@goto args\r\n:done\r\n@if not exist \"%output%\" mkdir \"%output%\"\r\n@copy /y \"{source}\" \"%output%\\AIBar.Desktop.exe\" > nul\r\n");
             return path;
         }
 
-        public (int ExitCode, string Output) Run(string output, string? publisher = null, string? parent = null, int timeout = 5, int smokeStartupMilliseconds = 1000, string? script = null)
+        public (int ExitCode, string Output) Run(string output, string? publisher = null, string? parent = null, int timeout = 5, int smokeStartupMilliseconds = 1000, string? script = null, string? expectedSource = null, bool prepareOnly = false, bool testMode = true, bool privateBeta = true, string mode = "")
         {
             var start = new ProcessStartInfo("pwsh") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
-            start.Environment["AIBAR_PRIVATE_BETA_TEST_MODE"] = "1";
-            foreach (var argument in new[] { "-NoProfile", "-File", script ?? Path.Combine(Root, "scripts", "Publish-Deterministic.ps1"), "-PrivateBeta", "-OutputDirectory", output, "-BetaBaselineCommit", Baseline, "-BetaParentCommit", parent ?? Parent, "-PublishCommand", publisher ?? Publisher("stay"), "-ProcessTimeoutSeconds", timeout.ToString(), "-SmokeStartupMilliseconds", smokeStartupMilliseconds.ToString() }) start.ArgumentList.Add(argument);
+            start.Environment.Remove("AIBAR_PRIVATE_BETA_TEST_MODE");
+            if (testMode) start.Environment["AIBAR_PRIVATE_BETA_TEST_MODE"] = "1";
+            foreach (var argument in new[] { "-NoProfile", "-File", script ?? Path.Combine(Root, "scripts", "Publish-Deterministic.ps1"), "-OutputDirectory", output, "-BetaBaselineCommit", Baseline, "-BetaParentCommit", parent ?? Parent, "-PublishCommand", publisher ?? Publisher("stay"), "-ProcessTimeoutSeconds", timeout.ToString(), "-SmokeStartupMilliseconds", smokeStartupMilliseconds.ToString() }) start.ArgumentList.Add(argument);
+            if (expectedSource is not null)
+            {
+                start.ArgumentList.Add("-ExpectedSourceCommit"); start.ArgumentList.Add(expectedSource);
+            }
+            if (privateBeta) start.ArgumentList.Add("-PrivateBeta");
+            if (mode.Length > 0) start.ArgumentList.Add(mode);
+            if (prepareOnly) start.ArgumentList.Add("-PrepareOnly");
             using var process = Process.Start(start)!;
             var text = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd(); process.WaitForExit();
             return (process.ExitCode, text);

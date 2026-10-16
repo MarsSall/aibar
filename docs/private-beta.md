@@ -8,7 +8,25 @@ The ZIP includes the optional stock YASB CustomWidget assets under `yasb/`: the 
 
 The quota service is an unsupported private integration. The widget reads only AIBar's sanitized snapshot. It does not refresh quotas, authenticate, access credentials, databases, logs, or analytics, and it does not make a public support or availability claim.
 
-## Build and install
+## Prepare a reviewed current-source package without starting AIBar
+
+Use a clean committed checkout, inspect its source commit, and pass that full lowercase commit ID explicitly:
+
+```powershell
+pwsh -NoProfile -File .\scripts\Publish-Deterministic.ps1 -PrivateBeta -ExpectedSourceCommit "<reviewed-full-commit-id>" -PrepareOnly -OutputDirectory "<fresh-output-directory>"
+```
+
+`-ExpectedSourceCommit` must exactly equal the observed `HEAD`; abbreviations, ref names and mismatches are rejected before publishing. This selects explicit-source provenance instead of the historical exact-parent gate, but preserves canonical repository, clean-source and baseline-ancestry checks. The manifest records the actual source and parent. `BetaBaselineCommit` and `BetaParentCommit` remain test-only overrides: do not enable test mode to prepare a delivery.
+
+Both new options require `-PrivateBeta` and reject combinations with `-CapabilityPlan` or `-GraphProjection` before producing output (`BETA_OPTIONS_REQUIRE_PRIVATE_BETA`). `-PrepareOnly` requires the explicit source pin. It packages all six YASB assets without extracting or launching the application for smoke testing. The manifest reports `startupSmoke: "not-run"`, and instructions explicitly say **Startup smoke not run**. This is not runtime or YASB integration proof. The intermediate `publish` directory is removed after the ZIP and inventory are generated; retain the ZIP, manifest and instructions, not another extracted application copy.
+
+To keep build outputs separate from an existing checkout, private-beta publishing also accepts the existing isolation parameters together: `IsolationParent`, `IsolationMarker`, `IntermediateDirectory`, `BuildOutputDirectory`, `RestoreMetadataDirectory`, and `PackageCacheDirectory`. The owned parent must already exist with an exact `.aibar-isolation-marker`; its child paths and output must be fresh, non-overlapping, and outside the repository. Only remove owned build/cache temporaries after retaining and verifying the package; existing source outputs are not cleanup targets.
+
+Preparation does not install, start, stop or reconfigure AIBar/YASB. Later, extract to one chosen stable `<AIBarRoot>`; do not accumulate versioned installation folders. Follow the stop-before-replacement instructions below. A failed build is not a usable package; preserve its failure evidence and reconcile any interrupted process before cleanup or another attempt.
+
+## Legacy beta.4 build and install
+
+Without the new options, the original provenance gate and application-startup smoke behavior are unchanged; successful manifests report `startupSmoke: "passed"` (process survival only, not full runtime validation). The smoke launch uses the current user's application data and is not an isolated live-state test.
 
 After committing the final beta.4 provenance update on exact parent `816c28b6747a6e9aa62c5c23c216cd4feb7a55fd`, run:
 
