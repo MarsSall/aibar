@@ -38,7 +38,7 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal("180", detailScroller.Attribute("MaxHeight")?.Value); Assert.Equal("Auto", detailScroller.Attribute("VerticalScrollBarVisibility")?.Value);
         var localUsageBreakdowns = localUsage.Descendants().Where(element => element.Attribute("Text")?.Value == "{Binding TokenBreakdownLabel}").ToArray();
         Assert.Equal(2, localUsageBreakdowns.Length); Assert.All(localUsageBreakdowns, breakdown => Assert.Equal("Wrap", breakdown.Attribute("TextWrapping")?.Value));
-        Assert.Equal(2, window.Split("Style=\"{StaticResource QuotaCardStyle}\"", StringSplitOptions.None).Length - 1);
+        Assert.Equal(2, window.Split("Style=\"{StaticResource PanelQuotaCardStyle}\"", StringSplitOptions.None).Length - 1);
         Assert.Equal(2, window.Split("Style=\"{StaticResource SecondaryCardStyle}\"", StringSplitOptions.None).Length - 1);
         Assert.Contains("AutomationProperties.Name=\"Refresh quota\"", window, StringComparison.Ordinal); Assert.Contains("IsTabStop=\"True\"", window, StringComparison.Ordinal);
         Assert.DoesNotContain("<DoubleAnimation", resources, StringComparison.Ordinal);

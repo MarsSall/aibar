@@ -7,7 +7,46 @@
         Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextBrush}"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
-    <Grid Margin="16" KeyboardNavigation.TabNavigation="Continue">
+    <Window.Resources>
+        <!-- Keep this visual treatment local to the opened panel. -->
+        <Style x:Key="PanelQuotaCardStyle" TargetType="{x:Type Border}" BasedOn="{StaticResource QuotaCardStyle}">
+            <Setter Property="BorderBrush" Value="{DynamicResource SecondaryBorderBrush}" />
+            <Setter Property="CornerRadius" Value="14" />
+        </Style>
+        <Style x:Key="PanelActionButtonStyle" TargetType="{x:Type Button}" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SecondaryBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="ActionChrome" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource ProgressTrackBrush}" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="20" KeyboardNavigation.TabNavigation="Continue">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -15,40 +54,44 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="0,0,0,8" automation:AutomationProperties.Name="Quota summary">
+        <Grid Grid.Row="0" Margin="0,0,0,16" automation:AutomationProperties.Name="Quota summary">
             <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-            <TextBlock Text="Quota" Style="{StaticResource QuotaTitleTextStyle}" />
-            <TextBlock Grid.Column="1" Text="{Binding FreshnessLabel}" Style="{StaticResource QuotaStatusTextStyle}" VerticalAlignment="Center" Margin="8,0,0,0" automation:AutomationProperties.LiveSetting="Polite" />
+            <StackPanel>
+                <TextBlock Text="AIBar" Style="{StaticResource QuotaStatusTextStyle}" Margin="0,0,0,2" />
+                <TextBlock Text="Quota" Style="{StaticResource QuotaTitleTextStyle}" FontSize="22" />
+            </StackPanel>
+            <Border Grid.Column="1" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource SecondaryBorderBrush}"
+                    BorderThickness="1" CornerRadius="10" Padding="8,4" VerticalAlignment="Center" Margin="8,0,0,0">
+                <TextBlock Text="{Binding FreshnessLabel}" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" />
+            </Border>
         </Grid>
 
         <StackPanel Grid.Row="1" automation:AutomationProperties.Name="Quota cards">
-            <GroupBox automation:AutomationProperties.Name="Weekly quota card" automation:AutomationProperties.HelpText="Weekly quota percentage, reset, and state" Visibility="{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource ChromeLessGroupBoxStyle}" Margin="0,0,0,8">
-                <Border Style="{StaticResource QuotaCardStyle}">
+            <GroupBox automation:AutomationProperties.Name="Weekly quota card" automation:AutomationProperties.HelpText="Weekly quota percentage and reset" Visibility="{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource ChromeLessGroupBoxStyle}" Margin="0,0,0,8">
+                <Border Style="{StaticResource PanelQuotaCardStyle}">
                     <Grid Margin="16">
                         <Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
                         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <TextBlock Text="{Binding Weekly.Label}" Style="{StaticResource QuotaLabelTextStyle}" />
-                        <TextBlock Grid.Column="1" Text="{Binding Weekly.PercentageUsed, StringFormat={}{0:0}%, TargetNullValue=--}" Style="{StaticResource QuotaPercentageTextStyle}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Weekly.PercentageUsed, StringFormat={}{0:0}%, TargetNullValue=--}" Style="{StaticResource QuotaPercentageTextStyle}" FontSize="32" />
                         <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource QuotaProgressStyle}" Value="{Binding Weekly.PercentageUsed}" Margin="0,8,0,0" automation:AutomationProperties.Name="Weekly quota progress" />
                         <StackPanel Grid.Row="2" Margin="0,6,0,0">
                             <TextBlock Style="{StaticResource QuotaCardSecondaryTextStyle}"><Run Text="Reset " /><Run Text="{Binding Weekly.ResetCountdown, TargetNullValue=unavailable}" /></TextBlock>
-                            <TextBlock Text="{Binding FreshnessLabel}" Style="{StaticResource QuotaStatusTextStyle}" />
                         </StackPanel>
                     </Grid>
                 </Border>
             </GroupBox>
 
-            <GroupBox automation:AutomationProperties.Name="5-hour quota card" automation:AutomationProperties.HelpText="5-hour quota percentage, reset, and state" Visibility="{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource ChromeLessGroupBoxStyle}">
-                <Border Style="{StaticResource QuotaCardStyle}">
+            <GroupBox automation:AutomationProperties.Name="5-hour quota card" automation:AutomationProperties.HelpText="5-hour quota percentage and reset" Visibility="{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource ChromeLessGroupBoxStyle}">
+                <Border Style="{StaticResource PanelQuotaCardStyle}">
                     <Grid Margin="16">
                         <Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
                         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <TextBlock Text="{Binding Primary.Label}" Style="{StaticResource QuotaLabelTextStyle}" />
-                        <TextBlock Grid.Column="1" Text="{Binding Primary.PercentageUsed, StringFormat={}{0:0}%, TargetNullValue=--}" Style="{StaticResource QuotaPercentageTextStyle}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Primary.PercentageUsed, StringFormat={}{0:0}%, TargetNullValue=--}" Style="{StaticResource QuotaPercentageTextStyle}" FontSize="32" />
                         <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource QuotaProgressStyle}" Value="{Binding Primary.PercentageUsed}" Margin="0,8,0,0" automation:AutomationProperties.Name="5-hour quota progress" />
                         <StackPanel Grid.Row="2" Margin="0,6,0,0">
                             <TextBlock Style="{StaticResource QuotaCardSecondaryTextStyle}"><Run Text="Reset " /><Run Text="{Binding Primary.ResetCountdown, TargetNullValue=unavailable}" /></TextBlock>
-                            <TextBlock Text="{Binding FreshnessLabel}" Style="{StaticResource QuotaStatusTextStyle}" />
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -108,9 +151,11 @@
             <TextBlock Text="Quota error" Visibility="{Binding State.IsSafeError, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
             <TextBlock Text="{Binding State.Disclosure}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" />
             <TextBlock Text="{Binding PrivateEndpointDisclosure}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,0,0,8" />
-            <Button Content="Copy summary" Command="{Binding CopySummaryCommand}" automation:AutomationProperties.Name="Copy quota summary" IsTabStop="True" HorizontalAlignment="Left" Margin="0,0,0,4" />
+            <WrapPanel x:Name="PanelActions" Margin="0,4,0,0">
+                <Button Content="Copy summary" Command="{Binding CopySummaryCommand}" Style="{StaticResource PanelActionButtonStyle}" automation:AutomationProperties.Name="Copy quota summary" IsTabStop="True" Margin="0,0,8,4" />
+                <Button Content="Refresh" Command="{Binding RefreshCommand}" Style="{StaticResource PanelActionButtonStyle}" Visibility="{Binding IsRefreshAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" automation:AutomationProperties.Name="Refresh quota" IsTabStop="True" Margin="0,0,0,4" />
+            </WrapPanel>
             <TextBlock Text="{Binding CopySummaryCommand.Feedback}" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" />
-            <Button Content="Refresh" Command="{Binding RefreshCommand}" Visibility="{Binding IsRefreshAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" automation:AutomationProperties.Name="Refresh quota" IsTabStop="True" HorizontalAlignment="Left" />
         </StackPanel>
     </Grid>
 </Window>
