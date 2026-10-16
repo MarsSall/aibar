@@ -50,8 +50,12 @@ public sealed class PopupRenderedTests
                 var root = Assert.IsType<Grid>(window.Content);
                 void Layout() { root.Measure(new Size(420, 720)); root.Arrange(new Rect(0, 0, 420, 720)); root.UpdateLayout(); System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.DataBind); root.UpdateLayout(); }
                 Layout();
+                var details = Assert.IsType<Expander>(window.FindName("AnalyticsDetailsExpander"));
+                Assert.False(details.IsExpanded);
+                details.IsExpanded = true;
+                Layout();
                 var children = root.Children.Cast<UIElement>().ToArray(); var cards = Assert.IsType<StackPanel>(children[1]); var secondary = Assert.IsType<ScrollViewer>(children[2]); var footer = Assert.IsType<StackPanel>(children[3]);
-                var quotaCards = cards.Children.OfType<GroupBox>().ToArray(); var progress = Visuals<ProgressBar>(cards).ToArray(); var refresh = footer.Children.OfType<Button>().Single(); var expanders = Visuals<Expander>(secondary).ToArray();
+                var quotaCards = cards.Children.OfType<GroupBox>().ToArray(); var progress = Visuals<ProgressBar>(cards).ToArray(); var refresh = footer.Children.OfType<Button>().Single(); var expanders = Visuals<Expander>(secondary).Where(item => item != details).ToArray();
                 Assert.Equal(new[] { 0, 1, 2, 3 }, children.Select(Grid.GetRow)); Assert.Equal(10, expanders.Length); Assert.Equal(KeyboardNavigationMode.Continue, KeyboardNavigation.GetTabNavigation(root));
                 Assert.Equal(rows.Select(row => row.AutomationLabel), expanders.Select(AutomationProperties.GetName)); Assert.All(expanders.Cast<Control>().Append(refresh), control => { Assert.True(control.Focusable && control.IsTabStop); Assert.NotNull(control.FocusVisualStyle); });
                 Assert.Equal(ScrollBarVisibility.Auto, secondary.VerticalScrollBarVisibility); Assert.True(secondary.ExtentHeight > secondary.ViewportHeight && secondary.ScrollableHeight > 0); secondary.ScrollToEnd(); Layout(); Assert.True(secondary.VerticalOffset > 0); secondary.ScrollToTop();

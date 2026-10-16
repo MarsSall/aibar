@@ -56,39 +56,44 @@
         </StackPanel>
 
         <ScrollViewer x:Name="SecondaryScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PreviewGotKeyboardFocus="OnSecondaryPreviewGotKeyboardFocus" automation:AutomationProperties.Name="Secondary analytics">
-            <StackPanel Margin="0,16,0,0">
-                <GroupBox Header="Local Codex data" automation:AutomationProperties.Name="Local Codex data" Style="{StaticResource SecondaryGroupBoxStyle}"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="16">
-                    <TextBlock Text="{Binding Analytics.SourceDetail}" Style="{StaticResource MutedTextStyle}" />
-                    <TextBlock Text="{Binding Analytics.TotalTokensLabel}" FontWeight="SemiBold" Margin="0,8,0,0" /><TextBlock Text="{Binding Analytics.ModelTotalsLabel}" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding Analytics.CoverageLabel}" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding Analytics.LastScanLabel}" Style="{StaticResource MutedTextStyle}" />
-                    <TextBlock Text="{Binding Analytics.WarningLabel}" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="Loading local Codex data" Visibility="{Binding Analytics.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource MutedTextStyle}" />
-                </StackPanel></Border></GroupBox>
+            <Expander x:Name="AnalyticsDetailsExpander" IsExpanded="False" Focusable="True" IsTabStop="True"
+                      Style="{StaticResource AccessibleExpanderStyle}" Margin="0,12,0,0"
+                      automation:AutomationProperties.Name="Local analytics details">
+                <Expander.Header><TextBlock Text="Local details" Foreground="{DynamicResource TextBrush}" /></Expander.Header>
+                <StackPanel Margin="0,8,0,0">
+                    <GroupBox Header="Local Codex data" automation:AutomationProperties.Name="Local Codex data" Style="{StaticResource SecondaryGroupBoxStyle}"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="16">
+                        <TextBlock Text="{Binding Analytics.SourceDetail}" Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock Text="{Binding Analytics.TotalTokensLabel}" FontWeight="SemiBold" Margin="0,8,0,0" /><TextBlock Text="{Binding Analytics.ModelTotalsLabel}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Analytics.CoverageLabel}" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding Analytics.LastScanLabel}" Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock Text="{Binding Analytics.WarningLabel}" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="Loading local Codex data" Visibility="{Binding Analytics.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource MutedTextStyle}" />
+                    </StackPanel></Border></GroupBox>
 
-                <GroupBox Header="OpenCode and Pi local usage" automation:AutomationProperties.Name="OpenCode and Pi local usage" Style="{StaticResource SecondaryGroupBoxStyle}" Margin="0,8,0,0"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="16">
-                    <TextBlock Text="{Binding LocalUsage.Description}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
-                    <TextBlock Text="{Binding LocalUsage.StatusLabel}" FontWeight="SemiBold" Margin="0,8,0,0" />
-                    <ItemsControl ItemsSource="{Binding LocalUsage.Rows}" Focusable="False" Margin="0,4,0,0"><ItemsControl.ItemTemplate><DataTemplate>
-                        <Expander IsExpanded="False" Focusable="True" IsTabStop="True" Style="{StaticResource AccessibleExpanderStyle}" HorizontalContentAlignment="Stretch" Margin="0,4,0,0" automation:AutomationProperties.Name="{Binding AutomationLabel}">
-                            <Expander.Header><Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                                <TextBlock Text="{Binding ScopeLabel}" FontWeight="SemiBold" />
-                                <TextBlock Grid.Column="1" Text="{Binding TotalLabel}" />
-                                <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" />
-                                <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding StatusLabel}" Style="{StaticResource MutedTextStyle}" />
-                            </Grid></Expander.Header>
-                            <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
-                                <ItemsControl ItemsSource="{Binding Details}" Focusable="False"><ItemsControl.ItemTemplate><DataTemplate>
-                                    <Grid Margin="16,4,0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
-                                        <TextBlock Text="{Binding LocalDayLabel}" FontWeight="SemiBold" automation:AutomationProperties.Name="{Binding AutomationLabel}" />
-                                        <TextBlock Grid.Column="1" Text="{Binding ModelLabel}" TextWrapping="Wrap" Margin="8,0,0,0" />
-                                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TotalLabel}" />
-                                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
-                                    </Grid>
-                                </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-                            </ScrollViewer>
-                        </Expander>
-                    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-                </StackPanel></Border></GroupBox>
-            </StackPanel>
+                    <GroupBox Header="OpenCode and Pi local usage" automation:AutomationProperties.Name="OpenCode and Pi local usage" Style="{StaticResource SecondaryGroupBoxStyle}" Margin="0,8,0,0"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="16">
+                        <TextBlock Text="{Binding LocalUsage.Description}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock Text="{Binding LocalUsage.StatusLabel}" FontWeight="SemiBold" Margin="0,8,0,0" />
+                        <ItemsControl ItemsSource="{Binding LocalUsage.Rows}" Focusable="False" Foreground="{DynamicResource TextBrush}" Margin="0,4,0,0"><ItemsControl.ItemTemplate><DataTemplate>
+                            <Expander IsExpanded="False" Focusable="True" IsTabStop="True" Style="{StaticResource AccessibleExpanderStyle}" HorizontalContentAlignment="Stretch" Margin="0,4,0,0" automation:AutomationProperties.Name="{Binding AutomationLabel}">
+                                <Expander.Header><Grid TextElement.Foreground="{DynamicResource TextBrush}"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                    <TextBlock Text="{Binding ScopeLabel}" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="{Binding TotalLabel}" />
+                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding StatusLabel}" Style="{StaticResource MutedTextStyle}" />
+                                </Grid></Expander.Header>
+                                <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
+                                    <ItemsControl ItemsSource="{Binding Details}" Focusable="False" Foreground="{DynamicResource TextBrush}"><ItemsControl.ItemTemplate><DataTemplate>
+                                        <Grid Margin="16,4,0,4" TextElement.Foreground="{DynamicResource TextBrush}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                                            <TextBlock Text="{Binding LocalDayLabel}" FontWeight="SemiBold" automation:AutomationProperties.Name="{Binding AutomationLabel}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding ModelLabel}" TextWrapping="Wrap" Margin="8,0,0,0" />
+                                            <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TotalLabel}" />
+                                            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
+                                        </Grid>
+                                    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                                </ScrollViewer>
+                            </Expander>
+                        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                    </StackPanel></Border></GroupBox>
+                </StackPanel>
+            </Expander>
         </ScrollViewer>
 
         <StackPanel Grid.Row="3" Margin="0,8,0,0" automation:AutomationProperties.Name="Quota footer">
