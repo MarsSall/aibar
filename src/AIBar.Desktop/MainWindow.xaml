@@ -67,7 +67,7 @@
         </Grid>
 
         <StackPanel Grid.Row="1" automation:AutomationProperties.Name="Quota cards">
-            <GroupBox automation:AutomationProperties.Name="Weekly quota card" automation:AutomationProperties.HelpText="Weekly quota percentage and reset" Visibility="{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource ChromeLessGroupBoxStyle}" Margin="0,0,0,8">
+            <GroupBox automation:AutomationProperties.Name="Weekly quota card" automation:AutomationProperties.HelpText="Weekly quota percentage, reset, and state" automation:AutomationProperties.ItemStatus="{Binding FreshnessLabel}" Visibility="{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource ChromeLessGroupBoxStyle}" Margin="0,0,0,8">
                 <Border Style="{StaticResource PanelQuotaCardStyle}">
                     <Grid Margin="16">
                         <Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
@@ -82,7 +82,7 @@
                 </Border>
             </GroupBox>
 
-            <GroupBox automation:AutomationProperties.Name="5-hour quota card" automation:AutomationProperties.HelpText="5-hour quota percentage and reset" Visibility="{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource ChromeLessGroupBoxStyle}">
+            <GroupBox automation:AutomationProperties.Name="5-hour quota card" automation:AutomationProperties.HelpText="5-hour quota percentage, reset, and state" automation:AutomationProperties.ItemStatus="{Binding FreshnessLabel}" Visibility="{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource ChromeLessGroupBoxStyle}">
                 <Border Style="{StaticResource PanelQuotaCardStyle}">
                     <Grid Margin="16">
                         <Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
