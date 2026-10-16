@@ -85,6 +85,77 @@ public sealed class PanelDetailsTests
         });
     }
 
+    [Theory]
+    [InlineData(WindowsTheme.Light)]
+    [InlineData(WindowsTheme.Dark)]
+    [InlineData(WindowsTheme.HighContrast)]
+    public void Panel_visual_treatment_is_local_and_preserves_semantic_colors(WindowsTheme theme)
+    {
+        WpfTestApplicationHost.Run(app =>
+        {
+            var original = app.Resources.MergedDictionaries[0];
+            var window = CreateWindow();
+            try
+            {
+                app.Resources.MergedDictionaries[0] = ThemeDictionaries.Create(theme);
+                Layout(window);
+                Assert.True(window.Resources.Contains("PanelQuotaCardStyle"));
+                Assert.False(app.Resources.Contains("PanelQuotaCardStyle"));
+                var cards = Visuals<GroupBox>((Grid)window.Content).Take(2).ToArray();
+                Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" }, cards.Select(AutomationProperties.GetName));
+                foreach (var card in cards)
+                {
+                    var border = Assert.IsType<Border>(card.Content);
+                    Assert.Same(window.Resources["PanelQuotaCardStyle"], border.Style);
+                    Assert.Equal(new CornerRadius(14), border.CornerRadius);
+                    Assert.Equal(ColorOf(window.FindResource("CardBrush")), ColorOf(border.Background));
+                    Assert.Equal(ColorOf(window.FindResource("SecondaryBorderBrush")), ColorOf(border.BorderBrush));
+                }
+                var percentage = Assert.Single(Visuals<TextBlock>(cards[0]).Where(text => text.Text == "40%"));
+                Assert.Equal(32d, percentage.FontSize);
+                Assert.Equal(ColorOf(window.FindResource("TextBrush")), ColorOf(percentage.Foreground));
+                Assert.Equal(new[] { 40d, 25d }, cards.SelectMany(Visuals<ProgressBar>).Select(bar => bar.Value));
+            }
+            finally { window.Close(); app.Resources.MergedDictionaries[0] = original; }
+        });
+    }
+
+    [Fact]
+    public void Copy_and_refresh_share_a_wrapping_row_and_keep_keyboard_affordances()
+    {
+        WpfTestApplicationHost.Run(_ =>
+        {
+            var window = CreateWindow();
+            try
+            {
+                Layout(window);
+                var actions = Assert.IsType<WrapPanel>(window.FindName("PanelActions"));
+                var buttons = actions.Children.OfType<Button>().ToArray();
+                Assert.Equal(new[] { "Copy quota summary", "Refresh quota" }, buttons.Select(AutomationProperties.GetName));
+                Assert.All(buttons, button =>
+                {
+                    Assert.True(button.Focusable && button.IsTabStop);
+                    Assert.NotNull(button.FocusVisualStyle);
+                    Assert.Same(window.Resources["PanelActionButtonStyle"], button.Style);
+                    button.ApplyTemplate();
+                    var chrome = Assert.IsType<Border>(button.Template.FindName("ActionChrome", button));
+                    Assert.Equal(new CornerRadius(8), chrome.CornerRadius);
+                });
+                var copyBounds = buttons[0].TransformToAncestor(actions).TransformBounds(new Rect(buttons[0].RenderSize));
+                var refreshBounds = buttons[1].TransformToAncestor(actions).TransformBounds(new Rect(buttons[1].RenderSize));
+                Assert.True(copyBounds.Width > 0 && refreshBounds.Width > 0);
+                Assert.Equal(copyBounds.Top, refreshBounds.Top);
+                Assert.True(refreshBounds.Left >= copyBounds.Right);
+                var footer = Assert.IsType<StackPanel>(((Grid)window.Content).Children[3]);
+                Assert.Same(footer, actions.Parent);
+                Assert.False(((Expander)window.FindName("AnalyticsDetailsExpander")).IsExpanded);
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    private static Color ColorOf(object brush) => Assert.IsType<SolidColorBrush>(brush).Color;
+
     private static MainWindow CreateWindow() => new()
     {
         Width = 420, Height = 720, SizeToContent = SizeToContent.Manual,
