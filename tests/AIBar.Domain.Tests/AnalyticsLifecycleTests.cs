@@ -198,6 +198,48 @@ public sealed class AnalyticsLifecycleTests(Xunit.Abstractions.ITestOutputHelper
     }
 
     [Fact]
+    public async Task Production_initial_scan_finishes_after_a_controlled_observation_timeout_without_mutating_source()
+    {
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        var marks = new System.Collections.Concurrent.ConcurrentQueue<(long Timestamp, string Stage)>();
+        void Mark(string stage) => marks.Enqueue((System.Diagnostics.Stopwatch.GetTimestamp(), stage));
+        try
+        {
+            // Hold the real scanner at the existing stability seam, not with a guessed sleep.
+            await using var harness = await ProductionHarness.CreateAsync(TimeSpan.FromSeconds(2), timing: Mark);
+            var presentation = (BetaAnalyticsPresentation)harness.Composition.Presentation;
+            var sourceBefore = await File.ReadAllBytesAsync(harness.SourcePath);
+            await harness.Composition.Initialize();
+            Assert.True(harness.Entered.Wait(TimeSpan.FromSeconds(2)));
+            Mark("initial_scan_held");
+
+            await Assert.ThrowsAsync<TimeoutException>(() => harness.ScanFinished.Task.WaitAsync(TimeSpan.FromSeconds(2)));
+            Mark("original_wait_timed_out");
+            Assert.False(harness.ScanFinished.Task.IsCompleted);
+            Assert.Null(presentation.Analytics.Totals);
+            Assert.Equal(sourceBefore, await File.ReadAllBytesAsync(harness.SourcePath));
+
+            Mark("release_initial_scan");
+            harness.Release.Set();
+            await harness.ScanFinished.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            Mark("late_scan_finished");
+            Assert.False(presentation.Analytics.IsLoading);
+            Assert.Equal(new TokenTotals(1, 0, 1), presentation.Analytics.Totals);
+            Assert.Equal(sourceBefore, await File.ReadAllBytesAsync(harness.SourcePath));
+        }
+        finally
+        {
+            // A successful induced delay is not evidence of the historical CI timeout's cause.
+            foreach (var mark in marks.OrderBy(entry => entry.Timestamp))
+            {
+                var milliseconds = (mark.Timestamp - started) * 1000d / System.Diagnostics.Stopwatch.Frequency;
+                output.WriteLine(System.FormattableString.Invariant(
+                    $"CONTROLLED_SCAN_DELAY ms={milliseconds:F3} stage={mark.Stage}"));
+            }
+        }
+    }
+
+    [Fact]
     public async Task Production_clear_times_out_fail_closed_without_deleting_analytics_database_family_or_codex_source()
     {
         await using var harness = await ProductionHarness.CreateAsync(TimeSpan.FromMilliseconds(50));
