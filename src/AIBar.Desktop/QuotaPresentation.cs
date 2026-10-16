@@ -158,6 +158,7 @@ public sealed class ManualRefreshCommand(Func<CancellationToken, ValueTask> refr
 
 public sealed class UnavailableQuotaPresentation
 {
+    public QuotaSummaryCopyCommand CopySummaryCommand { get; } = new(() => null, _ => { });
     public QuotaWindowPresentation Primary { get; } = new("5-hour quota", null, null); public QuotaWindowPresentation Weekly { get; } = new("Weekly quota", null, null);
     public bool IsPrimaryAvailable => false; public bool IsWeeklyAvailable => false; public string FreshnessLabel => "Unavailable"; public string PrivateEndpointDisclosure => "Quota access is unavailable."; public bool IsRefreshAvailable => false;
 }
@@ -169,6 +170,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     private readonly Action<Exception>? _report;
     private readonly Func<bool> _refreshAvailable;
     private readonly ManualRefreshCommand _refreshCommand;
+    public QuotaSummaryCopyCommand CopySummaryCommand { get; }
     private readonly IQuotaRefreshLifecycleEvents? _lifecycleEvents;
     private BetaPresentationState _state;
     private QuotaFailure? _reportedFailure;
@@ -180,6 +182,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         ArgumentNullException.ThrowIfNull(refreshAvailable);
         _coordinator = coordinator; _mapper = mapper; _dispatcher = Dispatcher.CurrentDispatcher; _refreshAvailable = refreshAvailable; _state = Map(coordinator.State); _report = report; _lifecycleEvents = lifecycleEvents;
         _refreshCommand = new ManualRefreshCommand(token => coordinator.RefreshAsync(RefreshTrigger.Manual, token), () => IsRefreshAvailable, report);
+        CopySummaryCommand = new(() => _disposed ? null : _state, System.Windows.Clipboard.SetText);
         _coordinator.StateChanged += OnStateChanged;
         if (_lifecycleEvents is not null) _lifecycleEvents.ClockChanged += OnClockChanged;
     }
@@ -217,6 +220,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     private void Update(QuotaRefreshState state)
     {
         _state = Map(state);
+        CopySummaryCommand.RefreshState();
         if (state.Failure != _reportedFailure)
         {
             _reportedFailure = state.Failure;
@@ -250,6 +254,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         if (!_disposed)
         {
             _disposed = true;
+            CopySummaryCommand.RefreshState();
             _coordinator.StateChanged -= OnStateChanged;
             if (_lifecycleEvents is not null) _lifecycleEvents.ClockChanged -= OnClockChanged;
         }

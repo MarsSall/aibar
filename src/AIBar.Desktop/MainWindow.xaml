@@ -108,6 +108,8 @@
             <TextBlock Text="Quota error" Visibility="{Binding State.IsSafeError, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
             <TextBlock Text="{Binding State.Disclosure}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,8,0,0" />
             <TextBlock Text="{Binding PrivateEndpointDisclosure}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,0,0,8" />
+            <Button Content="Copy summary" Command="{Binding CopySummaryCommand}" automation:AutomationProperties.Name="Copy quota summary" IsTabStop="True" HorizontalAlignment="Left" Margin="0,0,0,4" />
+            <TextBlock Text="{Binding CopySummaryCommand.Feedback}" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" />
             <Button Content="Refresh" Command="{Binding RefreshCommand}" Visibility="{Binding IsRefreshAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" automation:AutomationProperties.Name="Refresh quota" IsTabStop="True" HorizontalAlignment="Left" />
         </StackPanel>
     </Grid>
