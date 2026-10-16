@@ -419,7 +419,12 @@ public sealed class WpfPopoverRuntime : IPopoverRuntime
         if (!_window.IsVisible) _window.Show();
     }
     public void Hide() => _window.Hide();
-    public void Activate() => _window.Activate();
+    public void Activate()
+    {
+        var activated = _window.Activate();
+        System.Diagnostics.Trace.TraceInformation("AIBar popup activated: {0}; foreground PID: {1}",
+            activated, ForegroundActivation.ForegroundProcessId());
+    }
 }
 
 public sealed class TaskbarRecreationMonitor : ITaskbarRecreationEvents, IDisposable

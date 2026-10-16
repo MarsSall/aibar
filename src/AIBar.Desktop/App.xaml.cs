@@ -25,7 +25,7 @@ public partial class App : System.Windows.Application
         _instance = new SingleInstanceHost("AIBar");
         if (!_instance.IsPrimary)
         {
-            _instance.RequestActivation();
+            ForegroundActivation.Request(ForegroundActivation.TryGrantToPrimary, _instance.RequestActivation);
             _instance.Dispose();
             Shutdown();
             return;
@@ -113,7 +113,7 @@ public partial class App : System.Windows.Application
     };
     private void StartTray(StartupComposition composition)
     {
-        var window = new MainWindow { DataContext = composition.Presentation, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
+        var window = new MainWindow { Title = ForegroundActivation.WindowTitle, DataContext = composition.Presentation, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
         var themeSource = new WindowsThemeSource();
         _theme = new WindowsThemeController(Resources, themeSource, Dispatcher);
         _taskbar = new TaskbarRecreationMonitor(window);

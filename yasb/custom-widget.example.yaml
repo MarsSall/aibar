@@ -11,4 +11,4 @@ aibar_quota:
       run_interval: 60000
       return_format: "json"
     callbacks:
-      on_left: 'exec cmd /c "<AIBarRoot>\yasb\show-aibar.cmd"'
+      on_left: 'exec "<AIBarRoot>\AIBar.Desktop.exe" --show'
