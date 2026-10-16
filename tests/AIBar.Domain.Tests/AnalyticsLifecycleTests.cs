@@ -163,6 +163,23 @@ public sealed class AnalyticsLifecycleTests
     }
 
     [Fact]
+    public async Task Clear_cancellation_observation_does_not_reuse_the_preliminary_disable()
+    {
+        using var watchdog = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await using var harness = await ProductionHarness.CreateAsync(TimeSpan.FromSeconds(2));
+        await harness.Composition.Settings!.DisablePrivateIntegrationAsync(watchdog.Token).AsTask().WaitAsync(watchdog.Token);
+        Assert.True(harness.CancellationObserved.Task.IsCompletedSuccessfully);
+        Assert.False(harness.Release.IsSet);
+
+        var clearCancellation = harness.ArmClearCancellation();
+        Assert.False(clearCancellation.IsCompleted);
+        Assert.False(harness.Release.IsSet);
+        await harness.Composition.Settings.ClearAiBarDataAsync(watchdog.Token).AsTask().WaitAsync(watchdog.Token);
+        await clearCancellation.WaitAsync(watchdog.Token);
+        Assert.True(harness.Release.IsSet);
+    }
+
+    [Fact]
     public async Task Production_clear_times_out_fail_closed_without_deleting_analytics_database_family_or_codex_source()
     {
         await using var harness = await ProductionHarness.CreateAsync(TimeSpan.FromMilliseconds(50));
@@ -276,6 +293,7 @@ public sealed class AnalyticsLifecycleTests
             return new(root, sourcePath, host, composition, events, entered, cancelled, release, finished, cancellationObserved);
         }
 
+        public Task ArmClearCancellation() => CancellationObserved.Task;
         public Task ExitAsync() => _host.ExitAsync();
         public async ValueTask DisposeAsync()
         {
