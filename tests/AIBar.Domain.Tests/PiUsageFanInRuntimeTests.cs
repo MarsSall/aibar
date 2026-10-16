@@ -9,6 +9,7 @@ namespace AIBar.Domain.Tests;
 public sealed class PiUsageFanInRuntimeTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"aibar-pi-fan-in-{Guid.NewGuid():N}");
+    private bool _retainRoot;
     private string SettingsPath => Path.Combine(_root, "settings.json");
     private string LedgerPath => Path.Combine(_root, "ledger.db");
 
@@ -119,12 +120,62 @@ public sealed class PiUsageFanInRuntimeTests : IDisposable
     public async Task Concurrent_runs_serialize_and_a_cancelled_queued_caller_does_not_cancel_the_owner()
     {
         Directory.CreateDirectory(_root); var file = await Session("one.jsonl", "one"); var settings = new LocalUsageSettings(SettingsPath); await settings.SaveAsync(new(false, true), default);
-        await using var ledger = new SqliteUsageEventLedger(LedgerPath); using var entered = new ManualResetEventSlim(); using var release = new ManualResetEventSlim(); var calls = 0;
-        var runtime = new PiUsageFanInRuntime(settings, ledger, Input(Candidate(file, 1)), 1000, _ => { if (Interlocked.Increment(ref calls) == 1) { entered.Set(); release.Wait(); } });
+        var ledger = new SqliteUsageEventLedger(LedgerPath);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        var runtime = new PiUsageFanInRuntime(settings, ledger, Input(Candidate(file, 1)), 1000, _ =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                entered.TrySetResult();
+                release.Task.GetAwaiter().GetResult();
+            }
+        });
 
-        var first = runtime.RunAsync().AsTask(); Assert.True(entered.Wait(TimeSpan.FromSeconds(5))); using var cancellation = new CancellationTokenSource();
-        var queued = runtime.RunAsync(cancellation.Token).AsTask(); cancellation.Cancel(); await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queued); release.Set();
-        Assert.Equal(PiUsageFanInStatus.Completed, (await first).Status); Assert.Equal(1, calls); Assert.Equal(1, await ledger.CountAsync());
+        // The callback may run synchronously: do not let it block the test's calling thread.
+        var first = Task.Run(async () => await runtime.RunAsync());
+        using var watchdog = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        Exception? failure = null;
+        try
+        {
+            await entered.Task.WaitAsync(watchdog.Token);
+            using var cancellation = new CancellationTokenSource();
+            var queued = runtime.RunAsync(cancellation.Token).AsTask();
+            Assert.False(queued.IsCompleted);
+            cancellation.Cancel();
+            // The watchdog must not satisfy the assertion about the caller's cancellation.
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queued).WaitAsync(watchdog.Token);
+            Assert.False(first.IsCompleted);
+            Assert.Equal(1, Volatile.Read(ref calls));
+            release.TrySetResult();
+            Assert.Equal(PiUsageFanInStatus.Completed, (await first.WaitAsync(watchdog.Token)).Status);
+            Assert.Equal(1, calls);
+            Assert.Equal(1, await ledger.CountAsync());
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+            throw;
+        }
+        finally
+        {
+            release.TrySetResult();
+            try
+            {
+                // Cleanup has its own bound; the body's watchdog may already have expired.
+                await first.WaitAsync(TimeSpan.FromSeconds(30));
+            }
+            catch (Exception cleanupFailure) when (failure is not null)
+            {
+                throw new AggregateException("Test failed and owner cleanup also failed.", failure, cleanupFailure);
+            }
+            finally
+            {
+                if (first.IsCompleted) await ledger.DisposeAsync();
+                else _retainRoot = true; // Do not delete a fixture still used by a retained owner.
+            }
+        }
     }
 
     private PiUsageFanInInput Input(params LocalUsageDiscoveredCandidate[] candidates) => new LocalUsageDiscoveryResult([new(UsageTool.Pi, candidates.Length == 1 ? LocalUsageDiscoveryStatus.Ready : LocalUsageDiscoveryStatus.RequiresFanIn, candidates.Length, 0, [])], candidates).CreatePiFanInInput();
@@ -139,5 +190,5 @@ public sealed class PiUsageFanInRuntimeTests : IDisposable
     private static async Task<object?> Scalar(SqliteConnection db, string sql) { await using var command = db.CreateCommand(); command.CommandText = sql; return await command.ExecuteScalarAsync(); }
     private sealed class Proof(params LocalUsageAdmissionStatus[] statuses) : ILocalUsageSourceAdmission { private int _calls; public int Calls => _calls; public LocalUsageAdmissionStatus Validate(CancellationToken token) { token.ThrowIfCancellationRequested(); var index = Interlocked.Increment(ref _calls) - 1; return statuses.Length == 0 ? LocalUsageAdmissionStatus.Admitted : statuses[Math.Min(index, statuses.Length - 1)]; } }
     private static readonly DateTimeOffset At = new(2026, 8, 13, 12, 0, 0, TimeSpan.Zero);
-    public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }
+    public void Dispose() { if (!_retainRoot && Directory.Exists(_root)) Directory.Delete(_root, true); }
 }
