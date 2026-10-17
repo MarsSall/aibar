@@ -5,6 +5,7 @@ function Get-ReaderNow {
 }
 
 function Get-ReaderPath {
+    param([string]$Provider)
     $fixture = Get-Variable -Name AIBarQuotaFixturePath -Scope Script -ErrorAction SilentlyContinue
     if ($null -ne $fixture -and -not [string]::IsNullOrWhiteSpace($fixture.Value)) { return $fixture.Value }
     return (Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) 'AIBar\yasb-quota.json')
@@ -110,6 +111,7 @@ function Get-Window($Window, [AllowNull()]$Source) {
 }
 
 function Invoke-AiBarQuotaReader {
+    param([string]$Provider)
     $now = Get-ReaderNow
     try {
         $path = Get-ReaderPath

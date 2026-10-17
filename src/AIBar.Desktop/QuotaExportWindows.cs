@@ -10,6 +10,9 @@ namespace AIBar.Desktop;
 
 public static class WindowsQuotaExportPath
 {
+    public static string ForClaudeCurrentUser() => throw new NotImplementedException();
+    internal static string ForClaudeRoot(string localApplicationData) => throw new NotImplementedException();
+
     public static string ForCurrentUser() => ForRoot(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
     internal static string ForRoot(string localApplicationData)
     {
@@ -49,6 +52,9 @@ public sealed class WindowsAtomicQuotaExportWriter : IQuotaExportWriter
     private readonly bool _protectDirectoryAcl;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private long _requested;
+
+    public static WindowsAtomicQuotaExportWriter ForClaudeCurrentUser() => throw new NotImplementedException();
+    internal static WindowsAtomicQuotaExportWriter ForClaudeRoot(string localApplicationData, QuotaExportWriterSeams seams) => throw new NotImplementedException();
 
     public WindowsAtomicQuotaExportWriter() : this(WindowsQuotaExportPath.ForCurrentUser()) { }
     public WindowsAtomicQuotaExportWriter(string path) : this(path, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), new()) { }

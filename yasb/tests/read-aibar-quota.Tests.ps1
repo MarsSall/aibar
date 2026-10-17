@@ -78,9 +78,9 @@ Describe 'AIBar YASB reader' {
         $source | Should -Match '-cnotin'
         $source | Should -Not -Match 'Start-Process|Invoke-WebRequest|Remove-Item|Set-Content|Add-Content|WriteAll|CreateDirectory'
         $ci = Get-Content -Raw (Join-Path (Split-Path -Parent $root) '.github/workflows/ci.yml')
-        $ci | Should -Match '\$result.TotalCount -ne 11'
-        $ci | Should -Match 'Expected 11 passing YASB tests'
-        ([regex]::Matches((Get-Content -Raw (Join-Path $root 'tests/read-aibar-quota.Tests.ps1')), '(?m)^\s*It\s+')).Count | Should -Be 11
+        $ci | Should -Match '\$result.TotalCount -ne 19'
+        $ci | Should -Match 'Expected 19 passing YASB tests'
+        ([regex]::Matches((Get-Content -Raw (Join-Path $root 'tests/read-aibar-quota.Tests.ps1')), '(?m)^\s*It\s+')).Count | Should -Be 19
         $stderrPath = [IO.Path]::GetTempFileName()
         try {
             $start = [Diagnostics.ProcessStartInfo]::new('powershell.exe', ('-NoProfile -NonInteractive -File "{0}" unexpected' -f $reader))
@@ -284,6 +284,173 @@ aibar_quota:
             }
         }
         $css | Should -Not -Match '\.partial|opacity'
+    }
+}
+
+Describe 'Claude opt-in YASB contract (S4-S5)' {
+    BeforeAll {
+        function Read-ClaudeFixture([string]$name) {
+            $path = Join-Path $root "fixtures/$name"
+            $before = if (Test-Path -LiteralPath $path) { (Get-FileHash -LiteralPath $path).Hash } else { $null }
+            $result = & $readerModule {
+                param($path, $at)
+                $script:AIBarQuotaFixturePath = $path
+                $script:AIBarQuotaFixtureNow = $at
+                Invoke-AiBarQuotaReader -Provider Claude
+            } $path $now
+            if ($null -ne $before) { (Get-FileHash -LiteralPath $path).Hash | Should -BeExactly $before }
+            Assert-SafeFields $result
+            return $result
+        }
+        function Read-ClaudeDocument($document) {
+            $path = Join-Path $TestDrive 'claude-quota.json'
+            $json = ConvertTo-Json -InputObject $document -Depth 5 -Compress
+            [IO.File]::WriteAllText($path, $json, [Text.UTF8Encoding]::new($false))
+            $result = & $readerModule {
+                param($path, $at)
+                $script:AIBarQuotaFixturePath = $path
+                $script:AIBarQuotaFixtureNow = $at
+                Invoke-AiBarQuotaReader -Provider Claude
+            } $path $now
+            [IO.File]::ReadAllText($path) | Should -BeExactly $json
+            Assert-SafeFields $result
+            return $result
+        }
+    }
+
+    It 'selects the fixed Claude path without changing the default Codex path' {
+        $paths = & $readerModule {
+            $prior = $script:AIBarQuotaFixturePath
+            try {
+                $script:AIBarQuotaFixturePath = $null
+                @(Get-ReaderPath; Get-ReaderPath -Provider Claude)
+            } finally { $script:AIBarQuotaFixturePath = $prior }
+        }
+        $local = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+        $paths[0] | Should -BeExactly (Join-Path $local 'AIBar\yasb-quota.json')
+        $paths[1] | Should -BeExactly (Join-Path $local 'AIBar\yasb-claude-quota.json')
+    }
+
+    It 'prefixes both texts and identifies Claude across valid states and nullable windows' {
+        $cases = @(
+            @('current.json', '40%'), @('partial.json', '40%'), @('nullable-reset.json', '40%'),
+            @('refreshing.json', '12%'), @('stale-refresh.json', '40% | stale | refresh failed'),
+            @('stale-auth.json', '40% | stale | authentication failed'),
+            @('unavailable.json', 'unavailable'), @('disabled.json', 'disabled')
+        )
+        foreach ($case in $cases) {
+            $codex = Read-Fixture $case[0]
+            $claude = Read-ClaudeFixture $case[0]
+            $claude.compactText | Should -BeExactly ('Claude ' + $case[1])
+            $claude.label | Should -BeExactly ('Claude ' + $codex.label)
+            $claude.tooltip | Should -BeExactly ('Claude ' + $codex.tooltip)
+            $claude.progressGlyph | Should -BeExactly $codex.progressGlyph
+            $claude.progressColor | Should -BeExactly $codex.progressColor
+            # Selecting Claude must not mutate the module's subsequent default provider.
+            ((Read-Fixture $case[0]) | ConvertTo-Json -Compress) | Should -BeExactly ($codex | ConvertTo-Json -Compress)
+        }
+    }
+
+    It 'fails closed for malformed missing oversized and unsupported Claude contracts' {
+        foreach ($name in @('missing.json', 'empty.json', 'oversized.json', 'malformed.json',
+            'schema-2.json', 'schema-bool.json', 'schema-float.json', 'extra-field.json',
+            'property-order.json', 'property-case.json', 'bad-enum.json', 'state-case.json',
+            'warning-case.json', 'bad-value.json', 'percentage-bool.json', 'percentage-nan.json',
+            'percentage-infinity.json', 'future-time.json', 'source-after-generated.json',
+            'non-utc-generated.json', 'non-utc-source.json', 'non-utc-reset.json')) {
+            $result = Read-ClaudeFixture $name
+            $result.label | Should -BeExactly 'Claude unavailable'
+            Assert-Compact $result 'Claude unavailable'
+            $result.tooltip | Should -BeExactly 'Claude unavailable | age: --'
+        }
+    }
+
+    It 'retains weekly-first glyph and color boundaries including five-hour-only output' {
+        $culture = [Threading.Thread]::CurrentThread.CurrentCulture
+        try {
+            [Threading.Thread]::CurrentThread.CurrentCulture = [Globalization.CultureInfo]'fr-FR'
+            foreach ($value in @(0, 12.499999, 12.5, 25, 37, 37.5, 49.999999, 50, 62.5, 74.999999, 75, 87.5, 89.999999, 90, 100)) {
+                foreach ($weekly in @($true, $false)) {
+                    $window = [ordered]@{ percentageUsed = $value; resetAt = $null }
+                    $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $window; weekly = $null }
+                    if ($weekly) { $document.weekly = $window; $document.fiveHour = [ordered]@{ percentageUsed = 99; resetAt = $null } }
+                    $result = Read-ClaudeDocument $document
+                    Assert-Compact $result ('Claude ' + ([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%')
+                    $glyphs = @(0xF0766, 0xF0A9E, 0xF0A9F, 0xF0AA0, 0xF0AA1, 0xF0AA2, 0xF0AA3, 0xF0AA4, 0xF0AA5)
+                    $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32($glyphs[[int][math]::Min(8, [math]::Floor($value / 12.5))]))
+                    $result.progressColor | Should -BeExactly $(if ($value -lt 50) { '#58A6FF' } elseif ($value -lt 75) { '#E3B341' } elseif ($value -lt 90) { '#F0883E' } else { '#FF7B72' })
+                }
+            }
+        } finally { [Threading.Thread]::CurrentThread.CurrentCulture = $culture }
+    }
+
+    It 'accepts only the exact opt-in CLI pair and returns one safe JSON object without stderr' {
+        $start = [Diagnostics.ProcessStartInfo]::new('powershell.exe', ('-NoProfile -NonInteractive -File "{0}" -Provider Claude' -f $reader))
+        $start.UseShellExecute = $false
+        $start.RedirectStandardOutput = $true; $start.RedirectStandardError = $true
+        $start.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
+        $process = [Diagnostics.Process]::Start($start)
+        try {
+            $output = $process.StandardOutput.ReadToEnd(); $stderr = $process.StandardError.ReadToEnd()
+            $process.WaitForExit()
+            $process.ExitCode | Should -Be 0
+            $stderr | Should -BeExactly ''
+            $result = $output | ConvertFrom-Json -ErrorAction Stop
+            Assert-SafeFields $result
+            $result.label | Should -Match '^Claude '
+            $result.compactText | Should -Match '^Claude '
+            $result.tooltip | Should -Match '^Claude '
+        } finally { $process.Dispose() }
+    }
+
+    It 'rejects unknown provider values missing values duplicate switches and extra CLI arguments safely' {
+        # Case-sensitive allowlist: the only accepted nonempty argument list is -Provider Claude.
+        foreach ($arguments in @('-Provider Other', '-Provider Codex', '-Provider claude', '-Provider',
+            '-provider Claude', '-Provider Claude extra', '-Provider Claude -Provider Claude', '-Provider "<secret>&{}"')) {
+            $start = [Diagnostics.ProcessStartInfo]::new('powershell.exe', ('-NoProfile -NonInteractive -File "{0}" {1}' -f $reader, $arguments))
+            $start.UseShellExecute = $false
+            $start.RedirectStandardOutput = $true; $start.RedirectStandardError = $true
+            $start.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
+            $process = [Diagnostics.Process]::Start($start)
+            try {
+                $output = $process.StandardOutput.ReadToEnd(); $stderr = $process.StandardError.ReadToEnd()
+                $process.WaitForExit()
+                $process.ExitCode | Should -Be 1
+                $stderr | Should -BeExactly ''
+                $result = $output | ConvertFrom-Json -ErrorAction Stop
+                Assert-SafeFields $result
+                Assert-Compact $result 'unavailable'
+                $result.label | Should -BeExactly 'unavailable'
+                $result.tooltip | Should -BeExactly 'unavailable | age: --'
+                $output | Should -Not -Match 'secret|Other|extra|<|>|&'
+            } finally { $process.Dispose() }
+        }
+    }
+
+    It 'adds exactly the second widget with identical options and the same panel callback' {
+        $yaml = ((Get-Content -Raw (Join-Path $root 'custom-widget.example.yaml')) -replace "`r`n", "`n").TrimEnd()
+        $parts = [regex]::Split($yaml, '(?m)(?=^aibar_claude_quota:)')
+        $parts.Count | Should -Be 2
+        $codex = $parts[0].TrimEnd()
+        $claude = $parts[1].TrimEnd()
+        $expected = $codex.Replace('aibar_quota:', 'aibar_claude_quota:').Replace('read-aibar-quota.ps1"''', 'read-aibar-quota.ps1" -Provider Claude''')
+        $claude | Should -BeExactly $expected
+        ([regex]::Matches($yaml, 'on_left: ''exec "<AIBarRoot>\\AIBar.Desktop.exe" --show''')).Count | Should -Be 2
+    }
+
+    It 'never echoes credential token plan or unsafe text from Claude documents' {
+        foreach ($attack in @('token-canary', 'C:\private\credentials.json', 'plan-canary', '<font>&{}', ('x' * 256))) {
+            $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $null; weekly = [ordered]@{ percentageUsed = 37; resetAt = $null }; plan = $attack }
+            $result = Read-ClaudeDocument $document
+            Assert-Compact $result 'Claude unavailable'
+            $document.Remove('plan')
+            $document.weekly.percentageUsed = $attack
+            $result = Read-ClaudeDocument $document
+            Assert-Compact $result 'Claude unavailable'
+            foreach ($field in @($result.label, $result.compactText, $result.tooltip)) {
+                $field | Should -Not -Match 'canary|credential|C:|<|>|&|\{|\}'
+            }
+        }
     }
 }
 

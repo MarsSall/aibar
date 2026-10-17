@@ -140,7 +140,7 @@ public partial class App : System.Windows.Application
         internal static StartupComposition Unavailable => new(new UnavailableQuotaPresentation(), null, null, new EmptyAsyncResource(), () => Task.CompletedTask, () => { });
     }
 
-    internal sealed record CompositionSeams(string? DataDirectory = null, string? CodexHome = null, TimeSpan? AnalyticsShutdownBound = null, Action<string>? BeforeAnalyticsStability = null, Action<string>? LifecycleObservation = null, string? UserProfile = null, IQuotaExportWriter? ExportWriter = null, Func<PrivateIntegrationPolicy, IQuotaProvider>? ClaudeProviderFactory = null, TimeProvider? ClaudeTimeProvider = null);
+    internal sealed record CompositionSeams(string? DataDirectory = null, string? CodexHome = null, TimeSpan? AnalyticsShutdownBound = null, Action<string>? BeforeAnalyticsStability = null, Action<string>? LifecycleObservation = null, string? UserProfile = null, IQuotaExportWriter? ExportWriter = null, Func<PrivateIntegrationPolicy, IQuotaProvider>? ClaudeProviderFactory = null, TimeProvider? ClaudeTimeProvider = null, IQuotaExportWriter? ClaudeExportWriter = null);
     private sealed class SystemClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.UtcNow; }
     internal sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, QuotaRefreshLifecycleAdapter lifecycleAdapter, WindowsLifecycleEvents lifecycleEvents, BetaRuntime runtime, QuotaExportPublisher publisher, AnalyticsLifecycleOwner analyticsOwner, IAsyncDisposable store, LocalUsageCoordinator localUsage, IAsyncDisposable localUsageLedger, Action<string>? observe, ClaudeQuotaRuntime? claudeRuntime = null) : IAsyncDisposable
     {
