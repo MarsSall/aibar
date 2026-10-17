@@ -7,7 +7,7 @@ public partial class MainWindow : Window
 {
     public MainWindow() => InitializeComponent();
 
-    private void OnPanelDisclosureKeyDown(object sender, KeyEventArgs e)
+    private void OnPanelDisclosureKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (ReferenceEquals(sender, e.OriginalSource) && sender is System.Windows.Controls.Expander details &&
             e.Key is Key.Space or Key.Enter)
