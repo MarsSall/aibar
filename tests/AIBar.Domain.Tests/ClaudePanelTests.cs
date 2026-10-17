@@ -276,7 +276,7 @@ public sealed class ClaudePanelTests
         Assert.DoesNotContain(AutomationNames(window), name => name.StartsWith("Claude", StringComparison.Ordinal) || name == "Codex");
     }
     private static string[] AutomationNames(MainWindow window) => AutomationElement.FromHandle(new WindowInteropHelper(window).EnsureHandle())
-        .FindAll(TreeScope.Descendants, Condition.TrueCondition).Cast<AutomationElement>().Select(item => item.Current.Name).ToArray();
+        .FindAll(TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition).Cast<AutomationElement>().Select(item => item.Current.Name).ToArray();
     private static IEnumerable<string> VisibleText(DependencyObject root) => Visuals<TextBlock>(root).Where(item => item.IsVisible).Select(item => item.Text);
     private static Color ColorOf(object brush) => Assert.IsType<SolidColorBrush>(brush).Color;
     private static IEnumerable<T> Visuals<T>(DependencyObject root) where T : DependencyObject
