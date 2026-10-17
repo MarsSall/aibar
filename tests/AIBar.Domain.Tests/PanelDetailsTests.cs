@@ -107,12 +107,13 @@ public sealed class PanelDetailsTests
                 {
                     var border = Assert.IsType<Border>(card.Content);
                     Assert.Same(window.Resources["PanelQuotaCardStyle"], border.Style);
-                    Assert.Equal(new CornerRadius(14), border.CornerRadius);
-                    Assert.Equal(ColorOf(window.FindResource("CardBrush")), ColorOf(border.Background));
+                    Assert.Equal(new CornerRadius(0), border.CornerRadius);
+                    Assert.Equal(new Thickness(0), border.BorderThickness);
+                    Assert.Equal(Colors.Transparent, ColorOf(border.Background));
                     Assert.Equal(ColorOf(window.FindResource("SecondaryBorderBrush")), ColorOf(border.BorderBrush));
                 }
                 var percentage = Assert.Single(Visuals<TextBlock>(cards[0]).Where(text => text.Text == "40%"));
-                Assert.Equal(32d, percentage.FontSize);
+                Assert.Equal(20d, percentage.FontSize);
                 Assert.Equal(ColorOf(window.FindResource("TextBrush")), ColorOf(percentage.Foreground));
                 Assert.Equal(new[] { 40d, 25d }, cards.SelectMany(Visuals<ProgressBar>).Select(bar => bar.Value));
             }
@@ -154,9 +155,81 @@ public sealed class PanelDetailsTests
         });
     }
 
+    [Theory]
+    [InlineData(WindowsTheme.Light, 300)]
+    [InlineData(WindowsTheme.Light, 420)]
+    [InlineData(WindowsTheme.Dark, 300)]
+    [InlineData(WindowsTheme.Dark, 420)]
+    [InlineData(WindowsTheme.HighContrast, 300)]
+    [InlineData(WindowsTheme.HighContrast, 420)]
+    public void Integrated_composition_keeps_exact_details_accessible_at_supported_widths(WindowsTheme theme, int width)
+    {
+        WpfTestApplicationHost.Run(app =>
+        {
+            var original = app.Resources.MergedDictionaries[0];
+            const string total = "1275133661 retained tokens";
+            var window = CreateWindow(total);
+            window.Width = width;
+            try
+            {
+                app.Resources.MergedDictionaries[0] = ThemeDictionaries.Create(theme);
+                window.Show();
+                window.UpdateLayout();
+                var root = Assert.IsType<Grid>(window.Content);
+                var details = Assert.IsType<Expander>(window.FindName("AnalyticsDetailsExpander"));
+                Assert.False(details.IsExpanded);
+                details.ApplyTemplate();
+                Assert.NotNull(details.Template.FindName("DetailsChevron", details));
+                Assert.NotNull(window.FindName("PanelHeaderBand"));
+                Assert.NotNull(window.FindName("PanelFooterRule"));
+                SaveRender(root, theme, width, "collapsed");
+                details.Focus();
+                Assert.True(details.IsKeyboardFocused);
+                var key = new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice,
+                    PresentationSource.FromVisual(window), 0, System.Windows.Input.Key.Space)
+                    { RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent };
+                details.RaiseEvent(key);
+                Assert.True(key.Handled && details.IsExpanded);
+                window.UpdateLayout();
+                var provider = Visuals<Expander>(details).Single(row => AutomationProperties.GetName(row) == "Provider row");
+                Assert.Contains(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == total);
+                Assert.DoesNotContain(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
+                var peer = new ExpanderAutomationPeer(provider);
+                var toggle = Assert.IsAssignableFrom<IExpandCollapseProvider>(peer.GetPattern(PatternInterface.ExpandCollapse));
+                toggle.Expand(); window.UpdateLayout();
+                Assert.Contains(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
+                Assert.Contains(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "sample-model");
+                SaveRender(root, theme, width, "expanded");
+                toggle.Collapse(); window.UpdateLayout();
+                Assert.DoesNotContain(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
+                foreach (var child in root.Children.OfType<FrameworkElement>())
+                {
+                    var bounds = child.TransformToAncestor(root).TransformBounds(new Rect(child.RenderSize));
+                    Assert.InRange(bounds.Left, 0, root.ActualWidth);
+                    Assert.True(bounds.Right <= root.ActualWidth + .1 && bounds.Bottom <= root.ActualHeight + .1);
+                }
+            }
+            finally { window.Close(); app.Resources.MergedDictionaries[0] = original; }
+        });
+    }
+
+    private static void SaveRender(FrameworkElement root, WindowsTheme theme, int width, string state)
+    {
+        var directory = Environment.GetEnvironmentVariable("AIBAR_PANEL_RENDER_DIRECTORY");
+        if (string.IsNullOrEmpty(directory)) return;
+        Directory.CreateDirectory(directory);
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
+            (int)Math.Ceiling(root.ActualWidth), (int)Math.Ceiling(root.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(root);
+        var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using var output = File.Create(Path.Combine(directory, $"panel-{theme}-{width}-{state}.png"));
+        png.Save(output);
+    }
+
     private static Color ColorOf(object brush) => Assert.IsType<SolidColorBrush>(brush).Color;
 
-    private static MainWindow CreateWindow() => new()
+    private static MainWindow CreateWindow(string total = "165 retained tokens") => new()
     {
         Width = 420, Height = 720, SizeToContent = SizeToContent.Manual,
         DataContext = new
@@ -175,7 +248,7 @@ public sealed class PanelDetailsTests
                     new
                     {
                         AutomationLabel = "Provider row", ScopeLabel = "Provider scope",
-                        TotalLabel = "165 retained tokens", TokenBreakdownLabel = "Input 11", StatusLabel = "Current",
+                        TotalLabel = total, TokenBreakdownLabel = "Input 11", StatusLabel = "Current",
                         Details = new[] { new { LocalDayLabel = "2026-01-01", ModelLabel = "sample-model", TotalLabel = "100 tokens", TokenBreakdownLabel = "Input 10", AutomationLabel = "Daily usage" } }
                     }
                 }
