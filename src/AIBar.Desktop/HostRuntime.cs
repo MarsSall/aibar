@@ -32,6 +32,29 @@ public interface ITrayRuntime : IAsyncDisposable
     void Hide();
 }
 
+// Optional capability: existing ITrayRuntime implementations remain source-compatible.
+public interface IClaudeQuotaTray
+{
+    event Action? ClaudeQuotaEnableRequested;
+    event Action? ClaudeQuotaDisableRequested;
+    void SetClaudeQuotaEnabled(bool enabled);
+}
+
+/// <summary>RED scaffold for the independent Claude tray/disclosure binding.</summary>
+public sealed class ClaudeQuotaTrayController : IDisposable
+{
+    public ClaudeQuotaTrayController(IClaudeQuotaTray tray, ClaudeQuotaRuntime runtime,
+        IPrivateIntegrationConsentPrompt prompt) { }
+    public ValueTask EnableAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
+    public ValueTask DisableAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
+    public void Dispose() => throw new NotImplementedException();
+}
+
+public sealed class WindowsClaudeQuotaConsentPrompt : IPrivateIntegrationConsentPrompt
+{
+    public bool Confirm() => throw new NotImplementedException();
+}
+
 public interface IPopoverRuntime
 {
     event Action? Deactivated;

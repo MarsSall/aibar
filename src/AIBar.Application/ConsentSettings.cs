@@ -37,6 +37,10 @@ public sealed class ConsentSettings(string path)
         }
     }
 
+    // RED scaffold: Claude is a separate optional decision; existing Codex methods stay unchanged.
+    public ValueTask<bool> LoadClaudeAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
+    public ValueTask SaveClaudeAsync(bool enabled, CancellationToken cancellationToken) => throw new NotImplementedException();
+
     private sealed record StoredConsent(
         [property: JsonPropertyName("schema")] int Schema,
         [property: JsonPropertyName("privateCodexConsent")] bool PrivateCodexConsent);
