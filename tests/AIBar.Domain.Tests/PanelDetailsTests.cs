@@ -200,9 +200,25 @@ public sealed class PanelDetailsTests
                 toggle.Expand(); window.UpdateLayout();
                 Assert.Contains(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
                 Assert.Contains(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "sample-model");
+                System.Windows.Input.InputManager.Current.ProcessInput(new System.Windows.Input.KeyEventArgs(
+                    System.Windows.Input.Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), 0, System.Windows.Input.Key.Tab)
+                    { RoutedEvent = System.Windows.Input.Keyboard.KeyDownEvent });
+                Assert.True(provider.IsKeyboardFocused);
+                provider.BringIntoView(); window.UpdateLayout();
+                foreach (var label in new[] { total, "Input 11", "2026-01-01", "sample-model", "100 tokens", "Input 10" })
+                    AssertInViewports(Assert.Single(Visuals<TextBlock>(provider).Where(text => text.Text == label)));
+                Assert.NotEmpty(System.Windows.Documents.AdornerLayer.GetAdornerLayer(provider).GetAdorners(provider));
                 SaveRender(root, theme, width, "expanded");
                 toggle.Collapse(); window.UpdateLayout();
                 Assert.DoesNotContain(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
+                foreach (var label in new[] { "Quota disclosure", "Private endpoint disclosure" })
+                {
+                    var notice = Assert.Single(Visuals<TextBlock>(details).Where(text => text.Text == label));
+                    notice.BringIntoView(); window.UpdateLayout();
+                    AssertInViewports(notice);
+                    SaveRender(root, theme, width, label.StartsWith("Private", StringComparison.Ordinal) ? "private-access" : "quota-access");
+                }
+                details.Focus();
                 var enter = new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice,
                     PresentationSource.FromVisual(window), 0, System.Windows.Input.Key.Enter)
                     { RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent };
@@ -220,6 +236,18 @@ public sealed class PanelDetailsTests
         });
     }
 
+    private static void AssertInViewports(FrameworkElement element)
+    {
+        Assert.True(element.IsVisible && element.ActualHeight > 0);
+        for (var parent = VisualTreeHelper.GetParent(element); parent is not null; parent = VisualTreeHelper.GetParent(parent))
+        {
+            if (parent is not ScrollContentPresenter viewport) continue;
+            var bounds = element.TransformToAncestor(viewport).TransformBounds(new Rect(element.RenderSize));
+            Assert.True(bounds.Left >= -.1 && bounds.Top >= -.1 && bounds.Right <= viewport.ActualWidth + .1 &&
+                bounds.Bottom <= viewport.ActualHeight + .1, $"Content is clipped: {bounds}, viewport {viewport.RenderSize}");
+        }
+    }
+
     private static void SaveRender(FrameworkElement root, WindowsTheme theme, int width, string state)
     {
         var directory = Environment.GetEnvironmentVariable("AIBAR_PANEL_RENDER_DIRECTORY");
@@ -233,6 +261,7 @@ public sealed class PanelDetailsTests
             drawing.DrawRectangle(Window.GetWindow(root).Background, null, new Rect(root.RenderSize));
         bitmap.Render(background);
         bitmap.Render(root);
+        if (System.Windows.Documents.AdornerLayer.GetAdornerLayer(root) is { } layer) bitmap.Render(layer);
         var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
         png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
         using var output = File.Create(Path.Combine(directory, $"panel-{theme}-{width}-{state}.png"));
