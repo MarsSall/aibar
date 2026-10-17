@@ -40,19 +40,49 @@ public interface IClaudeQuotaTray
     void SetClaudeQuotaEnabled(bool enabled);
 }
 
-/// <summary>RED scaffold for the independent Claude tray/disclosure binding.</summary>
+/// <summary>Binds only the optional Claude capability; never changes Codex consent.</summary>
 public sealed class ClaudeQuotaTrayController : IDisposable
 {
-    public ClaudeQuotaTrayController(IClaudeQuotaTray tray, ClaudeQuotaRuntime runtime,
-        IPrivateIntegrationConsentPrompt prompt) { }
-    public ValueTask EnableAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
-    public ValueTask DisableAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
-    public void Dispose() => throw new NotImplementedException();
+    private readonly IClaudeQuotaTray _tray;
+    private readonly ClaudeQuotaRuntime _runtime;
+    private readonly IPrivateIntegrationConsentPrompt _prompt;
+    private int _granting;
+    private bool _disposed;
+
+    public ClaudeQuotaTrayController(IClaudeQuotaTray tray, ClaudeQuotaRuntime runtime, IPrivateIntegrationConsentPrompt prompt)
+    {
+        _tray = tray; _runtime = runtime; _prompt = prompt;
+        _tray.ClaudeQuotaEnableRequested += OnEnable; _tray.ClaudeQuotaDisableRequested += OnDisable;
+        _runtime.ConsentChanged += Update; Update();
+    }
+    public async ValueTask EnableAsync(CancellationToken cancellationToken)
+    {
+        if (_disposed || Interlocked.CompareExchange(ref _granting, 1, 0) != 0) return;
+        try { if (!_runtime.IsConsentEnabled && _prompt.Confirm()) await _runtime.GrantConsentAsync(cancellationToken); }
+        finally { Volatile.Write(ref _granting, 0); Update(); }
+    }
+    public async ValueTask DisableAsync(CancellationToken cancellationToken)
+    {
+        if (_disposed) return;
+        try { await _runtime.RevokeConsentAsync(cancellationToken); }
+        finally { Update(); }
+    }
+    private async void OnEnable() { try { await EnableAsync(CancellationToken.None); } catch (Exception) { } }
+    private async void OnDisable() { try { await DisableAsync(CancellationToken.None); } catch (Exception) { } }
+    private void Update() { if (!_disposed) _tray.SetClaudeQuotaEnabled(_runtime.IsConsentEnabled); }
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _tray.ClaudeQuotaEnableRequested -= OnEnable; _tray.ClaudeQuotaDisableRequested -= OnDisable;
+        _runtime.ConsentChanged -= Update;
+    }
 }
 
 public sealed class WindowsClaudeQuotaConsentPrompt : IPrivateIntegrationConsentPrompt
 {
-    public bool Confirm() => throw new NotImplementedException();
+    public bool Confirm() => Forms.MessageBox.Show(ClaudeQuotaRuntime.ConsentDisclosure, "Enable Claude subscription quota",
+        Forms.MessageBoxButtons.OKCancel, Forms.MessageBoxIcon.Warning, Forms.MessageBoxDefaultButton.Button2) == Forms.DialogResult.OK;
 }
 
 public interface IPopoverRuntime
@@ -101,6 +131,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private readonly QuotaPresentationHost? _presentation;
     private readonly IPrivateIntegrationConsentPrompt? _consentPrompt;
     private readonly IOpenCodeDataFolderPicker? _openCodeFolderPicker;
+    private readonly ClaudeQuotaTrayController? _claudeController;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly DispatcherTimer _activationTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private Task? _cleanupTask;
@@ -110,7 +141,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private bool _showPending;
     private bool _disposed;
 
-    public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess, IManualRefreshCommand? refreshCommand = null, NativeSettingsCommands? settings = null, Action? reportSettingsFailure = null, Func<RefreshTrigger, CancellationToken, ValueTask>? reevaluate = null, QuotaPresentationHost? presentation = null, IPrivateIntegrationConsentPrompt? consentPrompt = null, IOpenCodeDataFolderPicker? openCodeFolderPicker = null)
+    public TrayHostRuntime(SingleInstanceHost instance, ITrayRuntime tray, IPopoverRuntime popover, ITaskbarRecreationEvents taskbar, Func<CancellationToken, Task> awaitCancelledWork, IAsyncDisposable persistence, Action exitProcess, IManualRefreshCommand? refreshCommand = null, NativeSettingsCommands? settings = null, Action? reportSettingsFailure = null, Func<RefreshTrigger, CancellationToken, ValueTask>? reevaluate = null, QuotaPresentationHost? presentation = null, IPrivateIntegrationConsentPrompt? consentPrompt = null, IOpenCodeDataFolderPicker? openCodeFolderPicker = null, ClaudeQuotaRuntime? claudeQuota = null, IPrivateIntegrationConsentPrompt? claudeConsentPrompt = null)
     {
         _instance = instance; _tray = tray; _popover = popover; _taskbar = taskbar; _awaitCancelledWork = awaitCancelledWork; _persistence = persistence; _exitProcess = exitProcess; _refreshCommand = refreshCommand; _settings = settings; _reportSettingsFailure = reportSettingsFailure; _reevaluate = reevaluate; _presentation = presentation; _consentPrompt = consentPrompt; _openCodeFolderPicker = openCodeFolderPicker;
         if (_refreshCommand is not null) _refreshCommand.CanExecuteChanged += OnRefreshAvailabilityChanged;
@@ -121,6 +152,8 @@ public sealed class TrayHostRuntime : IAsyncDisposable
         _tray.SetLocalUsageAvailable(settings?.LocalUsageAvailable == true); _tray.SetLocalUsagePolicy(settings?.LocalUsagePolicy ?? LocalUsagePolicy.Disabled);
         _tray.Toggled += Toggle; _tray.ExitRequested += OnExitRequested; _tray.RefreshRequested += OnRefreshRequested; _tray.StartupToggleRequested += OnStartupToggleRequested; _tray.ClearAiBarDataRequested += OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested += OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested += OnPrivateIntegrationDisableRequested; _tray.OpenCodeLocalUsageToggleRequested += OnOpenCodeLocalUsageToggleRequested; _tray.PiLocalUsageToggleRequested += OnPiLocalUsageToggleRequested; _popover.Deactivated += OnDeactivated; _taskbar.Recreated += RecreateTray; _instance.ActivationRequested += RequestShow;
         if (_tray is IOpenCodeDataRootTray rootTray) { rootTray.OpenCodeDataFolderChooseRequested += OnOpenCodeDataFolderChooseRequested; rootTray.OpenCodeDataFolderResetRequested += OnOpenCodeDataFolderResetRequested; }
+        if (tray is IClaudeQuotaTray claudeTray && claudeQuota is not null)
+            _claudeController = new(claudeTray, claudeQuota, claudeConsentPrompt ?? new WindowsClaudeQuotaConsentPrompt());
         _activationTimer.Tick += DispatchPendingActivation;
     }
 
@@ -279,6 +312,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     private async Task ExitSafelyAsync() { try { await ExitAsync(); } catch (Exception) { } }
     private void Detach()
     {
+        _claudeController?.Dispose();
         _tray.Toggled -= Toggle; _tray.ExitRequested -= OnExitRequested; _tray.RefreshRequested -= OnRefreshRequested; _tray.StartupToggleRequested -= OnStartupToggleRequested; _tray.ClearAiBarDataRequested -= OnClearAiBarDataRequested; _tray.PrivateIntegrationEnableRequested -= OnPrivateIntegrationEnableRequested; _tray.PrivateIntegrationDisableRequested -= OnPrivateIntegrationDisableRequested; _tray.OpenCodeLocalUsageToggleRequested -= OnOpenCodeLocalUsageToggleRequested; _tray.PiLocalUsageToggleRequested -= OnPiLocalUsageToggleRequested; _popover.Deactivated -= OnDeactivated; _taskbar.Recreated -= RecreateTray; _instance.ActivationRequested -= RequestShow;
         if (_tray is IOpenCodeDataRootTray rootTray) { rootTray.OpenCodeDataFolderChooseRequested -= OnOpenCodeDataFolderChooseRequested; rootTray.OpenCodeDataFolderResetRequested -= OnOpenCodeDataFolderResetRequested; }
         if (_refreshCommand is not null) _refreshCommand.CanExecuteChanged -= OnRefreshAvailabilityChanged;
@@ -288,7 +322,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     public ValueTask DisposeAsync() => new(ExitAsync());
 }
 
-public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray
+public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IClaudeQuotaTray
 {
     private readonly Forms.NotifyIcon _icon = new() { Icon = SystemIcons.Application, Text = "AIBar", Visible = false };
     private readonly Forms.ContextMenuStrip _menu = new();
@@ -301,11 +335,17 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray
     private readonly Forms.ToolStripMenuItem _piUsage = new("Read Pi usage data locally");
     private readonly Forms.ToolStripMenuItem _chooseOpenCodeFolder = new(OpenCodeDataFolderCopy.Choose) { AccessibleName = OpenCodeDataFolderCopy.Choose };
     private readonly Forms.ToolStripMenuItem _resetOpenCodeFolder = new(OpenCodeDataFolderCopy.Reset) { AccessibleName = OpenCodeDataFolderCopy.Reset };
+    private readonly Forms.ToolStripMenuItem _enableClaude = new("Enable Claude quota");
+    private readonly Forms.ToolStripMenuItem _disableClaude = new("Disable Claude quota");
+    private bool _claudeAvailable;
+    private bool _claudeEnabled;
     private bool _settingsAvailable;
     private bool _privateIntegrationEnabled;
     public WindowsTrayRuntime()
     {
         var exit = new Forms.ToolStripMenuItem("Exit AIBar");
+        _enableClaude.Click += (_, _) => ClaudeQuotaEnableRequested?.Invoke();
+        _disableClaude.Click += (_, _) => ClaudeQuotaDisableRequested?.Invoke();
         _refresh.Click += (_, _) => RefreshRequested?.Invoke(); _startup.Click += (_, _) => StartupToggleRequested?.Invoke(); _clear.Click += (_, _) => ClearAiBarDataRequested?.Invoke(); _enablePrivate.Click += (_, _) => PrivateIntegrationEnableRequested?.Invoke(); _disablePrivate.Click += (_, _) => PrivateIntegrationDisableRequested?.Invoke(); _openCodeUsage.Click += (_, _) => OpenCodeLocalUsageToggleRequested?.Invoke(); _piUsage.Click += (_, _) => PiLocalUsageToggleRequested?.Invoke(); _chooseOpenCodeFolder.Click += (_, _) => OpenCodeDataFolderChooseRequested?.Invoke(); _resetOpenCodeFolder.Click += (_, _) => OpenCodeDataFolderResetRequested?.Invoke(); exit.Click += (_, _) => ExitRequested?.Invoke(); _menu.Items.Add(exit); _icon.ContextMenuStrip = _menu;
         _icon.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) Toggled?.Invoke(); };
     }
@@ -320,6 +360,19 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray
     public event Action? PiLocalUsageToggleRequested;
     public event Action? OpenCodeDataFolderChooseRequested;
     public event Action? OpenCodeDataFolderResetRequested;
+    public event Action? ClaudeQuotaEnableRequested;
+    public event Action? ClaudeQuotaDisableRequested;
+    public void SetClaudeQuotaEnabled(bool enabled)
+    {
+        if (_menu.InvokeRequired) { _menu.BeginInvoke(new Action(() => SetClaudeQuotaEnabled(enabled))); return; }
+        _claudeAvailable = true; _claudeEnabled = enabled; UpdateClaudeMenu();
+    }
+    private void UpdateClaudeMenu()
+    {
+        _menu.Items.Remove(_enableClaude); _menu.Items.Remove(_disableClaude);
+        if (_claudeAvailable && _settingsAvailable)
+            _menu.Items.Insert(Math.Max(0, _menu.Items.Count - 1), _claudeEnabled ? _disableClaude : _enableClaude);
+    }
     public void SetRefreshAvailable(bool available)
     {
         if (available && !_menu.Items.Contains(_refresh)) _menu.Items.Insert(0, _refresh);
@@ -331,7 +384,7 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray
         _settingsAvailable = available;
         if (available && !_menu.Items.Contains(_startup)) { _menu.Items.Insert(0, _clear); _menu.Items.Insert(0, _startup); }
         else if (!available) { _menu.Items.Remove(_startup); _menu.Items.Remove(_clear); }
-        UpdatePrivateIntegrationMenu();
+        UpdatePrivateIntegrationMenu(); UpdateClaudeMenu();
     }
     public void SetPrivateIntegrationEnabled(bool enabled) { _privateIntegrationEnabled = enabled; UpdatePrivateIntegrationMenu(); }
     private void UpdatePrivateIntegrationMenu()
