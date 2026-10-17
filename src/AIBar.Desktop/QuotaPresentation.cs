@@ -170,6 +170,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     private readonly Action<Exception>? _report;
     private readonly Func<bool> _refreshAvailable;
     private readonly ManualRefreshCommand _refreshCommand;
+    private readonly ClaudeQuotaPresentationHost? _claude;
     public QuotaSummaryCopyCommand CopySummaryCommand { get; }
     private readonly IQuotaRefreshLifecycleEvents? _lifecycleEvents;
     private BetaPresentationState _state;
@@ -177,17 +178,31 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     private bool _disposed;
     public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, bool refreshAvailable = true, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null)
         : this(coordinator, mapper, () => refreshAvailable, report, lifecycleEvents) { }
-    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, Func<bool> refreshAvailable, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null)
+    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, Func<bool> refreshAvailable, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null, ClaudeQuotaPresentationHost? claude = null)
     {
         ArgumentNullException.ThrowIfNull(refreshAvailable);
         _coordinator = coordinator; _mapper = mapper; _dispatcher = Dispatcher.CurrentDispatcher; _refreshAvailable = refreshAvailable; _state = Map(coordinator.State); _report = report; _lifecycleEvents = lifecycleEvents;
-        _refreshCommand = new ManualRefreshCommand(token => coordinator.RefreshAsync(RefreshTrigger.Manual, token), () => IsRefreshAvailable, report);
+        _claude = claude;
+        if (_claude is not null) _claude.PropertyChanged += OnClaudeChanged;
+        _refreshCommand = new ManualRefreshCommand(RefreshAllAsync, () => IsRefreshAvailable, report);
         CopySummaryCommand = new(() => _disposed ? null : _state, System.Windows.Clipboard.SetText);
         _coordinator.StateChanged += OnStateChanged;
         if (_lifecycleEvents is not null) _lifecycleEvents.ClockChanged += OnClockChanged;
     }
     public event PropertyChangedEventHandler? PropertyChanged;
-    public bool IsRefreshAvailable => !_disposed && _refreshAvailable();
+    public bool IsRefreshAvailable => !_disposed && (_refreshAvailable() || _claude?.IsEnabled == true);
+    private async ValueTask RefreshAllAsync(CancellationToken token)
+    {
+        var codex = _refreshAvailable() ? _coordinator.RefreshAsync(RefreshTrigger.Manual, token).AsTask() : Task.CompletedTask;
+        var claude = _claude?.IsEnabled == true ? _claude.RefreshAsync(token).AsTask() : Task.CompletedTask;
+        await Task.WhenAll(codex, claude);
+    }
+    private void OnClaudeChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName != nameof(ClaudeQuotaPresentationHost.IsEnabled)) return;
+        _refreshCommand.RefreshCanExecute();
+        PropertyChanged?.Invoke(this, new(nameof(IsRefreshAvailable)));
+    }
     public IManualRefreshCommand RefreshCommand => _refreshCommand;
     public BetaPresentationState State => _state;
     public QuotaWindowPresentation Primary => _state.Primary;
@@ -256,6 +271,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
             _disposed = true;
             CopySummaryCommand.RefreshState();
             _coordinator.StateChanged -= OnStateChanged;
+            if (_claude is not null) { _claude.PropertyChanged -= OnClaudeChanged; _claude.Dispose(); }
             if (_lifecycleEvents is not null) _lifecycleEvents.ClockChanged -= OnClockChanged;
         }
         return ValueTask.CompletedTask;

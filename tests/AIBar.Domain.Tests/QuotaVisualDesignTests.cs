@@ -38,7 +38,7 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal("180", detailScroller.Attribute("MaxHeight")?.Value); Assert.Equal("Auto", detailScroller.Attribute("VerticalScrollBarVisibility")?.Value);
         var localUsageBreakdowns = localUsage.Descendants().Where(element => element.Attribute("Text")?.Value == "{Binding TokenBreakdownLabel}").ToArray();
         Assert.Equal(2, localUsageBreakdowns.Length); Assert.All(localUsageBreakdowns, breakdown => Assert.Equal("Wrap", breakdown.Attribute("TextWrapping")?.Value));
-        Assert.Equal(2, window.Split("Style=\"{StaticResource PanelQuotaCardStyle}\"", StringSplitOptions.None).Length - 1);
+        Assert.Equal(4, window.Split("Style=\"{StaticResource PanelQuotaCardStyle}\"", StringSplitOptions.None).Length - 1);
         Assert.Equal(2, window.Split("Style=\"{StaticResource SecondaryCardStyle}\"", StringSplitOptions.None).Length - 1);
         Assert.Contains("AutomationProperties.Name=\"Refresh quota\"", window, StringComparison.Ordinal); Assert.Contains("IsTabStop=\"True\"", window, StringComparison.Ordinal);
         Assert.DoesNotContain("<DoubleAnimation", resources, StringComparison.Ordinal);
@@ -78,13 +78,13 @@ public sealed class QuotaVisualDesignTests
         Assert.All(textBlocks.Where(text => text.Attribute("Visibility")?.Value.Contains("State.Is", StringComparison.Ordinal) == true), text => Assert.Equal("{StaticResource QuotaStatusTextStyle}", text.Attribute("Style")?.Value));
         Assert.All(textBlocks.Where(text => text.Attribute("Text")?.Value.Contains("PercentageUsed", StringComparison.Ordinal) == true), text => Assert.Equal("{StaticResource QuotaPercentageTextStyle}", text.Attribute("Style")?.Value));
         var progressBars = window.Descendants(presentation + "ProgressBar").ToArray();
-        Assert.Equal(2, progressBars.Length);
-        Assert.Equal(new[] { "{Binding Weekly.PercentageUsed}", "{Binding Primary.PercentageUsed}" }, progressBars.Select(track => track.Attribute("Value")?.Value));
+        Assert.Equal(4, progressBars.Length);
+        Assert.Equal(new[] { "{Binding Weekly.PercentageUsed}", "{Binding Primary.PercentageUsed}", "{Binding Claude.State.Weekly.PercentageUsed}", "{Binding Claude.State.Primary.PercentageUsed}" }, progressBars.Select(track => track.Attribute("Value")?.Value));
         Assert.All(progressBars, track => Assert.Equal("{StaticResource QuotaProgressStyle}", track.Attribute("Style")?.Value));
         var groups = window.Descendants(presentation + "GroupBox").ToArray();
-        Assert.Equal(4, groups.Length);
-        Assert.All(groups.Take(2), group => Assert.Equal("{StaticResource ChromeLessGroupBoxStyle}", group.Attribute("Style")?.Value));
-        Assert.All(groups.Skip(2), group => Assert.Equal("{StaticResource SecondaryGroupBoxStyle}", group.Attribute("Style")?.Value));
+        Assert.Equal(6, groups.Length);
+        Assert.All(groups.Take(4), group => Assert.Equal("{StaticResource ChromeLessGroupBoxStyle}", group.Attribute("Style")?.Value));
+        Assert.All(groups.Skip(4), group => Assert.Equal("{StaticResource SecondaryGroupBoxStyle}", group.Attribute("Style")?.Value));
         Assert.Equal(2, window.Descendants(presentation + "Border").Count(border => border.Attribute("Style")?.Value == "{StaticResource SecondaryCardStyle}"));
         Assert.Equal("{StaticResource PanelDetailsExpanderStyle}", window.Descendants(presentation + "Expander").Single(element => element.Attributes().Any(attribute => attribute.Value == "{Binding AutomationLabel}")).Attribute("Style")?.Value);
     }
@@ -122,7 +122,11 @@ public sealed class QuotaVisualDesignTests
                 window = new MainWindow { DataContext = host }; window.Show();
                 ((System.Windows.Controls.Expander)window.FindName("AnalyticsDetailsExpander")).IsExpanded = true;
                 window.UpdateLayout();
-                var cards = FindVisualChildren<System.Windows.Controls.GroupBox>(window).ToArray();
+                var allCards = FindVisualChildren<System.Windows.Controls.GroupBox>(window).ToArray();
+                var claudeCards = allCards.Where(card => System.Windows.Automation.AutomationProperties.GetName(card).StartsWith("Claude ", StringComparison.Ordinal)).ToArray();
+                Assert.Equal(2, claudeCards.Length);
+                Assert.All(claudeCards, card => Assert.False(card.IsVisible));
+                var cards = allCards.Except(claudeCards).ToArray();
                 Assert.Equal(new[] { "Weekly quota card", "5-hour quota card", "Local Codex data", "OpenCode and Pi local usage" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
                 var button = FindVisualChildren<System.Windows.Controls.Button>(window).Single(item => System.Windows.Automation.AutomationProperties.GetName(item) == "Refresh quota");
                 Assert.IsAssignableFrom<System.Windows.Input.ICommand>(button.Command);
@@ -311,8 +315,11 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal(new[] { "{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", "{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" }, cards.Select(card => card.Attribute("Visibility")?.Value));
         Assert.All(cards, card => Assert.Contains("percentage, reset, and state", card.Attribute(presentation + "AutomationProperties.HelpText")?.Value));
         var values = window.Descendants().Attributes().Select(attribute => attribute.Value).ToArray();
-        Assert.Equal(2, values.Count(value => value.Contains("TargetNullValue=--", StringComparison.Ordinal)));
-        Assert.Equal(2, values.Count(value => value.Contains("TargetNullValue=unavailable", StringComparison.Ordinal)));
+        var codexValues = cards.SelectMany(card => card.DescendantsAndSelf().Attributes()).Select(attribute => attribute.Value).ToArray();
+        Assert.Equal(2, codexValues.Count(value => value.Contains("TargetNullValue=--", StringComparison.Ordinal)));
+        Assert.Equal(2, codexValues.Count(value => value.Contains("TargetNullValue=unavailable", StringComparison.Ordinal)));
+        Assert.Equal(4, values.Count(value => value.Contains("TargetNullValue=--", StringComparison.Ordinal)));
+        Assert.Equal(4, values.Count(value => value.Contains("TargetNullValue=unavailable", StringComparison.Ordinal)));
         Assert.Equal(3, values.Count(value => value == "{Binding FreshnessLabel}"));
         var scrollers = window.Descendants(presentation + "ScrollViewer").ToArray();
         Assert.Equal("SecondaryScrollViewer", scrollers[0].Attribute(x + "Name")?.Value);
@@ -332,7 +339,9 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal("0", summary.Attribute("Grid.Row")?.Value);
         Assert.True(window.Descendants().Count(element => element.Attribute(presentation + "AutomationProperties.LiveSetting")?.Value == "Polite") >= 3);
         var progress = window.Descendants(presentation + "ProgressBar").ToArray();
-        Assert.Equal(2, progress.Length); Assert.All(progress, item => { Assert.NotNull(item.Attribute(presentation + "AutomationProperties.Name")); Assert.Equal("{StaticResource QuotaProgressStyle}", item.Attribute("Style")?.Value); });
+        Assert.Equal(4, progress.Length);
+        Assert.Equal(new[] { "Weekly quota progress", "5-hour quota progress", "Claude weekly quota progress", "Claude 5-hour quota progress" }, progress.Select(item => item.Attribute(presentation + "AutomationProperties.Name")?.Value));
+        Assert.All(progress, item => { Assert.NotNull(item.Attribute(presentation + "AutomationProperties.Name")); Assert.Equal("{StaticResource QuotaProgressStyle}", item.Attribute("Style")?.Value); });
         var progressStyle = resources.Descendants(presentation + "Style").Single(style => style.Attribute(x + "Key")?.Value == "QuotaProgressStyle");
         Assert.Equal("False", progressStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "Focusable").Attribute("Value")?.Value);
         Assert.Equal("False", progressStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "IsHitTestVisible").Attribute("Value")?.Value);

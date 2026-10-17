@@ -98,14 +98,15 @@ public sealed class BetaAnalyticsPresentation : INotifyPropertyChanged
     private readonly LocalCodexAnalyticsView _analytics;
     private readonly LocalUsagePresentationHost _localUsage;
 
-    public BetaAnalyticsPresentation(QuotaPresentationHost quota, LocalCodexAnalyticsView analytics, LocalUsagePresentationHost localUsage)
+    public BetaAnalyticsPresentation(QuotaPresentationHost quota, LocalCodexAnalyticsView analytics, LocalUsagePresentationHost localUsage, ClaudeQuotaPresentationHost? claude = null)
     {
-        _quota = quota; _analytics = analytics; _localUsage = localUsage;
+        _quota = quota; _analytics = analytics; _localUsage = localUsage; Claude = claude;
         _quota.PropertyChanged += OnQuotaChanged;
         _analytics.PropertyChanged += OnAnalyticsChanged;
         _localUsage.PropertyChanged += OnLocalUsageChanged;
     }
 
+    public ClaudeQuotaPresentationHost? Claude { get; }
     public QuotaWindowPresentation Primary => _quota.Primary;
     public QuotaWindowPresentation Weekly => _quota.Weekly;
     public string FreshnessLabel => _quota.FreshnessLabel;
