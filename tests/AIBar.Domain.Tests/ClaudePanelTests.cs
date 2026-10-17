@@ -277,7 +277,9 @@ public sealed class ClaudePanelTests
     }
     private static string[] AutomationNames(MainWindow window) => AutomationElement.FromHandle(new WindowInteropHelper(window).EnsureHandle())
         .FindAll(TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition).Cast<AutomationElement>().Select(item => item.Current.Name).ToArray();
-    private static IEnumerable<string> VisibleText(DependencyObject root) => Visuals<TextBlock>(root).Where(item => item.IsVisible).Select(item => item.Text);
+    // Read rendered inline content: TextBlock.Text can stay empty for <Run> children.
+    private static IEnumerable<string> VisibleText(DependencyObject root) => Visuals<TextBlock>(root).Where(item => item.IsVisible)
+        .Select(item => new System.Windows.Documents.TextRange(item.ContentStart, item.ContentEnd).Text);
     private static Color ColorOf(object brush) => Assert.IsType<SolidColorBrush>(brush).Color;
     private static IEnumerable<T> Visuals<T>(DependencyObject root) where T : DependencyObject
     {
