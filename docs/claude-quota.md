@@ -22,7 +22,7 @@ Claude has its own loading, unavailable and stale-cache status. If its login is 
 
 While enabled, Claude uses the same five-minute polling cadence, cache-first freshness and throttling policy as Codex. Its normalized usage windows live in `%LOCALAPPDATA%\AIBar\claude-quota.db`, separate from Codex's `quota.db`. Consent is a separate decision in `settings.json`. Credential contents, tokens and credential paths are never logged or persisted in quota data.
 
-**Clear AIBar Data** cancels Claude work before removing `claude-quota.db`, its `-wal` and `-shm` sidecars, and consent settings (alongside the other AIBar-owned data). Claude stays off until explicitly enabled again. The Claude Code login is never deleted or modified.
+**Clear AIBar Data** cancels Claude work before removing `claude-quota.db`, its `-wal` and `-shm` sidecars, consent settings and the Claude YASB export (alongside the other AIBar-owned data). Claude stays off until explicitly enabled again. The Claude Code login is never deleted or modified.
 
 ## YASB: add the second widget
 
@@ -32,4 +32,4 @@ While enabled, Claude uses the same five-minute polling cadence, cache-first fre
 
 The no-argument reader and Codex export remain unchanged. Claude opts in with the exact, case-sensitive arguments `-Provider Claude` and reads `%LOCALAPPDATA%\AIBar\yasb-claude-quota.json`, not Codex's `yasb-quota.json`. Other nonempty argument lists return the existing safe unavailable output and exit code 1.
 
-Claude uses the same schema-v1 property order and atomic, ACL-verified, reparse-rejecting writer as Codex. Neither export contains tokens, credential paths or plan text. Cached values alone never unlock publication after enable: a new retrieval is required (or a failed attempt without cache produces a sanitized unavailable state). Revoking consent, clearing AIBar data or quitting drains pending Claude writes and leaves a disabled document with null usage/source fields. Shutdown retains consent and the internal normalized cache; it does not retain valued widget output.
+Claude uses the same schema-v1 property order and atomic, ACL-verified, reparse-rejecting writer as Codex. Neither export contains tokens, credential paths or plan text. Cached values alone never unlock publication after enable: a new retrieval is required (or a failed attempt without cache produces a sanitized unavailable state). Revoking consent or quitting drains pending Claude writes and leaves a disabled document with null usage/source fields. **Clear AIBar Data** drains them and then deletes `yasb-claude-quota.json`, like Codex's `yasb-quota.json`. Shutdown retains consent and the internal normalized cache; it does not retain valued widget output.
