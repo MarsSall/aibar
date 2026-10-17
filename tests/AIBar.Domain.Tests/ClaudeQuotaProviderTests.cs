@@ -48,7 +48,7 @@ public sealed class ClaudeQuotaProviderTests
     public async Task Reader_parses_nested_access_token_unix_milliseconds_and_subscription_type()
     {
         var expires = Now.AddHours(2);
-        var json = $$"""{"claudeAiOauth":{"accessToken":"{{Token}}","expiresAt":{{expires.ToUnixTimeMilliseconds()}},"subscriptionType":"max","refreshToken":"{{RefreshToken}}"}}""";
+        var json = $$$"""{"claudeAiOauth":{"accessToken":"{{{Token}}}","expiresAt":{{{expires.ToUnixTimeMilliseconds()}}},"subscriptionType":"max","refreshToken":"{{{RefreshToken}}}"}}""";
         using var credential = await new ClaudeCredentialReader(new StubFiles(json)).ReadAsync(Root, CancellationToken.None);
 
         Assert.Equal(Token, credential!.AccessToken);
@@ -60,7 +60,7 @@ public sealed class ClaudeQuotaProviderTests
     [Fact]
     public async Task Reader_allows_missing_optional_expiry_and_subscription()
     {
-        using var credential = await new ClaudeCredentialReader(new StubFiles($$"""{"claudeAiOauth":{"accessToken":"{{Token}}"}}""")).ReadAsync(Root, CancellationToken.None);
+        using var credential = await new ClaudeCredentialReader(new StubFiles($$$"""{"claudeAiOauth":{"accessToken":"{{{Token}}}"}}""")).ReadAsync(Root, CancellationToken.None);
         Assert.Equal(Token, credential!.AccessToken);
         Assert.Null(credential.ExpiresAt);
         Assert.Null(credential.SubscriptionType);
@@ -115,7 +115,7 @@ public sealed class ClaudeQuotaProviderTests
     public async Task Expiry_at_or_inside_sixty_second_margin_requires_login_without_HTTP_or_refresh(int seconds)
     {
         var handler = new StubHandler();
-        var json = $$"""{"claudeAiOauth":{"accessToken":"{{Token}}","expiresAt":{{Now.AddSeconds(seconds).ToUnixTimeMilliseconds()}},"refreshToken":"{{RefreshToken}}"}}""";
+        var json = $$$"""{"claudeAiOauth":{"accessToken":"{{{Token}}}","expiresAt":{{{Now.AddSeconds(seconds).ToUnixTimeMilliseconds()}}},"refreshToken":"{{{RefreshToken}}}"}}""";
         var files = new StubFiles(json);
         AssertFailure(await Provider(handler, files).GetQuotaAsync(CancellationToken.None), QuotaErrorKind.Authentication, "quota_authentication");
         Assert.Equal(0, handler.Calls);
@@ -126,7 +126,7 @@ public sealed class ClaudeQuotaProviderTests
     [Fact]
     public async Task Expiry_outside_margin_allows_one_usage_request_without_refresh()
     {
-        var json = $$"""{"claudeAiOauth":{"accessToken":"{{Token}}","expiresAt":{{Now.AddSeconds(61).ToUnixTimeMilliseconds()}},"refreshToken":"{{RefreshToken}}"}}""";
+        var json = $$$"""{"claudeAiOauth":{"accessToken":"{{{Token}}}","expiresAt":{{{Now.AddSeconds(61).ToUnixTimeMilliseconds()}}},"refreshToken":"{{{RefreshToken}}}"}}""";
         var handler = new StubHandler(Json(Valid));
         var result = await Provider(handler, new StubFiles(json)).GetQuotaAsync(CancellationToken.None);
         Assert.Null(result.Failure);
