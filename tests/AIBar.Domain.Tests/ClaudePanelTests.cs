@@ -329,7 +329,14 @@ public sealed class ClaudePanelTests
             Window = new MainWindow { Width = 420, Height = 720, SizeToContent = SizeToContent.Manual, DataContext = Composition.Presentation };
             Window.Show(); Pump(); Window.UpdateLayout();
         }
-        public void Enable() { Wait(Composition.ClaudeQuota.GrantConsentAsync(default).AsTask()); Window.UpdateLayout(); }
+        public void Enable()
+        {
+            Wait(Composition.ClaudeQuota.GrantConsentAsync(default).AsTask());
+            Window.UpdateLayout();
+            // Let pending bindings (including inline Runs) resolve, like the existing panel tests do.
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            Window.UpdateLayout();
+        }
         public void Revoke() { Wait(Composition.ClaudeQuota.RevokeConsentAsync(default).AsTask()); Window.UpdateLayout(); }
         public void Dispose()
         {

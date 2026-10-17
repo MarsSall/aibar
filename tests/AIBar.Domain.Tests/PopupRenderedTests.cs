@@ -58,7 +58,11 @@ public sealed class PopupRenderedTests
                 var quotaCards = cards.Children.OfType<GroupBox>().ToArray();
                 var claudeSection = Assert.IsType<StackPanel>(window.FindName("ClaudeQuotaSection"));
                 Assert.Equal(Visibility.Collapsed, claudeSection.Visibility);
-                Assert.Equal(2, Visuals<ProgressBar>(claudeSection).Count());
+                // A collapsed section is never measured, so count its meters in the logical tree.
+                static IEnumerable<object> Logical(object node) => node is DependencyObject parent
+                    ? LogicalTreeHelper.GetChildren(parent).Cast<object>().SelectMany(child => Logical(child).Prepend(child))
+                    : Enumerable.Empty<object>();
+                Assert.Equal(2, Logical(claudeSection).OfType<ProgressBar>().Count());
                 var progress = quotaCards.SelectMany(Visuals<ProgressBar>).ToArray(); var refresh = Visuals<Button>(footer).Single(button => AutomationProperties.GetName(button) == "Refresh quota"); var expanders = Visuals<Expander>(secondary).Where(item => item != details).ToArray();
                 Assert.Equal(new[] { 0, 1, 2, 3 }, children.Select(Grid.GetRow)); Assert.Equal(10, expanders.Length); Assert.Equal(KeyboardNavigationMode.Continue, KeyboardNavigation.GetTabNavigation(root));
                 Assert.Equal(rows.Select(row => row.AutomationLabel), expanders.Select(AutomationProperties.GetName)); Assert.All(expanders.Cast<Control>().Append(refresh), control => { Assert.True(control.Focusable && control.IsTabStop); Assert.NotNull(control.FocusVisualStyle); });
