@@ -237,7 +237,12 @@ public sealed class PanelDetailsTests
             IsRefreshAvailable = true, FreshnessLabel = "Current",
             Primary = new QuotaWindowPresentation("5-hour quota", 25m, "01h 00m"),
             Weekly = new QuotaWindowPresentation("Weekly quota", 40m, "03d 00h"),
-            State = new { IsWeeklyAvailable = true, IsPrimaryAvailable = true, Disclosure = "Quota disclosure" },
+            State = new
+            {
+                IsWeeklyAvailable = true, IsPrimaryAvailable = true, Disclosure = "Quota disclosure",
+                IsLoading = false, IsMissingCredential = false, IsOffline = false, IsDegraded = false,
+                IsUnavailable = false, IsPrivateIntegrationDisabled = false, IsSafeError = false
+            },
             PrivateEndpointDisclosure = "Private endpoint disclosure",
             Analytics = new { SourceDetail = "Local", TotalTokensLabel = "100", ModelTotalsLabel = "model" },
             LocalUsage = new
