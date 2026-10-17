@@ -235,9 +235,13 @@ aibar_quota:
     callbacks:
       on_left: 'exec "<AIBarRoot>\AIBar.Desktop.exe" --show'
 '@
-        $actualYaml = ($yaml -replace "`r`n", "`n").TrimEnd()
+        $blocks = [regex]::Split(($yaml -replace "`r`n", "`n").TrimEnd(), '(?m)(?=^aibar_claude_quota:)')
+        $blocks.Count | Should -Be 2
+        $actualYaml = $blocks[0].TrimEnd()
         $expectedYaml = ($expected -replace "`r`n", "`n").TrimEnd()
-        $actualYaml | Should -Be $expectedYaml
+        $actualYaml | Should -BeExactly $expectedYaml
+        $expectedClaude = $expectedYaml.Replace('aibar_quota:', 'aibar_claude_quota:').Replace('read-aibar-quota.ps1"''', 'read-aibar-quota.ps1" -Provider Claude''')
+        $blocks[1].TrimEnd() | Should -BeExactly $expectedClaude
         $yaml | Should -Match '(?m)^    exec_options:\r?$'
         $yaml | Should -Match '(?m)^      run_cmd: ''powershell\.exe .*<AIBarRoot>\\yasb\\read-aibar-quota\.ps1"''\r?$'
         $yaml | Should -Match '(?m)^      run_interval: 60000\r?$'

@@ -24,4 +24,12 @@ While enabled, Claude uses the same five-minute polling cadence, cache-first fre
 
 **Clear AIBar Data** cancels Claude work before removing `claude-quota.db`, its `-wal` and `-shm` sidecars, and consent settings (alongside the other AIBar-owned data). Claude stays off until explicitly enabled again. The Claude Code login is never deleted or modified.
 
-Claude YASB presentation is separate work; the existing Codex widget and export remain unchanged.
+## YASB: add the second widget
+
+1. In `yasb/custom-widget.example.yaml`, configure `<AIBarRoot>` as your extracted AIBar directory. Keep the existing `aibar_quota` definition and add `aibar_claude_quota` to your YASB configuration.
+2. Add `aibar_claude_quota` beside `aibar_quota` in your bar's widget list, then reload YASB. Both use the same stylesheet and left-click `AIBar.Desktop.exe --show` callback to open the panel.
+3. Enable Claude quota in AIBar. The second widget displays, for example, **Claude 37%**; the weekly window is preferred, with 5-hour usage used when weekly is absent. Alternate text and the tooltip identify Claude too. Invalid or missing data displays **Claude unavailable**.
+
+The no-argument reader and Codex export remain unchanged. Claude opts in with the exact, case-sensitive arguments `-Provider Claude` and reads `%LOCALAPPDATA%\AIBar\yasb-claude-quota.json`, not Codex's `yasb-quota.json`. Other nonempty argument lists return the existing safe unavailable output and exit code 1.
+
+Claude uses the same schema-v1 property order and atomic, ACL-verified, reparse-rejecting writer as Codex. Neither export contains tokens, credential paths or plan text. Cached values alone never unlock publication after enable: a new retrieval is required (or a failed attempt without cache produces a sanitized unavailable state). Revoking consent, clearing AIBar data or quitting drains pending Claude writes and leaves a disabled document with null usage/source fields. Shutdown retains consent and the internal normalized cache; it does not retain valued widget output.

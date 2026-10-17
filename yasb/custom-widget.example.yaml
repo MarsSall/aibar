@@ -12,3 +12,18 @@ aibar_quota:
       return_format: "json"
     callbacks:
       on_left: 'exec "<AIBarRoot>\AIBar.Desktop.exe" --show'
+
+aibar_claude_quota:
+  type: "yasb.custom.CustomWidget"
+  options:
+    label: "<font color='{data[progressColor]}'>{data[progressGlyph]}</font> {data[compactText]}"
+    label_alt: "{data[label]}"
+    class_name: "aibar-quota"
+    tooltip: true
+    tooltip_label: "{data[tooltip]}"
+    exec_options:
+      run_cmd: 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "<AIBarRoot>\yasb\read-aibar-quota.ps1" -Provider Claude'
+      run_interval: 60000
+      return_format: "json"
+    callbacks:
+      on_left: 'exec "<AIBarRoot>\AIBar.Desktop.exe" --show'

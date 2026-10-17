@@ -86,7 +86,10 @@ public partial class App : System.Windows.Application
             seams.ClaudeProviderFactory ?? (claudePolicy => new ClaudeQuotaHttpProvider(claudePolicy,
                 new ClaudeConsentCredentialSource(claudePolicy, new ClaudeCredentialReader(new ReadOnlyCredentialFileReader()),
                     ClaudeRootResolver.Resolve(Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"), userProfile)))),
-            clock, lifecycleEvents, seams.ClaudeTimeProvider);
+            clock, lifecycleEvents, seams.ClaudeTimeProvider,
+            seams.ClaudeExportWriter ?? (seams.DataDirectory is null
+                ? WindowsAtomicQuotaExportWriter.ForClaudeCurrentUser()
+                : WindowsAtomicQuotaExportWriter.ForClaudeOwnedSyntheticDataDirectory(dataDirectory)));
         var lifecycleAdapter = new QuotaRefreshLifecycleAdapter(lifecycleEvents, coordinator);
         var claudePresentation = new ClaudeQuotaPresentationHost(claudeRuntime, new ClaudeQuotaPresentationMapper(clock));
         var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents, claudePresentation);

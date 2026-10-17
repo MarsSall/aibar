@@ -15,6 +15,8 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private readonly TimeProvider _timeProvider;
     private readonly PrivateIntegrationPolicy _policy = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly IQuotaExportWriter? _exportWriter;
+    private QuotaExportPublisher? _publisher;
     private QuotaRefreshCoordinator? _coordinator;
     private IQuotaProvider? _provider;
     private CancellationTokenSource? _pollCancellation;
@@ -28,8 +30,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         IQuotaRefreshLifecycleEvents? lifecycle = null, TimeProvider? timeProvider = null,
         IQuotaExportWriter? exportWriter = null)
     {
-        // T4 RED seam: legacy callers stay unchanged until export ownership is implemented.
-        if (exportWriter is not null) throw new NotImplementedException();
+        _exportWriter = exportWriter;
         _settings = settings; _store = store; _providerFactory = providerFactory; _clock = clock;
         _lifecycle = lifecycle; _timeProvider = timeProvider ?? TimeProvider.System;
         if (_lifecycle is not null)
@@ -38,7 +39,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         }
     }
 
-    internal Task ExportCompletion => throw new NotImplementedException();
+    internal Task ExportCompletion => _publisher?.PublicationCompletion ?? Task.CompletedTask;
 
     public static string DatabasePath(string dataDirectory) => Path.Combine(dataDirectory, "claude-quota.db");
     public string Disclosure => ConsentDisclosure;
@@ -58,6 +59,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             if (_initialized) return;
             _initialized = true;
             if (await _settings.LoadClaudeAsync(cancellationToken)) await EnableCoreAsync(cancellationToken);
+            else await StopExportAsync();
         }
         finally { _gate.Release(); }
         _ = RefreshInitiallyAsync();
@@ -95,6 +97,11 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
                 new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
             _coordinator.StateChanged += OnStateChanged;
             await _coordinator.InitializeAsync(cancellationToken);
+            if (_exportWriter is not null)
+            {
+                _publisher = new QuotaExportPublisher(_coordinator, _exportWriter, _clock);
+                await _publisher.EnableAsync(cancellationToken);
+            }
             _enabled = true;
             _timer = _timeProvider.CreateTimer(_ => Forward(RefreshTrigger.Poll), null,
                 TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
@@ -140,12 +147,18 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         if (_timer is not null) await _timer.DisposeAsync();
         try
         {
-            if (_coordinator is not null)
+            // Cancel and drain publication before clearing the authority: no late valued write
+            // may outlive a privacy exit, even when the writer ignores cancellation.
+            try { await StopExportAsync(); }
+            finally
             {
-                // The wrapper rejects not-yet-entered saves. Awaiting drains an already-entered
-                // save before clearing it, even if an injected provider/store ignores cancellation.
-                await _coordinator.CancelAndWaitAsync(CancellationToken.None);
-                await _coordinator.ClearAsync(CancellationToken.None);
+                if (_coordinator is not null)
+                {
+                    // The wrapper rejects not-yet-entered saves. Awaiting drains an already-entered
+                    // save before clearing it, even if an injected provider/store ignores cancellation.
+                    await _coordinator.CancelAndWaitAsync(CancellationToken.None);
+                    await _coordinator.ClearAsync(CancellationToken.None);
+                }
             }
         }
         finally
@@ -160,6 +173,21 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             _coordinator = null; _provider = null; _timer = null;
             _pollCancellation?.Dispose(); _pollCancellation = null;
         }
+    }
+
+    private async ValueTask StopExportAsync()
+    {
+        var publisher = _publisher;
+        try
+        {
+            if (publisher is not null) await publisher.DisposeAsync();
+            else if (_exportWriter is not null)
+            {
+                var now = _clock.UtcNow;
+                await _exportWriter.WriteAsync(QuotaExportWire.Disabled(now), now, CancellationToken.None);
+            }
+        }
+        finally { _publisher = null; }
     }
 
     public async ValueTask CancelAndWaitAsync(CancellationToken cancellationToken)
@@ -208,15 +236,19 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             // Shutdown retains the normalized cache and consent; unlike revoke/clear it is not a reset.
             _enabled = false; _policy.Disable(); _pollCancellation?.Cancel();
             if (_timer is not null) await _timer.DisposeAsync();
-            if (_coordinator is not null)
+            try { await StopExportAsync(); }
+            finally
             {
-                _coordinator.StateChanged -= OnStateChanged;
-                await _coordinator.DisposeAsync();
+                if (_coordinator is not null)
+                {
+                    _coordinator.StateChanged -= OnStateChanged;
+                    await _coordinator.DisposeAsync();
+                }
+                if (_provider is IAsyncDisposable asyncProvider) await asyncProvider.DisposeAsync();
+                else if (_provider is IDisposable provider) provider.Dispose();
+                _pollCancellation?.Dispose();
+                if (_store is IAsyncDisposable store) await store.DisposeAsync();
             }
-            if (_provider is IAsyncDisposable asyncProvider) await asyncProvider.DisposeAsync();
-            else if (_provider is IDisposable provider) provider.Dispose();
-            _pollCancellation?.Dispose();
-            if (_store is IAsyncDisposable store) await store.DisposeAsync();
         }
         finally { _gate.Release(); }
     }
