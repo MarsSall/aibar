@@ -167,9 +167,10 @@ public sealed class PanelDetailsTests
         WpfTestApplicationHost.Run(app =>
         {
             var original = app.Resources.MergedDictionaries[0];
-            const string total = "1275133661 retained tokens";
+            const string total = "1234567890 retained tokens";
             var window = CreateWindow(total);
             window.Width = width;
+            window.SizeToContent = SizeToContent.Height;
             try
             {
                 app.Resources.MergedDictionaries[0] = ThemeDictionaries.Create(theme);
@@ -202,6 +203,12 @@ public sealed class PanelDetailsTests
                 SaveRender(root, theme, width, "expanded");
                 toggle.Collapse(); window.UpdateLayout();
                 Assert.DoesNotContain(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
+                var enter = new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice,
+                    PresentationSource.FromVisual(window), 0, System.Windows.Input.Key.Enter)
+                    { RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent };
+                details.RaiseEvent(enter);
+                Assert.True(enter.Handled && !details.IsExpanded);
+                window.UpdateLayout();
                 foreach (var child in root.Children.OfType<FrameworkElement>())
                 {
                     var bounds = child.TransformToAncestor(root).TransformBounds(new Rect(child.RenderSize));
@@ -220,6 +227,11 @@ public sealed class PanelDetailsTests
         Directory.CreateDirectory(directory);
         var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
             (int)Math.Ceiling(root.ActualWidth), (int)Math.Ceiling(root.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+        // The root Grid is transparent; include its real Window background in the export.
+        var background = new DrawingVisual();
+        using (var drawing = background.RenderOpen())
+            drawing.DrawRectangle(Window.GetWindow(root).Background, null, new Rect(root.RenderSize));
+        bitmap.Render(background);
         bitmap.Render(root);
         var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
         png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
