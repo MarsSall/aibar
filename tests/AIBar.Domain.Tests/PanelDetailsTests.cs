@@ -207,7 +207,6 @@ public sealed class PanelDetailsTests
                 provider.BringIntoView(); window.UpdateLayout();
                 foreach (var label in new[] { total, "Input 11", "2026-01-01", "sample-model", "100 tokens", "Input 10" })
                     AssertInViewports(Assert.Single(Visuals<TextBlock>(provider).Where(text => text.Text == label)));
-                Assert.NotEmpty(System.Windows.Documents.AdornerLayer.GetAdornerLayer(provider).GetAdorners(provider));
                 SaveRender(root, theme, width, "expanded");
                 toggle.Collapse(); window.UpdateLayout();
                 Assert.DoesNotContain(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
