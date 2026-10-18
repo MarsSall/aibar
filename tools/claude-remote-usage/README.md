@@ -30,8 +30,8 @@ Only this UTF-8, schema-v1 contract (at most 4096 bytes) is pushed to Windows:
 The property order is fixed. Windows receive path:
 `%LOCALAPPDATA%\AIBar\claude-remote-usage.json`. Windows must run under the same
 account/home as the configured SSH destination. Usage is 0–100; reset timestamps
-are normalized to UTC `Z`, or null when absent. Non-current states have both
-windows null. Tokens, account/plan/email, paths, error details and HTTP bodies
+are normalized to UTC `Z` and required: a window without a reset time is sent as
+null. Non-current states have both windows null. Tokens, account/plan/email, paths, error details and HTTP bodies
 are never output, logged, or pushed. Normal logs contain only state and UTC time.
 The token is necessarily handled in Python process memory, not erased securely.
 
