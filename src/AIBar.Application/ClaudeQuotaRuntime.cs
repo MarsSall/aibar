@@ -23,6 +23,10 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private IQuotaProvider? _provider;
     private CancellationTokenSource? _pollCancellation;
     private ITimer? _timer;
+    private readonly object _deadlineGate = new();
+    private ITimer? _remoteDeadlineTimer;
+    private long _deadlineGeneration;
+    private static readonly TimeSpan RemoteFreshness = TimeSpan.FromMinutes(15);
     private bool _initialized;
     private bool _disposed;
     private volatile bool _enabled;
@@ -71,11 +75,83 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         await RefreshAsync(RefreshTrigger.Manual, CancellationToken.None);
     }
     public bool IsConsentEnabled => _enabled;
-    public QuotaRefreshState State => _enabled ? _coordinator?.State ?? Empty : Empty;
+    public QuotaRefreshState State
+    {
+        get
+        {
+            var state = _enabled ? _coordinator?.State ?? Empty : Empty;
+            // Project freshness as well as notifying at the deadline: a delayed UI dispatch
+            // must never turn an expired remote snapshot back into Current.
+            return _source == ClaudeQuotaSource.OtherMachine && state.Snapshot is { } snapshot &&
+                _clock.UtcNow >= snapshot.RetrievedAt + RemoteFreshness
+                ? state with { Freshness = FreshnessState.Stale } : state;
+        }
+    }
     public TimeSpan? CachedAge => State.Snapshot is { } snapshot ? _clock.UtcNow - snapshot.RetrievedAt : null;
     public event Action? ConsentChanged;
     public event Action? StateChanged;
-    private void OnStateChanged(QuotaRefreshState state) => StateChanged?.Invoke();
+    private void OnStateChanged(QuotaRefreshState state)
+    {
+        ScheduleRemoteDeadline();
+        StateChanged?.Invoke();
+    }
+
+    private void ScheduleRemoteDeadline()
+    {
+        lock (_deadlineGate)
+        {
+            CancelRemoteDeadlineLocked();
+            if (!_enabled || _disposed || _source != ClaudeQuotaSource.OtherMachine ||
+                _coordinator?.State.Snapshot is not { } snapshot) return;
+            var remaining = snapshot.RetrievedAt + RemoteFreshness - _clock.UtcNow;
+            if (remaining <= TimeSpan.Zero) return;
+            var generation = _deadlineGeneration;
+            _remoteDeadlineTimer = _timeProvider.CreateTimer(_ =>
+            {
+                try { ExpireRemoteDeadline(generation); }
+                catch (Exception) { /* Never trace subscriber exceptions or private state. */ }
+            }, null, DeadlineDelay(remaining), Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private void ExpireRemoteDeadline(long generation)
+    {
+        lock (_deadlineGate)
+        {
+            // Disposed/replaced timers may already have queued callbacks. They cannot
+            // publish on behalf of an old source, consent, or snapshot generation.
+            if (generation != _deadlineGeneration || !_enabled || _disposed ||
+                _source != ClaudeQuotaSource.OtherMachine) return;
+            if (_coordinator?.State.Snapshot is { } snapshot)
+            {
+                var remaining = snapshot.RetrievedAt + RemoteFreshness - _clock.UtcNow;
+                if (remaining > TimeSpan.Zero)
+                {
+                    _remoteDeadlineTimer?.Change(DeadlineDelay(remaining), Timeout.InfiniteTimeSpan);
+                    return;
+                }
+            }
+            CancelRemoteDeadlineLocked();
+        }
+        // No provider read, polling, or new failure: retain values and existing guidance.
+        StateChanged?.Invoke();
+    }
+
+    // Keep system timers in range even after a large backward wall-clock correction.
+    private static TimeSpan DeadlineDelay(TimeSpan remaining) =>
+        remaining > TimeSpan.FromDays(1) ? TimeSpan.FromDays(1) : remaining;
+
+    private void CancelRemoteDeadline()
+    {
+        lock (_deadlineGate) CancelRemoteDeadlineLocked();
+    }
+
+    private void CancelRemoteDeadlineLocked()
+    {
+        _deadlineGeneration++;
+        _remoteDeadlineTimer?.Dispose();
+        _remoteDeadlineTimer = null;
+    }
 
     public async ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
@@ -132,6 +208,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
                 await _publisher.EnableAsync(cancellationToken);
             }
             _enabled = true;
+            ScheduleRemoteDeadline();
             _timer = _timeProvider.CreateTimer(_ => Forward(RefreshTrigger.Poll), null,
                 TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
             ConsentChanged?.Invoke();
@@ -172,6 +249,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private async ValueTask StopCoreAsync()
     {
         _enabled = false; _policy.Disable();
+        CancelRemoteDeadline();
         _pollCancellation?.Cancel();
         if (_timer is not null) await _timer.DisposeAsync();
         try
@@ -241,6 +319,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private void OnResumed() => Forward(RefreshTrigger.Resume);
     private void OnClockChanged()
     {
+        ScheduleRemoteDeadline();
         Forward(RefreshTrigger.ClockChanged);
         // Recalculate reset countdowns even when freshness and polling eligibility did not change.
         StateChanged?.Invoke();
@@ -264,6 +343,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             }
             // Shutdown retains the normalized cache and consent; unlike revoke/clear it is not a reset.
             _enabled = false; _policy.Disable(); _pollCancellation?.Cancel();
+            CancelRemoteDeadline();
             if (_timer is not null) await _timer.DisposeAsync();
             try { await StopExportAsync(); }
             finally
