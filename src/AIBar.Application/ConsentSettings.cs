@@ -17,9 +17,17 @@ public sealed class ConsentSettings(string path)
     public async ValueTask<bool> LoadClaudeAsync(CancellationToken cancellationToken) =>
         await ReadAsync<StoredConsent>(cancellationToken) is { Schema: Schema, PrivateClaudeConsent: true };
 
-    // RED seams: source selection is independent of either consent decision.
-    public ValueTask<ClaudeQuotaSource> LoadClaudeSourceAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
-    public ValueTask SaveClaudeSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public async ValueTask<ClaudeQuotaSource> LoadClaudeSourceAsync(CancellationToken cancellationToken)
+    {
+        var stored = await ReadAsync<StoredSource>(cancellationToken);
+        return stored is { Schema: Schema, ClaudeSource: { ValueKind: JsonValueKind.String } value } && value.GetString() == "other-machine"
+            ? ClaudeQuotaSource.OtherMachine : ClaudeQuotaSource.ThisPc;
+    }
+    public ValueTask SaveClaudeSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken)
+    {
+        if (source is not (ClaudeQuotaSource.ThisPc or ClaudeQuotaSource.OtherMachine)) throw new ArgumentOutOfRangeException(nameof(source));
+        return SaveDecisionAsync(null, null, cancellationToken, source);
+    }
 
     public ValueTask SaveAsync(bool enabled, CancellationToken cancellationToken) => SaveDecisionAsync(enabled, null, cancellationToken);
     public ValueTask SaveClaudeAsync(bool enabled, CancellationToken cancellationToken) => SaveDecisionAsync(null, enabled, cancellationToken);
@@ -36,7 +44,7 @@ public sealed class ConsentSettings(string path)
         catch (JsonException) { return null; }
     }
 
-    private async ValueTask SaveDecisionAsync(bool? codex, bool? claude, CancellationToken cancellationToken)
+    private async ValueTask SaveDecisionAsync(bool? codex, bool? claude, CancellationToken cancellationToken, ClaudeQuotaSource? source = null)
     {
         var gate = SaveGates.GetOrAdd(Path.GetFullPath(_path), _ => new(1, 1));
         await gate.WaitAsync(cancellationToken);
@@ -46,7 +54,9 @@ public sealed class ConsentSettings(string path)
             if (previous?.Schema != Schema) previous = null;
             if (previous is null && await ReadAsync<StoredCodexConsent>(cancellationToken) is { Schema: Schema } codexOnly)
                 previous = new(Schema, codexOnly.PrivateCodexConsent);
-            var settings = new StoredConsent(Schema, codex ?? previous?.PrivateCodexConsent ?? false, claude ?? previous?.PrivateClaudeConsent);
+            var sourceValue = source is null ? previous?.ClaudeSource :
+                JsonSerializer.SerializeToElement(source == ClaudeQuotaSource.OtherMachine ? "other-machine" : "this-pc");
+            var settings = new StoredConsent(Schema, codex ?? previous?.PrivateCodexConsent ?? false, claude ?? previous?.PrivateClaudeConsent, sourceValue);
             var directory = Path.GetDirectoryName(_path) ?? throw new InvalidOperationException("Consent settings require a directory.");
             Directory.CreateDirectory(directory);
             var temporary = Path.Combine(directory, $".{Path.GetFileName(_path)}.{Guid.NewGuid():N}.tmp");
@@ -68,5 +78,10 @@ public sealed class ConsentSettings(string path)
     private sealed record StoredConsent(
         [property: JsonPropertyName("schema")] int Schema,
         [property: JsonPropertyName("privateCodexConsent")] bool PrivateCodexConsent,
-        [property: JsonPropertyName("privateClaudeConsent"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PrivateClaudeConsent = null);
+        [property: JsonPropertyName("privateClaudeConsent"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PrivateClaudeConsent = null,
+        [property: JsonPropertyName("claudeSource"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? ClaudeSource = null);
+
+    private sealed record StoredSource(
+        [property: JsonPropertyName("schema")] int Schema,
+        [property: JsonPropertyName("claudeSource")] JsonElement? ClaudeSource);
 }

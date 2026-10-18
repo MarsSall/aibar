@@ -5,11 +5,13 @@ namespace AIBar.Application;
 /// <summary>Independent, opt-in owner of Claude subscription quota work and normalized cache.</summary>
 public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
 {
-    public const string ConsentDisclosure = "Enable Claude subscription quota?\n\nAIBar will read the existing Claude Code login file on this PC read-only and query Anthropic's unofficial subscription-usage endpoint. AIBar will never refresh or change the login. Credential contents, tokens and paths are never logged or saved in quota data. You can turn this off at any time.";
+    public const string ConsentDisclosure = "Enable Claude subscription quota?\n\nIn this PC mode, AIBar will read the existing Claude Code login file on this PC read-only and query Anthropic's unofficial subscription-usage endpoint. In other machine mode, AIBar reads a usage file pushed from another computer; no credentials are read on this PC. AIBar will never refresh or change the login. Credential contents, tokens and paths are never logged or saved in quota data. You can turn this off at any time.";
     private static readonly QuotaRefreshState Empty = new(null, FreshnessState.Unavailable, false, null, null);
     private readonly ConsentSettings _settings;
     private readonly IQuotaSnapshotStore _store;
     private readonly Func<PrivateIntegrationPolicy, IQuotaProvider> _providerFactory;
+    private readonly Func<PrivateIntegrationPolicy, IQuotaProvider> _remoteProviderFactory;
+    private volatile ClaudeQuotaSource _source;
     private readonly IClock _clock;
     private readonly IQuotaRefreshLifecycleEvents? _lifecycle;
     private readonly TimeProvider _timeProvider;
@@ -32,6 +34,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         Func<PrivateIntegrationPolicy, IQuotaProvider>? remoteProviderFactory = null)
     {
         _exportWriter = exportWriter;
+        _remoteProviderFactory = remoteProviderFactory ?? (policy => new ClaudeRemoteUsageProvider(policy));
         _settings = settings; _store = store; _providerFactory = providerFactory; _clock = clock;
         _lifecycle = lifecycle; _timeProvider = timeProvider ?? TimeProvider.System;
         if (_lifecycle is not null)
@@ -44,9 +47,29 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
 
     public static string DatabasePath(string dataDirectory) => Path.Combine(dataDirectory, "claude-quota.db");
     public string Disclosure => ConsentDisclosure;
-    // RED seams; existing local callers remain unchanged until GREEN.
-    public ClaudeQuotaSource Source => throw new NotImplementedException();
-    public ValueTask SetSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public ClaudeQuotaSource Source => _source;
+    public event Action? SourceChanged;
+    public async ValueTask SetSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken)
+    {
+        if (source is not (ClaudeQuotaSource.ThisPc or ClaudeQuotaSource.OtherMachine)) throw new ArgumentOutOfRangeException(nameof(source));
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            ThrowIfDisposed();
+            if (_source == source) return;
+            await _settings.SaveClaudeSourceAsync(source, cancellationToken);
+            // Once persisted, finish the handoff even if the menu caller cancels.
+            var enabled = _enabled;
+            await StopCoreAsync();
+            if (!enabled) await _store.ClearAsync(CancellationToken.None);
+            _source = source;
+            if (enabled) await EnableCoreAsync(CancellationToken.None);
+            SourceChanged?.Invoke();
+            StateChanged?.Invoke();
+        }
+        finally { _gate.Release(); }
+        await RefreshAsync(RefreshTrigger.Manual, CancellationToken.None);
+    }
     public bool IsConsentEnabled => _enabled;
     public QuotaRefreshState State => _enabled ? _coordinator?.State ?? Empty : Empty;
     public TimeSpan? CachedAge => State.Snapshot is { } snapshot ? _clock.UtcNow - snapshot.RetrievedAt : null;
@@ -61,7 +84,9 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         {
             ThrowIfDisposed();
             if (_initialized) return;
+            _source = await _settings.LoadClaudeSourceAsync(cancellationToken);
             _initialized = true;
+            SourceChanged?.Invoke();
             if (await _settings.LoadClaudeAsync(cancellationToken)) await EnableCoreAsync(cancellationToken);
             else await StopExportAsync();
         }
@@ -96,9 +121,9 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         _pollCancellation = new();
         try
         {
-            _provider = _providerFactory(_policy);
+            _provider = (_source == ClaudeQuotaSource.OtherMachine ? _remoteProviderFactory : _providerFactory)(_policy);
             _coordinator = new(new ConsentStore(_store, _policy, _pollCancellation.Token), _provider, _clock,
-                new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
+                new FreshnessPolicy(TimeSpan.FromMinutes(_source == ClaudeQuotaSource.OtherMachine ? 15 : 10)), TimeSpan.FromMinutes(5));
             _coordinator.StateChanged += OnStateChanged;
             await _coordinator.InitializeAsync(cancellationToken);
             if (_exportWriter is not null)

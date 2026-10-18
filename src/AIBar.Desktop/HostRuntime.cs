@@ -60,7 +60,10 @@ public sealed class ClaudeQuotaTrayController : IDisposable
     {
         _tray = tray; _runtime = runtime; _prompt = prompt;
         _tray.ClaudeQuotaEnableRequested += OnEnable; _tray.ClaudeQuotaDisableRequested += OnDisable;
-        _runtime.ConsentChanged += Update; Update();
+        _runtime.ConsentChanged += Update;
+        _runtime.SourceChanged += Update;
+        if (_tray is IClaudeQuotaSourceTray sourceTray) sourceTray.ClaudeSourceRequested += OnSource;
+        Update();
     }
     public async ValueTask EnableAsync(CancellationToken cancellationToken)
     {
@@ -68,7 +71,16 @@ public sealed class ClaudeQuotaTrayController : IDisposable
         try { if (!_runtime.IsConsentEnabled && _prompt.Confirm()) await _runtime.GrantConsentAsync(cancellationToken); }
         finally { Volatile.Write(ref _granting, 0); Update(); }
     }
-    public ValueTask SetSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken) => throw new NotImplementedException();
+    public async ValueTask SetSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken)
+    {
+        if (_disposed) return;
+        try { await _runtime.SetSourceAsync(source, cancellationToken); }
+        finally { Update(); }
+    }
+    private async void OnSource(ClaudeQuotaSource source)
+    {
+        try { await SetSourceAsync(source, CancellationToken.None); } catch (Exception) { }
+    }
 
     public async ValueTask DisableAsync(CancellationToken cancellationToken)
     {
@@ -78,13 +90,20 @@ public sealed class ClaudeQuotaTrayController : IDisposable
     }
     private async void OnEnable() { try { await EnableAsync(CancellationToken.None); } catch (Exception) { } }
     private async void OnDisable() { try { await DisableAsync(CancellationToken.None); } catch (Exception) { } }
-    private void Update() { if (!_disposed) _tray.SetClaudeQuotaEnabled(_runtime.IsConsentEnabled); }
+    private void Update()
+    {
+        if (_disposed) return;
+        _tray.SetClaudeQuotaEnabled(_runtime.IsConsentEnabled);
+        if (_tray is IClaudeQuotaSourceTray sourceTray) sourceTray.SetClaudeSource(_runtime.Source);
+    }
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
         _tray.ClaudeQuotaEnableRequested -= OnEnable; _tray.ClaudeQuotaDisableRequested -= OnDisable;
         _runtime.ConsentChanged -= Update;
+        _runtime.SourceChanged -= Update;
+        if (_tray is IClaudeQuotaSourceTray sourceTray) sourceTray.ClaudeSourceRequested -= OnSource;
     }
 }
 
@@ -346,6 +365,9 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IC
     private readonly Forms.ToolStripMenuItem _resetOpenCodeFolder = new(OpenCodeDataFolderCopy.Reset) { AccessibleName = OpenCodeDataFolderCopy.Reset };
     private readonly Forms.ToolStripMenuItem _enableClaude = new("Enable Claude quota");
     private readonly Forms.ToolStripMenuItem _disableClaude = new("Disable Claude quota");
+    private readonly Forms.ToolStripMenuItem _claudeSource = new("Claude source");
+    private readonly Forms.ToolStripMenuItem _claudeThisPc = new("This PC") { Checked = true };
+    private readonly Forms.ToolStripMenuItem _claudeOtherMachine = new("Other machine");
     private bool _claudeAvailable;
     private bool _claudeEnabled;
     private bool _settingsAvailable;
@@ -353,6 +375,9 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IC
     public WindowsTrayRuntime()
     {
         var exit = new Forms.ToolStripMenuItem("Exit AIBar");
+        _claudeSource.DropDownItems.AddRange(new Forms.ToolStripItem[] { _claudeThisPc, _claudeOtherMachine });
+        _claudeThisPc.Click += (_, _) => ClaudeSourceRequested?.Invoke(ClaudeQuotaSource.ThisPc);
+        _claudeOtherMachine.Click += (_, _) => ClaudeSourceRequested?.Invoke(ClaudeQuotaSource.OtherMachine);
         _enableClaude.Click += (_, _) => ClaudeQuotaEnableRequested?.Invoke();
         _disableClaude.Click += (_, _) => ClaudeQuotaDisableRequested?.Invoke();
         _refresh.Click += (_, _) => RefreshRequested?.Invoke(); _startup.Click += (_, _) => StartupToggleRequested?.Invoke(); _clear.Click += (_, _) => ClearAiBarDataRequested?.Invoke(); _enablePrivate.Click += (_, _) => PrivateIntegrationEnableRequested?.Invoke(); _disablePrivate.Click += (_, _) => PrivateIntegrationDisableRequested?.Invoke(); _openCodeUsage.Click += (_, _) => OpenCodeLocalUsageToggleRequested?.Invoke(); _piUsage.Click += (_, _) => PiLocalUsageToggleRequested?.Invoke(); _chooseOpenCodeFolder.Click += (_, _) => OpenCodeDataFolderChooseRequested?.Invoke(); _resetOpenCodeFolder.Click += (_, _) => OpenCodeDataFolderResetRequested?.Invoke(); exit.Click += (_, _) => ExitRequested?.Invoke(); _menu.Items.Add(exit); _icon.ContextMenuStrip = _menu;
@@ -369,9 +394,14 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IC
     public event Action? PiLocalUsageToggleRequested;
     public event Action? OpenCodeDataFolderChooseRequested;
     public event Action? OpenCodeDataFolderResetRequested;
-    // RED event accessors deliberately do not attach behavior yet.
-    public event Action<ClaudeQuotaSource>? ClaudeSourceRequested { add { } remove { } }
-    public void SetClaudeSource(ClaudeQuotaSource source) => throw new NotImplementedException();
+    public event Action<ClaudeQuotaSource>? ClaudeSourceRequested;
+    public void SetClaudeSource(ClaudeQuotaSource source)
+    {
+        if (_menu.InvokeRequired) { _menu.BeginInvoke(new Action(() => SetClaudeSource(source))); return; }
+        _claudeThisPc.Checked = source == ClaudeQuotaSource.ThisPc;
+        _claudeOtherMachine.Checked = source == ClaudeQuotaSource.OtherMachine;
+        UpdateClaudeMenu();
+    }
     public event Action? ClaudeQuotaEnableRequested;
     public event Action? ClaudeQuotaDisableRequested;
     public void SetClaudeQuotaEnabled(bool enabled)
@@ -381,9 +411,12 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IC
     }
     private void UpdateClaudeMenu()
     {
-        _menu.Items.Remove(_enableClaude); _menu.Items.Remove(_disableClaude);
+        _menu.Items.Remove(_enableClaude); _menu.Items.Remove(_disableClaude); _menu.Items.Remove(_claudeSource);
         if (_claudeAvailable && _settingsAvailable)
+        {
             _menu.Items.Insert(Math.Max(0, _menu.Items.Count - 1), _claudeEnabled ? _disableClaude : _enableClaude);
+            _menu.Items.Insert(Math.Max(0, _menu.Items.Count - 1), _claudeSource);
+        }
     }
     public void SetRefreshAvailable(bool available)
     {

@@ -11,18 +11,21 @@ public sealed class ClaudeQuotaPresentationMapper
     private readonly QuotaPresentationMapper _mapper;
     public ClaudeQuotaPresentationMapper(IClock clock) => _mapper = new(clock);
 
-    // RED seam: retain local behavior until source-aware guidance is implemented.
-    public BetaPresentationState Map(QuotaRefreshState state, bool consentEnabled, ClaudeQuotaSource source) =>
-        Map(state, consentEnabled);
+    public BetaPresentationState Map(QuotaRefreshState state, bool consentEnabled) =>
+        Map(state, consentEnabled, ClaudeQuotaSource.ThisPc);
 
-    public BetaPresentationState Map(QuotaRefreshState state, bool consentEnabled)
+    public BetaPresentationState Map(QuotaRefreshState state, bool consentEnabled, ClaudeQuotaSource source)
     {
         if (!consentEnabled)
             return _mapper.Map(new(null, FreshnessState.Unavailable, false, null, null)) with
             { IsPrivateIntegrationDisabled = true, IsUnavailable = false };
         var mapped = _mapper.Map(state);
         var needsLogin = mapped.IsMissingCredential || state.Failure?.Kind == QuotaErrorKind.Authentication;
-        var warning = needsLogin ? "Open Claude Code on this PC to renew the session" : mapped.WarningLabel;
+        var warning = needsLogin
+            ? source == ClaudeQuotaSource.OtherMachine
+                ? "Open Claude Code on the other machine to renew the session"
+                : "Open Claude Code on this PC to renew the session"
+            : mapped.WarningLabel;
         return mapped with { WarningLabel = warning, ErrorLabel = warning };
     }
 }
@@ -38,9 +41,10 @@ public sealed class ClaudeQuotaPresentationHost : INotifyPropertyChanged, IDispo
     {
         _runtime = runtime; _mapper = mapper;
         IsEnabled = runtime.IsConsentEnabled;
-        State = mapper.Map(runtime.State, IsEnabled);
+        State = mapper.Map(runtime.State, IsEnabled, runtime.Source);
         runtime.StateChanged += OnChanged;
         runtime.ConsentChanged += OnChanged;
+        runtime.SourceChanged += OnChanged;
     }
     public bool IsEnabled { get; private set; }
     public BetaPresentationState State { get; private set; }
@@ -53,7 +57,7 @@ public sealed class ClaudeQuotaPresentationHost : INotifyPropertyChanged, IDispo
         var enabled = _runtime.IsConsentEnabled;
         var changed = enabled != IsEnabled;
         IsEnabled = enabled;
-        State = _mapper.Map(_runtime.State, enabled);
+        State = _mapper.Map(_runtime.State, enabled, _runtime.Source);
         PropertyChanged?.Invoke(this, new(nameof(State)));
         if (changed) PropertyChanged?.Invoke(this, new(nameof(IsEnabled)));
     }
@@ -63,5 +67,6 @@ public sealed class ClaudeQuotaPresentationHost : INotifyPropertyChanged, IDispo
         _disposed = true;
         _runtime.StateChanged -= OnChanged;
         _runtime.ConsentChanged -= OnChanged;
+        _runtime.SourceChanged -= OnChanged;
     }
 }
