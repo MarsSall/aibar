@@ -17,6 +17,10 @@ public sealed class ConsentSettings(string path)
     public async ValueTask<bool> LoadClaudeAsync(CancellationToken cancellationToken) =>
         await ReadAsync<StoredConsent>(cancellationToken) is { Schema: Schema, PrivateClaudeConsent: true };
 
+    // RED seams: source selection is independent of either consent decision.
+    public ValueTask<ClaudeQuotaSource> LoadClaudeSourceAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
+    public ValueTask SaveClaudeSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken) => throw new NotImplementedException();
+
     public ValueTask SaveAsync(bool enabled, CancellationToken cancellationToken) => SaveDecisionAsync(enabled, null, cancellationToken);
     public ValueTask SaveClaudeAsync(bool enabled, CancellationToken cancellationToken) => SaveDecisionAsync(null, enabled, cancellationToken);
 

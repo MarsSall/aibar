@@ -40,6 +40,13 @@ public interface IClaudeQuotaTray
     void SetClaudeQuotaEnabled(bool enabled);
 }
 
+// Separate optional capability keeps existing Claude/Codex tray fakes source-compatible.
+public interface IClaudeQuotaSourceTray
+{
+    event Action<ClaudeQuotaSource>? ClaudeSourceRequested;
+    void SetClaudeSource(ClaudeQuotaSource source);
+}
+
 /// <summary>Binds only the optional Claude capability; never changes Codex consent.</summary>
 public sealed class ClaudeQuotaTrayController : IDisposable
 {
@@ -61,6 +68,8 @@ public sealed class ClaudeQuotaTrayController : IDisposable
         try { if (!_runtime.IsConsentEnabled && _prompt.Confirm()) await _runtime.GrantConsentAsync(cancellationToken); }
         finally { Volatile.Write(ref _granting, 0); Update(); }
     }
+    public ValueTask SetSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken) => throw new NotImplementedException();
+
     public async ValueTask DisableAsync(CancellationToken cancellationToken)
     {
         if (_disposed) return;
@@ -322,7 +331,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     public ValueTask DisposeAsync() => new(ExitAsync());
 }
 
-public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IClaudeQuotaTray
+public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IClaudeQuotaTray, IClaudeQuotaSourceTray
 {
     private readonly Forms.NotifyIcon _icon = new() { Icon = SystemIcons.Application, Text = "AIBar", Visible = false };
     private readonly Forms.ContextMenuStrip _menu = new();
@@ -360,6 +369,9 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IC
     public event Action? PiLocalUsageToggleRequested;
     public event Action? OpenCodeDataFolderChooseRequested;
     public event Action? OpenCodeDataFolderResetRequested;
+    // RED event accessors deliberately do not attach behavior yet.
+    public event Action<ClaudeQuotaSource>? ClaudeSourceRequested { add { } remove { } }
+    public void SetClaudeSource(ClaudeQuotaSource source) => throw new NotImplementedException();
     public event Action? ClaudeQuotaEnableRequested;
     public event Action? ClaudeQuotaDisableRequested;
     public void SetClaudeQuotaEnabled(bool enabled)

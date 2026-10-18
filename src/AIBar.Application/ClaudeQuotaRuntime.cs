@@ -28,7 +28,8 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     public ClaudeQuotaRuntime(ConsentSettings settings, IQuotaSnapshotStore store,
         Func<PrivateIntegrationPolicy, IQuotaProvider> providerFactory, IClock clock,
         IQuotaRefreshLifecycleEvents? lifecycle = null, TimeProvider? timeProvider = null,
-        IQuotaExportWriter? exportWriter = null)
+        IQuotaExportWriter? exportWriter = null,
+        Func<PrivateIntegrationPolicy, IQuotaProvider>? remoteProviderFactory = null)
     {
         _exportWriter = exportWriter;
         _settings = settings; _store = store; _providerFactory = providerFactory; _clock = clock;
@@ -43,6 +44,9 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
 
     public static string DatabasePath(string dataDirectory) => Path.Combine(dataDirectory, "claude-quota.db");
     public string Disclosure => ConsentDisclosure;
+    // RED seams; existing local callers remain unchanged until GREEN.
+    public ClaudeQuotaSource Source => throw new NotImplementedException();
+    public ValueTask SetSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken) => throw new NotImplementedException();
     public bool IsConsentEnabled => _enabled;
     public QuotaRefreshState State => _enabled ? _coordinator?.State ?? Empty : Empty;
     public TimeSpan? CachedAge => State.Snapshot is { } snapshot ? _clock.UtcNow - snapshot.RetrievedAt : null;

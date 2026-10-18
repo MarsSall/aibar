@@ -11,6 +11,10 @@ public sealed class ClaudeQuotaPresentationMapper
     private readonly QuotaPresentationMapper _mapper;
     public ClaudeQuotaPresentationMapper(IClock clock) => _mapper = new(clock);
 
+    // RED seam: retain local behavior until source-aware guidance is implemented.
+    public BetaPresentationState Map(QuotaRefreshState state, bool consentEnabled, ClaudeQuotaSource source) =>
+        Map(state, consentEnabled);
+
     public BetaPresentationState Map(QuotaRefreshState state, bool consentEnabled)
     {
         if (!consentEnabled)
