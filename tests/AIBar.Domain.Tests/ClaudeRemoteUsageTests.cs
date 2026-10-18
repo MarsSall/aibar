@@ -378,6 +378,105 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
         Assert.Empty(store.Saved);
     }
 
+    // T3, S2: an open panel expires without waiting for the five-minute poll.
+    [Fact]
+    public async Task Remote_deadline_marks_cached_values_stale_without_polling_or_changing_guidance()
+    {
+        var time = new AdvancingTimeProvider();
+        var clock = new AdvancingClock(time);
+        var files = new Files(GeneratedAt(Now.AddMinutes(-14)));
+        await using var runtime = await RemoteRuntime(time, clock, files);
+        var mapper = new ClaudeQuotaPresentationMapper(clock);
+        var panel = mapper.Map(runtime.State, true, runtime.Source);
+        Assert.True(panel.IsCurrent);
+        var warning = panel.WarningLabel;
+        var error = panel.ErrorLabel;
+        var changes = 0;
+        runtime.StateChanged += () => { changes++; panel = mapper.Map(runtime.State, true, runtime.Source); };
+        var reads = files.Paths.Count;
+
+        time.Advance(TimeSpan.FromSeconds(59));
+        Assert.True(panel.IsCurrent);
+        Assert.Equal(0, changes);
+        time.Advance(TimeSpan.FromSeconds(1)); // generatedAt + 15 minutes, not the next poll
+        Assert.False(panel.IsCurrent);
+        Assert.Equal(FreshnessState.Stale, runtime.State.Freshness);
+        Assert.True(panel.IsCached);
+        Assert.Equal("Stale", panel.FreshnessLabel);
+        Assert.Equal(32.5m, panel.Primary.PercentageUsed);
+        Assert.Equal(warning, panel.WarningLabel);
+        Assert.Equal(error, panel.ErrorLabel);
+        Assert.Equal(1, changes);
+        time.Advance(TimeSpan.FromMinutes(1)); // file is now 16 minutes old
+        Assert.False(panel.IsCurrent);
+        Assert.Equal(reads, files.Paths.Count);
+    }
+
+    [Fact]
+    public async Task Fresher_remote_file_replaces_the_previous_deadline()
+    {
+        var time = new AdvancingTimeProvider();
+        var clock = new AdvancingClock(time);
+        var files = new Files(GeneratedAt(Now.AddMinutes(-14)));
+        await using var runtime = await RemoteRuntime(time, clock, files);
+        time.Advance(TimeSpan.FromSeconds(30));
+        files.Content = Encoding.UTF8.GetBytes(GeneratedAt(time.GetUtcNow().AddMinutes(-12)));
+        await runtime.RefreshAsync(RefreshTrigger.Manual, default);
+        var changes = 0;
+        runtime.StateChanged += () => changes++;
+        var reads = files.Paths.Count;
+        time.Advance(TimeSpan.FromSeconds(30)); // old deadline
+        Assert.Equal(FreshnessState.Current, runtime.State.Freshness);
+        Assert.Equal(0, changes);
+        time.Advance(TimeSpan.FromMinutes(2));
+        Assert.Equal(FreshnessState.Current, runtime.State.Freshness);
+        time.Advance(TimeSpan.FromSeconds(30)); // replacement deadline
+        Assert.Equal(FreshnessState.Stale, runtime.State.Freshness);
+        Assert.Equal(1, changes);
+        Assert.Equal(reads, files.Paths.Count);
+    }
+
+    [Theory]
+    [InlineData("this-pc")]
+    [InlineData("revoke")]
+    [InlineData("clear")]
+    [InlineData("dispose")]
+    public async Task Leaving_remote_mode_cancels_its_deadline(string exit)
+    {
+        var time = new AdvancingTimeProvider();
+        var clock = new AdvancingClock(time);
+        var files = new Files(GeneratedAt(Now.AddMinutes(-14)));
+        await using var runtime = await RemoteRuntime(time, clock, files);
+        if (exit == "this-pc") await runtime.SetSourceAsync(ClaudeQuotaSource.ThisPc, default);
+        else if (exit == "revoke") await runtime.RevokeConsentAsync(default);
+        else if (exit == "clear") await runtime.CancelAndWaitAsync(default);
+        else await runtime.DisposeAsync();
+        Assert.Equal(exit == "this-pc" ? 1 : 0, time.ActiveTimers); // only local polling may remain
+        var changes = 0;
+        runtime.StateChanged += () => changes++;
+        var reads = files.Paths.Count;
+        time.Advance(TimeSpan.FromMinutes(2));
+        Assert.Equal(0, changes);
+        Assert.Equal(reads, files.Paths.Count);
+        if (exit == "this-pc") Assert.Equal(FreshnessState.Current, runtime.State.Freshness);
+        else Assert.False(runtime.IsConsentEnabled);
+    }
+
+    private static string GeneratedAt(DateTimeOffset generated) =>
+        Valid.Replace("2030-01-01T12:00:00Z", generated.ToString("yyyy-MM-ddTHH:mm:ss'Z'"));
+
+    private async Task<ClaudeQuotaRuntime> RemoteRuntime(AdvancingTimeProvider time, IClock clock, Files files)
+    {
+        await Settings.SaveClaudeSourceAsync(ClaudeQuotaSource.OtherMachine, default);
+        var runtime = new ClaudeQuotaRuntime(Settings, new Store(), _ => new Provider(), clock,
+            timeProvider: time, remoteProviderFactory: policy => new ClaudeRemoteUsageProvider(policy,
+                RemotePath, files, _ => FileAttributes.Normal, time.GetUtcNow));
+        await runtime.InitializeAsync(default);
+        await runtime.GrantConsentAsync(default);
+        Assert.Equal(FreshnessState.Current, runtime.State.Freshness);
+        return runtime;
+    }
+
     // f: keep all existing promises, extend the disclosure to both modes.
     [Fact]
     public void Disclosure_covers_local_read_only_login_and_remote_usage_without_local_credentials()
@@ -426,9 +525,56 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
     }
     public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }
     private sealed class Clock : IClock { public DateTimeOffset UtcNow => Now; }
+    private sealed class AdvancingClock(TimeProvider time) : IClock { public DateTimeOffset UtcNow => time.GetUtcNow(); }
+    // Synchronous virtual timers make expiry/event assertions independent of sleeps and thread scheduling.
+    private sealed class AdvancingTimeProvider : TimeProvider
+    {
+        private DateTimeOffset _now = Now;
+        private readonly List<VirtualTimer> _timers = [];
+        public override DateTimeOffset GetUtcNow() => _now;
+        public int ActiveTimers => _timers.Count(timer => timer.Due is not null);
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            var timer = new VirtualTimer(this, callback, state);
+            _timers.Add(timer);
+            timer.Change(dueTime, period);
+            return timer;
+        }
+        public void Advance(TimeSpan elapsed)
+        {
+            var target = _now + elapsed;
+            while (_timers.Where(timer => timer.Due <= target).OrderBy(timer => timer.Due).FirstOrDefault() is { } timer)
+            {
+                _now = timer.Due!.Value;
+                timer.Fire();
+            }
+            _now = target;
+        }
+        private sealed class VirtualTimer(AdvancingTimeProvider owner, TimerCallback callback, object? state) : ITimer
+        {
+            private bool _disposed;
+            private TimeSpan _period;
+            public DateTimeOffset? Due { get; private set; }
+            public bool Change(TimeSpan dueTime, TimeSpan period)
+            {
+                if (_disposed) return false;
+                _period = period;
+                Due = dueTime == Timeout.InfiniteTimeSpan ? null : owner._now + dueTime;
+                return true;
+            }
+            public void Fire()
+            {
+                Due = _period == Timeout.InfiniteTimeSpan ? null : owner._now + _period;
+                callback(state);
+            }
+            public void Dispose() { _disposed = true; Due = null; }
+            public ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
+        }
+    }
     private sealed class Files(byte[] bytes) : ICredentialFileReader
     {
         public Files(string json) : this(Encoding.UTF8.GetBytes(json)) { }
+        public byte[] Content { get; set; } = bytes;
         public Exception? Error { get; init; }
         public List<string> Paths { get; } = [];
         public FileShare Share { get; private set; }
@@ -438,7 +584,7 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
         {
             Paths.Add(path); Share = share;
             if (Error is not null) return ValueTask.FromException<Stream>(Error);
-            Stream = new TrackingStream(bytes);
+            Stream = new TrackingStream(Content);
             return ValueTask.FromResult<Stream>(Stream);
         }
     }
