@@ -2,6 +2,10 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
+// The Desktop project also references WinForms/System.Drawing; pin the WPF types.
+using Brush = System.Windows.Media.Brush;
+using Color = System.Windows.Media.Color;
+using ColorConverter = System.Windows.Media.ColorConverter;
 
 namespace AIBar.Desktop;
 
