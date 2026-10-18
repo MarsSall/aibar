@@ -366,7 +366,8 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IC
     private readonly Forms.ToolStripMenuItem _enableClaude = new("Enable Claude quota");
     private readonly Forms.ToolStripMenuItem _disableClaude = new("Disable Claude quota");
     private readonly Forms.ToolStripMenuItem _claudeSource = new("Claude source");
-    private readonly Forms.ToolStripMenuItem _claudeThisPc = new("This PC") { Checked = true };
+    private readonly Forms.ToolStripMenuItem _claudeAutomatic = new("Automatic") { Checked = true };
+    private readonly Forms.ToolStripMenuItem _claudeThisPc = new("This PC");
     private readonly Forms.ToolStripMenuItem _claudeOtherMachine = new("Other machine");
     private bool _claudeAvailable;
     private bool _claudeEnabled;
@@ -375,7 +376,8 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IC
     public WindowsTrayRuntime()
     {
         var exit = new Forms.ToolStripMenuItem("Exit AIBar");
-        _claudeSource.DropDownItems.AddRange(new Forms.ToolStripItem[] { _claudeThisPc, _claudeOtherMachine });
+        _claudeSource.DropDownItems.AddRange(new Forms.ToolStripItem[] { _claudeAutomatic, _claudeThisPc, _claudeOtherMachine });
+        _claudeAutomatic.Click += (_, _) => ClaudeSourceRequested?.Invoke(ClaudeQuotaSource.Automatic);
         _claudeThisPc.Click += (_, _) => ClaudeSourceRequested?.Invoke(ClaudeQuotaSource.ThisPc);
         _claudeOtherMachine.Click += (_, _) => ClaudeSourceRequested?.Invoke(ClaudeQuotaSource.OtherMachine);
         _enableClaude.Click += (_, _) => ClaudeQuotaEnableRequested?.Invoke();
@@ -398,6 +400,7 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IC
     public void SetClaudeSource(ClaudeQuotaSource source)
     {
         if (_menu.InvokeRequired) { _menu.BeginInvoke(new Action(() => SetClaudeSource(source))); return; }
+        _claudeAutomatic.Checked = source == ClaudeQuotaSource.Automatic;
         _claudeThisPc.Checked = source == ClaudeQuotaSource.ThisPc;
         _claudeOtherMachine.Checked = source == ClaudeQuotaSource.OtherMachine;
         UpdateClaudeMenu();

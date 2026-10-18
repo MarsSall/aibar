@@ -25,8 +25,17 @@ public sealed class ClaudeQuotaPresentationMapper
             ? source == ClaudeQuotaSource.OtherMachine
                 ? "Open Claude Code on the other machine to renew the session"
                 : "Open Claude Code on this PC to renew the session"
-            : mapped.WarningLabel;
-        return mapped with { WarningLabel = warning, ErrorLabel = warning };
+            : source == ClaudeQuotaSource.OtherMachine && state.Failure is not null
+                ? "Usage from the other machine is stale or unavailable; check the helper on that machine"
+                : mapped.WarningLabel;
+        return mapped with
+        {
+            WarningLabel = warning, ErrorLabel = warning,
+            PrivateEndpointDisclosure = source == ClaudeQuotaSource.OtherMachine
+                ? "Claude quota is read from a usage file supplied by the other machine; no local credentials are read."
+                : mapped.PrivateEndpointDisclosure,
+            Disclosure = ClaudeQuotaRuntime.ConsentDisclosure
+        };
     }
 }
 
@@ -41,7 +50,7 @@ public sealed class ClaudeQuotaPresentationHost : INotifyPropertyChanged, IDispo
     {
         _runtime = runtime; _mapper = mapper;
         IsEnabled = runtime.IsConsentEnabled;
-        State = mapper.Map(runtime.State, IsEnabled, runtime.Source);
+        State = mapper.Map(runtime.State, IsEnabled, runtime.ResolvedSource);
         runtime.StateChanged += OnChanged;
         runtime.ConsentChanged += OnChanged;
         runtime.SourceChanged += OnChanged;
@@ -57,7 +66,7 @@ public sealed class ClaudeQuotaPresentationHost : INotifyPropertyChanged, IDispo
         var enabled = _runtime.IsConsentEnabled;
         var changed = enabled != IsEnabled;
         IsEnabled = enabled;
-        State = _mapper.Map(_runtime.State, enabled, _runtime.Source);
+        State = _mapper.Map(_runtime.State, enabled, _runtime.ResolvedSource);
         PropertyChanged?.Invoke(this, new(nameof(State)));
         if (changed) PropertyChanged?.Invoke(this, new(nameof(IsEnabled)));
     }

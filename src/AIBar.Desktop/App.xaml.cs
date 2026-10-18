@@ -91,7 +91,8 @@ public partial class App : System.Windows.Application
                 ? WindowsAtomicQuotaExportWriter.ForClaudeCurrentUser()
                 : WindowsAtomicQuotaExportWriter.ForClaudeOwnedSyntheticDataDirectory(dataDirectory)),
             seams.ClaudeRemoteProviderFactory ?? (claudePolicy => new ClaudeRemoteUsageProvider(claudePolicy,
-                Path.Combine(dataDirectory, "claude-remote-usage.json"))));
+                Path.Combine(dataDirectory, "claude-remote-usage.json"))),
+            () => ClaudeRemoteUsageProvider.IsAvailableForAutomatic(Path.Combine(dataDirectory, "claude-remote-usage.json")));
         var lifecycleAdapter = new QuotaRefreshLifecycleAdapter(lifecycleEvents, coordinator);
         var claudePresentation = new ClaudeQuotaPresentationHost(claudeRuntime, new ClaudeQuotaPresentationMapper(clock));
         var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents, claudePresentation);

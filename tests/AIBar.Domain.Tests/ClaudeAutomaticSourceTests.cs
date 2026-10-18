@@ -410,6 +410,35 @@ public sealed class ClaudeAutomaticSourceTests : IDisposable
         Assert.False(await Settings.LoadAsync(default));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Restart_after_detection_changes_clears_the_previous_sources_persisted_cache(bool initiallyRemote)
+    {
+        var present = initiallyRemote; var store = new Store();
+        await using (var first = Runtime(store, _ => new Provider(11), _ => new Provider(73), () => present))
+        {
+            await first.InitializeAsync(default);
+            await first.GrantConsentAsync(default);
+            Assert.Equal(initiallyRemote ? 73m : 11m, store.Snapshot!.Primary!.PercentageUsed);
+        }
+        // Consent saves by either integration must preserve the cache's source identity.
+        await Settings.SaveAsync(true, default);
+        await Settings.SaveClaudeAsync(true, default);
+        present = !present;
+        var clears = store.Clears;
+        var failure = new FailureProvider();
+        await using var restarted = Runtime(store, _ => failure, _ => failure, () => present);
+        await restarted.InitializeAsync(default);
+        await restarted.RefreshAsync(RefreshTrigger.Manual, default);
+        Assert.True(store.Clears > clears);
+        Assert.Null(store.Snapshot);
+        Assert.Null(restarted.State.Snapshot);
+        Assert.Equal(present ? ClaudeQuotaSource.OtherMachine : ClaudeQuotaSource.ThisPc, restarted.ResolvedSource);
+        Assert.True(await Settings.LoadAsync(default));
+        Assert.True(await Settings.LoadClaudeAsync(default));
+    }
+
     private ClaudeQuotaRuntime Runtime(Store store, Func<PrivateIntegrationPolicy, IQuotaProvider> local,
         Func<PrivateIntegrationPolicy, IQuotaProvider> remote, Func<bool> available, VirtualTime? time = null) =>
         new(Settings, store, local, new Clock(time), timeProvider: time, remoteProviderFactory: remote, remoteFileAvailable: available);

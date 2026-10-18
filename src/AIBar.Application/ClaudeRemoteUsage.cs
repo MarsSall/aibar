@@ -27,9 +27,28 @@ public sealed class ClaudeRemoteUsageProvider : IQuotaProvider
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
     }
 
-    // T4 RED seam: availability is metadata-only; never inspect credentials or parse usage here.
+    // Detection is metadata-only: an invalid/stale payload still owns the remote source.
     public static bool IsAvailableForAutomatic(string? path = null,
-        Func<string, FileAttributes>? attributes = null) => throw new NotImplementedException();
+        Func<string, FileAttributes>? attributes = null)
+    {
+        try
+        {
+            var fullPath = Path.GetFullPath(path ?? DefaultPath());
+            var readAttributes = attributes ?? File.GetAttributes;
+            for (string? current = fullPath; current is not null; current = Path.GetDirectoryName(current))
+            {
+                var value = readAttributes(current);
+                if ((value & FileAttributes.ReparsePoint) != 0 ||
+                    current == fullPath && (value & FileAttributes.Directory) != 0) return false;
+            }
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
+            ArgumentException or NotSupportedException or System.Security.SecurityException)
+        {
+            return false;
+        }
+    }
 
     public static string DefaultPath() => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AIBar", "claude-remote-usage.json");
