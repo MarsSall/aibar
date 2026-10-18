@@ -25,6 +25,7 @@ public sealed class ConsentSettings(string path)
     }
     public ValueTask SaveClaudeSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken)
     {
+        if (source == ClaudeQuotaSource.Automatic) throw new NotImplementedException();
         if (source is not (ClaudeQuotaSource.ThisPc or ClaudeQuotaSource.OtherMachine)) throw new ArgumentOutOfRangeException(nameof(source));
         return SaveDecisionAsync(null, null, cancellationToken, source);
     }

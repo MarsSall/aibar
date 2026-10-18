@@ -21,9 +21,9 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
 
     // a: defaults, independent decisions, and exact wire spelling.
     [Fact]
-    public async Task Missing_source_defaults_to_this_pc_without_writing_or_granting_consent()
+    public async Task Missing_source_defaults_to_automatic_without_writing_or_granting_consent()
     {
-        Assert.Equal(ClaudeQuotaSource.ThisPc, await Settings.LoadClaudeSourceAsync(default));
+        Assert.Equal(ClaudeQuotaSource.Automatic, await Settings.LoadClaudeSourceAsync(default));
         Assert.False(File.Exists(SettingsPath));
         Assert.False(await Settings.LoadAsync(default));
         Assert.False(await Settings.LoadClaudeAsync(default));
@@ -37,7 +37,7 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
         await Settings.SaveAsync(true, default);
         if (withClaude) await Settings.SaveClaudeAsync(true, default);
         var before = await File.ReadAllTextAsync(SettingsPath);
-        Assert.Equal(ClaudeQuotaSource.ThisPc, await Settings.LoadClaudeSourceAsync(default));
+        Assert.Equal(ClaudeQuotaSource.Automatic, await Settings.LoadClaudeSourceAsync(default));
         Assert.Equal(before, await File.ReadAllTextAsync(SettingsPath));
         using var json = JsonDocument.Parse(before);
         Assert.Equal(withClaude ? 3 : 2, json.RootElement.EnumerateObject().Count());
@@ -149,16 +149,17 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
         var codexBefore = menu.Items.Cast<Forms.ToolStripItem>().Where(item => item.Text!.Contains("Private Quota Integration")).ToArray();
         ClaudeQuotaSource? requested = null;
         ((IClaudeQuotaSourceTray)tray).ClaudeSourceRequested += source => requested = source;
-        foreach (var source in new[] { ClaudeQuotaSource.ThisPc, ClaudeQuotaSource.OtherMachine })
+        foreach (var source in new[] { ClaudeQuotaSource.Automatic, ClaudeQuotaSource.ThisPc, ClaudeQuotaSource.OtherMachine })
         {
             tray.SetClaudeSource(source);
             var parent = Assert.Single(menu.Items.OfType<Forms.ToolStripMenuItem>(), item => item.Text == "Claude source");
             var children = parent.DropDownItems.OfType<Forms.ToolStripMenuItem>().ToArray();
-            Assert.Equal(new[] { "This PC", "Other machine" }, children.Select(item => item.Text));
-            Assert.Equal(source == ClaudeQuotaSource.ThisPc, children[0].Checked);
-            Assert.Equal(source == ClaudeQuotaSource.OtherMachine, children[1].Checked);
+            Assert.Equal(new[] { "Automatic", "This PC", "Other machine" }, children.Select(item => item.Text));
+            Assert.Equal(source == ClaudeQuotaSource.Automatic, children[0].Checked);
+            Assert.Equal(source == ClaudeQuotaSource.ThisPc, children[1].Checked);
+            Assert.Equal(source == ClaudeQuotaSource.OtherMachine, children[2].Checked);
             Assert.Equal(codexBefore, menu.Items.Cast<Forms.ToolStripItem>().Where(item => item.Text!.Contains("Private Quota Integration")).ToArray());
-            children[1].PerformClick(); Assert.Equal(ClaudeQuotaSource.OtherMachine, requested);
+            children[2].PerformClick(); Assert.Equal(ClaudeQuotaSource.OtherMachine, requested);
         }
         Assert.DoesNotContain(typeof(ITrayRuntime).GetMembers(), member => member.Name.Contains("Claude"));
     }

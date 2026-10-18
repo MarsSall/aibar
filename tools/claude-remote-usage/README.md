@@ -1,9 +1,18 @@
 # Claude usage from another machine (optional)
 
-Keep **This PC** for the normal Windows Claude Code login. This helper is only
-for choosing the Linux Claude Code session instead. Windows AIBar must enable
-Claude quota, accept its disclosure, and select **Claude source: Other machine**.
-The helper does not change AIBar's default source or enable consent.
+This optional helper sends Linux Claude Code usage to Windows AIBar. Enable
+Claude quota and accept its disclosure once. **Claude source: Automatic** is the
+default: no tray change is needed after installing the helper. AIBar detects the
+remote usage file on initialization and every refresh (including five-minute
+polls); without that file it uses the normal Windows Claude Code login.
+The helper never enables consent.
+
+For a manual override, choose **Claude source: This PC** to force the Windows
+login, or **Other machine** to force the remote file even when it is missing.
+Return to **Automatic** to resume detection. Existing explicit choices stay in
+force. A stale or invalid existing remote file stays remote, with stale/unavailable
+status and other-machine guidance; it never silently falls back to local credentials.
+Reparse-point files are excluded from automatic detection.
 
 ## What it reads and sends
 
@@ -90,8 +99,11 @@ same destination. AIBar treats data older than 15 minutes as stale, not current.
   stop any active service with `systemctl --user stop aibar-claude-remote-usage.service`,
   then remove the two installed unit files, installed helper, and
   `~/.config/aibar/claude-remote-usage.conf`; run `systemctl --user daemon-reload`.
-  Select **This PC** or disable Claude quota in AIBar. Remove the remote JSON and
-  `.tmp` file separately if desired; never remove Claude Code credentials.
+  Remove the remote JSON and `.tmp` file separately if desired; **Automatic**
+  returns to the Windows login after the JSON is removed, on the next refresh.
+  Alternatively, select **This PC** to force local use or disable Claude quota.
+  Never remove Claude Code credentials. Leaving a stopped helper's JSON in place
+  keeps Automatic on the stale remote source.
 
 ## Tests (no live credentials, HTTP or SSH)
 

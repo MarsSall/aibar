@@ -35,8 +35,11 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         Func<PrivateIntegrationPolicy, IQuotaProvider> providerFactory, IClock clock,
         IQuotaRefreshLifecycleEvents? lifecycle = null, TimeProvider? timeProvider = null,
         IQuotaExportWriter? exportWriter = null,
-        Func<PrivateIntegrationPolicy, IQuotaProvider>? remoteProviderFactory = null)
+        Func<PrivateIntegrationPolicy, IQuotaProvider>? remoteProviderFactory = null,
+        Func<bool>? remoteFileAvailable = null)
     {
+        // T4 RED seam; GREEN must consult this on initialization and every refresh.
+        _ = remoteFileAvailable;
         _exportWriter = exportWriter;
         _remoteProviderFactory = remoteProviderFactory ?? (policy => new ClaudeRemoteUsageProvider(policy));
         _settings = settings; _store = store; _providerFactory = providerFactory; _clock = clock;
@@ -52,9 +55,12 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     public static string DatabasePath(string dataDirectory) => Path.Combine(dataDirectory, "claude-quota.db");
     public string Disclosure => ConsentDisclosure;
     public ClaudeQuotaSource Source => _source;
+    // Selected mode remains Automatic while this reports ThisPc or OtherMachine.
+    public ClaudeQuotaSource ResolvedSource => throw new NotImplementedException();
     public event Action? SourceChanged;
     public async ValueTask SetSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken)
     {
+        if (source == ClaudeQuotaSource.Automatic) throw new NotImplementedException();
         if (source is not (ClaudeQuotaSource.ThisPc or ClaudeQuotaSource.OtherMachine)) throw new ArgumentOutOfRangeException(nameof(source));
         await _gate.WaitAsync(cancellationToken);
         try

@@ -6,7 +6,7 @@ using AIBar.Domain;
 
 namespace AIBar.Application;
 
-public enum ClaudeQuotaSource { ThisPc, OtherMachine }
+public enum ClaudeQuotaSource { ThisPc, OtherMachine, Automatic }
 
 /// <summary>Reads only the bounded, normalized usage file pushed by the other machine.</summary>
 public sealed class ClaudeRemoteUsageProvider : IQuotaProvider
@@ -26,6 +26,10 @@ public sealed class ClaudeRemoteUsageProvider : IQuotaProvider
         _attributes = attributes ?? File.GetAttributes;
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
     }
+
+    // T4 RED seam: availability is metadata-only; never inspect credentials or parse usage here.
+    public static bool IsAvailableForAutomatic(string? path = null,
+        Func<string, FileAttributes>? attributes = null) => throw new NotImplementedException();
 
     public static string DefaultPath() => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AIBar", "claude-remote-usage.json");
