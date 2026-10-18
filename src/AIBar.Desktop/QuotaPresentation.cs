@@ -32,7 +32,11 @@ public sealed record BetaPresentationState(
     string? WarningLabel,
     string Disclosure,
     bool IsPrivateIntegrationDisabled = false,
-    string? DiagnosticCode = null);
+    string? DiagnosticCode = null)
+{
+    public string? UpdatedLabel { get; init; }
+    public string? SourceLabel { get; init; }
+}
 
 public sealed class QuotaPresentationMapper(IClock clock)
 {
@@ -77,7 +81,10 @@ public sealed class QuotaPresentationMapper(IClock clock)
             warning,
             "Private quota access is optional, disabled by default, and can be revoked at any time.",
             false,
-            DiagnosticCode(failure));
+            DiagnosticCode(failure))
+        {
+            UpdatedLabel = snapshot is null ? null : RelativeUpdatedLabel(clock.UtcNow - snapshot.RetrievedAt)
+        };
     }
 
     private QuotaWindowPresentation Window(string label, QuotaWindow? window) => new(
@@ -91,6 +98,15 @@ public sealed class QuotaPresentationMapper(IClock clock)
         return duration < TimeSpan.FromDays(1)
             ? $"{duration.Hours:00}h {duration.Minutes:00}m"
             : $"{duration.Days}d {duration.Hours:00}h {duration.Minutes:00}m";
+    }
+
+    private static string RelativeUpdatedLabel(TimeSpan age)
+    {
+        age = NonNegative(age);
+        return age < TimeSpan.FromMinutes(1) ? "Updated just now"
+            : age < TimeSpan.FromHours(1) ? $"Updated {(int)age.TotalMinutes}m ago"
+            : age < TimeSpan.FromDays(1) ? $"Updated {(int)age.TotalHours}h ago"
+            : $"Updated {(int)age.TotalDays}d ago";
     }
 
     private static TimeSpan NonNegative(TimeSpan value) => value < TimeSpan.Zero ? TimeSpan.Zero : value;

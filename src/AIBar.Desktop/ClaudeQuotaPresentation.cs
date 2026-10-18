@@ -31,6 +31,7 @@ public sealed class ClaudeQuotaPresentationMapper
         return mapped with
         {
             WarningLabel = warning, ErrorLabel = warning,
+            SourceLabel = source == ClaudeQuotaSource.OtherMachine ? "From other machine" : null,
             PrivateEndpointDisclosure = source == ClaudeQuotaSource.OtherMachine
                 ? "Claude quota is read from a usage file supplied by the other machine; no local credentials are read."
                 : mapped.PrivateEndpointDisclosure,
