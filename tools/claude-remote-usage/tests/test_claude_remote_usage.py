@@ -168,6 +168,9 @@ class HelperTests(unittest.TestCase):
         # Atomic publication: replace an existing file, move only on first publication.
         self.assertNotIn('Move-Item', command)
         self.assertIn('[System.IO.File]::Replace(', command)
+        # PowerShell turns $null into "" for .NET string parameters; File.Replace rejects "".
+        self.assertIn('[NullString]::Value', command)
+        self.assertNotIn('$null)', command)
         self.assertIn('[System.IO.File]::Move(', command)
         self.assertIn('Test-Path', command)
         self.assertIn('-LiteralPath', command)

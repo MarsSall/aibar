@@ -160,7 +160,7 @@ def push(value, config_path, *, runner=None, temp_dir=None):
         command = ('powershell.exe -NoProfile -NonInteractive -Command "'
                    "$ErrorActionPreference = 'Stop'; "
                    "$d = Join-Path $HOME '" + destination + "'; $s = Join-Path $HOME '" + destination + ".tmp'; "
-                   "if (Test-Path -LiteralPath $d) { [System.IO.File]::Replace($s, $d, $null) } "
+                   "if (Test-Path -LiteralPath $d) { [System.IO.File]::Replace($s, $d, [NullString]::Value) } "
                    "else { [System.IO.File]::Move($s, $d) }\"")
         try:
             runner(['scp', *options, local.name, host + ':' + destination + '.tmp'], **run_options)
