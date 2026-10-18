@@ -181,13 +181,13 @@ public sealed class PopupRenderedTests
     private sealed class FakeSurface : IOpaquePopupSurface
     {
         public List<string> Calls { get; } = []; public bool Dark { get; private set; } public bool Corners { get; private set; } public bool Backdrop { get; private set; }
-        public void UseOpaqueBase() => Calls.Add("opaque"); public void SetDarkMode() { Dark = true; Calls.Add("dark"); } public void SetCorners() { Corners = true; Calls.Add("corners"); } public void SetBackdrop() { Backdrop = true; Calls.Add("backdrop"); }
+        public void UseOpaqueBase() => Calls.Add("opaque"); public void UseTranslucentBase() => Calls.Add("translucent"); public void SetDarkMode() { Dark = true; Calls.Add("dark"); } public void SetCorners() { Corners = true; Calls.Add("corners"); } public void SetBackdrop() { Backdrop = true; Calls.Add("backdrop"); }
     }
 
     private sealed class FakeHints(bool supports = true, bool remote = false, bool failDark = false, bool failCorners = false, bool failBackdrop = false) : IDwmSurfaceHints
     {
         public int DarkCalls { get; private set; } public int CornerCalls { get; private set; } public int BackdropCalls { get; private set; }
-        public bool SupportsHints => supports; public bool IsRemoteSession => remote;
+        public bool SupportsHints => supports; public bool IsRemoteSession => remote; public bool IsTransparencyEnabled => true;
         public void ApplyDarkMode(IOpaquePopupSurface surface) { DarkCalls++; if (failDark) throw new InvalidOperationException(); surface.SetDarkMode(); }
         public void ApplyCorners(IOpaquePopupSurface surface) { CornerCalls++; if (failCorners) throw new InvalidOperationException(); surface.SetCorners(); }
         public void ApplyBackdrop(IOpaquePopupSurface surface) { BackdropCalls++; if (failBackdrop) throw new InvalidOperationException(); surface.SetBackdrop(); }
