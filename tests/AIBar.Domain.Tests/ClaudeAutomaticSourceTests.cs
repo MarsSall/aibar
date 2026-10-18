@@ -439,6 +439,120 @@ public sealed class ClaudeAutomaticSourceTests : IDisposable
         Assert.True(await Settings.LoadClaudeAsync(default));
     }
 
+    // L33: handlers deliberately block like a synchronous UI subscriber. Both the
+    // inner wait and the outer operation are bounded, so the old code fails, not hangs.
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Automatic_handoff_notifications_allow_synchronous_refresh(bool initiallyRemote, bool sourceEvent)
+    {
+        var present = initiallyRemote;
+        await using var runtime = Runtime(new Store(), _ => new Provider(11), _ => new Provider(73), () => present);
+        await runtime.InitializeAsync(default);
+        await runtime.GrantConsentAsync(default);
+        var probe = new ReentryProbe(runtime);
+        if (sourceEvent) runtime.SourceChanged += probe.Handle;
+        else runtime.StateChanged += probe.Handle;
+        present = !present;
+        await Task.Run(async () => await runtime.RefreshAsync(RefreshTrigger.Manual, default))
+            .WaitAsync(TimeSpan.FromSeconds(15));
+        probe.AssertSucceeded();
+    }
+
+    [Theory]
+    [InlineData("initialize-source")]
+    [InlineData("initialize-state")]
+    [InlineData("grant-state")]
+    [InlineData("grant-source")]
+    [InlineData("grant-consent")]
+    [InlineData("revoke-state")]
+    [InlineData("revoke-consent")]
+    [InlineData("clear-state")]
+    [InlineData("clear-consent")]
+    [InlineData("manual-source")]
+    [InlineData("manual-state")]
+    public async Task Lifecycle_notifications_allow_synchronous_refresh(string site)
+    {
+        var present = false;
+        await using var runtime = Runtime(new Store(), _ => new Provider(11), _ => new Provider(73), () => present);
+        if (site.StartsWith("initialize")) await Settings.SaveClaudeAsync(true, default);
+        else
+        {
+            await runtime.InitializeAsync(default);
+            if (!site.StartsWith("grant")) await runtime.GrantConsentAsync(default);
+        }
+        var probe = new ReentryProbe(runtime);
+        if (site.EndsWith("source")) runtime.SourceChanged += probe.Handle;
+        else if (site.EndsWith("consent")) runtime.ConsentChanged += probe.Handle;
+        else runtime.StateChanged += probe.Handle;
+        await Task.Run(async () =>
+        {
+            if (site.StartsWith("initialize")) await runtime.InitializeAsync(default);
+            else if (site.StartsWith("grant")) { present = true; await runtime.GrantConsentAsync(default); }
+            else if (site.StartsWith("revoke")) await runtime.RevokeConsentAsync(default);
+            else if (site.StartsWith("clear")) { await runtime.CancelAndWaitAsync(default); runtime.ResumeAfterClear(); }
+            else await runtime.SetSourceAsync(ClaudeQuotaSource.OtherMachine, default);
+        }).WaitAsync(TimeSpan.FromSeconds(15));
+        probe.AssertSucceeded();
+    }
+
+    [Fact]
+    public async Task Freshness_deadline_notification_allows_synchronous_refresh()
+    {
+        var time = new VirtualTime();
+        await using var runtime = Runtime(new Store(), _ => new Provider(11),
+            _ => new Provider(73, Now.AddMinutes(-14)), () => true, time);
+        await runtime.InitializeAsync(default);
+        await runtime.GrantConsentAsync(default);
+        var probe = new ReentryProbe(runtime);
+        runtime.StateChanged += probe.Handle;
+        await Task.Run(() => time.Advance(TimeSpan.FromMinutes(1))).WaitAsync(TimeSpan.FromSeconds(15));
+        probe.AssertSucceeded();
+    }
+
+    [Fact]
+    public async Task Handoff_publishes_source_before_forwarded_state_without_losing_notifications()
+    {
+        var present = false;
+        await using var runtime = Runtime(new Store(), _ => new Provider(11), _ => new Provider(73), () => present);
+        await runtime.InitializeAsync(default);
+        await runtime.GrantConsentAsync(default);
+        var events = new List<string>();
+        runtime.SourceChanged += () => events.Add("source");
+        runtime.StateChanged += () => events.Add("state");
+        present = true;
+        await runtime.RefreshAsync(RefreshTrigger.Manual, default);
+        Assert.Equal("source", events[0]);
+        Assert.Single(events.Where(value => value == "source"));
+        // teardown clear, initialization, explicit handoff, loading, completed retrieval
+        Assert.Equal(5, events.Count(value => value == "state"));
+    }
+
+    private sealed class ReentryProbe(ClaudeQuotaRuntime runtime)
+    {
+        private int _entered;
+        private bool _completed;
+        private Exception? _failure;
+        public void Handle()
+        {
+            if (Interlocked.Exchange(ref _entered, 1) != 0) return;
+            try
+            {
+                _completed = runtime.RefreshAsync(RefreshTrigger.Manual, default).AsTask()
+                    .Wait(TimeSpan.FromSeconds(5));
+            }
+            catch (Exception exception) { _failure = exception; }
+        }
+        public void AssertSucceeded()
+        {
+            Assert.Equal(1, _entered);
+            Assert.Null(_failure);
+            Assert.True(_completed, "Synchronous subscriber could not re-enter RefreshAsync within five seconds.");
+        }
+    }
+
     private ClaudeQuotaRuntime Runtime(Store store, Func<PrivateIntegrationPolicy, IQuotaProvider> local,
         Func<PrivateIntegrationPolicy, IQuotaProvider> remote, Func<bool> available, VirtualTime? time = null) =>
         new(Settings, store, local, new Clock(time), timeProvider: time, remoteProviderFactory: remote, remoteFileAvailable: available);
