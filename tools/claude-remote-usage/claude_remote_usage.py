@@ -3,6 +3,7 @@
 
 import argparse
 from datetime import datetime, timezone
+import http.client
 import json
 import math
 import os
@@ -109,7 +110,7 @@ def collect(root, *, now=None, opener=None):
     except HTTPError as error:
         error.close()
         return document(now, 'authentication-required') if error.code in (401, 403) else unavailable
-    except (OSError, ValueError, TypeError, AttributeError, OverflowError):
+    except (OSError, ValueError, TypeError, AttributeError, OverflowError, http.client.HTTPException):
         return unavailable
     finally:
         request.remove_header('Authorization')
@@ -153,9 +154,14 @@ def push(value, config_path, *, runner=None, temp_dir=None):
     with tempfile.NamedTemporaryFile(suffix='.json.tmp', dir=temp_dir) as local:
         local.write(encode_contract(value))
         local.flush()
+        # File.Replace swaps atomically and keeps the previous file on failure; Move only for
+        # the first publication. .NET resolves relative paths against the process directory, so
+        # both paths are made absolute from the SSH user's home.
         command = ('powershell.exe -NoProfile -NonInteractive -Command "'
-                   "$ErrorActionPreference = 'Stop'; Move-Item -Force -LiteralPath '"
-                   + destination + ".tmp' -Destination '" + destination + "'\"")
+                   "$ErrorActionPreference = 'Stop'; "
+                   "$d = Join-Path $HOME '" + destination + "'; $s = Join-Path $HOME '" + destination + ".tmp'; "
+                   "if (Test-Path -LiteralPath $d) { [System.IO.File]::Replace($s, $d, $null) } "
+                   "else { [System.IO.File]::Move($s, $d) }\"")
         try:
             runner(['scp', *options, local.name, host + ':' + destination + '.tmp'], **run_options)
             runner(['ssh', *options, host, command], **run_options)
@@ -177,14 +183,17 @@ def main(argv=None):
     parser.add_argument('--dry-run', action='store_true', help='print only safe contract JSON; do not push')
     args = parser.parse_args(argv)
     root = Path(os.environ.get('CLAUDE_CONFIG_DIR', '').strip() or Path.home() / '.claude')
-    value = collect(root)
-    if args.dry_run:
-        print(encode_contract(value).decode('utf-8'))
-        return 0
+    value = None
     try:
+        value = collect(root)
+        if args.dry_run:
+            print(encode_contract(value).decode('utf-8'))
+            return 0
         push(value, Path.home() / '.config/aibar/claude-remote-usage.conf')
-    except (OSError, ValueError, subprocess.SubprocessError):
-        print('unavailable ' + value['generatedAt'], file=sys.stderr)
+    except Exception:
+        # Never let a traceback (paths, server text) reach the journal.
+        stamp = value['generatedAt'] if value else utc_stamp(datetime.now(timezone.utc).replace(microsecond=0))
+        print('unavailable ' + stamp, file=sys.stderr)
         return 1
     print(value['state'] + ' ' + value['generatedAt'], file=sys.stderr)
     return 0

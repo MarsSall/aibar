@@ -165,7 +165,11 @@ class HelperTests(unittest.TestCase):
         self.assertEqual([call[0][0] for call in calls], ['scp', 'ssh'])
         self.assertEqual(calls[0][0][-1], 'mars-windows:AppData/Local/AIBar/claude-remote-usage.json.tmp')
         command = calls[1][0][-1]
-        self.assertIn('Move-Item -Force', command)
+        # Atomic publication: replace an existing file, move only on first publication.
+        self.assertNotIn('Move-Item', command)
+        self.assertIn('[System.IO.File]::Replace(', command)
+        self.assertIn('[System.IO.File]::Move(', command)
+        self.assertIn('Test-Path', command)
         self.assertIn('-LiteralPath', command)
         self.assertIn('claude-remote-usage.json.tmp', command)
         self.assertIn('claude-remote-usage.json', command)
@@ -246,6 +250,30 @@ class HelperTests(unittest.TestCase):
         self.assertNotIn(TOKEN, out.getvalue())
         self.assertNotIn(REFRESH, out.getvalue())
         self.assertNotIn(str(self.root), out.getvalue())
+
+    def test_protocol_errors_are_unavailable_without_leaking(self):
+        import http.client
+        for error in (http.client.BadStatusLine(TOKEN), http.client.IncompleteRead(TOKEN.encode()),
+                      http.client.RemoteDisconnected(TOKEN)):
+            with self.subTest(error=type(error).__name__):
+                result = self.collect(error=error)
+                self.assertEqual(result['state'], 'unavailable')
+                self.assertNotIn(TOKEN, json.dumps(result))
+
+    def test_unexpected_errors_never_reach_stderr_as_tracebacks(self):
+        for patched in ('collect', 'push'):
+            with self.subTest(patched=patched):
+                out, err = io.StringIO(), io.StringIO()
+                document = self.h.document(NOW, 'unavailable')
+                side = RuntimeError(TOKEN + str(self.root))
+                with patch.object(self.h, 'collect', side_effect=side) if patched == 'collect' else \
+                        patch.object(self.h, 'collect', return_value=document), \
+                        patch.object(self.h, 'push', side_effect=side), \
+                        contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    self.assertEqual(self.h.main([]), 1)
+                self.assertNotIn(TOKEN, err.getvalue())
+                self.assertNotIn('Traceback', err.getvalue())
+                self.assertRegex(err.getvalue(), r'^unavailable \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\n$')
 
     def test_default_once_and_failure_logs_are_sanitized(self):
         out, err = io.StringIO(), io.StringIO()

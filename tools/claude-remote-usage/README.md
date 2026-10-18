@@ -69,7 +69,7 @@ slash-separated directory segments using letters, digits, `_` and `-`). Spaces,
 dots, absolute paths and shell syntax in directories are intentionally rejected.
 
 The helper creates a mode-0600 local temporary file, uses `scp` to stage
-`claude-remote-usage.json.tmp`, then `ssh` with PowerShell `Move-Item -Force` to
+`claude-remote-usage.json.tmp`, then `ssh` with PowerShell `[System.IO.File]::Replace` (or `Move` for the first publication) to
 replace the final file in that same directory. Both use argument lists,
 `BatchMode=yes`, `ConnectTimeout=10` and a 30-second process timeout. Failures exit
 non-zero, preserve the last published file, and attempt to remove remote staging.
