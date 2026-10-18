@@ -1,5 +1,6 @@
 using System.Windows;
-using System.Windows.Controls;
+// The Desktop project also references WinForms; pin the WPF control type.
+using UserControl = System.Windows.Controls.UserControl;
 
 namespace AIBar.Desktop;
 
