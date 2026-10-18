@@ -1,0 +1,8 @@
+[Unit]
+Description=Push read-only Claude usage to AIBar on Windows
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.local/lib/aibar/claude_remote_usage.py --once
+UMask=0077
+NoNewPrivileges=true

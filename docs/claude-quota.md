@@ -8,7 +8,16 @@ In the AIBar tray menu, choose **Enable Claude quota** and accept the Claude-spe
 
 AIBar reads the existing **Claude Code login on this PC**, read-only: `.credentials.json` under `CLAUDE_CONFIG_DIR`, or the current Windows user's `.claude` directory by default. It queries Anthropic's unofficial subscription-usage endpoint, `https://api.anthropic.com/api/oauth/usage`. This private endpoint is unsupported and may change.
 
-AIBar never refreshes tokens or changes the login. If the session expires or authentication fails, open Claude Code on this PC and sign in again. AIBar does not use a login from another computer.
+AIBar never refreshes tokens or changes the login. If the session expires or authentication fails, open Claude Code on this PC and sign in again. In this default mode AIBar does not use a login from another computer; see **Other machine** below for the optional usage-file source.
+
+## Other machine (optional)
+
+**This PC** remains the default. To use a Linux Claude Code login instead, follow
+[the optional remote usage helper instructions](../tools/claude-remote-usage/README.md)
+and select **Claude source: Other machine** in the Windows AIBar tray menu.
+Claude consent is still required. The helper pushes only usage percentages, reset
+times and availability—not credentials. Renew an expired session in Claude Code
+on Linux; data that stops updating is marked stale after 15 minutes.
 
 ## Opened panel
 
