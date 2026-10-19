@@ -143,16 +143,16 @@ def read_config(path):
     return host, remote_dir
 
 
-def push(value, config_path, *, runner=None, temp_dir=None):
+def push(value, config_path, *, runner=None, temp_dir=None, filename=FILENAME, encoder=encode_contract):
     host, remote_dir = read_config(config_path)
     runner = runner or subprocess.run
-    destination = remote_dir + '/' + FILENAME
+    destination = remote_dir + '/' + filename
     options = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10']
     run_options = dict(check=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL, timeout=30)
     # NamedTemporaryFile is mode 0600; its lifetime includes scp and rename.
     with tempfile.NamedTemporaryFile(suffix='.json.tmp', dir=temp_dir) as local:
-        local.write(encode_contract(value))
+        local.write(encoder(value))
         local.flush()
         # File.Replace swaps atomically and keeps the previous file on failure; Move only for
         # the first publication. .NET resolves relative paths against the process directory, so

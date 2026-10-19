@@ -356,6 +356,16 @@
                             <TextBlock Text="{Binding Claude.State.Primary.Pace.Notice}" TextWrapping="Wrap" FontSize="12" automation:AutomationProperties.LiveSetting="Polite" />
                         </Border>
                     </StackPanel>
+                    <StackPanel Margin="0,8,0,8" TextElement.FontSize="12">
+                        <TextBlock Text="CODEX · ESTIMATED COST" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" />
+                        <TextBlock Text="{Binding Analytics.UsageCost.TodayLabel}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Analytics.UsageCost.Last30DaysLabel}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,0,8" TextElement.FontSize="12" Visibility="{Binding Claude.IsEnabled, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
+                        <TextBlock Text="CLAUDE · ESTIMATED COST" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" />
+                        <TextBlock Text="{Binding ClaudeCost.State.TodayLabel}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding ClaudeCost.State.Last30DaysLabel}" TextWrapping="Wrap" />
+                    </StackPanel>
                     <TextBlock Text="Local usage" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,8,0,8" />
                     <StackPanel TextElement.FontSize="12">
                     <GroupBox Header="Local Codex data" automation:AutomationProperties.Name="Local Codex data" Style="{StaticResource SecondaryGroupBoxStyle}"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="16">

@@ -3,6 +3,8 @@ Description=Push read-only Claude usage to AIBar on Windows
 
 [Service]
 Type=oneshot
+# Independent aggregate push; a token-log failure must not prevent quota refresh.
+ExecStartPre=-/usr/bin/python3 %h/.local/lib/aibar/claude_remote_tokens.py --once
 ExecStart=/usr/bin/python3 %h/.local/lib/aibar/claude_remote_usage.py --once
 UMask=0077
 NoNewPrivileges=true

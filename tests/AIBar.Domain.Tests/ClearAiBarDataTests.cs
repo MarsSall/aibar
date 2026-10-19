@@ -56,6 +56,17 @@ public sealed class ClearAiBarDataTests(ITestOutputHelper output) : IDisposable
     }
 
     [Fact]
+    public async Task Clear_removes_remote_token_aggregate_but_preserves_existing_quota_payload()
+    {
+        Directory.CreateDirectory(_root);
+        await File.WriteAllTextAsync(Path.Combine(_root, "claude-remote-tokens.json"), "aggregate");
+        await File.WriteAllTextAsync(Path.Combine(_root, "claude-remote-usage.json"), "quota");
+        await new ClearAiBarDataService(_root, [], _ => ValueTask.CompletedTask).ClearAsync(default);
+        Assert.False(File.Exists(Path.Combine(_root, "claude-remote-tokens.json")));
+        Assert.Equal("quota", await File.ReadAllTextAsync(Path.Combine(_root, "claude-remote-usage.json")));
+    }
+
+    [Fact]
     public async Task Clear_is_idempotent_and_recreates_after_each_successful_retry()
     {
         var recreations = 0;
