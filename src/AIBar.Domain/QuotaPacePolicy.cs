@@ -10,7 +10,10 @@ public sealed record QuotaPaceResult(
     decimal? PaceRatio = null,
     DateTimeOffset? RunsOutAt = null,
     bool RunsOutBeforeReset = false,
-    bool IsLimitReached = false);
+    bool IsLimitReached = false)
+{
+    public bool IsObserved { get; init; }
+}
 
 /// <summary>A snapshot-only, constant-rate estimate, not a forecast from observation history.</summary>
 public static class QuotaPacePolicy

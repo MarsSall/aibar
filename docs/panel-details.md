@@ -36,15 +36,23 @@ Claude subscription quota is [optional and separately enabled](claude-quota.md).
 
 ## Pace
 
-Select **Pace & details** to see the **PACE** section, followed by smaller **Local usage** and **Quota access** details. The disclosure starts collapsed and keeps its keyboard and screen-reader behavior.
+Select **Pace & details** to see the **PACE** section, **Usage history**, cost and tokens, followed by smaller **Local usage** and **Quota access** details. The disclosure starts collapsed and keeps its keyboard and screen-reader behavior.
 
-Each quota window has its own pace row: Codex weekly and 5-hour first, then Claude windows only while Claude is enabled. Pace compares the percentage used with the percentage of the window that has elapsed (5 hours or 7 days). **1.0x** means on track to use exactly 100% at reset; **0.7x** is slower, **1.4x** is faster. The ratio is displayed to one decimal with a decimal point; calculations use the unrounded value.
+Each quota window has its own pace row: Codex weekly and 5-hour first, then Claude windows only while Claude is enabled. With sufficient history, pace compares the observed consumption rate with the even-use rate (100% over 5 hours or 7 days). Otherwise it compares the percentage used with the percentage of the window that has elapsed. **1.0x** means on track to use exactly 100% at reset; **0.7x** is slower, **1.4x** is faster. The ratio is displayed to one decimal with a decimal point; calculations use the unrounded value.
 
 The slim bar shows usage with the same green/yellow/red thresholds as the quota meters. Its vertical marker is the **even-use guide**: where usage would be if it were spread evenly over the window. Pace text stays muted when lasting until reset, turns yellow when projected to run out early, and red at **Limit reached**. High contrast keeps system colors.
 
-A faster rate shows a compact estimate such as **runs out in 1h 10m**, plus an amber notice: “At this pace, Claude 5-hour runs out before it resets.” This is a constant-rate estimate from the current snapshot, not a history-based prediction or a guarantee. Usage can change, and the provider controls resets.
+A faster rate shows a compact estimate such as **runs out in 1h 10m**, plus an amber notice: “At this pace, Claude 5-hour runs out before it resets.” This is a constant-rate estimate, not a guarantee. Once more than 5% of the cycle has elapsed and at least two distinct retrievals share the current reset instant, pace uses the rate between the earliest and latest samples in that cycle. Its accessible help says **based on observed use**; the visible pace wording is unchanged. Empty, single-sample, wrong-cycle or decreasing history falls back to the snapshot estimate. A flat observed rate means no projected exhaustion. Usage can change, and the provider controls resets.
 
 The first 5% of a window shows **Not enough data yet**. Missing usage/reset information or an expired reset has no current pace row. Cached or stale windows show **Not current** in muted text without an early-exhaustion notice.
+
+## Usage history
+
+Below the pace rows, **Usage history** plots percentages used on a fixed **0–100%** scale. Choose **24h**, **7d** or **30d** (default 24h) using the named, keyboard-focusable range selector. Tab reaches it; arrow keys select a range. The four labeled series are Codex 5-hour, Codex weekly, Claude 5-hour and Claude weekly. Solid, dashed, dotted and dash-dot strokes distinguish them without relying on color. They use the panel's dynamic text brush, including system high contrast. The plot scales to the available width; legends wrap.
+
+The chart reads the shared [quota history store](quota-history.md), including samples exactly on either range edge. It does not invent intermediate samples or connect different reset cycles or decreasing usage. A single retrieval remains visible as a dot. The legend exposes sample counts and latest percentages to assistive technology; empty history says **No usage history yet**. A read failure says **Usage history unavailable** without affecting quota retrieval.
+
+Opening the disclosure or changing range reloads the chart; while visible, it refreshes every 30 seconds and recalculates pace from history. Closing it discards chart data and cancels its read. Clear AIBar Data invalidates chart and observed-pace results before the database is cleared; in-flight reads cannot restore old results. The range is not persisted.
 
 ## Local details
 

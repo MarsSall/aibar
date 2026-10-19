@@ -1,0 +1,29 @@
+<UserControl x:Class="AIBar.Desktop.QuotaHistoryChart"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+ Focusable="False" Margin="0,8,0,16">
+ <StackPanel>
+  <TextBlock Text="USAGE HISTORY" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,0,8" />
+  <ComboBox x:Name="HistoryRange" SelectedIndex="0" HorizontalAlignment="Left" MinWidth="100" Margin="0,0,0,8"
+   Focusable="True" IsTabStop="True" SelectionChanged="OnRangeChanged" automation:AutomationProperties.Name="Usage history range">
+   <ComboBoxItem Content="24h" automation:AutomationProperties.Name="Last 24 hours" />
+   <ComboBoxItem Content="7d" automation:AutomationProperties.Name="Last 7 days" />
+   <ComboBoxItem Content="30d" automation:AutomationProperties.Name="Last 30 days" />
+  </ComboBox>
+  <Grid Height="124" Margin="0,4,0,0">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition /></Grid.ColumnDefinitions>
+   <TextBlock Text="100%" VerticalAlignment="Top" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
+   <TextBlock Text="50%" VerticalAlignment="Center" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
+   <TextBlock Text="0%" VerticalAlignment="Bottom" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
+   <Grid Grid.Column="1" Margin="0,6,2,6">
+    <Border BorderThickness="0,1,0,1" BorderBrush="{DynamicResource SecondaryBorderBrush}" />
+    <Border Height="1" VerticalAlignment="Center" Background="{DynamicResource SecondaryBorderBrush}" />
+    <Canvas x:Name="Plot" ClipToBounds="True" SizeChanged="OnPlotSizeChanged" automation:AutomationProperties.Name="Usage history, zero to one hundred percent" />
+   </Grid>
+  </Grid>
+  <Grid Margin="38,0,2,8"><TextBlock x:Name="RangeStart" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" /><TextBlock Text="Now" HorizontalAlignment="Right" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" /></Grid>
+  <TextBlock x:Name="HistoryMessage" Text="No usage history yet" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" automation:AutomationProperties.LiveSetting="Polite" />
+  <WrapPanel x:Name="Legend" />
+ </StackPanel>
+</UserControl>
