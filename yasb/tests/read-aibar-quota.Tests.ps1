@@ -44,7 +44,7 @@ Invoke-AiBarQuotaReader
         ($names -join ',') | Should -Be 'label,compactText,progressGlyph,progressColor,tooltip,className'
         $result.compactText.Length | Should -BeLessOrEqual 64
         $result.compactText | Should -Not -Match '[<>&{}]'
-        ($result.progressColor -cin @('#58A6FF', '#E3B341', '#F0883E', '#FF7B72', '#8995A4')) | Should -Be $true
+        ($result.progressColor -cin @('#3DDC84', '#FFC531', '#FF8A3D', '#FF4D5E', '#8995A4')) | Should -Be $true
     }
     function Assert-Compact($result, [string]$text) {
         $result.compactText | Should -BeExactly $text
@@ -173,7 +173,7 @@ Describe 'AIBar YASB reader' {
             foreach ($stage in $stages) {
                 $values = if ($stage[0] -eq 100) { @(100) } else { @($stage[0], ($stage[0] + 0.000001), ($stage[1] - 0.000001)) }
                 foreach ($value in $values) {
-                    $color = if ($value -lt 50) { '#58A6FF' } elseif ($value -lt 75) { '#E3B341' } elseif ($value -lt 90) { '#F0883E' } else { '#FF7B72' }
+                    $color = if ($value -lt 50) { '#3DDC84' } elseif ($value -lt 75) { '#FFC531' } elseif ($value -lt 90) { '#FF8A3D' } else { '#FF4D5E' }
                     foreach ($weeklyHero in @($true, $false)) {
                         $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'refreshing'; warning = $null; sourceRetrievedAt = $source; fiveHour = [ordered]@{ percentageUsed = $value; resetAt = $null }; weekly = $null }
                         if ($weeklyHero) { $document.weekly = $document.fiveHour; $document.fiveHour = $five }
@@ -188,7 +188,7 @@ Describe 'AIBar YASB reader' {
         } finally { [Threading.Thread]::CurrentThread.CurrentCulture = $culture }
         foreach ($value in @(89.999999, 90, 90.000001)) {
             $document.fiveHour.percentageUsed = $value
-            (Read-Document $document).progressColor | Should -BeExactly $(if ($value -lt 90) { '#F0883E' } else { '#FF7B72' })
+            (Read-Document $document).progressColor | Should -BeExactly $(if ($value -lt 90) { '#FF8A3D' } else { '#FF4D5E' })
         }
         $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'unavailable'; warning = 'authentication-failed'; sourceRetrievedAt = $null; fiveHour = $null; weekly = $null }
         Assert-Compact (Read-Document $document) 'unavailable | authentication failed'
@@ -223,7 +223,7 @@ Describe 'AIBar YASB reader' {
 aibar_quota:
   type: "yasb.custom.CustomWidget"
   options:
-    label: "<font color='{data[progressColor]}'>{data[progressGlyph]}</font> {data[compactText]}"
+    label: "<img src='<AIBarRoot>\\yasb\\icons\\openai.svg'/> <font color='{data[progressColor]}'>{data[progressGlyph]}</font> {data[compactText]}"
     label_alt: "{data[label]}"
     class_name: "aibar-quota"
     tooltip: true
@@ -240,7 +240,7 @@ aibar_quota:
         $actualYaml = $blocks[0].TrimEnd()
         $expectedYaml = ($expected -replace "`r`n", "`n").TrimEnd()
         $actualYaml | Should -BeExactly $expectedYaml
-        $expectedClaude = $expectedYaml.Replace('aibar_quota:', 'aibar_claude_quota:').Replace('read-aibar-quota.ps1"''', 'read-aibar-quota.ps1" -Provider Claude''')
+        $expectedClaude = $expectedYaml.Replace('aibar_quota:', 'aibar_claude_quota:').Replace('read-aibar-quota.ps1"''', 'read-aibar-quota.ps1" -Provider Claude''').Replace('icons\\openai.svg', 'icons\\claude.svg')
         $blocks[1].TrimEnd() | Should -BeExactly $expectedClaude
         $yaml | Should -Match '(?m)^    exec_options:\r?$'
         $yaml | Should -Match '(?m)^      run_cmd: ''powershell\.exe .*<AIBarRoot>\\yasb\\read-aibar-quota\.ps1"''\r?$'
@@ -261,6 +261,19 @@ aibar_quota:
             $parsed['aibar_quota']['options']['exec_options']['return_format'] | Should -Be 'json'
             $parsed['aibar_quota']['options']['exec_options']['run_cmd'] | Should -Be 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "<AIBarRoot>\yasb\read-aibar-quota.ps1"'
             $parsed['aibar_quota']['options']['callbacks']['on_left'] | Should -Be 'exec "<AIBarRoot>\AIBar.Desktop.exe" --show'
+        }
+    }
+
+    It 'ships both official marks as fixed-size local SVG images' {
+        foreach ($name in @('openai.svg', 'claude.svg')) {
+            $path = Join-Path $root (Join-Path 'icons' $name)
+            Test-Path -LiteralPath $path -PathType Leaf | Should -Be $true
+            [xml]$svg = Get-Content -Raw -LiteralPath $path
+            $svg.svg.width | Should -BeExactly '14'
+            $svg.svg.height | Should -BeExactly '14'
+            $svg.svg.viewBox | Should -BeExactly '0 0 24 24'
+            @($svg.svg.ChildNodes | Where-Object { $_.LocalName -ne 'path' }).Count | Should -Be 0
+            (Get-Content -Raw -LiteralPath $path) | Should -Not -Match '(?i)<script|href|https?:|xlink|on[a-z]+='
         }
     }
 
@@ -335,7 +348,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         $paths[1] | Should -BeExactly (Join-Path $local 'AIBar\yasb-claude-quota.json')
     }
 
-    It 'prefixes both texts and identifies Claude across valid states and nullable windows' {
+    It 'names Claude in the alternate label and tooltip while the compact text matches Codex' {
         $cases = @(
             @('current.json', '40%'), @('partial.json', '40%'), @('nullable-reset.json', '40%'),
             @('refreshing.json', '12%'), @('stale-refresh.json', '40% | stale | refresh failed'),
@@ -345,7 +358,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         foreach ($case in $cases) {
             $codex = Read-Fixture $case[0]
             $claude = Read-ClaudeFixture $case[0]
-            $claude.compactText | Should -BeExactly ('Claude ' + $case[1])
+            $claude.compactText | Should -BeExactly $case[1]
             $claude.label | Should -BeExactly ('Claude ' + $codex.label)
             $claude.tooltip | Should -BeExactly ('Claude ' + $codex.tooltip)
             $claude.progressGlyph | Should -BeExactly $codex.progressGlyph
@@ -364,7 +377,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
             'non-utc-generated.json', 'non-utc-source.json', 'non-utc-reset.json')) {
             $result = Read-ClaudeFixture $name
             $result.label | Should -BeExactly 'Claude unavailable'
-            Assert-Compact $result 'Claude unavailable'
+            Assert-Compact $result 'unavailable'
             $result.tooltip | Should -BeExactly 'Claude unavailable | age: --'
         }
     }
@@ -379,10 +392,10 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
                     $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $window; weekly = $null }
                     if ($weekly) { $document.weekly = $window; $document.fiveHour = [ordered]@{ percentageUsed = 99; resetAt = $null } }
                     $result = Read-ClaudeDocument $document
-                    Assert-Compact $result ('Claude ' + ([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%')
+                    Assert-Compact $result (([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%')
                     $glyphs = @(0xF0766, 0xF0A9E, 0xF0A9F, 0xF0AA0, 0xF0AA1, 0xF0AA2, 0xF0AA3, 0xF0AA4, 0xF0AA5)
                     $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32($glyphs[[int][math]::Min(8, [math]::Floor($value / 12.5))]))
-                    $result.progressColor | Should -BeExactly $(if ($value -lt 50) { '#58A6FF' } elseif ($value -lt 75) { '#E3B341' } elseif ($value -lt 90) { '#F0883E' } else { '#FF7B72' })
+                    $result.progressColor | Should -BeExactly $(if ($value -lt 50) { '#3DDC84' } elseif ($value -lt 75) { '#FFC531' } elseif ($value -lt 90) { '#FF8A3D' } else { '#FF4D5E' })
                 }
             }
         } finally { [Threading.Thread]::CurrentThread.CurrentCulture = $culture }
@@ -402,7 +415,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
             $result = $output | ConvertFrom-Json -ErrorAction Stop
             Assert-SafeFields $result
             $result.label | Should -Match '^Claude '
-            $result.compactText | Should -Match '^Claude '
+            $result.compactText | Should -Not -Match 'Claude'
             $result.tooltip | Should -Match '^Claude '
         } finally { $process.Dispose() }
     }
@@ -437,7 +450,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         $parts.Count | Should -Be 2
         $codex = $parts[0].TrimEnd()
         $claude = $parts[1].TrimEnd()
-        $expected = $codex.Replace('aibar_quota:', 'aibar_claude_quota:').Replace('read-aibar-quota.ps1"''', 'read-aibar-quota.ps1" -Provider Claude''')
+        $expected = $codex.Replace('aibar_quota:', 'aibar_claude_quota:').Replace('read-aibar-quota.ps1"''', 'read-aibar-quota.ps1" -Provider Claude''').Replace('icons\\openai.svg', 'icons\\claude.svg')
         $claude | Should -BeExactly $expected
         ([regex]::Matches($yaml, 'on_left: ''exec "<AIBarRoot>\\AIBar.Desktop.exe" --show''')).Count | Should -Be 2
     }
@@ -446,11 +459,11 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         foreach ($attack in @('token-canary', 'C:\private\credentials.json', 'plan-canary', '<font>&{}', ('x' * 256))) {
             $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $null; weekly = [ordered]@{ percentageUsed = 37; resetAt = $null }; plan = $attack }
             $result = Read-ClaudeDocument $document
-            Assert-Compact $result 'Claude unavailable'
+            Assert-Compact $result 'unavailable'
             $document.Remove('plan')
             $document.weekly.percentageUsed = $attack
             $result = Read-ClaudeDocument $document
-            Assert-Compact $result 'Claude unavailable'
+            Assert-Compact $result 'unavailable'
             foreach ($field in @($result.label, $result.compactText, $result.tooltip)) {
                 $field | Should -Not -Match 'canary|credential|C:|<|>|&|\{|\}'
             }

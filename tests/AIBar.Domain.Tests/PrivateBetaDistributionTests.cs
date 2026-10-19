@@ -73,7 +73,7 @@ public sealed class PrivateBetaDistributionTests
         using var archive = ZipFile.OpenRead(Path.Combine(output, "AIBar-win-x64-private-beta.zip"));
         Assert.Equal(archive.Entries.Select(entry => entry.FullName).OrderBy(path => path, StringComparer.Ordinal), archive.Entries.Select(entry => entry.FullName));
         Assert.Contains(archive.Entries, entry => entry.FullName == "PRIVATE-BETA.txt");
-        foreach (var relative in new[] { "yasb/read-aibar-quota.ps1", "yasb/remove-aibar-quota.ps1", "yasb/show-aibar.cmd", "yasb/custom-widget.example.yaml", "yasb/custom-widget.example.css", "yasb/README.txt" })
+        foreach (var relative in new[] { "yasb/read-aibar-quota.ps1", "yasb/remove-aibar-quota.ps1", "yasb/show-aibar.cmd", "yasb/custom-widget.example.yaml", "yasb/custom-widget.example.css", "yasb/README.txt", "yasb/icons/openai.svg", "yasb/icons/claude.svg" })
         {
             var entry = archive.Entries.Single(item => item.FullName == relative);
             using var stream = entry.Open(); using var bytes = new MemoryStream(); stream.CopyTo(bytes);
@@ -220,7 +220,8 @@ public sealed class PrivateBetaDistributionTests
             Directory.CreateDirectory(Path.Combine(Root, "src", "AIBar.Desktop"));
             Directory.CreateDirectory(Path.Combine(Root, "yasb"));
             File.Copy(Path.Combine(RepositoryRoot(), "scripts", "Publish-Deterministic.ps1"), Path.Combine(Root, "scripts", "Publish-Deterministic.ps1"));
-            foreach (var name in new[] { "read-aibar-quota.ps1", "remove-aibar-quota.ps1", "show-aibar.cmd", "custom-widget.example.yaml", "custom-widget.example.css", "README.txt" })
+            Directory.CreateDirectory(Path.Combine(Root, "yasb", "icons"));
+            foreach (var name in new[] { "read-aibar-quota.ps1", "remove-aibar-quota.ps1", "show-aibar.cmd", "custom-widget.example.yaml", "custom-widget.example.css", "README.txt", Path.Combine("icons", "openai.svg"), Path.Combine("icons", "claude.svg") })
                 File.Copy(Path.Combine(RepositoryRoot(), "yasb", name), Path.Combine(Root, "yasb", name));
             File.WriteAllText(Path.Combine(Root, "src", "AIBar.Desktop", "AIBar.Desktop.csproj"), "<Project><PropertyGroup><Version>0.1.0-beta.4</Version></PropertyGroup></Project>");
             File.WriteAllText(Path.Combine(Root, "README.md"), "baseline");
