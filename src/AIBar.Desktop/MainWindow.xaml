@@ -253,12 +253,21 @@
 
         <StackPanel Grid.Row="1" Margin="20,16,20,4" automation:AutomationProperties.Name="Quota cards">
             <Grid Margin="0,0,0,2">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                 <Path Data="{StaticResource OpenAiMark}" Style="{StaticResource PanelProviderMark}">
                     <Path.Fill><MultiBinding Converter="{StaticResource PanelPalette}" ConverterParameter="Codex"><Binding Source="0" /><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag.Color" RelativeSource="{RelativeSource Self}" /></MultiBinding></Path.Fill>
                     <Path.Effect><MultiBinding Converter="{StaticResource PanelGlow}" ConverterParameter="#10A37F"><Binding Source="0" /><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag.Color" RelativeSource="{RelativeSource Self}" /></MultiBinding></Path.Effect>
                 </Path>
-                <TextBlock Grid.Column="1" Text="CODEX" Style="{StaticResource PanelProviderTitle}" automation:AutomationProperties.Name="Codex" />
+                <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="CODEX" Style="{StaticResource PanelProviderTitle}" automation:AutomationProperties.Name="Codex" />
+                    <Button Content="Usage ↗" Click="OnCodexUsage" Margin="8,0,4,0" Padding="4,2" FontSize="12" Background="Transparent" Foreground="{DynamicResource TextBrush}" automation:AutomationProperties.Name="Open Codex official usage" />
+                </WrapPanel>
+                <Button Grid.Row="1" Grid.ColumnSpan="3" Click="OnCodexStatus" Margin="32,4,0,4" Padding="7,3" HorizontalContentAlignment="Left"
+                        Visibility="{Binding ProviderStatus.CodexDescription, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}"
+                        automation:AutomationProperties.Name="Open OpenAI service status" automation:AutomationProperties.HelpText="{Binding ProviderStatus.CodexDescription, RelativeSource={RelativeSource AncestorType=Window}}" automation:AutomationProperties.LiveSetting="Polite">
+                    <TextBlock Text="{Binding ProviderStatus.CodexDescription, RelativeSource={RelativeSource AncestorType=Window}}" TextWrapping="Wrap" />
+                </Button>
                 <Border Grid.Column="2" Style="{StaticResource PanelPill}">
                     <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE977;" Style="{StaticResource PanelGlyph}" Foreground="{DynamicResource MutedTextBrush}" /><TextBlock Text="This PC" Style="{StaticResource PanelPillText}" /></StackPanel>
                 </Border>
@@ -290,12 +299,21 @@
                         Visibility="{Binding Claude.IsEnabled, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
                 <Border Style="{StaticResource PanelRule}" Margin="0,4,0,16" />
                 <Grid Margin="0,0,0,2">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <Path Data="{StaticResource ClaudeMark}" Style="{StaticResource PanelProviderMark}">
                         <Path.Fill><MultiBinding Converter="{StaticResource PanelPalette}" ConverterParameter="Claude"><Binding Source="0" /><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag.Color" RelativeSource="{RelativeSource Self}" /></MultiBinding></Path.Fill>
                         <Path.Effect><MultiBinding Converter="{StaticResource PanelGlow}" ConverterParameter="#D97757"><Binding Source="0" /><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag.Color" RelativeSource="{RelativeSource Self}" /></MultiBinding></Path.Effect>
                     </Path>
-                    <TextBlock Grid.Column="1" Text="CLAUDE" Style="{StaticResource PanelProviderTitle}" automation:AutomationProperties.Name="Claude" />
+                    <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="CLAUDE" Style="{StaticResource PanelProviderTitle}" automation:AutomationProperties.Name="Claude" />
+                        <Button Content="Usage ↗" Click="OnClaudeUsage" Margin="8,0,4,0" Padding="4,2" FontSize="12" Background="Transparent" Foreground="{DynamicResource TextBrush}" automation:AutomationProperties.Name="Open Claude official usage" />
+                    </WrapPanel>
+                    <Button Grid.Row="1" Grid.ColumnSpan="3" Click="OnClaudeStatus" Margin="32,4,0,4" Padding="7,3" HorizontalContentAlignment="Left"
+                            Visibility="{Binding ProviderStatus.ClaudeDescription, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}"
+                            automation:AutomationProperties.Name="Open Anthropic service status" automation:AutomationProperties.HelpText="{Binding ProviderStatus.ClaudeDescription, RelativeSource={RelativeSource AncestorType=Window}}" automation:AutomationProperties.LiveSetting="Polite">
+                        <TextBlock Text="{Binding ProviderStatus.ClaudeDescription, RelativeSource={RelativeSource AncestorType=Window}}" TextWrapping="Wrap" />
+                    </Button>
                     <Border Grid.Column="2" Style="{StaticResource PanelPill}" Visibility="{Binding Claude.State.SourceLabel, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}">
                         <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7F8;" Style="{StaticResource PanelGlyph}" Foreground="{DynamicResource MutedTextBrush}" /><TextBlock Text="{Binding Claude.State.SourceLabel}" Style="{StaticResource PanelPillText}" /></StackPanel>
                     </Border>

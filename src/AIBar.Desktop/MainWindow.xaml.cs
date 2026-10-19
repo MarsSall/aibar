@@ -10,6 +10,19 @@ public partial class MainWindow : Window
 
     public MainWindow() => InitializeComponent();
 
+    public static readonly DependencyProperty ProviderStatusProperty = DependencyProperty.Register(
+        nameof(ProviderStatus), typeof(ProviderStatusPresentation), typeof(MainWindow));
+    public ProviderStatusPresentation? ProviderStatus
+    {
+        get => (ProviderStatusPresentation?)GetValue(ProviderStatusProperty);
+        set => SetValue(ProviderStatusProperty, value);
+    }
+
+    private void OnCodexUsage(object sender, RoutedEventArgs e) => ProviderLinks.OpenUsage(AIBar.Domain.StatusProvider.Codex);
+    private void OnClaudeUsage(object sender, RoutedEventArgs e) => ProviderLinks.OpenUsage(AIBar.Domain.StatusProvider.Claude);
+    private void OnCodexStatus(object sender, RoutedEventArgs e) => ProviderLinks.OpenStatus(AIBar.Domain.StatusProvider.Codex);
+    private void OnClaudeStatus(object sender, RoutedEventArgs e) => ProviderLinks.OpenStatus(AIBar.Domain.StatusProvider.Claude);
+
     /// <summary>True only while the acrylic backdrop is active; the surface then uses a translucent tint.</summary>
     public bool IsTranslucent
     {
