@@ -97,6 +97,16 @@ public partial class QuotaHistoryChart : UserControl
             }
         }
     }
+    private static void SetProviderBrush(Shape target, DependencyProperty property, string provider)
+    {
+        target.SetResourceReference(TagProperty, "SurfaceBrush");
+        var brush = new System.Windows.Data.MultiBinding { Converter = new ProviderVisuals(), ConverterParameter = provider };
+        brush.Bindings.Add(new System.Windows.Data.Binding { Source = 0 });
+        brush.Bindings.Add(new System.Windows.Data.Binding("Tag") { RelativeSource = System.Windows.Data.RelativeSource.Self });
+        brush.Bindings.Add(new System.Windows.Data.Binding("Tag.Color") { RelativeSource = System.Windows.Data.RelativeSource.Self });
+        System.Windows.Data.BindingOperations.SetBinding(target, property, brush);
+    }
+
     private void Draw()
     {
         if (Plot is null) return;
@@ -111,7 +121,7 @@ public partial class QuotaHistoryChart : UserControl
             var legend = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 12, 0) };
             var swatch = new Line { X1 = 0, X2 = 24, Y1 = 7, Y2 = 7, Width = 26, Height = 14, StrokeThickness = 2,
                 StrokeDashArray = new DoubleCollection(Dashes[index % Dashes.Length]) };
-            swatch.SetResourceReference(Shape.StrokeProperty, "TextBrush"); legend.Children.Add(swatch);
+            SetProviderBrush(swatch, Shape.StrokeProperty, series.Provider.ToString()); legend.Children.Add(swatch);
             var label = new TextBlock { Text = series.Label, FontSize = 11, TextWrapping = TextWrapping.Wrap };
             label.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush"); legend.Children.Add(label);
             var summary = series.Label + (series.Samples.Count == 0 ? ": no samples" :
@@ -126,7 +136,7 @@ public partial class QuotaHistoryChart : UserControl
                 if (beginsSegment)
                 {
                     line = new Polyline { StrokeThickness = 2, StrokeDashArray = new DoubleCollection(Dashes[index % Dashes.Length]) };
-                    line.SetResourceReference(Shape.StrokeProperty, "TextBrush"); Plot.Children.Add(line);
+                    SetProviderBrush(line, Shape.StrokeProperty, series.Provider.ToString()); Plot.Children.Add(line);
                 }
                 var x = (double)((decimal)(sample.RetrievedAt - data.From).Ticks / (data.To - data.From).Ticks) * Plot.ActualWidth;
                 var y = (1 - (double)sample.Percentage / 100) * Plot.ActualHeight;
@@ -134,7 +144,7 @@ public partial class QuotaHistoryChart : UserControl
                 if (beginsSegment)
                 {
                     var dot = new Ellipse { Width = 3, Height = 3 };
-                    dot.SetResourceReference(Shape.FillProperty, "TextBrush");
+                    SetProviderBrush(dot, Shape.FillProperty, series.Provider.ToString());
                     Canvas.SetLeft(dot, Math.Clamp(x - 1.5, 0, Math.Max(0, Plot.ActualWidth - 3)));
                     Canvas.SetTop(dot, Math.Clamp(y - 1.5, 0, Math.Max(0, Plot.ActualHeight - 3)));
                     Plot.Children.Add(dot);

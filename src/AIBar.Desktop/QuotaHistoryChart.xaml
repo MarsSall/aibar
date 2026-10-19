@@ -4,7 +4,7 @@
  xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
  Focusable="False" Margin="0,8,0,16">
  <StackPanel>
-  <TextBlock Text="USAGE HISTORY" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,0,8" />
+  <TextBlock Text="Usage history" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,8" />
   <ComboBox x:Name="HistoryRange" SelectedIndex="0" HorizontalAlignment="Left" MinWidth="100" Margin="0,0,0,8"
    Focusable="True" IsTabStop="True" SelectionChanged="OnRangeChanged" automation:AutomationProperties.Name="Usage history range">
    <ComboBoxItem Content="24h" automation:AutomationProperties.Name="Last 24 hours" />

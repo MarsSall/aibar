@@ -9,7 +9,7 @@
             <ResourceDictionary Source="Themes/Semantic.Light.xaml" />
         </ResourceDictionary.MergedDictionaries>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-        <FontFamily x:Key="AppFont">Segoe UI</FontFamily>
+        <FontFamily x:Key="AppFont">Segoe UI Variable Text, Segoe UI</FontFamily>
         <system:Double x:Key="SpacingSmall">8</system:Double>
         <system:Double x:Key="SpacingMedium">16</system:Double>
         <CornerRadius x:Key="CardRadius">10</CornerRadius>

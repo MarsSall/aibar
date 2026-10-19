@@ -4,9 +4,14 @@ using UserControl = System.Windows.Controls.UserControl;
 
 namespace AIBar.Desktop;
 
-/// <summary>One quota meter row: dot, label, alert flag, percent, bar and compact reset.</summary>
+/// <summary>One CodexBar-style window: title, brand bar, usage/reset and inline pace.</summary>
 public partial class PanelMeter : UserControl
 {
+    public static readonly DependencyProperty ProviderProperty = Register(nameof(Provider), "Codex");
+    public static readonly DependencyProperty PaceProperty = Register<PanelPacePresentation?>(nameof(Pace), null);
+    public string Provider { get => (string)GetValue(ProviderProperty); set => SetValue(ProviderProperty, value); }
+    public PanelPacePresentation? Pace { get => (PanelPacePresentation?)GetValue(PaceProperty); set => SetValue(PaceProperty, value); }
+
     public static readonly DependencyProperty LabelProperty = Register<string?>(nameof(Label), null);
     public static readonly DependencyProperty UsageProperty = Register<decimal?>(nameof(Usage), null);
     public static readonly DependencyProperty IsCurrentProperty = Register(nameof(IsCurrent), true);

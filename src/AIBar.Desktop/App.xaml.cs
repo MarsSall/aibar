@@ -147,6 +147,8 @@ public partial class App : System.Windows.Application
         _taskbar = new TaskbarRecreationMonitor(window);
         var trayPresentation = composition.Presentation is BetaAnalyticsPresentation analyticsPresentation ? analyticsPresentation.QuotaPresentation : composition.Presentation as QuotaPresentationHost;
         var tray = new WindowsTrayRuntime();
+        window.SettingsRequested += () => tray.ShowSettingsMenu(window);
+        window.QuitRequested += tray.RequestExit;
         _runtime = new TrayHostRuntime(_instance!, tray, new WpfPopoverRuntime(window, _theme, () => WindowsPopoverPlacementContextProvider.Get(window), null, () => themeSource.Current), _taskbar,
             _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation, new WindowsPrivateIntegrationConsentPrompt(), new WindowsOpenCodeDataFolderPicker(), composition.ClaudeQuota);
         if (composition.Alerts is { } alerts)
