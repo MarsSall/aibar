@@ -266,7 +266,7 @@ aibar_quota:
 
     It 'shows each reset as a compact countdown without seconds' {
         $cases = @(
-            @('2026-07-12T12:00:30Z', '5h resets in <1m'), @('2026-07-12T12:05:59Z', '5h resets in 5m'),
+            @('2026-07-12T12:00:30Z', '5h resets in under 1m'), @('2026-07-12T12:05:59Z', '5h resets in 5m'),
             @('2026-07-12T15:53:00Z', '5h resets in 3h 53m'), @('2026-07-13T11:59:59Z', '5h resets in 23h 59m'),
             @('2026-07-13T12:00:00Z', '5h resets in 1d 0h'), @('2026-07-15T20:30:00Z', '5h resets in 3d 8h'),
             @('2026-07-12T12:00:00Z', '5h reset: due'), @('2026-07-12T11:00:00Z', '5h reset: due')
@@ -275,7 +275,8 @@ aibar_quota:
             $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 12; resetAt = $case[0] }; weekly = $null }
             $result = Read-Document $document
             $result.tooltip | Should -BeExactly ('current | ' + $case[1] + ' | age: 2h')
-            $result.tooltip | Should -Not -Match '[0-9]{2}:[0-9]{2}:[0-9]{2}|Z\b'
+            # Tooltips may render as rich text: no seconds, no UTC suffix, no markup characters.
+            $result.tooltip | Should -Not -Match '[0-9]{2}:[0-9]{2}:[0-9]{2}|Z\b|[<>&]'
         }
     }
 

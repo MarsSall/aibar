@@ -20,7 +20,13 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
         if ($null -eq $Window -or $null -eq $Window.resetAt) { return "$Name reset: --" }
         $reset = [DateTimeOffset]$Window.resetAt
         if ($reset -le $Now) { return "$Name reset: due" }
-        return "$Name reset: $($reset.UtcDateTime.ToString('u').TrimEnd('Z'))Z"
+        # Compact countdown like the panel; no seconds and no markup characters in the tooltip.
+        $left = $reset - $Now
+        $text = if ($left.TotalDays -ge 1) { '{0}d {1}h' -f [math]::Floor($left.TotalDays), $left.Hours }
+            elseif ($left.TotalHours -ge 1) { '{0}h {1}m' -f [math]::Floor($left.TotalHours), $left.Minutes }
+            elseif ($left.TotalMinutes -ge 1) { '{0}m' -f [math]::Floor($left.TotalMinutes) }
+            else { 'under 1m' }
+        return "$Name resets in $text"
     }
     $stateText = switch -CaseSensitive ($State) {
         'current' { 'current' }; 'refreshing' { 'refreshing' }; 'stale' { 'stale' }

@@ -17,7 +17,7 @@ Claude uses the same schema-v1 sanitized fields, atomic replacement, ACL verific
 Presentation
 Only supplied quota windows appear, in 5h then 7d order. Weekly-only input can display "7d: 35% | current" without an empty 5h slot.
 Human warnings use "refresh failed", "authentication failed", and "service unavailable". Duplicate unavailable/disabled warnings are omitted from visible copy, not from authoritative CSS classes.
-The tooltip shows state, any distinct warning, supplied-window resets, then source age. Invalid or missing input fails closed as "unavailable", with "unavailable | age: --" in the tooltip.
+The tooltip shows state, any distinct warning, supplied-window resets as countdowns (for example "5h resets in 3h 53m", "7d resets in 1d 22h", "under 1m", or "due"), then source age. Invalid or missing input fails closed as "unavailable", with "unavailable | age: --" in the tooltip.
 The compact label selects weekly when supplied, otherwise 5h, and shows exact invariant percentage USED without rounding. Current/refreshing show percentage only; stale retains explicit problem text. Without safe values it shows the state/warning, never a percentage.
 Reader JSON is BOM-less UTF-8 with ordered label, compactText, progressGlyph, progressColor, tooltip, className fields. Full label, tooltip and classes retain their compatibility meaning.
 The YAML colors only a closed progress glyph; plain percentage/problem text stays outside its markup. The glyph fills in 8 steps and is green below 50%, yellow from 50%, orange from 75% and red from 90%; it is gray when no value is available.
