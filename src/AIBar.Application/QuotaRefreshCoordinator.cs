@@ -31,6 +31,7 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
     }
 
     public QuotaRefreshState State { get { lock (_gate) return _state; } }
+    public long RetrievalGeneration { get { lock (_gate) return _retrievalGeneration; } }
     public event Action<QuotaAuthorityUpdate>? AuthorityUpdated;
     public event Action<QuotaRefreshState>? StateChanged;
 

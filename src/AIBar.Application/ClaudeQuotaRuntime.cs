@@ -26,6 +26,8 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private readonly IQuotaExportWriter? _exportWriter;
     private QuotaExportPublisher? _publisher;
     private QuotaRefreshCoordinator? _coordinator;
+    private readonly IQuotaHistoryStore? _historyStore;
+    private QuotaHistoryRecorder? _historyRecorder;
     private IQuotaProvider? _provider;
     private CancellationTokenSource? _pollCancellation;
     private ITimer? _timer;
@@ -42,8 +44,9 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         IQuotaRefreshLifecycleEvents? lifecycle = null, TimeProvider? timeProvider = null,
         IQuotaExportWriter? exportWriter = null,
         Func<PrivateIntegrationPolicy, IQuotaProvider>? remoteProviderFactory = null,
-        Func<bool>? remoteFileAvailable = null)
+        Func<bool>? remoteFileAvailable = null, IQuotaHistoryStore? historyStore = null)
     {
+        _historyStore = historyStore;
         _remoteFileAvailable = remoteFileAvailable ?? (() => ClaudeRemoteUsageProvider.IsAvailableForAutomatic());
         _exportWriter = exportWriter;
         _remoteProviderFactory = remoteProviderFactory ?? (policy => new ClaudeRemoteUsageProvider(policy));
@@ -286,6 +289,9 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             _provider = (_resolvedSource == ClaudeQuotaSource.OtherMachine ? _remoteProviderFactory : _providerFactory)(_policy);
             _coordinator = new(new ConsentStore(_store, _policy, _pollCancellation.Token), _provider, _clock,
                 new FreshnessPolicy(TimeSpan.FromMinutes(_resolvedSource == ClaudeQuotaSource.OtherMachine ? 15 : 10)), TimeSpan.FromMinutes(5));
+            if (_historyStore is not null)
+                _historyRecorder = new(_coordinator, _historyStore, _clock, QuotaHistoryProvider.Claude,
+                    _resolvedSource == ClaudeQuotaSource.OtherMachine ? QuotaHistorySource.ClaudeRemote : QuotaHistorySource.ClaudeLocal);
             _coordinator.StateChanged += OnStateChanged;
             await _coordinator.InitializeAsync(cancellationToken);
             if (_exportWriter is not null)
@@ -354,7 +360,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         catch (ObjectDisposedException) when (!_enabled || !ReferenceEquals(coordinator, _coordinator)) { }
     }
 
-    private async ValueTask StopCoreAsync()
+    private async ValueTask StopCoreAsync(bool discardPendingHistory = false)
     {
         _enabled = false; _policy.Disable();
         CancelRemoteDeadline();
@@ -372,6 +378,9 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
                     // The wrapper rejects not-yet-entered saves. Awaiting drains an already-entered
                     // save before clearing it, even if an injected provider/store ignores cancellation.
                     await _coordinator.CancelAndWaitAsync(CancellationToken.None);
+                    if (discardPendingHistory && _historyRecorder is not null)
+                        await _historyRecorder.CancelAndWaitAsync(CancellationToken.None);
+                    await StopHistoryAsync();
                     await _coordinator.ClearAsync(CancellationToken.None);
                 }
             }
@@ -383,11 +392,19 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
                 _coordinator.StateChanged -= OnStateChanged;
                 await _coordinator.DisposeAsync();
             }
+            await StopHistoryAsync();
             if (_provider is IAsyncDisposable asyncProvider) await asyncProvider.DisposeAsync();
             else if (_provider is IDisposable provider) provider.Dispose();
             _coordinator = null; _provider = null; _timer = null;
             _pollCancellation?.Dispose(); _pollCancellation = null;
         }
+    }
+
+    private async ValueTask StopHistoryAsync()
+    {
+        var recorder = _historyRecorder;
+        _historyRecorder = null;
+        if (recorder is not null) await recorder.DisposeAsync();
     }
 
     private async ValueTask StopExportAsync()
@@ -411,7 +428,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         try
         {
             ThrowIfDisposed();
-            try { await StopCoreAsync(); }
+            try { await StopCoreAsync(discardPendingHistory: true); }
             finally
             {
                 await _settings.SaveClaudeAsync(false, CancellationToken.None);
@@ -461,6 +478,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
                     _coordinator.StateChanged -= OnStateChanged;
                     await _coordinator.DisposeAsync();
                 }
+                await StopHistoryAsync();
                 if (_provider is IAsyncDisposable asyncProvider) await asyncProvider.DisposeAsync();
                 else if (_provider is IDisposable provider) provider.Dispose();
                 _pollCancellation?.Dispose();
