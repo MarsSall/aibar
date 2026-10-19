@@ -91,8 +91,9 @@ public sealed class ClaudeQuotaPresentationHost : INotifyPropertyChanged, IDispo
     {
         try
         {
-            var samples = await _history!.ReadPaceAsync(QuotaHistoryProvider.Claude);
-            if (_disposed || revision != _historyRevision || !IsEnabled) return;
+            var historyRevision = _history!.Revision;
+            var samples = await _history.ReadPaceAsync(QuotaHistoryProvider.Claude);
+            if (_disposed || revision != _historyRevision || !IsEnabled || !_history.CanPublish(historyRevision)) return;
             State = _mapper.Map(state, true, source, samples);
             PropertyChanged?.Invoke(this, new(nameof(State)));
         }

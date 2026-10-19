@@ -25,6 +25,7 @@ public partial class QuotaHistoryChart : UserControl
     public QuotaHistoryChartData? Data { get => (QuotaHistoryChartData?)GetValue(DataProperty); set => SetValue(DataProperty, value); }
     private readonly DispatcherTimer _timer;
     private CancellationTokenSource? _read;
+    private PanelPaceHistory? _subscribedHistory;
     private long _revision;
     private static readonly double[][] Dashes = [[], [5, 2], [1, 2], [5, 2, 1, 2]];
 
@@ -34,15 +35,22 @@ public partial class QuotaHistoryChart : UserControl
         _timer = new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, (_, _) => Refresh(), Dispatcher);
         _timer.Stop();
         IsVisibleChanged += (_, _) => { if (IsVisible) { _timer.Start(); Refresh(); } else { _timer.Stop(); Reset(); } };
-        Unloaded += (_, _) => { _timer.Stop(); Reset(); };
+        Loaded += (_, _) => { SetHistorySubscription(History); if (IsVisible) { _timer.Start(); Refresh(); } };
+        Unloaded += (_, _) => { _timer.Stop(); SetHistorySubscription(null); Reset(); };
     }
 
     private static void OnHistoryChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
     {
         var chart = (QuotaHistoryChart)sender;
-        if (args.OldValue is PanelPaceHistory old) old.Invalidated -= chart.Reset;
-        if (args.NewValue is PanelPaceHistory current) current.Invalidated += chart.Reset;
+        chart.SetHistorySubscription(chart.IsLoaded ? args.NewValue as PanelPaceHistory : null);
         chart.Reset(); chart.Refresh();
+    }
+    private void SetHistorySubscription(PanelPaceHistory? history)
+    {
+        if (ReferenceEquals(_subscribedHistory, history)) return;
+        if (_subscribedHistory is not null) _subscribedHistory.Invalidated -= Reset;
+        _subscribedHistory = history;
+        if (_subscribedHistory is not null) _subscribedHistory.Invalidated += Reset;
     }
     private void OnRangeChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
@@ -51,30 +59,43 @@ public partial class QuotaHistoryChart : UserControl
     private void OnPlotSizeChanged(object sender, SizeChangedEventArgs e) => Draw();
     private void Reset()
     {
-        ++_revision; _read?.Cancel(); _read?.Dispose(); _read = null; Data = null;
+        ++_revision;
+        var retired = _read; _read = null;
+        if (retired is not null) _ = PanelPaceHistory.CancelAndDisposeAsync(retired);
+        Data = null;
         if (Plot is null) return;
         Plot.Children.Clear(); Legend.Children.Clear(); HistoryMessage.Text = "No usage history yet";
     }
     private async void Refresh()
     {
-        if (!IsVisible || History is null || _read is not null) return;
+        var history = History;
+        if (!IsVisible || history is null || _read is not null) return;
         var revision = ++_revision;
-        using var cancellation = new CancellationTokenSource(); _read = cancellation;
+        var historyRevision = history.Revision;
+        var cancellation = new CancellationTokenSource(); _read = cancellation;
         var range = (QuotaHistoryChartRange)((ComboBox)HistoryRange).SelectedIndex;
         RangeStart.Text = range switch { QuotaHistoryChartRange.Day => "24h ago", QuotaHistoryChartRange.Week => "7d ago", _ => "30d ago" };
         try
         {
-            var data = await History.ReadChartAsync(range, cancellation.Token);
-            if (revision != _revision || !IsVisible) return;
+            var data = await history.ReadChartAsync(range, cancellation.Token);
+            if (revision != _revision || !IsVisible || !ReferenceEquals(History, history) || !history.CanPublish(historyRevision)) return;
             Data = data;
-            History?.RefreshPace();
+            history.RefreshPace();
         }
         catch (OperationCanceledException) { }
         catch (Exception)
         {
             if (revision == _revision) { Data = null; HistoryMessage.Text = "Usage history unavailable"; }
         }
-        finally { if (ReferenceEquals(_read, cancellation)) _read = null; }
+        finally
+        {
+            // Reset transfers ownership of an interrupted source to the cancellation helper.
+            if (ReferenceEquals(_read, cancellation))
+            {
+                _read = null;
+                _ = PanelPaceHistory.CancelAndDisposeAsync(cancellation);
+            }
+        }
     }
     private void Draw()
     {

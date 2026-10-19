@@ -203,6 +203,14 @@ public sealed class PanelDetailsTests
                 System.Windows.Input.InputManager.Current.ProcessInput(new System.Windows.Input.KeyEventArgs(
                     System.Windows.Input.Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), 0, System.Windows.Input.Key.Tab)
                     { RoutedEvent = System.Windows.Input.Keyboard.KeyDownEvent });
+                var chart = Assert.Single(Visuals<QuotaHistoryChart>(details));
+                var selector = Assert.IsType<System.Windows.Controls.ComboBox>(chart.FindName("HistoryRange"));
+                Assert.True(selector.IsKeyboardFocused);
+                Assert.Equal("Usage history range", AutomationProperties.GetName(selector));
+                window.UpdateLayout(); AssertInViewports(selector);
+                System.Windows.Input.InputManager.Current.ProcessInput(new System.Windows.Input.KeyEventArgs(
+                    System.Windows.Input.Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), 0, System.Windows.Input.Key.Tab)
+                    { RoutedEvent = System.Windows.Input.Keyboard.KeyDownEvent });
                 Assert.True(provider.IsKeyboardFocused);
                 provider.BringIntoView(); window.UpdateLayout();
                 foreach (var label in new[] { total, "Input 11", "2026-01-01", "sample-model", "100 tokens", "Input 10" })
