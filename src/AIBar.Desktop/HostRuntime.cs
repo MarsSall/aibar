@@ -350,7 +350,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     public ValueTask DisposeAsync() => new(ExitAsync());
 }
 
-public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IClaudeQuotaTray, IClaudeQuotaSourceTray
+public sealed partial class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IClaudeQuotaTray, IClaudeQuotaSourceTray, IQuotaAlertTray
 {
     private readonly Forms.NotifyIcon _icon = new() { Icon = SystemIcons.Application, Text = "AIBar", Visible = false };
     private readonly Forms.ContextMenuStrip _menu = new();
@@ -375,6 +375,7 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IC
     private bool _privateIntegrationEnabled;
     public WindowsTrayRuntime()
     {
+        InitializeAlerts();
         var exit = new Forms.ToolStripMenuItem("Exit AIBar");
         _claudeSource.DropDownItems.AddRange(new Forms.ToolStripItem[] { _claudeAutomatic, _claudeThisPc, _claudeOtherMachine });
         _claudeAutomatic.Click += (_, _) => ClaudeSourceRequested?.Invoke(ClaudeQuotaSource.Automatic);
