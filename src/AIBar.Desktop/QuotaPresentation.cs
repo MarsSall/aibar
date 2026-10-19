@@ -41,9 +41,11 @@ public sealed record BetaPresentationState(
     public string? SourceLabel { get; init; }
 }
 
-public sealed class QuotaPresentationMapper(IClock clock)
+public sealed class QuotaPresentationMapper(IClock clock, QuotaHistoryProvider provider = QuotaHistoryProvider.Codex)
 {
-    public BetaPresentationState Map(QuotaRefreshState state)
+    public BetaPresentationState Map(QuotaRefreshState state) => Map(state, []);
+
+    public BetaPresentationState Map(QuotaRefreshState state, IReadOnlyList<QuotaHistorySample> history)
     {
         var snapshot = state.Snapshot;
         var failure = state.Failure;
@@ -59,8 +61,8 @@ public sealed class QuotaPresentationMapper(IClock clock)
         var warning = WarningLabel(failure, isMissingCredential, isOffline);
         var freshness = isLoading ? "Loading" : isFresh ? "Current" : isCached ? "Stale" : isMissingCredential ? "Missing credential" : isOffline ? "Offline" : "Unavailable";
         return new(
-            Window("5-hour quota", snapshot?.Primary, isFresh, QuotaPaceWindow.FiveHour),
-            Window("Weekly quota", snapshot?.Weekly, isFresh, QuotaPaceWindow.Weekly),
+            Window("5-hour quota", snapshot?.Primary, isFresh, QuotaPaceWindow.FiveHour, history),
+            Window("Weekly quota", snapshot?.Weekly, isFresh, QuotaPaceWindow.Weekly, history),
             snapshot?.Primary is not null,
             snapshot?.Weekly is not null,
             isFresh,
@@ -90,13 +92,14 @@ public sealed class QuotaPresentationMapper(IClock clock)
         };
     }
 
-    private QuotaWindowPresentation Window(string label, QuotaWindow? window, bool current, QuotaPaceWindow kind) => new(
+    private QuotaWindowPresentation Window(string label, QuotaWindow? window, bool current, QuotaPaceWindow kind, IReadOnlyList<QuotaHistorySample> history) => new(
         label,
         window?.PercentageUsed,
         window is null ? null : FormatCountdown(window.CountdownAt(clock.UtcNow)))
     {
         Pace = PanelPacePresentation.Create(kind == QuotaPaceWindow.Weekly ? "Codex weekly" : "Codex 5-hour",
-            window?.PercentageUsed, QuotaPacePolicy.Calculate(window?.PercentageUsed, window?.ResetAt, kind, clock.UtcNow), current, clock.UtcNow)
+            window?.PercentageUsed, ObservedPacePolicy.Calculate(window?.PercentageUsed, window?.ResetAt, kind, clock.UtcNow, provider,
+                current ? history : []), current, clock.UtcNow)
     };
 
     private static string FormatCountdown(TimeSpan value)
@@ -199,13 +202,21 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     private BetaPresentationState _state;
     private QuotaFailure? _reportedFailure;
     private bool _disposed;
+    private readonly PanelPaceHistory? _history;
+    private long _historyRevision;
     public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, bool refreshAvailable = true, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null)
         : this(coordinator, mapper, () => refreshAvailable, report, lifecycleEvents) { }
-    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, Func<bool> refreshAvailable, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null, ClaudeQuotaPresentationHost? claude = null)
+    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, Func<bool> refreshAvailable, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null, ClaudeQuotaPresentationHost? claude = null, PanelPaceHistory? history = null)
     {
         ArgumentNullException.ThrowIfNull(refreshAvailable);
         _coordinator = coordinator; _mapper = mapper; _dispatcher = Dispatcher.CurrentDispatcher; _refreshAvailable = refreshAvailable; _state = Map(coordinator.State); _report = report; _lifecycleEvents = lifecycleEvents;
         _claude = claude;
+        _history = history;
+        if (_history is not null)
+        {
+            _history.Invalidated += OnHistoryInvalidated;
+            _history.PaceRefreshRequested += OnHistoryInvalidated;
+        }
         if (_claude is not null) _claude.PropertyChanged += OnClaudeChanged;
         _refreshCommand = new ManualRefreshCommand(RefreshAllAsync, () => IsRefreshAvailable, report);
         CopySummaryCommand = new(() => _disposed ? null : _state, System.Windows.Clipboard.SetText);
@@ -255,9 +266,13 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         if (!_dispatcher.CheckAccess()) { _dispatcher.BeginInvoke(() => Update(state)); return; }
         Update(state);
     }
+    private void OnHistoryInvalidated() => Update(_coordinator.State);
     private void Update(QuotaRefreshState state)
     {
+        if (_disposed) return;
+        var revision = ++_historyRevision;
         _state = Map(state);
+        if (_history is not null && _state.IsCurrent && _refreshAvailable()) _ = ApplyHistoryAsync(state, revision);
         CopySummaryCommand.RefreshState();
         if (state.Failure != _reportedFailure)
         {
@@ -265,6 +280,17 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
             if (state.Failure is not null) _report?.Invoke(new InvalidOperationException(state.Failure.SafeCode));
         }
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
+    }
+    private async Task ApplyHistoryAsync(QuotaRefreshState state, long revision)
+    {
+        try
+        {
+            var samples = await _history!.ReadPaceAsync(QuotaHistoryProvider.Codex);
+            if (_disposed || revision != _historyRevision || !_refreshAvailable()) return;
+            _state = _mapper.Map(state, samples);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
+        }
+        catch (Exception) { /* History is optional; the snapshot estimate remains visible. */ }
     }
     private BetaPresentationState Map(QuotaRefreshState state)
     {
@@ -294,6 +320,11 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
             _disposed = true;
             CopySummaryCommand.RefreshState();
             _coordinator.StateChanged -= OnStateChanged;
+            if (_history is not null)
+            {
+                _history.Invalidated -= OnHistoryInvalidated;
+                _history.PaceRefreshRequested -= OnHistoryInvalidated;
+            }
             if (_claude is not null) { _claude.PropertyChanged -= OnClaudeChanged; _claude.Dispose(); }
             if (_lifecycleEvents is not null) _lifecycleEvents.ClockChanged -= OnClockChanged;
         }

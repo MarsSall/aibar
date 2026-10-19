@@ -2,7 +2,7 @@
 
 AIBar records successful Codex and Claude quota retrievals in
 `%LOCALAPPDATA%\AIBar\quota-history.db`. This is independent of the single-snapshot
-quota caches and the Codex export v1 format. No UI is added by this storage change.
+quota caches and the Codex export v1 format. **Pace & details** displays this history and uses it for observed pace; see [panel details](panel-details.md).
 
 ## What is recorded
 
@@ -55,13 +55,36 @@ percentages retain decimal precision as invariant text.
   Reversed endpoints, invalid enum values, invalid percentages, and a source
   inconsistent with its provider are rejected. Disposed stores reject access.
 
-`QuotaHistorySample` includes `ResetAt`, so the observed-pace consumer can select
-only samples in the current reset cycle. T3 can request 24-hour, 7-day, or 30-day
-ranges through this same API; it owns chart presentation and the observed-rate
-policy/fallback. Desktop composition exposes the shared store as
-`StartupComposition.QuotaHistory` for that integration. Queries during the
-privacy-clear pause fail with `InvalidOperationException`; consumers should
-refresh after clear, not retain old query results in UI memory.
+Desktop composition exposes the shared store as `StartupComposition.QuotaHistory`.
+`PanelPaceHistory` uses that same store for chart and pace reads, off the UI thread.
+The chart requests each provider/window separately over inclusive 24-hour, 7-day,
+or 30-day ranges ending at the read clock time. It keeps all four series on a
+fixed 0–100% scale and breaks segments when the reset instant changes or usage
+decreases. Missing history is not interpolated.
+
+`ObservedPacePolicy` selects samples matching provider, window and the current
+`ResetAt`, inside the nominal cycle start through evaluation time (inclusive).
+It sorts and deduplicates retrieval instants. With at least two distinct samples,
+strictly more than 5% elapsed, and no decreasing interval, the observed rate is
+`(last percentage - first percentage) / (last retrieval - first retrieval)`.
+The pace ratio is this rate divided by `100% / nominal duration`; projected
+exhaustion is evaluation time plus `(100% - current usage) / observed rate`.
+Zero observed consumption has ratio zero and no exhaustion instant. Projections
+beyond the date type's maximum have no representable exhaustion instant.
+
+Insufficient or inconsistent history retains `QuotaPacePolicy`'s snapshot result,
+including its exact 5% boundary, limit-reached and expired-reset behavior. Only
+current, fresh, successful quota states use observed pace; stale data remains
+**Not current** without a warning. History errors never replace quota authority.
+Pace rows retain their wording and expose **based on observed use** in accessible
+help when applicable. Presentation updates use revision checks to discard results
+from superseded states, consent/source changes, or clear operations.
+
+Queries during the privacy-clear pause fail with `InvalidOperationException`.
+The desktop reader joins clear before the store: it cancels its read epoch and
+invalidates visible chart data and observed pace. Closing the disclosure also
+cancels chart reads and drops chart data. The next visible refresh queries again;
+there is no persistent presentation history cache.
 
 ## Clear and shutdown
 
@@ -87,6 +110,10 @@ and observe RED in Windows CI, then commit implementation and observe GREEN:
 - `tests/AIBar.Domain.Tests/SqliteQuotaHistoryStoreTests.cs`
 - `tests/AIBar.Domain.Tests/QuotaHistoryRecorderTests.cs`
 - History allowlist assertions in `tests/AIBar.Domain.Tests/ClearAiBarDataTests.cs`
+- `tests/AIBar.Domain.Tests/ObservedPacePolicyTests.cs`
+- `tests/AIBar.Domain.Tests/ObservedPacePresentationTests.cs`
+- `tests/AIBar.Domain.Tests/QuotaHistoryChartTests.cs`
+- `tests/AIBar.Domain.Tests/QuotaHistoryChartLifecycleTests.cs`
 
 The Windows workflow restores/builds `AIBar.sln` and runs `dotnet test AIBar.sln`
 with its existing no-build/no-restore, Debug, logger and results-directory options.

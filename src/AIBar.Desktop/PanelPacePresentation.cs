@@ -10,7 +10,8 @@ public sealed record PanelPacePresentation(
 {
     public bool IsCurrent { get; init; }
     public string AutomationName => Label + " pace";
-    public string HelpText => Label + ": " + Text;
+    public bool IsObserved { get; init; }
+    public string HelpText => Label + ": " + Text + (IsObserved ? " · based on observed use" : "");
 
     public static PanelPacePresentation Create(string label, decimal? used, QuotaPaceResult pace, bool current, DateTimeOffset now)
     {
@@ -24,7 +25,7 @@ public sealed record PanelPacePresentation(
             : pace.RunsOutBeforeReset ? PanelTone.Near : PanelTone.Muted;
         var notice = visible && current && pace.RunsOutBeforeReset
             ? $"At this pace, {label} runs out before it resets." : null;
-        return new(label, text, used, pace.ExpectedPercentage, tone, notice, visible) { IsCurrent = current };
+        return new(label, text, used, pace.ExpectedPercentage, tone, notice, visible) { IsCurrent = current, IsObserved = current && pace.IsObserved };
     }
 
     public PanelPacePresentation ForProvider(string provider) => this with

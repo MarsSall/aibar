@@ -374,6 +374,7 @@
                             <TextBlock Text="{Binding Claude.State.Primary.Pace.Notice}" TextWrapping="Wrap" FontSize="12" automation:AutomationProperties.LiveSetting="Polite" />
                         </Border>
                     </StackPanel>
+                    <local:QuotaHistoryChart History="{Binding PaceHistory, RelativeSource={RelativeSource AncestorType={x:Type local:MainWindow}}}" />
                     <StackPanel Margin="0,8,0,8" TextElement.FontSize="12">
                         <TextBlock Text="CODEX · ESTIMATED COST" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" />
                         <TextBlock Text="{Binding Analytics.UsageCost.TodayLabel}" TextWrapping="Wrap" />

@@ -18,6 +18,14 @@ public partial class MainWindow : Window
         set => SetValue(ProviderStatusProperty, value);
     }
 
+    public static readonly DependencyProperty PaceHistoryProperty = DependencyProperty.Register(
+        nameof(PaceHistory), typeof(PanelPaceHistory), typeof(MainWindow));
+    public PanelPaceHistory? PaceHistory
+    {
+        get => (PanelPaceHistory?)GetValue(PaceHistoryProperty);
+        set => SetValue(PaceHistoryProperty, value);
+    }
+
     private void OnCodexUsage(object sender, RoutedEventArgs e) => ProviderLinks.OpenUsage(AIBar.Domain.StatusProvider.Codex);
     private void OnClaudeUsage(object sender, RoutedEventArgs e) => ProviderLinks.OpenUsage(AIBar.Domain.StatusProvider.Claude);
     private void OnCodexStatus(object sender, RoutedEventArgs e) => ProviderLinks.OpenStatus(AIBar.Domain.StatusProvider.Codex);
