@@ -78,9 +78,9 @@ Describe 'AIBar YASB reader' {
         $source | Should -Match '-cnotin'
         $source | Should -Not -Match 'Start-Process|Invoke-WebRequest|Remove-Item|Set-Content|Add-Content|WriteAll|CreateDirectory'
         $ci = Get-Content -Raw (Join-Path (Split-Path -Parent $root) '.github/workflows/ci.yml')
-        $ci | Should -Match '\$result.TotalCount -ne 19'
-        $ci | Should -Match 'Expected 19 passing YASB tests'
-        ([regex]::Matches((Get-Content -Raw (Join-Path $root 'tests/read-aibar-quota.Tests.ps1')), '(?m)^\s*It\s+')).Count | Should -Be 19
+        $ci | Should -Match '\$result.TotalCount -ne 20'
+        $ci | Should -Match 'Expected 20 passing YASB tests'
+        ([regex]::Matches((Get-Content -Raw (Join-Path $root 'tests/read-aibar-quota.Tests.ps1')), '(?m)^\s*It\s+')).Count | Should -Be 20
         $stderrPath = [IO.Path]::GetTempFileName()
         try {
             $start = [Diagnostics.ProcessStartInfo]::new('powershell.exe', ('-NoProfile -NonInteractive -File "{0}" unexpected' -f $reader))
