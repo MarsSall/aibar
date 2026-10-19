@@ -216,7 +216,7 @@ function Invoke-OwnedProcess([string]$FileName, [string[]]$Arguments, [string]$S
     }
 }
 function Copy-PrivateBetaYasbAssets([string]$Repository, [string]$Publish) {
-    $paths = @("yasb/read-aibar-quota.ps1", "yasb/remove-aibar-quota.ps1", "yasb/show-aibar.cmd", "yasb/custom-widget.example.yaml", "yasb/custom-widget.example.css", "yasb/README.txt")
+    $paths = @("yasb/read-aibar-quota.ps1", "yasb/remove-aibar-quota.ps1", "yasb/show-aibar.cmd", "yasb/custom-widget.example.yaml", "yasb/custom-widget.example.css", "yasb/README.txt", "yasb/icons/openai.svg", "yasb/icons/claude.svg")
     foreach ($relative in $paths) {
         $source = Join-Path $Repository ($relative -replace '/', '\\')
         if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "BETA_YASB_ASSET_MISSING" }
