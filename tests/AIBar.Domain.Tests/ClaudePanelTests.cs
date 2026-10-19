@@ -255,8 +255,10 @@ public sealed class ClaudePanelTests
             Assert.True(view.State.IsMissingCredential); // Codex manual refresh read only the synthetic missing login.
             Assert.Same(copy, view.CopySummaryCommand);
             Assert.Same(copy, view.QuotaPresentation.CopySummaryCommand);
-            Assert.Equal(beforeState.Primary, view.State.Primary);
-            Assert.Equal(beforeState.Weekly, view.State.Weekly);
+            // Cached Codex values and resets are unchanged; pace is derived from the clock and freshness, so compare it apart.
+            Assert.Equal(beforeState.Primary with { Pace = null }, view.State.Primary with { Pace = null });
+            Assert.Equal(beforeState.Weekly with { Pace = null }, view.State.Weekly with { Pace = null });
+            Assert.All(new[] { view.State.Primary.Pace, view.State.Weekly.Pace }.Where(pace => pace is not null), pace => Assert.Equal("Not current", pace!.Text));
             string? summary = null;
             new QuotaSummaryCopyCommand(() => view.State, text => summary = text).Execute(null);
             Assert.NotNull(summary);

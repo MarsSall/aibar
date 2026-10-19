@@ -162,7 +162,8 @@ public sealed class PrivateBetaDistributionTests
             Assert.Equal(item.GetProperty("length").GetInt64(), entry.Length);
             Assert.Equal(item.GetProperty("sha256").GetString(), Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant());
         }
-        Assert.Equal(6, archive.Entries.Count(entry => entry.FullName.StartsWith("yasb/", StringComparison.Ordinal)));
+        // Six YASB files plus the two provider marks under yasb/icons.
+        Assert.Equal(8, archive.Entries.Count(entry => entry.FullName.StartsWith("yasb/", StringComparison.Ordinal)));
         var repeat = fixture.Output("prepared-repeat");
         Assert.Equal(0, fixture.Run(repeat, publisher: fixture.Publisher("invalid"), expectedSource: fixture.Source, prepareOnly: true).ExitCode);
         Assert.Equal(File.ReadAllBytes(zip), File.ReadAllBytes(Path.Combine(repeat, "AIBar-win-x64-private-beta.zip")));
