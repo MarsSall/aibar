@@ -81,10 +81,21 @@ help when applicable. Presentation updates use revision checks to discard result
 from superseded states, consent/source changes, or clear operations.
 
 Queries during the privacy-clear pause fail with `InvalidOperationException`.
-The desktop reader joins clear before the store: it cancels its read epoch and
-invalidates visible chart data and observed pace. Closing the disclosure also
-cancels chart reads and drops chart data. The next visible refresh queries again;
-there is no persistent presentation history cache.
+The desktop reader joins clear before the store: it synchronously pauses reads
+and advances its publication revision, then cancels the retired epoch without
+waiting for cancellation callbacks, a query, or the WPF dispatcher. UI invalidation
+runs immediately on the owner thread or is posted without awaiting it. Consumers
+check the reader revision again before publishing, so even an already-completed
+read queued for UI delivery cannot restore pre-clear data after resume. The store
+itself owns draining database access later in the clear sequence.
+
+Epoch replacement, pause/resume and disposal are serialized; disposal is idempotent,
+and resume after disposal cannot recreate a reader. Each retired cancellation
+source has one owner and is disposed only after its asynchronous cancellation
+callbacks finish. Closing the disclosure also cancels chart reads and drops chart
+data. Unloading the chart stops its timer and removes its invalidation subscription.
+The next visible refresh queries again; there is no persistent presentation history
+cache.
 
 ## Clear and shutdown
 

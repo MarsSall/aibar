@@ -266,7 +266,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         if (!_dispatcher.CheckAccess()) { _dispatcher.BeginInvoke(() => Update(state)); return; }
         Update(state);
     }
-    private void OnHistoryInvalidated() => Update(_coordinator.State);
+    private void OnHistoryInvalidated() => OnStateChanged(_coordinator.State);
     private void Update(QuotaRefreshState state)
     {
         if (_disposed) return;
@@ -285,8 +285,9 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     {
         try
         {
-            var samples = await _history!.ReadPaceAsync(QuotaHistoryProvider.Codex);
-            if (_disposed || revision != _historyRevision || !_refreshAvailable()) return;
+            var historyRevision = _history!.Revision;
+            var samples = await _history.ReadPaceAsync(QuotaHistoryProvider.Codex);
+            if (_disposed || revision != _historyRevision || !_refreshAvailable() || !_history.CanPublish(historyRevision)) return;
             _state = _mapper.Map(state, samples);
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         }
