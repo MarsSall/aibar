@@ -26,7 +26,7 @@ public sealed class QuotaAlertPolicyTests
     public void First_current_sample_can_report_existing_limits_but_not_a_reset()
     {
         var events = QuotaAlertPolicy.Evaluate(Sample(100), null, [], FreshnessState.Current, true, Now);
-        Assert.Equal(new[] { 75, 90, 100 }, events.Where(a => a.Kind == QuotaAlertKind.ThresholdCrossed).Select(a => a.Threshold));
+        Assert.Equal(new int?[] { 75, 90, 100 }, events.Where(a => a.Kind == QuotaAlertKind.ThresholdCrossed).Select(a => a.Threshold));
         Assert.DoesNotContain(events, a => a.Kind == QuotaAlertKind.Reset);
     }
 
