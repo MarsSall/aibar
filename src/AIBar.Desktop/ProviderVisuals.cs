@@ -94,6 +94,7 @@ public sealed class ProviderVisuals : IMultiValueConverter
             "Line" => Frozen(dark ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x14, 0x00, 0x00, 0x00)),
             "Pill" => Frozen(dark ? Color.FromArgb(0x73, 0x14, 0x15, 0x18) : Color.FromArgb(0x8C, 0xE4, 0xE4, 0xEA)),
             "Muted" => Frozen(PanelPalette.ToneColor(PanelTone.Muted, dark)),
+            "PaceText" => Frozen(PanelPalette.ToneColor(values[0] is PanelTone tone ? tone : PanelTone.Muted, dark)),
             "Brand" => Frozen(dark ? Color.FromRgb(0xFF, 0x00, 0x36) : Color.FromRgb(0xE0, 0x00, 0x2F)),
             "Codex" => Frozen(dark ? Color.FromRgb(0x2F, 0xBF, 0x98) : Color.FromRgb(0x0B, 0x7D, 0x61)),
             "Claude" => Frozen(dark ? Color.FromRgb(0xE0, 0x87, 0x6A) : Color.FromRgb(0xB4, 0x5A, 0x3D)),
@@ -123,7 +124,7 @@ public sealed class ProviderVisuals : IMultiValueConverter
     private static object HighContrast(string? kind, SolidColorBrush semantic) => kind switch
     {
         "Meter" or "Brand" or "Codex" or "Claude" => SystemColors.HighlightBrush,
-        "Notice" or "Muted" => SystemColors.WindowTextBrush,
+        "Notice" or "Muted" or "PaceText" => SystemColors.WindowTextBrush,
         "Border" or "Line" => SystemColors.WindowTextBrush,
         "FlagFill" or "NoticeFill" or "Band" or "Pill" or "Well" => SystemColors.WindowBrush,
         _ => semantic

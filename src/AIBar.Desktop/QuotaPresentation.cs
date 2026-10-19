@@ -4,7 +4,10 @@ using System.Windows.Threading;
 using AIBar.Application;
 using AIBar.Domain;
 namespace AIBar.Desktop;
-public sealed record QuotaWindowPresentation(string Label, decimal? PercentageUsed, string? ResetCountdown);
+public sealed record QuotaWindowPresentation(string Label, decimal? PercentageUsed, string? ResetCountdown)
+{
+    public PanelPacePresentation? Pace { get; init; }
+}
 
 public sealed record BetaPresentationState(
     QuotaWindowPresentation Primary,
@@ -56,8 +59,8 @@ public sealed class QuotaPresentationMapper(IClock clock)
         var warning = WarningLabel(failure, isMissingCredential, isOffline);
         var freshness = isLoading ? "Loading" : isFresh ? "Current" : isCached ? "Stale" : isMissingCredential ? "Missing credential" : isOffline ? "Offline" : "Unavailable";
         return new(
-            Window("5-hour quota", snapshot?.Primary),
-            Window("Weekly quota", snapshot?.Weekly),
+            Window("5-hour quota", snapshot?.Primary, isFresh, QuotaPaceWindow.FiveHour),
+            Window("Weekly quota", snapshot?.Weekly, isFresh, QuotaPaceWindow.Weekly),
             snapshot?.Primary is not null,
             snapshot?.Weekly is not null,
             isFresh,
@@ -87,10 +90,14 @@ public sealed class QuotaPresentationMapper(IClock clock)
         };
     }
 
-    private QuotaWindowPresentation Window(string label, QuotaWindow? window) => new(
+    private QuotaWindowPresentation Window(string label, QuotaWindow? window, bool current, QuotaPaceWindow kind) => new(
         label,
         window?.PercentageUsed,
-        window is null ? null : FormatCountdown(window.CountdownAt(clock.UtcNow)));
+        window is null ? null : FormatCountdown(window.CountdownAt(clock.UtcNow)))
+    {
+        Pace = PanelPacePresentation.Create(kind == QuotaPaceWindow.Weekly ? "Codex weekly" : "Codex 5-hour",
+            window?.PercentageUsed, QuotaPacePolicy.Calculate(window?.PercentageUsed, window?.ResetAt, kind, clock.UtcNow), current, clock.UtcNow)
+    };
 
     private static string FormatCountdown(TimeSpan value)
     {

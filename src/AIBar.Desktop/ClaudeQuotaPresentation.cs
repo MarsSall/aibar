@@ -30,6 +30,8 @@ public sealed class ClaudeQuotaPresentationMapper
                 : mapped.WarningLabel;
         return mapped with
         {
+            Primary = mapped.Primary with { Pace = mapped.Primary.Pace?.ForProvider("Claude") },
+            Weekly = mapped.Weekly with { Pace = mapped.Weekly.Pace?.ForProvider("Claude") },
             WarningLabel = warning, ErrorLabel = warning,
             SourceLabel = source == ClaudeQuotaSource.OtherMachine ? "Other machine" : "This PC",
             PrivateEndpointDisclosure = source == ClaudeQuotaSource.OtherMachine

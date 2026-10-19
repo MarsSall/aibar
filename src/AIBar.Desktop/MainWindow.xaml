@@ -284,9 +284,32 @@
         <ScrollViewer x:Name="SecondaryScrollViewer" Grid.Row="2" Margin="20,0,20,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PreviewGotKeyboardFocus="OnSecondaryPreviewGotKeyboardFocus" automation:AutomationProperties.Name="Secondary analytics">
             <Expander x:Name="AnalyticsDetailsExpander" IsExpanded="False" Focusable="True" IsTabStop="True"
                       Style="{StaticResource PanelDetailsExpanderStyle}" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SecondaryBorderBrush}"
-                      automation:AutomationProperties.Name="Local analytics details" automation:AutomationProperties.HelpText="Local usage breakdown and quota access information">
-                <Expander.Header><TextBlock Text="Details &amp; quota access" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" /></Expander.Header>
+                      automation:AutomationProperties.Name="Local analytics details" automation:AutomationProperties.HelpText="Quota pace, local usage breakdown and quota access information">
+                <Expander.Header><TextBlock Text="Pace &amp; details" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" /></Expander.Header>
                 <StackPanel Margin="0,8,0,0">
+                    <TextBlock Text="PACE" FontFamily="{StaticResource PanelDisplayFont}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,0,12" />
+                    <local:PanelPaceRow Data="{Binding State.Weekly.Pace}" />
+                    <local:PanelPaceRow Data="{Binding State.Primary.Pace}" />
+                    <StackPanel Visibility="{Binding Claude.IsEnabled, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
+                        <local:PanelPaceRow Data="{Binding Claude.State.Weekly.Pace}" />
+                        <local:PanelPaceRow Data="{Binding Claude.State.Primary.Pace}" />
+                    </StackPanel>
+                    <Border Style="{StaticResource PanelNotice}" Visibility="{Binding State.Weekly.Pace.Notice, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}">
+                        <TextBlock Text="{Binding State.Weekly.Pace.Notice}" TextWrapping="Wrap" FontSize="12" automation:AutomationProperties.LiveSetting="Polite" />
+                    </Border>
+                    <Border Style="{StaticResource PanelNotice}" Visibility="{Binding State.Primary.Pace.Notice, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}">
+                        <TextBlock Text="{Binding State.Primary.Pace.Notice}" TextWrapping="Wrap" FontSize="12" automation:AutomationProperties.LiveSetting="Polite" />
+                    </Border>
+                    <StackPanel Visibility="{Binding Claude.IsEnabled, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
+                        <Border Style="{StaticResource PanelNotice}" Visibility="{Binding Claude.State.Weekly.Pace.Notice, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}">
+                            <TextBlock Text="{Binding Claude.State.Weekly.Pace.Notice}" TextWrapping="Wrap" FontSize="12" automation:AutomationProperties.LiveSetting="Polite" />
+                        </Border>
+                        <Border Style="{StaticResource PanelNotice}" Visibility="{Binding Claude.State.Primary.Pace.Notice, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}">
+                            <TextBlock Text="{Binding Claude.State.Primary.Pace.Notice}" TextWrapping="Wrap" FontSize="12" automation:AutomationProperties.LiveSetting="Polite" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="Local usage" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,8,0,8" />
+                    <StackPanel TextElement.FontSize="12">
                     <GroupBox Header="Local Codex data" automation:AutomationProperties.Name="Local Codex data" Style="{StaticResource SecondaryGroupBoxStyle}"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="16">
                         <TextBlock Text="{Binding Analytics.SourceDetail}" Style="{StaticResource MutedTextStyle}" />
                         <TextBlock Text="{Binding Analytics.TotalTokensLabel}" FontWeight="SemiBold" Margin="0,8,0,0" /><TextBlock Text="{Binding Analytics.ModelTotalsLabel}" TextWrapping="Wrap" />
@@ -320,9 +343,10 @@
                             </Expander>
                         </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
                     </StackPanel></Border></GroupBox>
-                    <TextBlock Text="Quota access" FontWeight="SemiBold" Margin="0,16,0,8" />
+                    <TextBlock Text="Quota access" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,16,0,8" />
                     <TextBlock Text="{Binding State.Disclosure}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
                     <TextBlock Text="{Binding PrivateEndpointDisclosure}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,4,0,12" />
+                    </StackPanel>
                 </StackPanel>
             </Expander>
         </ScrollViewer>
