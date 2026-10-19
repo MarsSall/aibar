@@ -107,7 +107,7 @@ public sealed class QuotaHistoryChartTests
         });
     }
 
-    private sealed class Clock : AIBar.Application.IClock { public DateTimeOffset UtcNow => Now; }
+    private sealed class Clock : AIBar.Domain.IClock { public DateTimeOffset UtcNow => Now; }
 
     private sealed class Store : IQuotaHistoryStore
     {
