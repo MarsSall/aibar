@@ -25,8 +25,8 @@ public sealed class PricingPolicyTests
         var catalog = CheckedInPricingCatalog.Current;
         var result = new PricingPolicy(catalog).Calculate([Usage("gpt-5", 1, 2, 3)]);
 
-        Assert.Equal("2026-07-14", catalog.Version);
-        Assert.Equal(new DateOnly(2026, 7, 14), catalog.EffectiveDate);
+        Assert.Equal("2026-10-19", catalog.Version);
+        Assert.Equal(new DateOnly(2026, 10, 19), catalog.EffectiveDate);
         Assert.Equal(catalog.Version, result.CatalogVersion);
         Assert.Equal(catalog.EffectiveDate, result.CatalogDate);
         Assert.Equal(new TokenTotals(1, 2, 3), result.TokenFacts.Single().Tokens);
@@ -43,8 +43,8 @@ public sealed class PricingPolicyTests
         var rates = Assert.IsAssignableFrom<IDictionary<string, ComponentRates>>(catalog.Rates);
         Assert.Throws<NotSupportedException>(() => rates.Add("mutated", alteredCopy));
         Assert.False(catalog.Rates.ContainsKey("mutated"));
-        Assert.Equal("2026-07-14", catalog.Version);
-        Assert.Equal(new DateOnly(2026, 7, 14), catalog.EffectiveDate);
+        Assert.Equal("2026-10-19", catalog.Version);
+        Assert.Equal(new DateOnly(2026, 10, 19), catalog.EffectiveDate);
     }
 
     [Fact]
@@ -89,6 +89,53 @@ public sealed class PricingPolicyTests
             result.Warnings);
         var warnings = Assert.IsAssignableFrom<IList<PricingWarning>>(result.Warnings);
         Assert.Throws<NotSupportedException>(() => warnings[0] = PricingWarning.UnknownModel);
+    }
+
+    [Theory]
+    [InlineData("claude-haiku-4-5-20251001", true)]
+    [InlineData("claude-haiku-4-5-2025100", false)]
+    [InlineData("claude-haiku-4-5-202510011", false)]
+    [InlineData("claude-haiku-4-5-latest", false)]
+    [InlineData("gpt-5-20251001", false)]
+    [InlineData("GPT-5", false)]
+    public void Only_exact_ids_and_Claude_eight_digit_date_suffixes_are_priced(string model, bool expected) =>
+        Assert.Equal(expected, CheckedInPricingCatalog.Current.TryGetRates(model, out _));
+
+    [Theory]
+    [InlineData("claude-fable-5-1", 10, .25, 12.5, 50)]
+    [InlineData("claude-fable-5", 10, 1, 12.5, 50)]
+    [InlineData("claude-opus-5-5", 4, .2, 5, 20)]
+    [InlineData("claude-opus-5", 5, .5, 6.25, 25)]
+    [InlineData("claude-sonnet-5-5", 2, .1, 2.5, 10)]
+    [InlineData("claude-sonnet-5", 2, .2, 2.5, 10)]
+    [InlineData("claude-haiku-5-5", .1, .01, .125, .5)]
+    [InlineData("claude-haiku-4-5", 1, .1, 1.25, 5)]
+    [InlineData("gpt-6-sol", 2, .2, 0, 10)]
+    [InlineData("gpt-6.1-sol", 2, .1, 0, 10)]
+    [InlineData("gpt-6-luna", .1, .01, 0, .5)]
+    [InlineData("gpt-6-astra", 10, 1, 0, 50)]
+    [InlineData("gpt-5.6-sol", 4, .4, 0, 20)]
+    [InlineData("gpt-5.6-terra", 2, .2, 0, 12)]
+    [InlineData("gpt-5.6-luna", .2, .02, 0, 1.2)]
+    [InlineData("gpt-5.5", 5, .5, 0, 30)]
+    [InlineData("gpt-5.4", 2.5, .25, 0, 15)]
+    [InlineData("gpt-5.4-mini", .75, .075, 0, 4.5)]
+    [InlineData("gpt-5.2", 1.75, .175, 0, 14)]
+    [InlineData("gpt-5.1", 1.25, .125, 0, 10)]
+    [InlineData("gpt-5", 1.25, .125, 0, 10)]
+    [InlineData("gpt-5-mini", .25, .025, 0, 2)]
+    public void Every_approved_rate_matches_the_official_snapshot(string model, decimal input, decimal cached, decimal write, decimal output)
+    {
+        Assert.True(CheckedInPricingCatalog.Current.TryGetRates(model, out var rates));
+        Assert.Equal(new ComponentRates(input, cached, output, write), rates);
+    }
+
+    [Fact]
+    public void Official_catalog_has_exactly_the_22_approved_models()
+    {
+        Assert.Equal(22, CheckedInPricingCatalog.Current.Rates.Count);
+        Assert.Equal(new ComponentRates(10m, .25m, 50m, 12.5m), CheckedInPricingCatalog.Current.Rates["claude-fable-5-1"]);
+        Assert.Equal(new ComponentRates(2m, .1m, 10m), CheckedInPricingCatalog.Current.Rates["gpt-6.1-sol"]);
     }
 
     private static DailyUsage Usage(string model, long input, long cached, long output) =>
