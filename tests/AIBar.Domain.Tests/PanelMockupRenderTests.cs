@@ -25,6 +25,9 @@ public sealed class PanelMockupRenderTests
     [InlineData("needs-login-dark", WindowsTheme.Dark, 14, 7, true, true, false)]
     [InlineData("stale-dark", WindowsTheme.Dark, 14, 7, true, false, true)]
     [InlineData("codex-only-dark", WindowsTheme.Dark, 14, 7, false, false, false)]
+    [InlineData("details-dark", WindowsTheme.Dark, 14, 7, true, false, false)]
+    [InlineData("details-light", WindowsTheme.Light, 14, 7, true, false, false)]
+    [InlineData("narrow-high-contrast", WindowsTheme.HighContrast, 14, 7, true, false, false)]
     public void Render_panel_identity_mockup(string scenario, WindowsTheme theme, int weekly, int primary,
         bool claudeEnabled, bool needsLogin, bool stale)
     {
@@ -50,7 +53,7 @@ public sealed class PanelMockupRenderTests
                     claudeEnabled, ClaudeQuotaSource.OtherMachine);
                 window = new MainWindow
                 {
-                    Width = 360, SizeToContent = SizeToContent.Height,
+                    Width = scenario.StartsWith("narrow", StringComparison.Ordinal) ? 300 : 360, SizeToContent = SizeToContent.Height,
                     WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
                     ShowInTaskbar = false, ShowActivated = false,
                     WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000,
@@ -66,8 +69,10 @@ public sealed class PanelMockupRenderTests
                         {
                             SourceDetail = "Synthetic local data", TotalTokensLabel = "0 tokens",
                             ModelTotalsLabel = "", CoverageLabel = "", LastScanLabel = "",
-                            WarningLabel = "", IsLoading = false
+                            WarningLabel = "", IsLoading = false,
+                            UsageCost = new { TodayLabel = "Today: $0.04 · 15K tokens", Last30DaysLabel = "Last 30 days: $12.80 · 9.4M tokens" }
                         },
+                        ClaudeCost = new { State = new { TodayLabel = "Today: $38.17 · 264M tokens", Last30DaysLabel = "Last 30 days: $254.24 · 918M tokens (partial)" } },
                         LocalUsage = new { Description = "Synthetic local usage", StatusLabel = "Current", Rows = Array.Empty<object>() }
                     }
                 };
@@ -75,6 +80,11 @@ public sealed class PanelMockupRenderTests
                 window.UpdateLayout();
                 Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 window.UpdateLayout();
+                if (scenario.StartsWith("details", StringComparison.Ordinal))
+                {
+                    ((Button)window.FindName("CostButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    window.UpdateLayout();
+                }
                 SaveRender(window, scenario);
             }
             finally
@@ -103,7 +113,7 @@ public sealed class PanelMockupRenderTests
         var png = new PngBitmapEncoder();
         png.Frames.Add(BitmapFrame.Create(bitmap));
         Directory.CreateDirectory(directory);
-        using var output = File.Create(Path.Combine(directory, $"panel-mockup-{scenario}-360.png"));
+        using var output = File.Create(Path.Combine(directory, $"panel-mockup-{scenario}-{window.Width:0}.png"));
         png.Save(output);
     }
 

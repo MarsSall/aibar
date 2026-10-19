@@ -12,48 +12,24 @@ using ColorConverter = System.Windows.Media.ColorConverter;
 
 namespace AIBar.Domain.Tests;
 
-/// <summary>Approved panel identity: status-colored meters, word flags, compact resets,
-/// source pills and a translucent surface that falls back to opaque.</summary>
+/// <summary>CodexBar panel identity: brand meters, inline states, compact resets and acrylic fallback.</summary>
 public sealed class PanelIdentityTests
 {
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
 
     [Theory]
-    [InlineData(null, PanelTone.Ok)]
-    [InlineData(0d, PanelTone.Ok)]
-    [InlineData(74.99d, PanelTone.Ok)]
-    [InlineData(75d, PanelTone.Near)]
-    [InlineData(89.99d, PanelTone.Near)]
-    [InlineData(90d, PanelTone.Full)]
-    [InlineData(100d, PanelTone.Full)]
-    public void Meter_tone_is_green_below_75_yellow_from_75_and_red_from_90(double? usage, PanelTone expected)
-    {
-        Assert.Equal(expected, PanelPalette.Tone((decimal?)usage, isCurrent: true));
-        Assert.Equal(PanelTone.Muted, PanelPalette.Tone((decimal?)usage, isCurrent: false));
-    }
-
-    [Theory]
-    [InlineData(PanelTone.Ok, true, "#3DDC84")]
-    [InlineData(PanelTone.Near, true, "#FFC531")]
-    [InlineData(PanelTone.Full, true, "#FF4D5E")]
-    [InlineData(PanelTone.Muted, true, "#A1A2A8")]
-    [InlineData(PanelTone.Ok, false, "#15924A")]
-    [InlineData(PanelTone.Near, false, "#A86B00")]
-    [InlineData(PanelTone.Full, false, "#C8203C")]
-    [InlineData(PanelTone.Muted, false, "#66676D")]
-    public void Meter_tones_use_the_approved_colors_for_each_theme(PanelTone tone, bool dark, string expected) =>
+    [InlineData(PanelTone.Near, true, "#FF9F5A")]
+    [InlineData(PanelTone.Muted, true, "#A1A1A6")]
+    [InlineData(PanelTone.Near, false, "#C4581F")]
+    [InlineData(PanelTone.Muted, false, "#6E6E73")]
+    public void Pace_warning_and_secondary_text_follow_the_mockup(PanelTone tone, bool dark, string expected) =>
         Assert.Equal(Parse(expected), PanelPalette.ToneColor(tone, dark));
 
     [Theory]
-    [InlineData(null, true, null)]
-    [InlineData(74.99d, true, null)]
-    [InlineData(75d, true, "High usage")]
-    [InlineData(89.99d, true, "High usage")]
-    [InlineData(90d, true, "Near limit")]
-    [InlineData(100d, true, "Near limit")]
-    [InlineData(92d, false, null)]
-    public void Alert_flags_name_the_condition_in_words_only_for_current_values(double? usage, bool isCurrent, string? expected) =>
-        Assert.Equal(expected, PanelPalette.FlagText((decimal?)usage, isCurrent));
+    [InlineData("Codex", "#10A37F")]
+    [InlineData("Claude", "#C4703F")]
+    public void Provider_brand_colors_are_theme_independent(string provider, string expected) =>
+        Assert.Equal(Parse(expected), PanelPalette.ProviderColor(provider));
 
     [Theory]
     [InlineData("3d 20h 00m", "3d 20h")]
@@ -120,17 +96,17 @@ public sealed class PanelIdentityTests
         Assert.Equal(expected, WindowsTransparencySetting.IsEnabled(value));
 
     [Theory]
-    [InlineData(true, false, "#BD232428")]
-    [InlineData(false, false, "#FF232428")]
-    [InlineData(true, true, "#C2F6F6F8")]
-    [InlineData(false, true, "#FFF6F6F8")]
+    [InlineData(true, false, "#D1242428")]
+    [InlineData(false, false, "#FF242428")]
+    [InlineData(true, true, "#D1ECECF6")]
+    [InlineData(false, true, "#FFECECF6")]
     public void Surface_tint_is_translucent_only_with_acrylic(bool translucent, bool light, string expected) =>
         Assert.Equal(Parse(expected), PanelPalette.Surface(dark: !light, translucent));
 
     [Theory]
-    [InlineData(WindowsTheme.Dark, true, 0xBD)]
+    [InlineData(WindowsTheme.Dark, true, 0xD1)]
     [InlineData(WindowsTheme.Dark, false, 0xFF)]
-    [InlineData(WindowsTheme.Light, true, 0xC2)]
+    [InlineData(WindowsTheme.Light, true, 0xD1)]
     public void Rendered_surface_follows_the_window_translucency(WindowsTheme theme, bool translucent, byte alpha)
     {
         WithPanel(theme, 14, 7, ClaudeQuotaSource.OtherMachine, window =>
@@ -142,37 +118,37 @@ public sealed class PanelIdentityTests
     }
 
     [Fact]
-    public void Rendered_panel_shows_identity_flags_pills_and_compact_resets()
+    public void Rendered_panel_shows_provider_brands_no_chrome_flags_and_compact_resets()
     {
         WithPanel(WindowsTheme.Dark, 78, 92, ClaudeQuotaSource.OtherMachine, window =>
         {
             var text = VisibleText(window).ToArray();
-            Assert.Contains("AIBAR", text);
-            Assert.Contains("CODEX", text); Assert.Contains("CLAUDE", text);
-            Assert.Contains("This PC", text); Assert.Contains("Other machine", text);
-            Assert.Contains("High usage", text); Assert.Contains("Near limit", text);
+            Assert.DoesNotContain("AIBAR", text);
+            Assert.Contains("Codex", text); Assert.Contains("Claude", text);
+            Assert.Contains(text, value => value.Contains("from other machine", StringComparison.Ordinal));
+            Assert.DoesNotContain("High usage", text); Assert.DoesNotContain("Near limit", text);
             Assert.Contains("78% used", text); Assert.Contains("92% used", text);
             Assert.Contains("Resets in 3d 20h", text); Assert.Contains("Resets in 3h 53m", text);
-            var titles = Visuals<TextBlock>(window).Where(item => item.IsVisible && item.Text is "CODEX" or "CLAUDE").ToArray();
+            var titles = Visuals<TextBlock>(window).Where(item => item.IsVisible && item.Text is "Codex" or "Claude").ToArray();
             Assert.Equal(new[] { "Codex", "Claude" }, titles.Select(AutomationProperties.GetName));
             var claudeBars = Visuals<ProgressBar>(window).Where(bar => bar.IsVisible && AutomationProperties.GetName(bar).StartsWith("Claude", StringComparison.Ordinal)).ToArray();
-            Assert.Equal(new[] { Parse("#FFC531"), Parse("#FF4D5E") }, claudeBars.Select(bar => Assert.IsAssignableFrom<SolidColorBrush>(bar.Foreground).Color));
+            Assert.Equal(new[] { Parse("#C4703F"), Parse("#C4703F") }, claudeBars.Select(bar => Assert.IsAssignableFrom<SolidColorBrush>(bar.Foreground).Color));
             var codexBar = Visuals<ProgressBar>(window).First(bar => bar.IsVisible && AutomationProperties.GetName(bar) == "Weekly quota progress");
-            Assert.Equal(Parse("#3DDC84"), Assert.IsAssignableFrom<SolidColorBrush>(codexBar.Foreground).Color);
+            Assert.Equal(Parse("#10A37F"), Assert.IsAssignableFrom<SolidColorBrush>(codexBar.Foreground).Color);
         });
     }
 
     [Fact]
-    public void Rendered_panel_without_alerts_shows_no_flags_and_this_pc_for_local_Claude()
+    public void Rendered_panel_without_alerts_shows_no_flags_or_remote_suffix_for_local_Claude()
     {
         WithPanel(WindowsTheme.Light, 14, 7, ClaudeQuotaSource.ThisPc, window =>
         {
             var text = VisibleText(window).ToArray();
             Assert.DoesNotContain("High usage", text); Assert.DoesNotContain("Near limit", text);
-            Assert.Equal(2, text.Count(item => item == "This PC"));
+            Assert.DoesNotContain(text, item => item.Contains("from other machine", StringComparison.Ordinal));
             Assert.DoesNotContain("Other machine", text);
             var bars = Visuals<ProgressBar>(window).Where(bar => bar.IsVisible).ToArray();
-            Assert.All(bars, bar => Assert.Equal(Parse("#15924A"), Assert.IsAssignableFrom<SolidColorBrush>(bar.Foreground).Color));
+            Assert.All(bars, bar => Assert.Equal(Parse(AutomationProperties.GetName(bar).StartsWith("Claude", StringComparison.Ordinal) ? "#C4703F" : "#10A37F"), Assert.IsAssignableFrom<SolidColorBrush>(bar.Foreground).Color));
         });
     }
 

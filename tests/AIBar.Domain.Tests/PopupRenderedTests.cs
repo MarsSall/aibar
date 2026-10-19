@@ -50,11 +50,12 @@ public sealed class PopupRenderedTests
                 var root = Assert.IsType<Grid>(window.Content);
                 void Layout() { root.Measure(new Size(420, 720)); root.Arrange(new Rect(0, 0, 420, 720)); root.UpdateLayout(); System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.DataBind); root.UpdateLayout(); }
                 Layout();
-                var details = Assert.IsType<Expander>(window.FindName("AnalyticsDetailsExpander"));
-                Assert.False(details.IsExpanded);
-                details.IsExpanded = true;
+                var cost = Assert.IsType<Button>(window.FindName("CostButton"));
+                var detail = Assert.IsType<StackPanel>(window.FindName("DetailView"));
+                Assert.Equal(Visibility.Collapsed, detail.Visibility);
+                cost.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Layout();
-                var children = root.Children.Cast<UIElement>().ToArray(); var cards = Assert.IsType<StackPanel>(children[1]); var secondary = Assert.IsType<ScrollViewer>(children[2]); var footer = Assert.IsType<StackPanel>(children[3]);
+                var children = root.Children.Cast<UIElement>().ToArray(); var cards = Assert.IsType<StackPanel>(window.FindName("QuotaCards")); var secondary = Assert.IsType<ScrollViewer>(children[0]); var footer = Assert.IsType<StackPanel>(children[1]);
                 var quotaCards = cards.Children.OfType<GroupBox>().ToArray();
                 var claudeSection = Assert.IsType<StackPanel>(window.FindName("ClaudeQuotaSection"));
                 Assert.Equal(Visibility.Collapsed, claudeSection.Visibility);
@@ -63,8 +64,8 @@ public sealed class PopupRenderedTests
                     ? LogicalTreeHelper.GetChildren(parent).Cast<object>().SelectMany(child => Logical(child).Prepend(child))
                     : Enumerable.Empty<object>();
                 Assert.Equal(2, Logical(claudeSection).OfType<ProgressBar>().Count());
-                var progress = quotaCards.SelectMany(Visuals<ProgressBar>).ToArray(); var refresh = Visuals<Button>(footer).Single(button => AutomationProperties.GetName(button) == "Refresh quota"); var expanders = Visuals<Expander>(secondary).Where(item => item != details).ToArray();
-                Assert.Equal(new[] { 0, 1, 2, 3 }, children.Select(Grid.GetRow)); Assert.Equal(10, expanders.Length); Assert.Equal(KeyboardNavigationMode.Continue, KeyboardNavigation.GetTabNavigation(root));
+                var progress = quotaCards.SelectMany(Visuals<ProgressBar>).ToArray(); var refresh = Visuals<Button>(footer).Single(button => AutomationProperties.GetName(button) == "Refresh quota"); var expanders = Visuals<Expander>(secondary).ToArray();
+                Assert.Equal(new[] { 0, 1 }, children.Select(Grid.GetRow)); Assert.Equal(10, expanders.Length); Assert.Equal(KeyboardNavigationMode.Continue, KeyboardNavigation.GetTabNavigation(root));
                 Assert.Equal(rows.Select(row => row.AutomationLabel), expanders.Select(AutomationProperties.GetName)); Assert.All(expanders.Cast<Control>().Append(refresh), control => { Assert.True(control.Focusable && control.IsTabStop); Assert.NotNull(control.FocusVisualStyle); });
                 Assert.Equal(ScrollBarVisibility.Auto, secondary.VerticalScrollBarVisibility); Assert.True(secondary.ExtentHeight > secondary.ViewportHeight && secondary.ScrollableHeight > 0); secondary.ScrollToEnd(); Layout(); Assert.True(secondary.VerticalOffset > 0); secondary.ScrollToTop();
                 foreach (var theme in Enum.GetValues<WindowsTheme>())
@@ -73,13 +74,14 @@ public sealed class PopupRenderedTests
                     Assert.Same(root, window.Content); Assert.Equal(children, root.Children.Cast<UIElement>()); Assert.Equal(rows.Select(row => row.AutomationLabel), expanders.Select(AutomationProperties.GetName)); Assert.All(expanders.Cast<Control>().Append(refresh), control => Assert.NotNull(control.FocusVisualStyle)); Assert.IsAssignableFrom<Brush>(window.TryFindResource("SurfaceBrush")); Assert.Contains($"Semantic.{theme}.xaml", app.Resources.MergedDictionaries[0].Source!.OriginalString, StringComparison.Ordinal);
                     Assert.InRange(root.ActualWidth, 1, 420); Assert.InRange(root.ActualHeight, 1, 720);
                     foreach (var item in children.Cast<FrameworkElement>()) { var bounds = item.TransformToAncestor(root).TransformBounds(new Rect(item.RenderSize)); Assert.True(item.ActualHeight > 0 && bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= root.ActualWidth + .1 && bounds.Bottom <= root.ActualHeight + .1); }
-                    Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" }, quotaCards.Select(card => new GroupBoxAutomationPeer(card).GetName())); Assert.All(quotaCards, card => Assert.Contains("percentage, reset, and state", new GroupBoxAutomationPeer(card).GetHelpText(), StringComparison.Ordinal));
-                    Assert.Equal(new[] { 73d, 42d }, progress.Select(item => item.Value)); Assert.Equal(new[] { "Weekly quota progress", "5-hour quota progress" }, progress.Select(item => new ProgressBarAutomationPeer(item).GetName())); Assert.All(progress, item => { Assert.False(item.Focusable || item.IsHitTestVisible); Assert.Equal(item.Value, Assert.IsAssignableFrom<System.Windows.Automation.Provider.IRangeValueProvider>(new ProgressBarAutomationPeer(item).GetPattern(PatternInterface.RangeValue)).Value); });
-                    var cardText = quotaCards.SelectMany(Visuals<TextBlock>).ToArray(); static string Rendered(TextBlock item) => new System.Windows.Documents.TextRange(item.ContentStart, item.ContentEnd).Text; Assert.Equal(new[] { "Resets in 06d 00h", "Resets in 1h 0m" }, cardText.Select(Rendered).Where(text => text.StartsWith("Resets in ", StringComparison.Ordinal))); Assert.DoesNotContain(cardText, item => Rendered(item) == "Stale");
-                    var freshness = Assert.Single(Visuals<TextBlock>(children[0]).Where(item => new TextBlockAutomationPeer(item).GetName() == "Stale"));
+                    ((Button)window.FindName("BackButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Layout();
+                    Assert.Equal(new[] { "5-hour quota card", "Weekly quota card" }, quotaCards.Select(card => new GroupBoxAutomationPeer(card).GetName())); Assert.All(quotaCards, card => Assert.Contains("percentage, reset, and state", new GroupBoxAutomationPeer(card).GetHelpText(), StringComparison.Ordinal));
+                    Assert.Equal(new[] { 42d, 73d }, progress.Select(item => item.Value)); Assert.Equal(new[] { "5-hour quota progress", "Weekly quota progress" }, progress.Select(item => new ProgressBarAutomationPeer(item).GetName())); Assert.All(progress, item => { Assert.False(item.Focusable || item.IsHitTestVisible); Assert.Equal(item.Value, Assert.IsAssignableFrom<System.Windows.Automation.Provider.IRangeValueProvider>(new ProgressBarAutomationPeer(item).GetPattern(PatternInterface.RangeValue)).Value); });
+                    var cardText = quotaCards.SelectMany(Visuals<TextBlock>).ToArray(); static string Rendered(TextBlock item) => new System.Windows.Documents.TextRange(item.ContentStart, item.ContentEnd).Text; Assert.Equal(new[] { "Resets in 1h 0m", "Resets in 06d 00h" }, cardText.Select(Rendered).Where(text => text.StartsWith("Resets in ", StringComparison.Ordinal))); Assert.DoesNotContain(cardText, item => Rendered(item) == "Stale");
+                    var freshness = Assert.Single(Visuals<TextBlock>(cards).Where(item => new TextBlockAutomationPeer(item).GetName() == "Stale"));
                     Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(freshness));
                     Assert.All(quotaCards, card => Assert.Equal("Stale", new GroupBoxAutomationPeer(card).GetItemStatus()));
-                    Assert.Equal("Refresh quota", new ButtonAutomationPeer(refresh).GetName()); var statusText = Visuals<TextBlock>(cards).Where(item => item.Visibility == Visibility.Visible && item.ActualHeight > 0).Select(item => new TextBlockAutomationPeer(item).GetName()).ToArray(); Assert.Contains("Cached 00h 05m", statusText); Assert.Contains("Network unavailable", statusText); Assert.True(secondary.ScrollableHeight > 0);
+                    Assert.Equal("Refresh quota", new ButtonAutomationPeer(refresh).GetName()); var statusText = Visuals<TextBlock>(cards).Where(item => item.Visibility == Visibility.Visible && item.ActualHeight > 0).Select(item => new TextBlockAutomationPeer(item).GetName()).ToArray(); Assert.Contains("Cached 00h 05m", statusText); Assert.Contains("Network unavailable", statusText); cost.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Layout(); Assert.True(secondary.ScrollableHeight > 0);
                     var image = new RenderTargetBitmap(420, 720, 96, 96, PixelFormats.Pbgra32); image.Render(root); var pixels = new byte[420 * 720 * 4]; image.CopyPixels(pixels, 420 * 4, 0); Assert.Contains(pixels.Where((_, index) => index % 4 == 3), alpha => alpha > 0);
                 }
             }
@@ -123,10 +125,10 @@ public sealed class PopupRenderedTests
                     var root = Assert.IsType<Grid>(window.Content);
                     root.Measure(new Size(420, 720)); root.Arrange(new Rect(0, 0, 420, 720)); root.UpdateLayout();
                     System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); root.UpdateLayout();
-                    var cards = Assert.IsType<StackPanel>(root.Children[1]);
+                    var cards = Assert.IsType<StackPanel>(window.FindName("QuotaCards"));
                     var quotaCards = cards.Children.OfType<GroupBox>().ToArray();
-                    Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" }, quotaCards.Select(card => AutomationProperties.GetName(card)));
-                    Assert.Equal(new[] { scenario.Weekly ? Visibility.Visible : Visibility.Collapsed, scenario.Primary ? Visibility.Visible : Visibility.Collapsed }, quotaCards.Select(card => card.Visibility));
+                    Assert.Equal(new[] { "5-hour quota card", "Weekly quota card" }, quotaCards.Select(card => AutomationProperties.GetName(card)));
+                    Assert.Equal(new[] { scenario.Primary ? Visibility.Visible : Visibility.Collapsed, scenario.Weekly ? Visibility.Visible : Visibility.Collapsed }, quotaCards.Select(card => card.Visibility));
                     Assert.All(quotaCards.Where(card => card.Visibility == Visibility.Collapsed), card => { Assert.False(card.IsVisible); Assert.Equal(0, card.ActualHeight); });
                     var automationRoot = AutomationElement.FromHandle(new WindowInteropHelper(window).EnsureHandle());
                     var automationCards = new[] { "Weekly quota card", "5-hour quota card" }.Where(name => automationRoot.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, name)) is not null).ToArray();

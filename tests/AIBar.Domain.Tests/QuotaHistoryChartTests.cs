@@ -91,7 +91,8 @@ public sealed class QuotaHistoryChartTests
                         Assert.Equal(0d, line.Points[0].X, 3); Assert.Equal(plot.ActualHeight, line.Points[0].Y, 3);
                         Assert.Equal(plot.ActualWidth, line.Points[1].X, 3); Assert.Equal(0d, line.Points[1].Y, 3);
                     }
-                    Assert.Equal(((System.Windows.Media.SolidColorBrush)chart.FindResource("TextBrush")).Color,
+                    Assert.Equal(theme == WindowsTheme.HighContrast ? System.Windows.SystemColors.HighlightColor :
+                        PanelPalette.ProviderColor(Array.IndexOf(lines, line) < expectedSegments / 2 ? "Codex" : "Claude"),
                         Assert.IsType<System.Windows.Media.SolidColorBrush>(line.Stroke).Color);
                 });
                 ((ComboBox)chart.FindName("HistoryRange")).SelectedIndex = 2;

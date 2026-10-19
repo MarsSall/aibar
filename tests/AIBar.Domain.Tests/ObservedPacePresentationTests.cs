@@ -17,13 +17,13 @@ public sealed class ObservedPacePresentationTests
         var snapshot = mapper.Map(state); var observed = mapper.Map(state, history);
         Assert.Equal(snapshot with { Primary = observed.Primary }, observed);
         Assert.Equal(snapshot.Primary with { Pace = observed.Primary.Pace }, observed.Primary);
-        Assert.Equal("Pace 1.5x · runs out in 2h 0m", observed.Primary.Pace!.Text);
+        Assert.Equal("Pace: Ahead (+50%) · Runs out in 2h 0m", observed.Primary.Pace!.Text);
         Assert.Equal("Codex 5-hour", observed.Primary.Pace.Label);
         Assert.Contains("observed use", observed.Primary.Pace.HelpText);
         Assert.Equal(PanelTone.Near, observed.Primary.Pace.Tone);
         Assert.Equal("At this pace, Codex 5-hour runs out before it resets.", observed.Primary.Pace.Notice);
         var stale = mapper.Map(state with { Freshness = FreshnessState.Stale }, history);
-        Assert.Equal("Not current", stale.Primary.Pace!.Text); Assert.Null(stale.Primary.Pace.Notice);
+        Assert.Equal("Pace: Not current", stale.Primary.Pace!.Text); Assert.Null(stale.Primary.Pace.Notice);
         Assert.DoesNotContain("observed use", stale.Primary.Pace.HelpText);
     }
     private sealed record Clock(DateTimeOffset UtcNow) : IClock;

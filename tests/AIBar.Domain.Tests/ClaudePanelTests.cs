@@ -85,26 +85,26 @@ public sealed class ClaudePanelTests
             using var panel = new PanelFixture();
             var root = Assert.IsType<Grid>(panel.Window.Content);
             var children = root.Children.Cast<UIElement>().ToArray();
-            Assert.Equal(4, root.RowDefinitions.Count);
-            Assert.Equal(new[] { 0, 1, 2, 3 }, children.Select(Grid.GetRow));
-            var cards = Assert.IsType<StackPanel>(children[1]);
-            Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" },
+            Assert.Equal(2, root.RowDefinitions.Count);
+            Assert.Equal(new[] { 0, 1 }, children.Select(Grid.GetRow));
+            var cards = Assert.IsType<StackPanel>(panel.Window.FindName("QuotaCards"));
+            Assert.Equal(new[] { "5-hour quota card", "Weekly quota card" },
                 Visuals<GroupBox>(cards).Where(item => item.IsVisible).Select(AutomationProperties.GetName));
-            Assert.Equal(new[] { 20d, 11d }, Visuals<ProgressBar>(cards).Where(item => item.IsVisible).Select(item => item.Value));
+            Assert.Equal(new[] { 11d, 20d }, Visuals<ProgressBar>(cards).Where(item => item.IsVisible).Select(item => item.Value));
             AssertNoClaude(panel.Window);
             panel.Enable();
             Assert.Same(root, panel.Window.Content);
             Assert.Equal(children, root.Children.Cast<UIElement>());
-            Assert.Equal(4, root.RowDefinitions.Count);
-            Assert.Contains(VisibleText(cards), text => text == "CODEX");
-            Assert.Contains(VisibleText(cards), text => text == "CLAUDE");
-            Assert.Equal(new[] { 20d, 11d, 67d, 31d },
+            Assert.Equal(2, root.RowDefinitions.Count);
+            Assert.Contains(VisibleText(cards), text => text == "Codex");
+            Assert.Contains(VisibleText(cards), text => text == "Claude");
+            Assert.Equal(new[] { 11d, 20d, 31d, 67d },
                 Visuals<ProgressBar>(cards).Where(item => item.IsVisible).Select(item => item.Value));
             panel.Revoke();
             AssertNoClaude(panel.Window);
-            Assert.Equal(new[] { 20d, 11d }, Visuals<ProgressBar>(cards).Where(item => item.IsVisible).Select(item => item.Value));
+            Assert.Equal(new[] { 11d, 20d }, Visuals<ProgressBar>(cards).Where(item => item.IsVisible).Select(item => item.Value));
             panel.Enable();
-            Assert.Contains("CLAUDE", VisibleText(cards));
+            Assert.Contains("Claude", VisibleText(cards));
         });
     }
 
@@ -122,9 +122,9 @@ public sealed class ClaudePanelTests
             {
                 app.Resources.MergedDictionaries[0] = ThemeDictionaries.Create(theme);
                 using var panel = new PanelFixture(); panel.Enable();
-                var cards = Assert.IsType<StackPanel>(((Grid)panel.Window.Content).Children[1]);
+                var cards = Assert.IsType<StackPanel>(panel.Window.FindName("QuotaCards"));
                 var meters = Visuals<GroupBox>(cards).Where(item => item.IsVisible).ToArray();
-                Assert.Equal(new[] { "Weekly quota card", "5-hour quota card", "Claude weekly quota card", "Claude 5-hour quota card" }, meters.Select(AutomationProperties.GetName));
+                Assert.Equal(new[] { "5-hour quota card", "Weekly quota card", "Claude 5-hour quota card", "Claude weekly quota card" }, meters.Select(AutomationProperties.GetName));
                 foreach (var card in meters.Skip(2))
                 {
                     Assert.Equal(KeyboardNavigation.GetTabIndex(meters[0]), KeyboardNavigation.GetTabIndex(card));
@@ -135,25 +135,25 @@ public sealed class ClaudePanelTests
                     Assert.Same(panel.Window.FindResource("QuotaProgressStyle"), bar.Style.BasedOn);
                     Assert.False(bar.Focusable || bar.IsHitTestVisible);
                     // Both Claude fixtures are below 75%: green, or the system highlight in high contrast.
-                    var expectedBar = theme == WindowsTheme.HighContrast ? SystemColors.HighlightColor : PanelPalette.ToneColor(PanelTone.Ok, theme == WindowsTheme.Dark);
+                    var expectedBar = theme == WindowsTheme.HighContrast ? SystemColors.HighlightColor : (Color)ColorConverter.ConvertFromString("#C4703F");
                     Assert.Equal(expectedBar, ColorOf(bar.Foreground));
                     var percentage = Assert.Single(Visuals<TextBlock>(card).Where(text => text.Text.EndsWith("% used", StringComparison.Ordinal)));
-                    Assert.Equal(14d, percentage.FontSize);
+                    Assert.Equal(13.5d, percentage.FontSize);
                     Assert.Equal(ColorOf(panel.Window.FindResource("TextBrush")), ColorOf(percentage.Foreground));
                     Assert.Contains(VisibleText(card), text => text.StartsWith("Resets in ", StringComparison.Ordinal));
                 }
                 var bars = Visuals<ProgressBar>(cards).Where(item => item.IsVisible).ToArray();
-                Assert.Equal(new[] { "Weekly quota progress", "5-hour quota progress", "Claude weekly quota progress", "Claude 5-hour quota progress" },
+                Assert.Equal(new[] { "5-hour quota progress", "Weekly quota progress", "Claude 5-hour quota progress", "Claude weekly quota progress" },
                     bars.Select(item => new ProgressBarAutomationPeer(item).GetName()));
                 var names = AutomationNames(panel.Window);
                 Assert.Contains("5-hour quota progress", names);
                 Assert.Contains("Claude weekly quota progress", names);
                 Assert.True(Array.IndexOf(names, "5-hour quota progress") < Array.IndexOf(names, "Claude weekly quota progress"));
                 Assert.Contains("Claude 5-hour quota progress", names);
-                var details = Assert.IsType<Expander>(panel.Window.FindName("AnalyticsDetailsExpander"));
+                var details = Assert.IsType<Button>(panel.Window.FindName("CostButton"));
                 details.Focus(); Assert.True(details.IsKeyboardFocused);
                 Assert.True(details.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
-                Assert.Equal("Copy quota summary", AutomationProperties.GetName(Assert.IsAssignableFrom<DependencyObject>(Keyboard.FocusedElement)));
+                Assert.Equal("Refresh quota", AutomationProperties.GetName(Assert.IsAssignableFrom<DependencyObject>(Keyboard.FocusedElement)));
             }
             finally { app.Resources.MergedDictionaries[0] = original; }
         });
@@ -170,7 +170,7 @@ public sealed class ClaudePanelTests
             using var panel = new PanelFixture(primary, weekly); panel.Enable();
             var cards = Visuals<GroupBox>(panel.Window).Where(item => AutomationProperties.GetName(item).StartsWith("Claude ", StringComparison.Ordinal)).ToArray();
             Assert.Equal(2, cards.Length);
-            Assert.Equal(new[] { weekly ? Visibility.Visible : Visibility.Collapsed, primary ? Visibility.Visible : Visibility.Collapsed }, cards.Select(item => item.Visibility));
+            Assert.Equal(new[] { primary ? Visibility.Visible : Visibility.Collapsed, weekly ? Visibility.Visible : Visibility.Collapsed }, cards.Select(item => item.Visibility));
             var names = AutomationNames(panel.Window);
             foreach (var card in cards.Where(item => item.Visibility == Visibility.Collapsed))
             {
@@ -258,7 +258,7 @@ public sealed class ClaudePanelTests
             // Cached Codex values and resets are unchanged; pace is derived from the clock and freshness, so compare it apart.
             Assert.Equal(beforeState.Primary with { Pace = null }, view.State.Primary with { Pace = null });
             Assert.Equal(beforeState.Weekly with { Pace = null }, view.State.Weekly with { Pace = null });
-            Assert.All(new[] { view.State.Primary.Pace, view.State.Weekly.Pace }.Where(pace => pace is not null), pace => Assert.Equal("Not current", pace!.Text));
+            Assert.All(new[] { view.State.Primary.Pace, view.State.Weekly.Pace }.Where(pace => pace is not null), pace => Assert.Equal("Pace: Not current", pace!.Text));
             string? summary = null;
             new QuotaSummaryCopyCommand(() => view.State, text => summary = text).Execute(null);
             Assert.NotNull(summary);
@@ -276,7 +276,7 @@ public sealed class ClaudePanelTests
     private static void AssertNoClaude(MainWindow window)
     {
         // Codex-only panel: the CODEX section stays, nothing names Claude in any casing.
-        Assert.Contains("CODEX", VisibleText(window));
+        Assert.Contains("Codex", VisibleText(window));
         Assert.DoesNotContain(VisibleText(window), text => text.Contains("Claude", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(Visuals<FrameworkElement>(window), item => item.IsVisible && AutomationProperties.GetName(item).StartsWith("Claude", StringComparison.Ordinal));
         Assert.DoesNotContain(AutomationNames(window), name => name.Contains("Claude", StringComparison.OrdinalIgnoreCase));

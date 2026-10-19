@@ -74,14 +74,15 @@ public sealed class QuotaVisualDesignTests
         Assert.Contains("SystemColors.HighlightBrushKey", Style("KeyboardFocusVisual").ToString(SaveOptions.DisableFormatting), StringComparison.Ordinal);
 
         var textBlocks = window.Descendants(presentation + "TextBlock").ToArray();
-        // Approved header: the AIBAR eyebrow in the panel display font replaces the old "Quota" title.
-        Assert.Equal("{StaticResource PanelDisplayFont}", textBlocks.Single(text => text.Attribute("Text")?.Value == "AIBAR").Attribute("FontFamily")?.Value);
+        // S6 replaces the eyebrow with sentence-case provider headers.
+        Assert.DoesNotContain(textBlocks, text => text.Attribute("Text")?.Value == "AIBAR");
+        Assert.Equal(new[] { "Codex", "Claude" }, textBlocks.Where(text => text.Attribute("Style")?.Value == "{StaticResource PanelProviderTitle}").Select(text => text.Attribute("Text")?.Value));
         Assert.All(textBlocks.Where(text => text.Attribute("Visibility")?.Value.Contains("State.Is", StringComparison.Ordinal) == true), text => Assert.Equal("{StaticResource QuotaStatusTextStyle}", text.Attribute("Style")?.Value));
         // Each quota meter is one shared PanelMeter row bound to its window's data.
         var meters = window.Descendants(PanelNamespace + "PanelMeter").ToArray();
         Assert.Equal(4, meters.Length);
-        Assert.Equal(new[] { "{Binding Weekly.PercentageUsed}", "{Binding Primary.PercentageUsed}", "{Binding Claude.State.Weekly.PercentageUsed}", "{Binding Claude.State.Primary.PercentageUsed}" }, meters.Select(row => row.Attribute("Usage")?.Value));
-        Assert.Equal(new[] { "{Binding Weekly.ResetCountdown}", "{Binding Primary.ResetCountdown}", "{Binding Claude.State.Weekly.ResetCountdown}", "{Binding Claude.State.Primary.ResetCountdown}" }, meters.Select(row => row.Attribute("ResetCountdown")?.Value));
+        Assert.Equal(new[] { "{Binding Primary.PercentageUsed}", "{Binding Weekly.PercentageUsed}", "{Binding Claude.State.Primary.PercentageUsed}", "{Binding Claude.State.Weekly.PercentageUsed}" }, meters.Select(row => row.Attribute("Usage")?.Value));
+        Assert.Equal(new[] { "{Binding Primary.ResetCountdown}", "{Binding Weekly.ResetCountdown}", "{Binding Claude.State.Primary.ResetCountdown}", "{Binding Claude.State.Weekly.ResetCountdown}" }, meters.Select(row => row.Attribute("ResetCountdown")?.Value));
         var meter = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/PanelMeter.xaml"));
         var meterBar = Assert.Single(meter.Descendants(presentation + "ProgressBar"));
         Assert.Equal("{StaticResource PanelMeterProgressStyle}", meterBar.Attribute("Style")?.Value);
@@ -125,14 +126,14 @@ public sealed class QuotaVisualDesignTests
             try
             {
                 window = new MainWindow { DataContext = host }; window.Show();
-                ((System.Windows.Controls.Expander)window.FindName("AnalyticsDetailsExpander")).IsExpanded = true;
+                ((System.Windows.Controls.Button)window.FindName("CostButton")).RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
                 window.UpdateLayout();
                 var allCards = FindVisualChildren<System.Windows.Controls.GroupBox>(window).ToArray();
                 var claudeCards = allCards.Where(card => System.Windows.Automation.AutomationProperties.GetName(card).StartsWith("Claude ", StringComparison.Ordinal)).ToArray();
                 Assert.Equal(2, claudeCards.Length);
                 Assert.All(claudeCards, card => Assert.False(card.IsVisible));
                 var cards = allCards.Except(claudeCards).ToArray();
-                Assert.Equal(new[] { "Weekly quota card", "5-hour quota card", "Local Codex data", "OpenCode and Pi local usage" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
+                Assert.Equal(new[] { "5-hour quota card", "Weekly quota card", "Local Codex data", "OpenCode and Pi local usage" }, cards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
                 var button = FindVisualChildren<System.Windows.Controls.Button>(window).Single(item => System.Windows.Automation.AutomationProperties.GetName(item) == "Refresh quota");
                 Assert.IsAssignableFrom<System.Windows.Input.ICommand>(button.Command);
                 Assert.True(button.IsEnabled);
@@ -148,17 +149,18 @@ public sealed class QuotaVisualDesignTests
                     {
                         var initialization = cardCoordinator.InitializeAsync(default).AsTask(); PumpUntil(() => initialization.IsCompleted); Assert.True(initialization.IsCompletedSuccessfully);
                         cardWindow = new MainWindow { DataContext = new BetaAnalyticsPresentation(cardHost, analytics, LocalUsageHost()) }; cardWindow.Show();
-                        ((System.Windows.Controls.Expander)cardWindow.FindName("AnalyticsDetailsExpander")).IsExpanded = true;
                         cardWindow.UpdateLayout();
                         System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); cardWindow.UpdateLayout();
                         var quotaCards = FindVisualChildren<System.Windows.Controls.GroupBox>(cardWindow).Take(2).ToArray();
-                        Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" }, quotaCards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
-                        Assert.Equal(new[] { availability.Weekly ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, availability.Primary ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed }, quotaCards.Select(card => card.Visibility));
+                        Assert.Equal(new[] { "5-hour quota card", "Weekly quota card" }, quotaCards.Select(card => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(card)!.GetName()));
+                        Assert.Equal(new[] { availability.Primary ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed, availability.Weekly ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed }, quotaCards.Select(card => card.Visibility));
                         Assert.All(quotaCards.Where(card => card.Visibility == System.Windows.Visibility.Collapsed), card => { Assert.False(card.IsVisible); Assert.Equal(0, card.ActualHeight); });
                         var automationRoot = System.Windows.Automation.AutomationElement.FromHandle(new System.Windows.Interop.WindowInteropHelper(cardWindow).EnsureHandle());
                         var automationCards = new[] { "Weekly quota card", "5-hour quota card" }.Where(name => automationRoot.FindFirst(System.Windows.Automation.TreeScope.Descendants, new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.NameProperty, name)) is not null).ToArray();
                         var expectedAutomationCards = new[] { (availability.Weekly, "Weekly quota card"), (availability.Primary, "5-hour quota card") }.Where(item => item.Item1).Select(item => item.Item2).ToArray();
                         Assert.Equal(expectedAutomationCards, automationCards);
+                        ((System.Windows.Controls.Button)cardWindow.FindName("CostButton")).RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
+                        cardWindow.UpdateLayout();
                         var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(cardWindow).Where(item => item.Name != "AnalyticsDetailsExpander").ToArray(); Assert.Equal(3, usageExpanders.Length);
                         var openCode = usageExpanders.Single(item => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(item)!.GetName().StartsWith("OpenCode,", StringComparison.Ordinal));
                         var openCodePeer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(openCode)!;
@@ -183,7 +185,9 @@ public sealed class QuotaVisualDesignTests
                 disabled = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(new FixedClock(DateTimeOffset.UtcNow)), false);
                 disabledWindow = new MainWindow { DataContext = disabled };
                 disabledWindow.Show();
-                Assert.Equal(System.Windows.Visibility.Collapsed, FindVisualChildren<System.Windows.Controls.Button>(disabledWindow).Single(item => System.Windows.Automation.AutomationProperties.GetName(item) == "Refresh quota").Visibility);
+                var unavailableRefresh = FindVisualChildren<System.Windows.Controls.Button>(disabledWindow).Single(item => System.Windows.Automation.AutomationProperties.GetName(item) == "Refresh quota");
+                Assert.Equal(System.Windows.Visibility.Visible, unavailableRefresh.Visibility);
+                Assert.False(unavailableRefresh.IsEnabled);
                 provider.Release(); PumpUntil(() => button.IsEnabled);
                 Assert.True(button.IsEnabled); Assert.Equal(1, provider.Calls);
             }
@@ -311,16 +315,16 @@ public sealed class QuotaVisualDesignTests
         var window = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml"));
         Assert.Equal("AIBar quota", window.Root!.Attribute("Title")?.Value);
         var grid = window.Root.Element(presentation + "Grid")!;
-        Assert.Equal(4, grid.Element(presentation + "Grid.RowDefinitions")!.Elements().Count());
-        Assert.Equal(new[] { "0", "1", "2", "3" }, grid.Elements().Where(element => element.Name != presentation + "Grid.RowDefinitions").Select(element => element.Attribute("Grid.Row")?.Value ?? "0"));
+        Assert.Equal(2, grid.Element(presentation + "Grid.RowDefinitions")!.Elements().Count());
+        Assert.Equal(new[] { "0", "1" }, grid.Elements().Where(element => element.Name != presentation + "Grid.RowDefinitions").Select(element => element.Attribute("Grid.Row")?.Value ?? "0"));
         Assert.Equal("Continue", grid.Attribute("KeyboardNavigation.TabNavigation")?.Value);
         var cards = window.Descendants(presentation + "GroupBox").Take(2).ToArray();
-        Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" }, cards.Select(card => card.Attribute(presentation + "AutomationProperties.Name")?.Value));
+        Assert.Equal(new[] { "5-hour quota card", "Weekly quota card" }, cards.Select(card => card.Attribute(presentation + "AutomationProperties.Name")?.Value));
         // Row spacing now lives in the shared meter row instead of each card.
         Assert.Equal(new string?[] { null, null }, cards.Select(card => card.Attribute("Margin")?.Value));
         var meter = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/PanelMeter.xaml"));
-        Assert.Equal("0,0,0,14", meter.Descendants(presentation + "Grid").First().Attribute("Margin")?.Value);
-        Assert.Equal(new[] { "{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", "{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" }, cards.Select(card => card.Attribute("Visibility")?.Value));
+        Assert.Equal("0,12,0,0", meter.Descendants(presentation + "Grid").First().Attribute("Margin")?.Value);
+        Assert.Equal(new[] { "{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", "{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" }, cards.Select(card => card.Attribute("Visibility")?.Value));
         Assert.All(cards, card => Assert.Contains("percentage, reset, and state", card.Attribute(presentation + "AutomationProperties.HelpText")?.Value));
         var values = window.Descendants().Attributes().Select(attribute => attribute.Value).ToArray();
         // Missing values render "--" and "unavailable" once in the shared row, used by all four meters.
@@ -332,7 +336,7 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal(3, values.Count(value => value == "{Binding FreshnessLabel}"));
         var scrollers = window.Descendants(presentation + "ScrollViewer").ToArray();
         Assert.Equal("SecondaryScrollViewer", scrollers[0].Attribute(x + "Name")?.Value);
-        Assert.Equal("2", scrollers[0].Attribute("Grid.Row")?.Value);
+        Assert.Equal("0", scrollers[0].Attribute("Grid.Row")?.Value);
         Assert.Equal("OnSecondaryPreviewGotKeyboardFocus", scrollers[0].Attribute("PreviewGotKeyboardFocus")?.Value);
         Assert.All(scrollers.Skip(1), scroller => Assert.Contains(scroller.Ancestors(), ancestor => ancestor == scrollers[0]));
     }
@@ -344,12 +348,12 @@ public sealed class QuotaVisualDesignTests
         var presentation = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml/presentation");
         var window = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml"));
         var resources = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/App.xaml"));
-        var summary = window.Descendants(presentation + "Grid").Single(grid => grid.Attribute(presentation + "AutomationProperties.Name")?.Value == "Quota summary");
-        Assert.Equal("0", summary.Attribute("Grid.Row")?.Value);
+        var summary = window.Descendants(presentation + "StackPanel").Single(panel => panel.Attribute(x + "Name")?.Value == "SummaryView");
+        Assert.Equal("Quota summary", summary.Attribute(presentation + "AutomationProperties.Name")?.Value);
         Assert.True(window.Descendants().Count(element => element.Attribute(presentation + "AutomationProperties.LiveSetting")?.Value == "Polite") >= 3);
         var progress = window.Descendants(PanelNamespace + "PanelMeter").ToArray();
         Assert.Equal(4, progress.Length);
-        Assert.Equal(new[] { "Weekly quota progress", "5-hour quota progress", "Claude weekly quota progress", "Claude 5-hour quota progress" }, progress.Select(item => item.Attribute("MeterName")?.Value));
+        Assert.Equal(new[] { "5-hour quota progress", "Weekly quota progress", "Claude 5-hour quota progress", "Claude weekly quota progress" }, progress.Select(item => item.Attribute("MeterName")?.Value));
         // The shared row names its bar from MeterName and keeps the shared non-interactive progress style.
         var meter = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/PanelMeter.xaml"));
         var meterBar = Assert.Single(meter.Descendants(presentation + "ProgressBar"));
