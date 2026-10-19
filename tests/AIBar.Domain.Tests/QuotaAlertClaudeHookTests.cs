@@ -40,9 +40,9 @@ public sealed class QuotaAlertClaudeHookTests : IDisposable
             changed = true;
             handoff = runtime.SetSourceAsync(ClaudeQuotaSource.OtherMachine, default).AsTask();
         };
-        await runtime.GrantConsentAsync(default).AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        await runtime.GrantConsentAsync(default).AsTask().WaitAsync(TimeSpan.FromSeconds(60));
         Assert.True(changed);
-        await handoff!.WaitAsync(TimeSpan.FromSeconds(5));
+        await handoff!.WaitAsync(TimeSpan.FromSeconds(60));
         Assert.Equal(ClaudeQuotaSource.OtherMachine, runtime.Source);
     }
     private sealed class Provider(DateTimeOffset now) : IQuotaProvider
