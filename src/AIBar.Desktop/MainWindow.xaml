@@ -252,11 +252,16 @@
                     </Path>
                     <TextBlock Grid.Column="1" Text="CLAUDE" Style="{StaticResource PanelProviderTitle}" automation:AutomationProperties.Name="Claude" />
                     <Border Grid.Column="2" Style="{StaticResource PanelPill}" Visibility="{Binding Claude.State.SourceLabel, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}">
-                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8AF;" Style="{StaticResource PanelGlyph}" Foreground="{DynamicResource MutedTextBrush}" /><TextBlock Text="{Binding Claude.State.SourceLabel}" Style="{StaticResource PanelPillText}" /></StackPanel>
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE7F8;" Style="{StaticResource PanelGlyph}" Foreground="{DynamicResource MutedTextBrush}" /><TextBlock Text="{Binding Claude.State.SourceLabel}" Style="{StaticResource PanelPillText}" /></StackPanel>
                     </Border>
                 </Grid>
                 <TextBlock Text="{Binding Claude.State.UpdatedLabel}" Style="{StaticResource QuotaStatusTextStyle}" FontSize="12" Margin="32,0,0,12" />
-                <TextBlock Text="{Binding Claude.State.FreshnessLabel}" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" Margin="0,0,0,4" />
+                <!-- Only a non-current state needs words here; current data already says when it was updated. -->
+                <TextBlock Text="{Binding Claude.State.FreshnessLabel}" automation:AutomationProperties.LiveSetting="Polite" Margin="0,0,0,4">
+                    <TextBlock.Style><Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource QuotaStatusTextStyle}">
+                        <Style.Triggers><DataTrigger Binding="{Binding Claude.State.IsCurrent}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+                    </Style></TextBlock.Style>
+                </TextBlock>
                 <TextBlock Text="{Binding Claude.State.CachedAgeLabel}" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" />
                 <Border Style="{StaticResource PanelNotice}" Visibility="{Binding Claude.State.WarningLabel, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}">
                     <TextBlock Text="{Binding Claude.State.WarningLabel}" TextWrapping="Wrap" FontSize="12" Style="{StaticResource QuotaStatusTextStyle}" Foreground="{DynamicResource TextBrush}" automation:AutomationProperties.LiveSetting="Polite" />
