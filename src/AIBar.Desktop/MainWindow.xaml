@@ -161,6 +161,51 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Slim overlay-style scroll bar for the details area: rounded thumb, no arrow buttons. -->
+        <Style x:Key="PanelScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Width" Value="6" /><Setter Property="MinWidth" Value="6" />
+            <Setter Property="Margin" Value="4,2,0,2" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Background="{TemplateBinding Background}">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Focusable="False" IsTabStop="False">
+                                        <RepeatButton.Template><ControlTemplate TargetType="{x:Type RepeatButton}"><Border Background="Transparent" /></ControlTemplate></RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Focusable="False" IsTabStop="False">
+                                        <RepeatButton.Template><ControlTemplate TargetType="{x:Type RepeatButton}"><Border Background="Transparent" /></ControlTemplate></RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="{x:Type Thumb}">
+                                                <Border x:Name="ThumbChrome" CornerRadius="3" Background="{DynamicResource MutedTextBrush}" Opacity="0.45" />
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ThumbChrome" Property="Opacity" Value="0.75" /></Trigger>
+                                                    <Trigger Property="IsDragging" Value="True"><Setter TargetName="ThumbChrome" Property="Opacity" Value="0.9" /></Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto" /><Setter Property="MinWidth" Value="0" />
+                    <Setter Property="Height" Value="6" /><Setter Property="Margin" Value="2,4,2,0" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
     <!-- Graphite surface; translucent only while the acrylic backdrop is active. -->
     <Window.Background>
@@ -282,6 +327,9 @@
         </StackPanel>
 
         <ScrollViewer x:Name="SecondaryScrollViewer" Grid.Row="2" Margin="20,0,20,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PreviewGotKeyboardFocus="OnSecondaryPreviewGotKeyboardFocus" automation:AutomationProperties.Name="Secondary analytics">
+            <ScrollViewer.Resources>
+                <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource PanelScrollBarStyle}" />
+            </ScrollViewer.Resources>
             <Expander x:Name="AnalyticsDetailsExpander" IsExpanded="False" Focusable="True" IsTabStop="True"
                       Style="{StaticResource PanelDetailsExpanderStyle}" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SecondaryBorderBrush}"
                       automation:AutomationProperties.Name="Local analytics details" automation:AutomationProperties.HelpText="Quota pace, local usage breakdown and quota access information">

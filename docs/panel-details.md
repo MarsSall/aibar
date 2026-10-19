@@ -51,7 +51,7 @@ The first 5% of a window shows **Not enough data yet**. Missing usage/reset info
 - Below pace, the smaller **Local usage** and **Quota access** sections retain local Codex and OpenCode/Pi usage and the full private-quota access disclosures.
 - Provider headers keep the scope, exact total and status separate. Expand a provider to reveal its exact token breakdown and daily/model totals; no totals are rounded or removed.
 - Right-hand chevrons replace the operating-system expander decoration. Use Tab to focus a disclosure and Space or Enter to toggle it; UI Automation ExpandCollapse remains available.
-- The secondary area scrolls and brings focused content into view. Quota meters, warnings, copy feedback and footer actions remain outside it.
+- The secondary area scrolls with a slim rounded scroll bar (no arrow buttons) and brings focused content into view. Quota meters, warnings, copy feedback and footer actions remain outside it.
 
 Headers and expanded provider details use the existing semantic text colors in light, dark, and system high-contrast themes. No global button styling is introduced.
 
