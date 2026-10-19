@@ -26,8 +26,6 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private long _authorityEpoch;
     private long _authorityRetrievalGeneration;
     private long _coordinatorRetrievalGeneration;
-    private int _authorityRefreshes;
-    private readonly List<(QuotaAuthorityUpdate Update, long Epoch)> _pendingAuthorityUpdates = [];
     private int _notificationDeferrals;
     private enum Notification { Source, State, Consent, Authority }
     public event Action<QuotaAuthorityUpdate>? AuthorityUpdated;
@@ -42,33 +40,8 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
                 _authorityRetrievalGeneration++;
             }
             update = update with { RetrievalGeneration = _authorityRetrievalGeneration };
-            if (_authorityRefreshes != 0)
-            {
-                _pendingAuthorityUpdates.Add((update, epoch));
-                return;
-            }
         }
         Notify(Notification.Authority, update, epoch);
-    }
-
-    private void EndAuthorityRefresh()
-    {
-        (QuotaAuthorityUpdate Update, long Epoch)[] pending;
-        lock (_notificationGate)
-        {
-            if (--_authorityRefreshes != 0) return;
-            pending = _pendingAuthorityUpdates.ToArray();
-            _pendingAuthorityUpdates.Clear();
-        }
-        Exception? failure = null;
-        foreach (var (update, epoch) in pending)
-        {
-            // Reuse ExitGate deferral if a source/consent operation is now holding the gate.
-            // RaiseNotification also rejects epochs invalidated while retrieval was draining.
-            try { Notify(Notification.Authority, update, epoch); }
-            catch (Exception exception) { failure ??= exception; }
-        }
-        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
     private readonly IQuotaExportWriter? _exportWriter;
     private QuotaExportPublisher? _publisher;
@@ -402,28 +375,10 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         }
         finally { ExitGate(); }
         if (coordinator is null) return;
-        // Caller cancellation may stop waiting, but authority must stay deferred until
-        // the coordinator's actual refresh completes (it owns retrieval cancellation).
-        var refresh = RefreshAndPublishAuthorityAsync(coordinator, trigger);
-        if (cancellationToken.CanBeCanceled) await refresh.WaitAsync(cancellationToken);
-        else await refresh;
-    }
-
-    private async Task RefreshAndPublishAuthorityAsync(QuotaRefreshCoordinator coordinator, RefreshTrigger trigger)
-    {
         // Resolution/handoff is serialized, never retrieval: revoke or another source
         // change must be able to cancel and drain even a cancellation-ignoring provider.
-        // Coordinator callbacks run before its active refresh task completes. Publishing
-        // authority inline lets a subscriber's source handoff drain that same refresh.
-        // Defer authority until retrieval has returned, without holding the runtime gate
-        // or delaying ordinary loading/state notifications.
-        lock (_notificationGate) _authorityRefreshes++;
-        try
-        {
-            try { await coordinator.ReevaluateAsync(trigger, CancellationToken.None); }
-            catch (ObjectDisposedException) when (!_enabled || !ReferenceEquals(coordinator, _coordinator)) { }
-        }
-        finally { EndAuthorityRefresh(); }
+        try { await coordinator.ReevaluateAsync(trigger, cancellationToken); }
+        catch (ObjectDisposedException) when (!_enabled || !ReferenceEquals(coordinator, _coordinator)) { }
     }
 
     private async ValueTask StopCoreAsync()
