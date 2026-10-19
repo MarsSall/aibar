@@ -6,8 +6,9 @@ public enum AnalyticsScanStatus { Idle, Loading, Complete, Empty, Partial, Unava
 public sealed record ModelTokenTotal(string Model, TokenTotals Tokens);
 public sealed class LocalAnalyticsState
 {
-    public LocalAnalyticsState(AnalyticsScanStatus status, ScanCoverageState coverage, TokenTotals? totals, IReadOnlyList<ModelTokenTotal> models, DateTimeOffset? scannedAt, IReadOnlyList<string> warnings)
+    public LocalAnalyticsState(AnalyticsScanStatus status, ScanCoverageState coverage, TokenTotals? totals, IReadOnlyList<ModelTokenTotal> models, DateTimeOffset? scannedAt, IReadOnlyList<string> warnings, UsageCostSummary? usageCost = null)
     {
+        UsageCost = usageCost ?? UsageCostSummary.Unavailable;
         Status = status;
         Coverage = coverage;
         Totals = totals;
@@ -21,6 +22,7 @@ public sealed class LocalAnalyticsState
             _ => safeWarnings
         });
     }
+    public UsageCostSummary UsageCost { get; }
     public AnalyticsScanStatus Status { get; }
     public ScanCoverageState Coverage { get; }
     public TokenTotals? Totals { get; }
@@ -40,7 +42,7 @@ public sealed class LocalAnalyticsState
     public static LocalAnalyticsState Empty(DateTimeOffset at, IReadOnlyList<string> w) => new(AnalyticsScanStatus.Empty, ScanCoverageState.Unavailable, null, [], at, w);
     public static LocalAnalyticsState Unavailable(DateTimeOffset at, IReadOnlyList<string> w) => new(AnalyticsScanStatus.Unavailable, ScanCoverageState.Unavailable, null, [], at, w);
     public static LocalAnalyticsState Failed(DateTimeOffset at, string safeCode = "local_scan_failed") => new(AnalyticsScanStatus.Failed, ScanCoverageState.Unavailable, null, [], at, [safeCode]);
-    public LocalAnalyticsState WithStatus(AnalyticsScanStatus status) => new(status, Coverage, Totals, Models, ScannedAt, WarningCodes);
+    public LocalAnalyticsState WithStatus(AnalyticsScanStatus status) => new(status, Coverage, Totals, Models, ScannedAt, WarningCodes, UsageCost);
 
     private static bool IsSafeWarning(string warning) => warning is
         "session_root_missing" or "session_root_unreadable" or "session_root_attribute_unavailable" or "session_root_reparse_skipped" or
@@ -88,7 +90,6 @@ public sealed class LocalCodexAnalyticsAdapter : ILocalCodexAnalyticsScanner
         var warnings = new HashSet<string>(discovery.Coverage.WarningCodes.Where(IsSafeWarning), StringComparer.Ordinal);
         var files = discovery.Batches.SelectMany(batch => batch.Files).OrderBy(path => path, StringComparer.Ordinal).ToArray();
         var scannedAt = _utcNow();
-        if (files.Length == 0) return LocalAnalyticsState.Unavailable(scannedAt, warnings.Order().ToArray());
 
         foreach (var file in files)
         {
@@ -105,14 +106,18 @@ public sealed class LocalCodexAnalyticsAdapter : ILocalCodexAnalyticsScanner
         try { usage = await _load(cancellationToken); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception exception) { throw new LocalCodexAnalyticsScanException("local_store_load_failed", exception); }
-        if (usage.Count == 0) return LocalAnalyticsState.Empty(scannedAt, warnings.Order().ToArray());
+        if (usage.Count == 0 && files.Length == 0) return LocalAnalyticsState.Unavailable(scannedAt, warnings.Order().ToArray());
+        if (usage.Count == 0) return new(AnalyticsScanStatus.Empty, ScanCoverageState.Unavailable,
+            null, [], scannedAt, warnings.Order().ToArray(), UsageCostPolicy.Calculate([], DateOnly.FromDateTime(scannedAt.LocalDateTime), warnings.Count > 0));
+        var cost = UsageCostPolicy.Calculate(usage.Select(row => new UsageCostDaily(row.LocalDay, row.Model,
+            row.Tokens.Input, row.Tokens.CachedInput, 0, row.Tokens.Output)), DateOnly.FromDateTime(scannedAt.LocalDateTime), warnings.Count > 0);
         var models = usage.GroupBy(item => item.Model, StringComparer.Ordinal)
             .Select(group => new ModelTokenTotal(group.Key, Add(group.Select(item => item.Tokens))))
             .OrderBy(item => item.Model, StringComparer.Ordinal).ToArray();
         var totals = Add(models.Select(model => model.Tokens));
-        return warnings.Count == 0
-            ? LocalAnalyticsState.Complete(totals, models, scannedAt, [])
-            : LocalAnalyticsState.Partial(totals, models, scannedAt, warnings.Order().ToArray());
+        return new(warnings.Count == 0 ? AnalyticsScanStatus.Complete : AnalyticsScanStatus.Partial,
+            warnings.Count == 0 ? ScanCoverageState.Complete : ScanCoverageState.Partial,
+            totals, models, scannedAt, warnings.Order().ToArray(), cost);
     }
 
     private static TokenTotals Add(IEnumerable<TokenTotals> values) => values.Aggregate(new TokenTotals(0, 0, 0), (sum, value) => new(sum.Input + value.Input, sum.CachedInput + value.CachedInput, sum.Output + value.Output));
