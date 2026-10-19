@@ -48,7 +48,7 @@ public sealed class ProviderStatusTests
         var exact = Encoding.UTF8.GetBytes(Incident.PadRight(65536));
         Assert.NotNull(ProviderStatus.Parse(exact));
         Assert.Null(ProviderStatus.Parse(Encoding.UTF8.GetBytes(Incident.PadRight(65537))));
-        Assert.Null(ProviderStatus.Parse([0xff]));
+        Assert.Null(ProviderStatus.Parse(new byte[] { 0xff }));
     }
 
     [Fact]
