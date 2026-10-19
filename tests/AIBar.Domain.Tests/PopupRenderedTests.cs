@@ -79,7 +79,7 @@ public sealed class PopupRenderedTests
                     var freshness = Assert.Single(Visuals<TextBlock>(children[0]).Where(item => new TextBlockAutomationPeer(item).GetName() == "Stale"));
                     Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(freshness));
                     Assert.All(quotaCards, card => Assert.Equal("Stale", new GroupBoxAutomationPeer(card).GetItemStatus()));
-                    Assert.Equal("Refresh quota", new ButtonAutomationPeer(refresh).GetName()); var statusText = Visuals<TextBlock>(cards).Where(item => item.IsVisible && item.ActualHeight > 0).Select(item => new TextBlockAutomationPeer(item).GetName()).ToArray(); Assert.Contains("Cached 00h 05m", statusText); Assert.Contains("Network unavailable", statusText); Assert.True(secondary.ScrollableHeight > 0);
+                    Assert.Equal("Refresh quota", new ButtonAutomationPeer(refresh).GetName()); var statusText = Visuals<TextBlock>(cards).Where(item => item.Visibility == Visibility.Visible && item.ActualHeight > 0).Select(item => new TextBlockAutomationPeer(item).GetName()).ToArray(); Assert.Contains("Cached 00h 05m", statusText); Assert.Contains("Network unavailable", statusText); Assert.True(secondary.ScrollableHeight > 0);
                     var image = new RenderTargetBitmap(420, 720, 96, 96, PixelFormats.Pbgra32); image.Render(root); var pixels = new byte[420 * 720 * 4]; image.CopyPixels(pixels, 420 * 4, 0); Assert.Contains(pixels.Where((_, index) => index % 4 == 3), alpha => alpha > 0);
                 }
             }
