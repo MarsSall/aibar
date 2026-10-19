@@ -1,7 +1,7 @@
 aibar_quota:
   type: "yasb.custom.CustomWidget"
   options:
-    label: "<font color='{data[progressColor]}'>{data[progressGlyph]}</font> {data[compactText]}"
+    label: "<img src='<AIBarRoot>\\yasb\\icons\\openai.svg'/> <font color='{data[progressColor]}'>{data[progressGlyph]}</font> {data[compactText]}"
     label_alt: "{data[label]}"
     class_name: "aibar-quota"
     tooltip: true
@@ -16,7 +16,7 @@ aibar_quota:
 aibar_claude_quota:
   type: "yasb.custom.CustomWidget"
   options:
-    label: "<font color='{data[progressColor]}'>{data[progressGlyph]}</font> {data[compactText]}"
+    label: "<img src='<AIBarRoot>\\yasb\\icons\\claude.svg'/> <font color='{data[progressColor]}'>{data[progressGlyph]}</font> {data[compactText]}"
     label_alt: "{data[label]}"
     class_name: "aibar-quota"
     tooltip: true

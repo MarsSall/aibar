@@ -273,7 +273,9 @@ aibar_quota:
             $svg.svg.height | Should -BeExactly '14'
             $svg.svg.viewBox | Should -BeExactly '0 0 24 24'
             @($svg.svg.ChildNodes | Where-Object { $_.LocalName -ne 'path' }).Count | Should -Be 0
-            (Get-Content -Raw -LiteralPath $path) | Should -Not -Match '(?i)<script|href|https?:|xlink|on[a-z]+='
+            $svg.svg.NamespaceURI | Should -BeExactly 'http://www.w3.org/2000/svg'
+            # Only the SVG namespace itself may name a URL; no scripts, links or external references.
+            (Get-Content -Raw -LiteralPath $path).Replace('xmlns="http://www.w3.org/2000/svg"', '') | Should -Not -Match '(?i)<script|href|https?:|xlink|on[a-z]+='
         }
     }
 
