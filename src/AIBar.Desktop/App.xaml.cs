@@ -64,6 +64,8 @@ public partial class App : System.Windows.Application
         var codexHome = seams.CodexHome ?? Environment.GetEnvironmentVariable("CODEX_HOME");
         var credentials = new ConsentCredentialSource(policy, new CodexCredentialReader(new ReadOnlyCredentialFileReader()), CodexRootResolver.Resolve(codexHome, userProfile));
         var coordinator = new QuotaRefreshCoordinator(store, new QuotaHttpProvider(policy, credentials), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
+        var historyStore = new SqliteQuotaHistoryStore(SqliteQuotaHistoryStore.DatabasePath(dataDirectory));
+        var historyRecorder = new QuotaHistoryRecorder(coordinator, historyStore, clock, QuotaHistoryProvider.Codex, QuotaHistorySource.CodexLocal);
         var exportWriter = seams.ExportWriter ?? (seams.DataDirectory is null
             ? new WindowsAtomicQuotaExportWriter()
             : WindowsAtomicQuotaExportWriter.ForOwnedSyntheticDataDirectory(dataDirectory));
@@ -92,19 +94,19 @@ public partial class App : System.Windows.Application
                 : WindowsAtomicQuotaExportWriter.ForClaudeOwnedSyntheticDataDirectory(dataDirectory)),
             seams.ClaudeRemoteProviderFactory ?? (claudePolicy => new ClaudeRemoteUsageProvider(claudePolicy,
                 Path.Combine(dataDirectory, "claude-remote-usage.json"))),
-            () => ClaudeRemoteUsageProvider.IsAvailableForAutomatic(Path.Combine(dataDirectory, "claude-remote-usage.json")));
+            () => ClaudeRemoteUsageProvider.IsAvailableForAutomatic(Path.Combine(dataDirectory, "claude-remote-usage.json")), historyStore: historyStore);
         var lifecycleAdapter = new QuotaRefreshLifecycleAdapter(lifecycleEvents, coordinator);
         var claudePresentation = new ClaudeQuotaPresentationHost(claudeRuntime, new ClaudeQuotaPresentationMapper(clock));
         var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents, claudePresentation);
         var localUsagePresentation = new LocalUsagePresentationHost(localUsage, new LocalUsagePresentationMapper());
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
-        var clear = new ClearAiBarDataService(dataDirectory, [claudeRuntime, publisher, coordinator, localUsage, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics, publisher));
+        var clear = new ClearAiBarDataService(dataDirectory, [claudeRuntime, publisher, coordinator, historyRecorder, historyStore, localUsage, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics, publisher));
         return new(new BetaAnalyticsPresentation(presentation, analytics, localUsagePresentation, claudePresentation), presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy, betaRuntime.RevokeConsentAsync, betaRuntime.GrantConsentAsync,
                 localUsageSettings.LoadAsync, localUsageSettings.SaveAsync, async (value, token) => { await localUsagePresentation.ApplyPolicyAsync(value, token); }),
-            new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, publisher, analyticsOwner, store, localUsage, localUsageLedger, seams.LifecycleObservation, claudeRuntime),
+            new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, publisher, analyticsOwner, store, localUsage, localUsageLedger, seams.LifecycleObservation, claudeRuntime, historyRecorder, historyStore),
             () => Task.WhenAll(InitializeCompositionAsync(betaRuntime, presentation, localUsagePresentation, default), claudeRuntime.InitializeAsync(default).AsTask()), presentation.ReportUnavailable,
             async (trigger, token) => { await ReevaluateCompositionAsync(coordinator, localUsagePresentation, trigger, token); await claudeRuntime.RefreshAsync(trigger, token); }, localUsagePresentation.RefreshAsync)
-            { ClaudeQuota = claudeRuntime };
+            { ClaudeQuota = claudeRuntime, QuotaHistory = historyStore };
     }
     internal static async Task InitializeCompositionAsync(BetaRuntime runtime, QuotaPresentationHost presentation, LocalUsagePresentationHost localUsage, CancellationToken cancellationToken)
     {
@@ -143,19 +145,23 @@ public partial class App : System.Windows.Application
             : this(presentation, refreshCommand, null, resource, initialize, reportUnavailable) { }
         // Unavailable/legacy compositions have no Claude capability; production always supplies it.
         internal ClaudeQuotaRuntime ClaudeQuota { get; init; } = null!;
+        internal IQuotaHistoryStore? QuotaHistory { get; init; }
         internal static StartupComposition Unavailable => new(new UnavailableQuotaPresentation(), null, null, new EmptyAsyncResource(), () => Task.CompletedTask, () => { });
     }
 
     internal sealed record CompositionSeams(string? DataDirectory = null, string? CodexHome = null, TimeSpan? AnalyticsShutdownBound = null, Action<string>? BeforeAnalyticsStability = null, Action<string>? LifecycleObservation = null, string? UserProfile = null, IQuotaExportWriter? ExportWriter = null, Func<PrivateIntegrationPolicy, IQuotaProvider>? ClaudeProviderFactory = null, TimeProvider? ClaudeTimeProvider = null, IQuotaExportWriter? ClaudeExportWriter = null, Func<PrivateIntegrationPolicy, IQuotaProvider>? ClaudeRemoteProviderFactory = null);
     private sealed class SystemClock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.UtcNow; }
-    internal sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, QuotaRefreshLifecycleAdapter lifecycleAdapter, WindowsLifecycleEvents lifecycleEvents, BetaRuntime runtime, QuotaExportPublisher publisher, AnalyticsLifecycleOwner analyticsOwner, IAsyncDisposable store, LocalUsageCoordinator localUsage, IAsyncDisposable localUsageLedger, Action<string>? observe, ClaudeQuotaRuntime? claudeRuntime = null) : IAsyncDisposable
+    internal sealed class QuotaRuntimeResource(QuotaPresentationHost presentation, QuotaRefreshLifecycleAdapter lifecycleAdapter, WindowsLifecycleEvents lifecycleEvents, BetaRuntime runtime, QuotaExportPublisher publisher, AnalyticsLifecycleOwner analyticsOwner, IAsyncDisposable store, LocalUsageCoordinator localUsage, IAsyncDisposable localUsageLedger, Action<string>? observe, ClaudeQuotaRuntime? claudeRuntime = null, QuotaHistoryRecorder? historyRecorder = null, SqliteQuotaHistoryStore? historyStore = null) : IAsyncDisposable
     {
         public AnalyticsShutdownOutcome AnalyticsOutcome => analyticsOwner.Outcome;
         public ValueTask DisposeAsync() => DisposeAllAsync([
             lifecycleAdapter.DisposeAsync, presentation.DisposeAsync,
             () => claudeRuntime?.DisposeAsync() ?? ValueTask.CompletedTask,
             () => { lifecycleEvents.Dispose(); return ValueTask.CompletedTask; },
-            () => DisposeResourceAsync(publisher, observe, "quota_export_publisher_disposed"), runtime.DisposeAsync, () => DisposeResourceAsync(localUsage, observe, "local_usage_coordinator_disposed"),
+            () => DisposeResourceAsync(publisher, observe, "quota_export_publisher_disposed"), runtime.DisposeAsync,
+            () => historyRecorder?.DisposeAsync() ?? ValueTask.CompletedTask,
+            () => historyStore?.DisposeAsync() ?? ValueTask.CompletedTask,
+            () => DisposeResourceAsync(localUsage, observe, "local_usage_coordinator_disposed"),
             () => DisposeResourceAsync(localUsageLedger, observe, "local_usage_ledger_disposed"),
             () => DisposeResourceAsync(store, observe, "quota_store_disposed"), analyticsOwner.DisposeAsync]);
 

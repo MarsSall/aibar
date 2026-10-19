@@ -23,6 +23,8 @@ public sealed class ClearAiBarDataTests(ITestOutputHelper output) : IDisposable
         await File.WriteAllTextAsync(Path.Combine(_root, "analytics.db"), "analytics");
         await File.WriteAllTextAsync(Path.Combine(_root, "analytics.db-wal"), "analytics-wal");
         await File.WriteAllTextAsync(Path.Combine(_root, "analytics.db-shm"), "analytics-shm");
+        foreach (var suffix in new[] { "", "-wal", "-shm" })
+            await File.WriteAllTextAsync(Path.Combine(_root, "quota-history.db" + suffix), "history");
         await File.WriteAllTextAsync(Path.Combine(_root, "settings.json"), "settings");
         await File.WriteAllTextAsync(Path.Combine(_root, "yasb-quota.json"), "snapshot");
         await File.WriteAllTextAsync(Path.Combine(_root, "unrelated.txt"), "preserve");
@@ -45,6 +47,8 @@ public sealed class ClearAiBarDataTests(ITestOutputHelper output) : IDisposable
         Assert.False(File.Exists(Path.Combine(_root, "analytics.db")));
         Assert.False(File.Exists(Path.Combine(_root, "analytics.db-wal")));
         Assert.False(File.Exists(Path.Combine(_root, "analytics.db-shm")));
+        foreach (var suffix in new[] { "", "-wal", "-shm" })
+            Assert.False(File.Exists(Path.Combine(_root, "quota-history.db" + suffix)));
         Assert.False(Directory.Exists(Path.Combine(_root, "logs")));
         Assert.False(File.Exists(Path.Combine(_root, "settings.json")));
         Assert.False(File.Exists(Path.Combine(_root, "yasb-quota.json")));
