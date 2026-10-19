@@ -112,8 +112,8 @@ public sealed class PanelDetailsTests
                     Assert.Equal(Colors.Transparent, ColorOf(border.Background));
                     Assert.Equal(ColorOf(window.FindResource("SecondaryBorderBrush")), ColorOf(border.BorderBrush));
                 }
-                var percentage = Assert.Single(Visuals<TextBlock>(cards[0]).Where(text => text.Text == "40%"));
-                Assert.Equal(20d, percentage.FontSize);
+                var percentage = Assert.Single(Visuals<TextBlock>(cards[0]).Where(text => text.Text == "40% used"));
+                Assert.Equal(14d, percentage.FontSize);
                 Assert.Equal(ColorOf(window.FindResource("TextBrush")), ColorOf(percentage.Foreground));
                 Assert.Equal(new[] { 40d, 25d }, cards.SelectMany(Visuals<ProgressBar>).Select(bar => bar.Value));
             }

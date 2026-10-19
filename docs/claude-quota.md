@@ -32,11 +32,11 @@ work, clears its cached quota, and refreshes the newly resolved source.
 
 ## Opened panel
 
-While Claude is enabled, the panel shows **Codex** and **Claude** headings, with Claude below the Codex meters. Each provider shows weekly quota first, then the 5-hour window: percentage used, a slim progress bar and reset countdown. Missing windows are omitted. The meters use the same light, dark and high-contrast semantic styles.
+While Claude is enabled, a **CLAUDE** section appears below **CODEX**, with a pill naming where its quota is read (**This PC** or **Other machine**). Each provider shows weekly quota first, then the 5-hour window: percentage used, a status-colored bar and a compact reset. Missing windows are omitted. Meter colors, flags and translucency are described in [the panel appearance](panel-details.md#panel-appearance).
 
 Claude has its own loading, unavailable and stale-cache status. If its login is missing or expired, renewal guidance names **this PC** or **the other machine**, following the resolved source even in Automatic. Cached values remain visible after a failed refresh and are marked stale; raw errors, credential paths, tokens and plan details are not shown.
 
-**Refresh** refreshes both enabled integrations; **Copy summary** remains Codex-only. Enabling or disabling Claude updates the open panel without restarting. When Claude is off, its section and both provider headings disappear from layout and UI Automation, leaving the existing Codex panel unchanged.
+**Refresh** refreshes both enabled integrations; **Copy summary** remains Codex-only. Enabling or disabling Claude updates the open panel without restarting. When Claude is off, its section disappears from layout and UI Automation and the panel shows only the **CODEX** section.
 
 ## Local data and privacy
 

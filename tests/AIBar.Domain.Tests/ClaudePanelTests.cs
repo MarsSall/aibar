@@ -96,15 +96,15 @@ public sealed class ClaudePanelTests
             Assert.Same(root, panel.Window.Content);
             Assert.Equal(children, root.Children.Cast<UIElement>());
             Assert.Equal(4, root.RowDefinitions.Count);
-            Assert.Contains(VisibleText(cards), text => text == "Codex");
-            Assert.Contains(VisibleText(cards), text => text == "Claude");
+            Assert.Contains(VisibleText(cards), text => text == "CODEX");
+            Assert.Contains(VisibleText(cards), text => text == "CLAUDE");
             Assert.Equal(new[] { 20d, 11d, 67d, 31d },
                 Visuals<ProgressBar>(cards).Where(item => item.IsVisible).Select(item => item.Value));
             panel.Revoke();
             AssertNoClaude(panel.Window);
             Assert.Equal(new[] { 20d, 11d }, Visuals<ProgressBar>(cards).Where(item => item.IsVisible).Select(item => item.Value));
             panel.Enable();
-            Assert.Contains("Claude", VisibleText(cards));
+            Assert.Contains("CLAUDE", VisibleText(cards));
         });
     }
 
@@ -132,13 +132,15 @@ public sealed class ClaudePanelTests
                     Assert.Same(panel.Window.Resources["PanelQuotaCardStyle"], border.Style);
                     Assert.Equal(new Thickness(0), border.BorderThickness);
                     var bar = Assert.Single(Visuals<ProgressBar>(card));
-                    Assert.Same(panel.Window.FindResource("QuotaProgressStyle"), bar.Style);
+                    Assert.Same(panel.Window.FindResource("QuotaProgressStyle"), bar.Style.BasedOn);
                     Assert.False(bar.Focusable || bar.IsHitTestVisible);
-                    Assert.Equal(ColorOf(panel.Window.FindResource("AccentBrush")), ColorOf(bar.Foreground));
-                    var percentage = Assert.Single(Visuals<TextBlock>(card).Where(text => text.Text.EndsWith('%')));
-                    Assert.Equal(20d, percentage.FontSize);
+                    // Both Claude fixtures are below 75%: green, or the system highlight in high contrast.
+                    var expectedBar = theme == WindowsTheme.HighContrast ? SystemColors.HighlightColor : PanelPalette.ToneColor(PanelTone.Ok, theme == WindowsTheme.Dark);
+                    Assert.Equal(expectedBar, ColorOf(bar.Foreground));
+                    var percentage = Assert.Single(Visuals<TextBlock>(card).Where(text => text.Text.EndsWith("% used", StringComparison.Ordinal)));
+                    Assert.Equal(14d, percentage.FontSize);
                     Assert.Equal(ColorOf(panel.Window.FindResource("TextBrush")), ColorOf(percentage.Foreground));
-                    Assert.Contains(VisibleText(card), text => text.StartsWith("Reset ", StringComparison.Ordinal));
+                    Assert.Contains(VisibleText(card), text => text.StartsWith("Resets in ", StringComparison.Ordinal));
                 }
                 var bars = Visuals<ProgressBar>(cards).Where(item => item.IsVisible).ToArray();
                 Assert.Equal(new[] { "Weekly quota progress", "5-hour quota progress", "Claude weekly quota progress", "Claude 5-hour quota progress" },
@@ -271,9 +273,11 @@ public sealed class ClaudePanelTests
     }
     private static void AssertNoClaude(MainWindow window)
     {
-        Assert.DoesNotContain(VisibleText(window), text => text is "Codex" or "Claude" || text.StartsWith("Claude ", StringComparison.Ordinal));
+        // Codex-only panel: the CODEX section stays, nothing names Claude in any casing.
+        Assert.Contains("CODEX", VisibleText(window));
+        Assert.DoesNotContain(VisibleText(window), text => text.Contains("Claude", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(Visuals<FrameworkElement>(window), item => item.IsVisible && AutomationProperties.GetName(item).StartsWith("Claude", StringComparison.Ordinal));
-        Assert.DoesNotContain(AutomationNames(window), name => name.StartsWith("Claude", StringComparison.Ordinal) || name == "Codex");
+        Assert.DoesNotContain(AutomationNames(window), name => name.Contains("Claude", StringComparison.OrdinalIgnoreCase));
     }
     private static string[] AutomationNames(MainWindow window) => AutomationElement.FromHandle(new WindowInteropHelper(window).EnsureHandle())
         .FindAll(TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition).Cast<AutomationElement>().Select(item => item.Current.Name).ToArray();

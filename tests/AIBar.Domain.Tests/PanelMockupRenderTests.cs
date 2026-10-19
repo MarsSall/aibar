@@ -3,13 +3,14 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using AIBar.Application;
 using AIBar.Desktop;
 using AIBar.Domain;
 
 namespace AIBar.Domain.Tests;
 
 /// <summary>
-/// Image-approval fixtures for T1, not pixel assertions. Without the opt-in directory
+/// Image fixtures for comparing the native panel with the approved design, not pixel assertions. Without the opt-in directory
 /// each case still constructs and lays out the real panel to catch XAML failures.
 /// All data and commands are synthetic; no runtime, credential or usage files are opened.
 /// </summary>
@@ -18,13 +19,14 @@ public sealed class PanelMockupRenderTests
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
 
     [Theory]
-    [InlineData("current-dark", WindowsTheme.Dark, 14, 7, true, false)]
-    [InlineData("current-light", WindowsTheme.Light, 14, 7, true, false)]
-    [InlineData("alerts-dark", WindowsTheme.Dark, 78, 92, true, false)]
-    [InlineData("needs-login-dark", WindowsTheme.Dark, 14, 7, true, true)]
-    [InlineData("codex-only-dark", WindowsTheme.Dark, 14, 7, false, false)]
+    [InlineData("current-dark", WindowsTheme.Dark, 14, 7, true, false, false)]
+    [InlineData("current-light", WindowsTheme.Light, 14, 7, true, false, false)]
+    [InlineData("alerts-dark", WindowsTheme.Dark, 78, 92, true, false, false)]
+    [InlineData("needs-login-dark", WindowsTheme.Dark, 14, 7, true, true, false)]
+    [InlineData("stale-dark", WindowsTheme.Dark, 14, 7, true, false, true)]
+    [InlineData("codex-only-dark", WindowsTheme.Dark, 14, 7, false, false, false)]
     public void Render_panel_identity_mockup(string scenario, WindowsTheme theme, int weekly, int primary,
-        bool claudeEnabled, bool needsLogin)
+        bool claudeEnabled, bool needsLogin, bool stale)
     {
         WpfTestApplicationHost.Run(app =>
         {
@@ -37,12 +39,15 @@ public sealed class PanelMockupRenderTests
                 var codex = new QuotaPresentationMapper(clock).Map(new(
                     new(null, new(1, Now.AddDays(3).AddHours(20)), Now),
                     FreshnessState.Current, false, null, null));
+                var claudeSnapshot = new QuotaSnapshot(new(primary, Now.AddHours(3).AddMinutes(53)),
+                    new(weekly, Now.AddDays(3).AddHours(20)), stale ? Now.AddMinutes(-18) : Now);
                 var claude = new ClaudeQuotaPresentationMapper(clock).Map(needsLogin
                     ? new(null, FreshnessState.Unavailable, false,
                         new(QuotaErrorKind.Authentication, "quota_authentication"), null)
-                    : new(new(new(primary, Now.AddHours(3).AddMinutes(53)),
-                            new(weekly, Now.AddDays(3).AddHours(20)), Now),
-                        FreshnessState.Current, false, null, null), claudeEnabled);
+                    : stale
+                        ? new(claudeSnapshot, FreshnessState.Stale, false, new(QuotaErrorKind.Unavailable, "remote_stale"), null)
+                        : new(claudeSnapshot, FreshnessState.Current, false, null, null),
+                    claudeEnabled, ClaudeQuotaSource.OtherMachine);
                 window = new MainWindow
                 {
                     Width = 360, SizeToContent = SizeToContent.Height,
@@ -86,7 +91,7 @@ public sealed class PanelMockupRenderTests
         if (string.IsNullOrWhiteSpace(directory)) return;
         // Render the template surface, not just Window.Content: this includes the
         // rounded border, real background and AdornerDecorator subtree. DWM acrylic
-        // cannot be captured offscreen; the opaque surface is an approximation.
+        // cannot be captured offscreen, so renders use the opaque fallback surface.
         var surface = (Border)window.Template.FindName("PanelSurface", window);
         var bitmap = new RenderTargetBitmap((int)Math.Ceiling(surface.ActualWidth),
             (int)Math.Ceiling(surface.ActualHeight), 96, 96, PixelFormats.Pbgra32);
