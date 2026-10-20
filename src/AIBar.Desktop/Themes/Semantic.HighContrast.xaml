@@ -19,7 +19,7 @@
     <SolidColorBrush x:Key="ControlBrush" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}" />
     <SolidColorBrush x:Key="WindowBorderBrush" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}" />
     <SolidColorBrush x:Key="CardBorderBrush" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}" />
-    <SolidColorBrush x:Key="ControlBorderBrush" Color="{DynamicResource {x:Static SystemColors.ButtonTextColorKey}}" />
+    <SolidColorBrush x:Key="ControlBorderBrush" Color="{DynamicResource {x:Static SystemColors.ControlTextColorKey}}" />
     <SolidColorBrush x:Key="TertiaryTextBrush" Color="{DynamicResource {x:Static SystemColors.GrayTextColorKey}}" />
     <SolidColorBrush x:Key="ClaudeUiBrush" Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" />
     <SolidColorBrush x:Key="CodexUiBrush" Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" />
