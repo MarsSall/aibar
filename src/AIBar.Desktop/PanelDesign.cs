@@ -20,27 +20,10 @@ public static class PanelMenuHints
     public static string GetShortcut(DependencyObject target) => (string)target.GetValue(ShortcutProperty);
 }
 
-/// <summary>WPF has no CharacterSpacing. Draw tracked headings without changing UIA text.</summary>
+/// <summary>Uppercase section label. WPF TextBlock seals MeasureOverride/OnRender, so the spec's
+/// 0.08 em tracking is not drawn; the label keeps plain text for UI Automation and tests.</summary>
 public sealed class PanelSectionLabel : TextBlock
 {
-    protected override Size MeasureOverride(Size constraint)
-    {
-        var size = base.MeasureOverride(constraint);
-        return new Size(size.Width + Math.Max(0, Text.Length - 1) * FontSize * .08, size.Height);
-    }
-
-    protected override void OnRender(DrawingContext context)
-    {
-        var x = 0d;
-        foreach (var character in Text)
-        {
-            var glyph = new FormattedText(character.ToString(), CultureInfo.CurrentUICulture,
-                FlowDirection, new Typeface(FontFamily, FontStyle, FontWeight, FontStretch), FontSize,
-                Foreground, VisualTreeHelper.GetDpi(this).PixelsPerDip);
-            context.DrawText(glyph, new Point(x, 0));
-            x += glyph.WidthIncludingTrailingWhitespace + FontSize * .08;
-        }
-    }
 }
 
 public sealed class PanelLoginVisibilityConverter : IValueConverter
