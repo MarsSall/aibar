@@ -20,7 +20,7 @@
     <Grid x:Name="MeterRoot" Tag="{DynamicResource SurfaceBrush}" Margin="0,12,0,0">
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-        <TextBlock Grid.ColumnSpan="2" Text="{Binding Label, RelativeSource={RelativeSource AncestorType=local:PanelMeter}, Converter={StaticResource WindowLabel}}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+        <TextBlock Grid.ColumnSpan="2" Text="{Binding Label, RelativeSource={RelativeSource AncestorType=local:PanelMeter}, Converter={StaticResource WindowLabel}}" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
         <ProgressBar x:Name="MeterBar" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,7,0,0" Style="{StaticResource PanelMeterProgressStyle}"
                      Value="{Binding Usage, RelativeSource={RelativeSource AncestorType=local:PanelMeter}}"
                      automation:AutomationProperties.Name="{Binding MeterName, RelativeSource={RelativeSource AncestorType=local:PanelMeter}}">
@@ -29,6 +29,7 @@
                 <Binding Path="Tag" ElementName="MeterRoot" /><Binding Path="Tag.Color" ElementName="MeterRoot" />
                 <Binding Path="IsCurrent" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
                 <Binding Path="Provider" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                <Binding Path="BarColorMode" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" />
             </MultiBinding></ProgressBar.Foreground>
             <ProgressBar.Background><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="Well">
                 <Binding Source="0" /><Binding Path="Tag" ElementName="MeterRoot" /><Binding Path="Tag.Color" ElementName="MeterRoot" />

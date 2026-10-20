@@ -68,6 +68,7 @@ public sealed class ClaudeQuotaPresentationHost : INotifyPropertyChanged, IDispo
         runtime.ConsentChanged += OnChanged;
         runtime.SourceChanged += OnChanged;
     }
+    public string? PlanLabel => _runtime.PlanLabel;
     public bool IsEnabled { get; private set; }
     public BetaPresentationState State { get; private set; }
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -85,6 +86,7 @@ public sealed class ClaudeQuotaPresentationHost : INotifyPropertyChanged, IDispo
         State = _mapper.Map(state, enabled, source);
         if (_history is not null && enabled && State.IsCurrent) _ = ApplyHistoryAsync(state, source, revision);
         PropertyChanged?.Invoke(this, new(nameof(State)));
+        PropertyChanged?.Invoke(this, new(nameof(PlanLabel)));
         if (changed) PropertyChanged?.Invoke(this, new(nameof(IsEnabled)));
     }
     private async Task ApplyHistoryAsync(QuotaRefreshState state, ClaudeQuotaSource source, long revision)

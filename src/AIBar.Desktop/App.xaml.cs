@@ -64,7 +64,8 @@ public partial class App : System.Windows.Application
         var clock = new SystemClock();
         var codexHome = seams.CodexHome ?? Environment.GetEnvironmentVariable("CODEX_HOME");
         var credentials = new ConsentCredentialSource(policy, new CodexCredentialReader(new ReadOnlyCredentialFileReader()), CodexRootResolver.Resolve(codexHome, userProfile));
-        var coordinator = new QuotaRefreshCoordinator(store, new QuotaHttpProvider(policy, credentials), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
+        var codexProvider = new QuotaHttpProvider(policy, credentials);
+        var coordinator = new QuotaRefreshCoordinator(store, codexProvider, clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
         var historyStore = new SqliteQuotaHistoryStore(SqliteQuotaHistoryStore.DatabasePath(dataDirectory));
         var paceHistory = new PanelPaceHistory(historyStore, clock);
         var historyRecorder = new QuotaHistoryRecorder(coordinator, historyStore, clock, QuotaHistoryProvider.Codex, QuotaHistorySource.CodexLocal);
@@ -108,7 +109,7 @@ public partial class App : System.Windows.Application
             () => claudeRuntime.IsConsentEnabled && claudeRuntime.State.Freshness == FreshnessState.Current && claudeRuntime.State.Failure is null);
         var lifecycleAdapter = new QuotaRefreshLifecycleAdapter(lifecycleEvents, coordinator);
         var claudePresentation = new ClaudeQuotaPresentationHost(claudeRuntime, new ClaudeQuotaPresentationMapper(clock), paceHistory);
-        var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents, claudePresentation, paceHistory);
+        var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents, claudePresentation, paceHistory, codexProvider);
         var localUsagePresentation = new LocalUsagePresentationHost(localUsage, new LocalUsagePresentationMapper());
         var providerStatus = new ProviderStatusPresentation(presentation, claudePresentation, () => policy.IsEnabled);
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());

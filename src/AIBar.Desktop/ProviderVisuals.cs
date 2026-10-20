@@ -24,6 +24,13 @@ public static partial class PanelPalette
         ? Color.FromArgb(translucent ? (byte)0xD1 : (byte)0xFF, 0x24, 0x24, 0x28)
         : Color.FromArgb(translucent ? (byte)0xD1 : (byte)0xFF, 0xEC, 0xEC, 0xF6);
 
+    // Restore the pre-CodexBar semantic ramp without changing pace-warning colors.
+    public static Color UsageColor(decimal usage, bool dark) => usage >= 90
+        ? dark ? Color.FromRgb(0xFF, 0x4D, 0x5E) : Color.FromRgb(0xC8, 0x20, 0x3C)
+        : usage >= 75
+            ? dark ? Color.FromRgb(0xFF, 0xC5, 0x31) : Color.FromRgb(0xA8, 0x6B, 0x00)
+            : dark ? Color.FromRgb(0x3D, 0xDC, 0x84) : Color.FromRgb(0x15, 0x92, 0x4A);
+
     public static Color ProviderColor(string provider) => provider == "Claude"
         ? Color.FromRgb(0xC4, 0x70, 0x3F) : Color.FromRgb(0x10, 0xA3, 0x7F);
 
@@ -76,9 +83,11 @@ public sealed class ProviderVisuals : IMultiValueConverter
             "Codex" or "Claude" => Frozen(PanelPalette.ProviderColor(kind)),
             "ClaudeMark" => Frozen(Color.FromRgb(0xD9, 0x77, 0x57)),
             "Notice" => Frozen(PanelPalette.ToneColor(PanelTone.Near, dark)),
-            "Meter" => Frozen(!current || Usage(values[0]) is null
+            "Meter" => Frozen(!current || Usage(values[0]) is null or < 0
                 ? dark ? Color.FromRgb(0xA1, 0xA1, 0xA1) : Color.FromRgb(0x6E, 0x6E, 0x6E)
-                : PanelPalette.ProviderColor(values.Length > 4 ? values[4] as string ?? "Codex" : "Codex")),
+                : values.Length > 5 && values[5] is PanelBarColorMode.Usage
+                    ? PanelPalette.UsageColor(Usage(values[0])!.Value, dark)
+                    : PanelPalette.ProviderColor(values.Length > 4 ? values[4] as string ?? "Codex" : "Codex")),
             _ => DependencyProperty.UnsetValue
         };
     }

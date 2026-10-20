@@ -39,6 +39,7 @@ public sealed record BetaPresentationState(
 {
     public string? UpdatedLabel { get; init; }
     public string? SourceLabel { get; init; }
+    public string? PlanLabel { get; init; }
 }
 
 public sealed class QuotaPresentationMapper(IClock clock, QuotaHistoryProvider provider = QuotaHistoryProvider.Codex)
@@ -197,6 +198,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     private readonly Func<bool> _refreshAvailable;
     private readonly ManualRefreshCommand _refreshCommand;
     private readonly ClaudeQuotaPresentationHost? _claude;
+    private readonly IQuotaPlanMetadata? _planSource;
     public QuotaSummaryCopyCommand CopySummaryCommand { get; }
     private readonly IQuotaRefreshLifecycleEvents? _lifecycleEvents;
     private BetaPresentationState _state;
@@ -206,9 +208,10 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     private long _historyRevision;
     public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, bool refreshAvailable = true, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null)
         : this(coordinator, mapper, () => refreshAvailable, report, lifecycleEvents) { }
-    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, Func<bool> refreshAvailable, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null, ClaudeQuotaPresentationHost? claude = null, PanelPaceHistory? history = null)
+    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, Func<bool> refreshAvailable, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null, ClaudeQuotaPresentationHost? claude = null, PanelPaceHistory? history = null, IQuotaPlanMetadata? planSource = null)
     {
         ArgumentNullException.ThrowIfNull(refreshAvailable);
+        _planSource = planSource;
         _coordinator = coordinator; _mapper = mapper; _dispatcher = Dispatcher.CurrentDispatcher; _refreshAvailable = refreshAvailable; _state = Map(coordinator.State); _report = report; _lifecycleEvents = lifecycleEvents;
         _claude = claude;
         _history = history;
@@ -288,14 +291,14 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
             var historyRevision = _history!.Revision;
             var samples = await _history.ReadPaceAsync(QuotaHistoryProvider.Codex);
             if (_disposed || revision != _historyRevision || !_refreshAvailable() || !_history.CanPublish(historyRevision)) return;
-            _state = _mapper.Map(state, samples);
+            _state = _mapper.Map(state, samples) with { PlanLabel = _refreshAvailable() ? _planSource?.PlanLabel : null };
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         }
         catch (Exception) { /* History is optional; the snapshot estimate remains visible. */ }
     }
     private BetaPresentationState Map(QuotaRefreshState state)
     {
-        var mapped = _mapper.Map(state);
+        var mapped = _mapper.Map(state) with { PlanLabel = _refreshAvailable() ? _planSource?.PlanLabel : null };
         return _refreshAvailable() ? mapped : mapped with
         {
             FreshnessLabel = "Private quota integration disabled",

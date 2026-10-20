@@ -1,5 +1,19 @@
 namespace AIBar.Domain;
 
+/// <summary>Optional display-only metadata from an already authorized quota read.</summary>
+public interface IQuotaPlanMetadata { string? PlanLabel { get; } }
+
+public static class QuotaPlanLabels
+{
+    // Never display arbitrary credential/response text in the panel.
+    public static string? FromKnownValue(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        "max" => "Max", "pro" => "Pro", "plus" => "Plus", "free" => "Free",
+        "team" => "Team", "business" => "Business", "enterprise" => "Enterprise",
+        "edu" => "Edu", _ => null
+    };
+}
+
 public readonly record struct QuotaProviderId(string Value);
 public readonly record struct QuotaWindowKey(string Value);
 public enum QuotaWindowRole { Hero, Supporting }

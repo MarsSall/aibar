@@ -121,6 +121,9 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
                 ? state with { Freshness = FreshnessState.Stale } : state;
         }
     }
+    public string? PlanLabel => _enabled && _resolvedSource == ClaudeQuotaSource.ThisPc
+        ? (_provider as IQuotaPlanMetadata)?.PlanLabel : null;
+
     public TimeSpan? CachedAge => State.Snapshot is { } snapshot ? _clock.UtcNow - snapshot.RetrievedAt : null;
     public event Action? ConsentChanged;
     public event Action? StateChanged;
