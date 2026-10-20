@@ -1,0 +1,3 @@
+# SSH alias and home-relative Windows directory; no tokens belong here.
+host=mars-windows
+remote_dir=AppData/Local/AIBar

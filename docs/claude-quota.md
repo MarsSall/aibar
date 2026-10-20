@@ -6,15 +6,35 @@ Claude quota is a separate, optional integration for Claude Pro/Max subscription
 
 In the AIBar tray menu, choose **Enable Claude quota** and accept the Claude-specific disclosure. Cancelling leaves it off. Choose **Disable Claude quota** at any time to cancel Claude requests, stop polling and clear its cached quota. Codex keeps running independently.
 
-AIBar reads the existing **Claude Code login on this PC**, read-only: `.credentials.json` under `CLAUDE_CONFIG_DIR`, or the current Windows user's `.claude` directory by default. It queries Anthropic's unofficial subscription-usage endpoint, `https://api.anthropic.com/api/oauth/usage`. This private endpoint is unsupported and may change.
+With **Automatic** (the default), AIBar detects a usage file from another machine; if none exists, it reads the existing **Claude Code login on this PC**, read-only: `.credentials.json` under `CLAUDE_CONFIG_DIR`, or the current Windows user's `.claude` directory by default. It queries Anthropic's unofficial subscription-usage endpoint, `https://api.anthropic.com/api/oauth/usage`. This private endpoint is unsupported and may change.
 
-AIBar never refreshes tokens or changes the login. If the session expires or authentication fails, open Claude Code on this PC and sign in again. AIBar does not use a login from another computer.
+AIBar never refreshes tokens or changes the login. If the local session expires or authentication fails, open Claude Code on this PC and sign in again. When a remote usage file is detected, renew the session on the other machine instead; no local Claude credentials are opened.
+
+## Other machine (optional)
+
+To use a Linux Claude Code login, follow
+[the optional remote usage helper instructions](../tools/claude-remote-usage/README.md).
+No tray change is needed after installing the helper: **Claude source: Automatic**
+detects `%LOCALAPPDATA%\AIBar\claude-remote-usage.json` on initialization and each
+refresh, including five-minute polls. Claude consent is still required once.
+The helper pushes only usage percentages, reset times and availability—not credentials.
+Renew an expired session in Claude Code on Linux; data that stops updating is
+marked stale after 15 minutes. An existing stale or invalid file stays remote;
+AIBar never silently falls back to the local login. Reparse-point files are not
+eligible for automatic detection.
+
+The tray offers **Automatic / This PC / Other machine**. Choose **This PC** to
+force the Windows login even while a remote file exists, or **Other machine** to
+force the remote source even when its file is missing. Existing explicit choices
+are preserved. Return to **Automatic** to detect the source again. When the file
+appears or is removed in Automatic, AIBar cancels and drains the previous source's
+work, clears its cached quota, and refreshes the newly resolved source.
 
 ## Opened panel
 
 While Claude is enabled, the panel shows **Codex** and **Claude** headings, with Claude below the Codex meters. Each provider shows weekly quota first, then the 5-hour window: percentage used, a slim progress bar and reset countdown. Missing windows are omitted. The meters use the same light, dark and high-contrast semantic styles.
 
-Claude has its own loading, unavailable and stale-cache status. If its login is missing or expired, the panel says **Open Claude Code on this PC to renew the session**. Cached values remain visible after a failed refresh and are marked stale; raw errors, credential paths, tokens and plan details are not shown.
+Claude has its own loading, unavailable and stale-cache status. If its login is missing or expired, renewal guidance names **this PC** or **the other machine**, following the resolved source even in Automatic. Cached values remain visible after a failed refresh and are marked stale; raw errors, credential paths, tokens and plan details are not shown.
 
 **Refresh** refreshes both enabled integrations; **Copy summary** remains Codex-only. Enabling or disabling Claude updates the open panel without restarting. When Claude is off, its section and both provider headings disappear from layout and UI Automation, leaving the existing Codex panel unchanged.
 
