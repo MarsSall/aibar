@@ -12,7 +12,7 @@ public static class ObservedPacePolicy
         var duration = window == QuotaPaceWindow.FiveHour ? TimeSpan.FromHours(5) : TimeSpan.FromDays(7);
         var key = window == QuotaPaceWindow.FiveHour ? QuotaHistoryWindow.FiveHour : QuotaHistoryWindow.Weekly;
         var start = resetAt!.Value - duration;
-        var cycle = samples.Where(sample => sample.Provider == provider && sample.Window == key && sample.ResetAt == resetAt &&
+        var cycle = samples.Where(sample => sample.Provider == provider && sample.Window == key && QuotaAlertPolicy.IsSameCycle(sample.ResetAt, resetAt.Value, window) &&
                 sample.RetrievedAt >= start && sample.RetrievedAt <= now && sample.Percentage is >= 0 and <= 100)
             .OrderBy(sample => sample.RetrievedAt).DistinctBy(sample => sample.RetrievedAt).ToArray();
         if (cycle.Length < 2 || cycle[^1].Percentage > used!.Value ||

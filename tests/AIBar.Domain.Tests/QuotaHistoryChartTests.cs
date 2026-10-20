@@ -61,16 +61,17 @@ public sealed class QuotaHistoryChartTests
     }
 
     [Theory]
-    [InlineData(WindowsTheme.Dark, false)]
-    [InlineData(WindowsTheme.Light, false)]
-    [InlineData(WindowsTheme.HighContrast, false)]
-    [InlineData(WindowsTheme.Dark, true)]
-    public void Narrow_chart_renders_all_series_with_dynamic_brushes_and_clear_removes_points(WindowsTheme theme, bool cycleChange)
+    [InlineData(WindowsTheme.Dark, false, false)]
+    [InlineData(WindowsTheme.Light, false, false)]
+    [InlineData(WindowsTheme.HighContrast, false, false)]
+    [InlineData(WindowsTheme.Dark, true, false)]
+    [InlineData(WindowsTheme.Dark, false, true)]
+    public void Narrow_chart_renders_all_series_with_dynamic_brushes_and_clear_removes_points(WindowsTheme theme, bool cycleChange, bool resetJitter)
     {
         WpfTestApplicationHost.Run(app =>
         {
             var original = app.Resources.MergedDictionaries[0];
-            var store = new Store { ChangeCycle = cycleChange };
+            var store = new Store { ChangeCycle = cycleChange, ResetJitter = resetJitter };
             var history = new PanelPaceHistory(store, new Clock());
             var chart = new QuotaHistoryChart { History = history };
             var window = new System.Windows.Window { Content = chart, Width = 200, SizeToContent = System.Windows.SizeToContent.Height,
@@ -117,13 +118,15 @@ public sealed class QuotaHistoryChartTests
     {
         public bool Empty { get; init; }
         public bool ChangeCycle { get; init; }
+        // Providers report the same reset with sub-second jitter; it must not split a line.
+        public bool ResetJitter { get; init; }
         public System.Collections.Concurrent.ConcurrentQueue<(QuotaHistoryProvider Provider, QuotaHistoryWindow Window, DateTimeOffset From, DateTimeOffset To)> Calls { get; } = new();
         public ValueTask AppendAsync(IReadOnlyList<QuotaHistorySample> samples, DateTimeOffset now, CancellationToken cancellationToken) => ValueTask.CompletedTask;
         public ValueTask<IReadOnlyList<QuotaHistorySample>> QueryAsync(QuotaHistoryProvider provider, QuotaHistoryWindow window, DateTimeOffset fromInclusive, DateTimeOffset toInclusive, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested(); Calls.Enqueue((provider, window, fromInclusive, toInclusive));
             var source = provider == QuotaHistoryProvider.Codex ? QuotaHistorySource.CodexLocal : QuotaHistorySource.ClaudeRemote;
-            return ValueTask.FromResult<IReadOnlyList<QuotaHistorySample>>(Empty ? [] : [new(provider, window, 0, Now.AddDays(1), fromInclusive, source), new(provider, window, 100, Now.AddDays(ChangeCycle ? 2 : 1), toInclusive, source)]);
+            return ValueTask.FromResult<IReadOnlyList<QuotaHistorySample>>(Empty ? [] : [new(provider, window, 0, Now.AddDays(1), fromInclusive, source), new(provider, window, 100, ChangeCycle ? Now.AddDays(8) : Now.AddDays(1).AddSeconds(ResetJitter ? 0.9 : 0), toInclusive, source)]);
         }
     }
 }

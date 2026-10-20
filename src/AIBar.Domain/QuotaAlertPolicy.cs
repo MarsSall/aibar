@@ -19,6 +19,19 @@ public static class QuotaAlertPolicy
         sample.Window is QuotaPaceWindow.FiveHour or QuotaPaceWindow.Weekly &&
         sample.PercentageUsed is >= 0 and <= 100 && sample.ResetAt > now && sample.RetrievedAt <= now;
 
+    /// <summary>Providers report the same reset with sub-second jitter. A window starts a new cycle
+    /// only when its reset moves at least half the window later; anything closer is the same cycle.</summary>
+    public static bool IsSameCycle(DateTimeOffset previousReset, DateTimeOffset currentReset, QuotaPaceWindow window) =>
+        (currentReset - previousReset).Duration() < HalfWindow(window);
+
+    /// <summary>Keeps the earlier reset as the cycle identity while the provider jitters around it.</summary>
+    public static QuotaAlertSample Anchor(QuotaAlertSample current, QuotaAlertSample? previous) =>
+        previous is not null && previous.Provider == current.Provider && previous.Window == current.Window &&
+        IsSameCycle(previous.ResetAt, current.ResetAt, current.Window) ? current with { ResetAt = previous.ResetAt } : current;
+
+    private static TimeSpan HalfWindow(QuotaPaceWindow window) =>
+        window == QuotaPaceWindow.FiveHour ? TimeSpan.FromHours(2.5) : TimeSpan.FromDays(3.5);
+
     public static IReadOnlyList<QuotaAlert> Evaluate(QuotaAlertSample current, QuotaAlertSample? previous,
         IReadOnlyCollection<string> fired, FreshnessState freshness, bool consented, DateTimeOffset now,
         IReadOnlyList<int>? thresholds = null)
@@ -26,6 +39,8 @@ public static class QuotaAlertPolicy
         if (!consented || freshness != FreshnessState.Current || !IsValid(current, now)) return [];
         if (previous is not null && (previous.Provider != current.Provider || previous.Window != current.Window)) previous = null;
         if (previous is not null && current.RetrievedAt <= previous.RetrievedAt) return [];
+        current = Anchor(current, previous);
+        var newCycle = previous is not null && current.ResetAt - previous.ResetAt >= HalfWindow(current.Window);
         var events = new List<QuotaAlert>();
         void Add(QuotaAlertKind kind, int? threshold = null, DateTimeOffset? runsOut = null)
         {
@@ -34,7 +49,7 @@ public static class QuotaAlertPolicy
                 threshold?.ToString(CultureInfo.InvariantCulture) ?? "");
             if (!fired.Contains(key)) events.Add(new(key, kind, current, threshold, runsOut));
         }
-        if (previous is not null && current.ResetAt > previous.ResetAt) Add(QuotaAlertKind.Reset);
+        if (newCycle) Add(QuotaAlertKind.Reset);
         foreach (var threshold in ValidThresholds(thresholds) ? thresholds! : DefaultThresholds)
             if (current.PercentageUsed >= threshold &&
                 (previous is null || current.ResetAt != previous.ResetAt || previous.PercentageUsed < threshold))
