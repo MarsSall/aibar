@@ -31,8 +31,10 @@ public sealed class SettingsWindowTests
                 Assert.Equal("Appearance", AutomationProperties.GetName((TabItem)tabs.Items[0]));
                 Assert.Equal("Alerts", AutomationProperties.GetName((TabItem)tabs.Items[1]));
                 Assert.Equal("Providers", AutomationProperties.GetName((TabItem)tabs.Items[2]));
-                Assert.Equal(520, window.Width);
-                Assert.Equal(600, window.Height);
+                // The 520 × 600 Settings surface is unchanged; the transparent host reserves
+                // 40 DIPs on each side so the exterior glow is not clipped.
+                Assert.Equal(600, window.Width);
+                Assert.Equal(680, window.Height);
                 Assert.Equal(WindowStyle.None, window.WindowStyle);
                 var opacity = Assert.IsType<Slider>(window.FindName("BackgroundOpacity"));
                 Assert.Equal(30, opacity.Minimum); Assert.Equal(100, opacity.Maximum);
@@ -55,7 +57,9 @@ public sealed class SettingsWindowTests
                 Assert.False(Assert.IsType<CheckBox>(window.FindName("ClaudeEnabled")).IsEnabled);
                 Assert.NotNull(Assert.IsType<System.Windows.Shapes.Path>(window.FindName("CodexMark")).Data);
                 Assert.NotNull(Assert.IsType<System.Windows.Shapes.Path>(window.FindName("ClaudeMark")).Data);
-                Assert.Equal(((SolidColorBrush)window.FindResource("SettingsSurfaceBrush")).Color, ((SolidColorBrush)window.Background).Color);
+                // The host must be transparent for exterior shadows; the surface stays opaque.
+                var surface = Assert.IsType<Border>(window.FindName("SettingsSurface"));
+                Assert.Equal(((SolidColorBrush)window.FindResource("SettingsSurfaceBrush")).Color, ((SolidColorBrush)surface.Background).Color);
             }
             finally
             {

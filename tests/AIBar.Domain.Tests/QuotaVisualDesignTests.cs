@@ -252,6 +252,9 @@ public sealed class QuotaVisualDesignTests
                 ("NotificationBadgeTextBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("SettingsBackgroundBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("NotificationBackgroundBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("SettingsWindowBorderBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsControlBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("SettingsControlBorderBrush", "{DynamicResource {x:Static SystemColors.ControlTextColorKey}}"),
                 ("SettingsSurfaceBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("SettingsCardBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("SettingsFooterBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
@@ -496,7 +499,7 @@ public sealed class QuotaVisualDesignTests
     [
         "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush",
         "BackdropBrush", "SettingsBackgroundBrush", "NotificationBackgroundBrush", "FooterBrush", "TabSelectedBrush", "PressedBrush", "ControlBrush", "WindowBorderBrush", "CardBorderBrush", "ControlBorderBrush", "TertiaryTextBrush", "ClaudeUiBrush", "CodexUiBrush", "AccentIndicatorBrush", "LinkBrush", "WarningTextBrush", "WarningBackgroundBrush", "DangerTextBrush", "SuccessTextBrush", "CodexBrush", "CodexTintBrush", "ClaudeBrush", "ClaudeTintBrush", "UsageOkBrush", "UsageWarnBrush", "UsageHighBrush",
-        "SettingsSurfaceBrush", "SettingsCardBrush", "SettingsFooterBrush", "SettingsTextBrush", "SettingsSecondaryBrush", "SettingsBorderBrush", "SettingsAccentBrush", "SettingsIndicatorBrush", "SettingsOnAccentBrush", "SettingsDangerBrush", "SettingsFocusBrush", "SettingsHoverBrush", "SettingsHoverTextBrush", "SettingsTrackBrush", "SettingsCodexBrush", "SettingsClaudeBrush", "SettingsUsageOkBrush", "SettingsUsageWarnBrush", "SettingsUsageHighBrush",
+        "SettingsWindowBorderBrush", "SettingsControlBrush", "SettingsControlBorderBrush", "SettingsSurfaceBrush", "SettingsCardBrush", "SettingsFooterBrush", "SettingsTextBrush", "SettingsSecondaryBrush", "SettingsBorderBrush", "SettingsAccentBrush", "SettingsIndicatorBrush", "SettingsOnAccentBrush", "SettingsDangerBrush", "SettingsFocusBrush", "SettingsHoverBrush", "SettingsHoverTextBrush", "SettingsTrackBrush", "SettingsCodexBrush", "SettingsClaudeBrush", "SettingsUsageOkBrush", "SettingsUsageWarnBrush", "SettingsUsageHighBrush",
         "NotificationSurfaceBrush", "NotificationTextBrush", "NotificationSecondaryTextBrush", "NotificationBorderBrush", "NotificationThresholdBrush", "NotificationResetBrush", "NotificationPaceBrush", "NotificationTimerBrush", "NotificationCodexBrush", "NotificationClaudeBrush", "NotificationCodexTileBrush", "NotificationClaudeTileBrush", "NotificationFocusBrush", "NotificationHoverBrush", "NotificationHoverTextBrush", "NotificationBadgeTextBrush"
     ];
     private static readonly XNamespace PanelNamespace = "clr-namespace:AIBar.Desktop";
