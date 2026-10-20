@@ -56,6 +56,12 @@ public sealed class SettingsAlertOptionsTests : IDisposable
         Assert.False(SettingsThresholdEditor.TryParse(text, out _, out var error)); Assert.False(string.IsNullOrWhiteSpace(error));
     }
     [Fact]
+    public void Editor_explains_the_specific_out_of_order_pair()
+    {
+        Assert.False(SettingsThresholdEditor.TryParse("75, 90, 85", out _, out var error));
+        Assert.Equal("Keep the values ascending: 85 comes after 90. Use whole numbers from 1 to 100.", error);
+    }
+    [Fact]
     public void Editor_accepts_ascending_integer_boundaries()
     {
         Assert.True(SettingsThresholdEditor.TryParse("1, 75, 100", out var values, out var error));

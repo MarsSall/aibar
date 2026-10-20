@@ -16,7 +16,7 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal("Themes/Semantic.Light.xaml", mergedSource);
         var semanticKeys = XDocument.Parse(ReadProjectFile($"src/AIBar.Desktop/{mergedSource}")).Descendants()
             .Select(element => element.Attribute(x + "Key")?.Value).Where(key => key is not null).Cast<string>().Order().ToArray();
-        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, semanticKeys);
+        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SettingsAccentBrush", "SettingsBorderBrush", "SettingsCardBrush", "SettingsClaudeBrush", "SettingsCodexBrush", "SettingsDangerBrush", "SettingsFocusBrush", "SettingsFooterBrush", "SettingsHoverBrush", "SettingsHoverTextBrush", "SettingsIndicatorBrush", "SettingsOnAccentBrush", "SettingsSecondaryBrush", "SettingsSurfaceBrush", "SettingsTextBrush", "SettingsTrackBrush", "SettingsUsageHighBrush", "SettingsUsageOkBrush", "SettingsUsageWarnBrush", "SurfaceBrush", "TextBrush" }, semanticKeys);
         var window = ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml");
 
         foreach (var key in new[] { "SpacingSmall", "SpacingMedium", "CardRadius" })
@@ -227,13 +227,32 @@ public sealed class QuotaVisualDesignTests
             .Select(name => XDocument.Parse(ReadProjectFile($"src/AIBar.Desktop/Themes/Semantic.{name}.xaml"))).ToArray();
         var keySets = dictionaries.Select(dictionary => dictionary.Descendants().Select(element => element.Attribute(x + "Key")?.Value).Where(key => key is not null).Cast<string>().Order().ToArray()).ToArray();
         Assert.All(keySets.Skip(1), keys => Assert.Equal(keySets[0], keys));
-        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, keySets[0]);
+        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SettingsAccentBrush", "SettingsBorderBrush", "SettingsCardBrush", "SettingsClaudeBrush", "SettingsCodexBrush", "SettingsDangerBrush", "SettingsFocusBrush", "SettingsFooterBrush", "SettingsHoverBrush", "SettingsHoverTextBrush", "SettingsIndicatorBrush", "SettingsOnAccentBrush", "SettingsSecondaryBrush", "SettingsSurfaceBrush", "SettingsTextBrush", "SettingsTrackBrush", "SettingsUsageHighBrush", "SettingsUsageOkBrush", "SettingsUsageWarnBrush", "SurfaceBrush", "TextBrush" }, keySets[0]);
             var highContrastMappings = new[]
             {
                 ("SurfaceBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("CardBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("TextBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
                 ("MutedTextBrush", "{DynamicResource {x:Static SystemColors.GrayTextColorKey}}"),
+                ("SettingsSurfaceBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("SettingsCardBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("SettingsFooterBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("SettingsTextBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsSecondaryBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsBorderBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsAccentBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsIndicatorBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsOnAccentBrush", "{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"),
+                ("SettingsDangerBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsFocusBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsHoverBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsHoverTextBrush", "{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"),
+                ("SettingsTrackBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsCodexBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsClaudeBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsUsageOkBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsUsageWarnBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsUsageHighBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
                 ("PanelMenuHighlightBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
                 ("PanelMenuHighlightTextBrush", "{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"),
                 ("PanelRowHoverBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
