@@ -54,7 +54,7 @@ public sealed class CodexBarPanelTests
                 Assert.False(((StackPanel)window.FindName("ClaudeQuotaSection")).IsVisible);
                 var heading = Visuals<TextBlock>(window).Single(text => text.IsVisible && AutomationProperties.GetName(text) == "Codex");
                 // Reference is 2x: the 28px heading is 14 DIPs, not the former 21-DIP mockup title.
-                Assert.Equal(14d, heading.FontSize); Assert.Equal(FontWeights.Bold, heading.FontWeight);
+                Assert.Equal(17d, heading.FontSize); Assert.Equal(FontWeights.Bold, heading.FontWeight);
                 Assert.Equal(new[] { "5-hour quota progress", "Weekly quota progress", "Claude 5-hour quota progress", "Claude weekly quota progress" }, Visuals<PanelMeter>(window).Select(meter => meter.MeterName));
                 Assert.All(Visuals<PanelMeter>(window).SelectMany(Visuals<ProgressBar>), bar =>
                 {

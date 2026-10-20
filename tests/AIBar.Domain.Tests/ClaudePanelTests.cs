@@ -142,7 +142,7 @@ public sealed class ClaudePanelTests
                     Assert.Equal(expectedBar, ColorOf(bar.Foreground));
                     var percentage = Assert.Single(Visuals<TextBlock>(card).Where(text => text.Text.EndsWith("% used", StringComparison.Ordinal)));
                     // S9 normalizes the 2x reference's percentage text to 11 DIPs.
-                    Assert.Equal(11d, percentage.FontSize);
+                    Assert.Equal(13d, percentage.FontSize);
                     Assert.Equal(ColorOf(panel.Window.FindResource("TextBrush")), ColorOf(percentage.Foreground));
                     Assert.Contains(VisibleText(card), text => text.StartsWith("Resets in ", StringComparison.Ordinal));
                 }

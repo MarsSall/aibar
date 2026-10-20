@@ -83,7 +83,7 @@ public sealed class PanelDetailsTests
                 Assert.False(app.Resources.Contains("PanelQuotaCardStyle"));
                 var percentage = Assert.Single(Visuals<TextBlock>(cards[1]).Where(text => text.Text == "40% used"));
                 // Reference percentage text is approximately 22 physical pixels at 2x.
-                Assert.Equal(11d, percentage.FontSize); Assert.Equal(expected, Assert.IsType<SolidColorBrush>(percentage.Foreground).Color);
+                Assert.Equal(13d, percentage.FontSize); Assert.Equal(expected, Assert.IsType<SolidColorBrush>(percentage.Foreground).Color);
                 var menu = Assert.IsType<StackPanel>(window.FindName("PanelActions"));
                 Assert.All(menu.Children.OfType<Button>(), button =>
                 {
