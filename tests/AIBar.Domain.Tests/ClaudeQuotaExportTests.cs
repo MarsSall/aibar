@@ -134,12 +134,15 @@ public sealed class ClaudeQuotaExportTests : IDisposable
     public async Task Persisted_consent_with_fresh_cache_still_waits_for_a_new_retrieval()
     {
         await Settings.SaveClaudeAsync(true, default);
-        var writer = new Writer(); var provider = new Provider();
+        var writer = new Writer(); var provider = new Provider { Block = true };
         await using var runtime = Runtime(writer, provider, new Store { Snapshot = Snapshot(11) });
         await runtime.InitializeAsync(default);
+        // Startup now refreshes by interval even with a fresh cache (S13); while that retrieval
+        // is pending the cached value must still not unlock the export.
+        await provider.Started.Task.WaitAsync(TimeSpan.FromSeconds(60));
         await runtime.ExportCompletion;
-        Assert.False(provider.Started.Task.IsCompleted);
         Assert.All(writer.Documents, value => Assert.Equal(QuotaExportState.Disabled, value.State));
+        provider.Release.TrySetResult();
         await runtime.RefreshAsync(RefreshTrigger.Manual, default);
         await runtime.ExportCompletion;
         Assert.Equal(37m, writer.Documents.Last().Weekly!.PercentageUsed);
