@@ -6,7 +6,7 @@ using AIBar.Domain;
 
 namespace AIBar.Application;
 
-public sealed class QuotaHttpProvider : IQuotaProvider
+public sealed class QuotaHttpProvider : IQuotaProvider, IQuotaPlanMetadata
 {
     private static readonly Uri Origin = new("https://chatgpt.com/backend-api/");
     private readonly HttpClient _client;
@@ -41,8 +41,12 @@ public sealed class QuotaHttpProvider : IQuotaProvider
 
     private readonly ConsentCredentialSource? _credentialAvailability;
 
+    private string? _planLabel;
+    public string? PlanLabel => _policy.IsEnabled ? _planLabel : null;
+
     public async ValueTask<QuotaProviderResult> GetQuotaAsync(CancellationToken cancellationToken)
     {
+        _planLabel = null;
         if (!_policy.IsEnabled) return Fail(QuotaErrorKind.Unavailable, "quota_disabled");
         cancellationToken.ThrowIfCancellationRequested();
         using var credential = await _credentials(cancellationToken);
@@ -56,6 +60,13 @@ public sealed class QuotaHttpProvider : IQuotaProvider
         var primary = await SendAsync("wham/usage", credential, cancellationToken);
         if (primary.Failure is not null) return new(null, primary.Failure);
         if (!TrySnapshot(primary.Body!, out var snapshot)) return Fail(QuotaErrorKind.MalformedResponse, "quota_malformed");
+        // wham/usage already carries plan_type on supported accounts. No new request.
+        using (var document = JsonDocument.Parse(primary.Body!))
+        {
+            var root = document.RootElement;
+            if (CountProperties(root, "plan_type") == 1 && root.TryGetProperty("plan_type", out var plan) && plan.ValueKind == JsonValueKind.String)
+                _planLabel = QuotaPlanLabels.FromKnownValue(plan.GetString());
+        }
         var detail = await SendAsync("wham/rate-limit-reset-credits", credential, cancellationToken, false);
         if (detail.Failure is not null) return new(snapshot, null, null, detail.Failure);
         return TryCredits(detail.Body!, out var credits) ? new(snapshot, null, credits) : new(snapshot, null, null, new(QuotaErrorKind.MalformedResponse, "quota_optional_malformed"));

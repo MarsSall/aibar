@@ -128,7 +128,9 @@ public sealed class BetaPresentationTests
             Assert.Equal("00h 55m", presentation.State.Primary.ResetCountdown);
             Assert.Same(presentation.State, popupState);
             Assert.Same(presentation.State, tray.State);
-            Assert.Equal(0, provider.Calls);
+            // Opening the panel now refreshes data older than one minute (S13); the cached
+            // countdown is still what the popup showed first.
+            Assert.Equal(1, provider.Calls);
         }
         finally
         {

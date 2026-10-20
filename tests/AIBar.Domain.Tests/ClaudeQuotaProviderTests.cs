@@ -352,6 +352,17 @@ public sealed class ClaudeQuotaProviderTests
         AssertFailure(await provider.GetQuotaAsync(CancellationToken.None), QuotaErrorKind.Unavailable, "quota_credential_unusable");
     }
 
+    [Fact]
+    public async Task Plan_comes_from_existing_read_only_credential_without_extra_requests()
+    {
+        var handler = new StubHandler(Json(Valid));
+        using var provider = Provider(handler);
+        Assert.Null(provider.PlanLabel);
+        Assert.Null((await provider.GetQuotaAsync(default)).Failure);
+        Assert.Equal("Max", provider.PlanLabel);
+        Assert.Equal(1, handler.Calls);
+    }
+
     private static ClaudeQuotaHttpProvider Provider(HttpMessageHandler handler, StubFiles? files = null, List<TimeSpan>? delays = null)
     {
         var policy = new PrivateIntegrationPolicy(true);

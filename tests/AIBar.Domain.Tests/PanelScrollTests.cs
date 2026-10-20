@@ -30,8 +30,7 @@ public sealed class PanelScrollTests
                 app.Resources.MergedDictionaries[0] = ThemeDictionaries.Create(theme);
                 window = CreateWindow();
                 window.Show();
-                var details = (Expander)window.FindName("AnalyticsDetailsExpander");
-                details.IsExpanded = true;
+                ((System.Windows.Controls.Button)window.FindName("CostButton")).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
                 Settle(window);
                 var scroller = (ScrollViewer)window.FindName("SecondaryScrollViewer");
                 Assert.True(scroller.ScrollableHeight > 0);
@@ -43,8 +42,13 @@ public sealed class PanelScrollTests
                 var thumb = Assert.Single(Visuals<Thumb>(bar));
                 var chrome = Assert.Single(Visuals<System.Windows.Controls.Border>(thumb));
                 Assert.True(chrome.CornerRadius.TopLeft >= 2);
-                // Keyboard and wheel scrolling keep working with the slim bar.
-                scroller.ScrollToEnd(); Settle(window);
+                // Keyboard and wheel scrolling keep working with the slim bar. Opening Cost focuses Back,
+                // and a late window activation can bring that focused button back into view; retry
+                // a bounded number of times so only a viewer that cannot scroll fails.
+                for (var attempt = 0; attempt < 10 && scroller.VerticalOffset <= 0; attempt++)
+                {
+                    scroller.ScrollToEnd(); Settle(window);
+                }
                 Assert.True(scroller.VerticalOffset > 0);
             }
             finally

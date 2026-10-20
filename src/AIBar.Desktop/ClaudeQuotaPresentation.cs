@@ -9,17 +9,19 @@ namespace AIBar.Desktop;
 public sealed class ClaudeQuotaPresentationMapper
 {
     private readonly QuotaPresentationMapper _mapper;
-    public ClaudeQuotaPresentationMapper(IClock clock) => _mapper = new(clock);
+    public ClaudeQuotaPresentationMapper(IClock clock) => _mapper = new(clock, QuotaHistoryProvider.Claude);
 
     public BetaPresentationState Map(QuotaRefreshState state, bool consentEnabled) =>
         Map(state, consentEnabled, ClaudeQuotaSource.ThisPc);
 
-    public BetaPresentationState Map(QuotaRefreshState state, bool consentEnabled, ClaudeQuotaSource source)
+    public BetaPresentationState Map(QuotaRefreshState state, bool consentEnabled, ClaudeQuotaSource source) => Map(state, consentEnabled, source, []);
+
+    public BetaPresentationState Map(QuotaRefreshState state, bool consentEnabled, ClaudeQuotaSource source, IReadOnlyList<QuotaHistorySample> history)
     {
         if (!consentEnabled)
             return _mapper.Map(new(null, FreshnessState.Unavailable, false, null, null)) with
             { IsPrivateIntegrationDisabled = true, IsUnavailable = false };
-        var mapped = _mapper.Map(state);
+        var mapped = _mapper.Map(state, history);
         var needsLogin = mapped.IsMissingCredential || state.Failure?.Kind == QuotaErrorKind.Authentication;
         var warning = needsLogin
             ? source == ClaudeQuotaSource.OtherMachine
@@ -49,8 +51,16 @@ public sealed class ClaudeQuotaPresentationHost : INotifyPropertyChanged, IDispo
     private readonly ClaudeQuotaPresentationMapper _mapper;
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
     private bool _disposed;
-    public ClaudeQuotaPresentationHost(ClaudeQuotaRuntime runtime, ClaudeQuotaPresentationMapper mapper)
+    private readonly PanelPaceHistory? _history;
+    private long _historyRevision;
+    public ClaudeQuotaPresentationHost(ClaudeQuotaRuntime runtime, ClaudeQuotaPresentationMapper mapper, PanelPaceHistory? history = null)
     {
+        _history = history;
+        if (_history is not null)
+        {
+            _history.Invalidated += OnChanged;
+            _history.PaceRefreshRequested += OnChanged;
+        }
         _runtime = runtime; _mapper = mapper;
         IsEnabled = runtime.IsConsentEnabled;
         State = mapper.Map(runtime.State, IsEnabled, runtime.ResolvedSource);
@@ -58,6 +68,7 @@ public sealed class ClaudeQuotaPresentationHost : INotifyPropertyChanged, IDispo
         runtime.ConsentChanged += OnChanged;
         runtime.SourceChanged += OnChanged;
     }
+    public string? PlanLabel => _runtime.PlanLabel;
     public bool IsEnabled { get; private set; }
     public BetaPresentationState State { get; private set; }
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -69,14 +80,36 @@ public sealed class ClaudeQuotaPresentationHost : INotifyPropertyChanged, IDispo
         var enabled = _runtime.IsConsentEnabled;
         var changed = enabled != IsEnabled;
         IsEnabled = enabled;
-        State = _mapper.Map(_runtime.State, enabled, _runtime.ResolvedSource);
+        var state = _runtime.State;
+        var source = _runtime.ResolvedSource;
+        var revision = ++_historyRevision;
+        State = _mapper.Map(state, enabled, source);
+        if (_history is not null && enabled && State.IsCurrent) _ = ApplyHistoryAsync(state, source, revision);
         PropertyChanged?.Invoke(this, new(nameof(State)));
+        PropertyChanged?.Invoke(this, new(nameof(PlanLabel)));
         if (changed) PropertyChanged?.Invoke(this, new(nameof(IsEnabled)));
+    }
+    private async Task ApplyHistoryAsync(QuotaRefreshState state, ClaudeQuotaSource source, long revision)
+    {
+        try
+        {
+            var historyRevision = _history!.Revision;
+            var samples = await _history.ReadPaceAsync(QuotaHistoryProvider.Claude);
+            if (_disposed || revision != _historyRevision || !IsEnabled || !_history.CanPublish(historyRevision)) return;
+            State = _mapper.Map(state, true, source, samples);
+            PropertyChanged?.Invoke(this, new(nameof(State)));
+        }
+        catch (Exception) { /* Keep the snapshot fallback if history is unavailable. */ }
     }
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+        if (_history is not null)
+        {
+            _history.Invalidated -= OnChanged;
+            _history.PaceRefreshRequested -= OnChanged;
+        }
         _runtime.StateChanged -= OnChanged;
         _runtime.ConsentChanged -= OnChanged;
         _runtime.SourceChanged -= OnChanged;

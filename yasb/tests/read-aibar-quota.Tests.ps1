@@ -78,9 +78,9 @@ Describe 'AIBar YASB reader' {
         $source | Should -Match '-cnotin'
         $source | Should -Not -Match 'Start-Process|Invoke-WebRequest|Remove-Item|Set-Content|Add-Content|WriteAll|CreateDirectory'
         $ci = Get-Content -Raw (Join-Path (Split-Path -Parent $root) '.github/workflows/ci.yml')
-        $ci | Should -Match '\$result.TotalCount -ne 21'
-        $ci | Should -Match 'Expected 21 passing YASB tests'
-        ([regex]::Matches((Get-Content -Raw (Join-Path $root 'tests/read-aibar-quota.Tests.ps1')), '(?m)^\s*It\s+')).Count | Should -Be 21
+        $ci | Should -Match '\$result.TotalCount -ne 29'
+        $ci | Should -Match 'Expected 29 passing YASB tests'
+        ([regex]::Matches((Get-Content -Raw (Join-Path $root 'tests/read-aibar-quota.Tests.ps1')), '(?m)^\s*It\s+')).Count | Should -Be 29
         $stderrPath = [IO.Path]::GetTempFileName()
         try {
             $start = [Diagnostics.ProcessStartInfo]::new('powershell.exe', ('-NoProfile -NonInteractive -File "{0}" unexpected' -f $reader))
@@ -176,7 +176,8 @@ Describe 'AIBar YASB reader' {
                     $color = if ($value -lt 50) { '#3DDC84' } elseif ($value -lt 75) { '#FFC531' } elseif ($value -lt 90) { '#FF8A3D' } else { '#FF4D5E' }
                     foreach ($weeklyHero in @($true, $false)) {
                         $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'refreshing'; warning = $null; sourceRetrievedAt = $source; fiveHour = [ordered]@{ percentageUsed = $value; resetAt = $null }; weekly = $null }
-                        if ($weeklyHero) { $document.weekly = $document.fiveHour; $document.fiveHour = $five }
+                        # S14: keep the competing window at zero so the target still exercises every exact ramp boundary.
+                        if ($weeklyHero) { $document.weekly = $document.fiveHour; $document.fiveHour = [ordered]@{ percentageUsed = 0; resetAt = $null } }
                         $result = Read-Document $document
                         Assert-SafeFields $result
                         Assert-Compact $result (([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%')
@@ -400,7 +401,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         }
     }
 
-    It 'retains weekly-first glyph and color boundaries including five-hour-only output' {
+    It 'retains blocking-window glyph and color boundaries including five-hour-only output' {
         $culture = [Threading.Thread]::CurrentThread.CurrentCulture
         try {
             [Threading.Thread]::CurrentThread.CurrentCulture = [Globalization.CultureInfo]'fr-FR'
@@ -408,7 +409,8 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
                 foreach ($weekly in @($true, $false)) {
                     $window = [ordered]@{ percentageUsed = $value; resetAt = $null }
                     $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $window; weekly = $null }
-                    if ($weekly) { $document.weekly = $window; $document.fiveHour = [ordered]@{ percentageUsed = 99; resetAt = $null } }
+                    # S14 replaces weekly-first: zero competing usage preserves all original target ramp assertions.
+                    if ($weekly) { $document.weekly = $window; $document.fiveHour = [ordered]@{ percentageUsed = 0; resetAt = $null } }
                     $result = Read-ClaudeDocument $document
                     Assert-Compact $result (([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%')
                     $glyphs = @(0xF0766, 0xF0A9E, 0xF0A9F, 0xF0AA0, 0xF0AA1, 0xF0AA2, 0xF0AA3, 0xF0AA4, 0xF0AA5)
@@ -417,6 +419,84 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
                 }
             }
         } finally { [Threading.Thread]::CurrentThread.CurrentCulture = $culture }
+    }
+
+    It 'uses Claude five-hour usage when it is higher and retains both window details' {
+        $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 92; resetAt = '2026-07-12T13:00:00Z' }; weekly = [ordered]@{ percentageUsed = 40; resetAt = '2026-07-14T10:00:00Z' } }
+        $result = Read-ClaudeDocument $document
+        Assert-Compact $result '92%'
+        $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA4))
+        $result.progressColor | Should -BeExactly '#FF4D5E'
+        $result.label | Should -BeExactly 'Claude 5h: 92% | 7d: 40% | current'
+        $result.tooltip | Should -BeExactly 'Claude current | 5h resets in 1h 0m | 7d resets in 1d 22h | age: 2h'
+        # Cached/stale data uses the same selection without losing its explicit warning.
+        $document.state = 'stale'; $document.warning = 'refresh-failed'
+        $result = Read-ClaudeDocument $document
+        Assert-Compact $result '92% | stale | refresh failed'
+        $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA4))
+        $result.progressColor | Should -BeExactly '#FF4D5E'
+    }
+
+    It 'uses Claude weekly usage when it is higher even if five-hour resets sooner' {
+        $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 40; resetAt = '2026-07-12T13:00:00Z' }; weekly = [ordered]@{ percentageUsed = 78; resetAt = '2026-07-14T10:00:00Z' } }
+        $result = Read-ClaudeDocument $document
+        Assert-Compact $result '78%'
+        $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA3))
+        $result.progressColor | Should -BeExactly '#FF8A3D'
+        $result.label | Should -BeExactly 'Claude 5h: 40% | 7d: 78% | current'
+        $result.tooltip | Should -BeExactly 'Claude current | 5h resets in 1h 0m | 7d resets in 1d 22h | age: 2h'
+    }
+
+    It 'breaks equal usage ties by the sooner known reset in either window' {
+        # Equal percentages produce identical six-field output, so also inspect the selected window.
+        foreach ($resets in @(
+            @('2026-07-12T13:00:00Z', '2026-07-14T10:00:00Z', 'five'),
+            @('2026-07-14T10:00:00Z', '2026-07-12T13:00:00Z', 'weekly'),
+            @($null, '2026-07-12T13:00:00Z', 'weekly'),
+            @('2026-07-12T13:00:00Z', $null, 'five'),
+            @($null, $null, 'five'),
+            @('2026-07-12T13:00:00Z', '2026-07-12T13:00:00Z', 'five')
+        )) {
+            $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 50; resetAt = $resets[0] }; weekly = [ordered]@{ percentageUsed = 50; resetAt = $resets[1] } }
+            $result = Read-ClaudeDocument $document
+            Assert-Compact $result '50%'
+            $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA1))
+            $result.progressColor | Should -BeExactly '#FFC531'
+            $selected = & $readerModule {
+                param($five, $weekly)
+                $parsedFive = Get-Window ([pscustomobject]$five) $null
+                $parsedWeekly = Get-Window ([pscustomobject]$weekly) $null
+                [object]::ReferenceEquals((Get-BlockingWindow $parsedFive $parsedWeekly), $parsedFive)
+            } $document.fiveHour $document.weekly
+            $selected | Should -Be ($resets[2] -ceq 'five')
+        }
+    }
+
+    It 'uses Codex weekly-only usage for compact text glyph and color' {
+        $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $null; weekly = [ordered]@{ percentageUsed = 62.5; resetAt = '2026-07-14T10:00:00Z' } }
+        $result = Read-Document $document
+        Assert-SafeFields $result
+        Assert-Compact $result '62.5%'
+        $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA2))
+        $result.progressColor | Should -BeExactly '#FFC531'
+        $result.label | Should -BeExactly '7d: 62.5% | current'
+        $result.tooltip | Should -BeExactly 'current | 7d resets in 1d 22h | age: 2h'
+    }
+
+    It 'uses the sole Claude window when either sibling is null including zero usage' {
+        foreach ($weeklyOnly in @($true, $false)) {
+            foreach ($used in @(0, 100)) {
+                $window = [ordered]@{ percentageUsed = $used; resetAt = $null }
+                $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $window; weekly = $null }
+                if ($weeklyOnly) { $document.fiveHour = $null; $document.weekly = $window }
+                $result = Read-ClaudeDocument $document
+                Assert-Compact $result ("$used%")
+                $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32($(if ($used -eq 0) { 0xF0766 } else { 0xF0AA5 })))
+                $result.progressColor | Should -BeExactly $(if ($used -eq 0) { '#3DDC84' } else { '#FF4D5E' })
+                $result.label | Should -BeExactly $(if ($weeklyOnly) { "Claude 7d: $used% | current" } else { "Claude 5h: $used% | current" })
+                $result.tooltip | Should -BeExactly $(if ($weeklyOnly) { 'Claude current | 7d reset: -- | age: 2h' } else { 'Claude current | 5h reset: -- | age: 2h' })
+            }
+        }
     }
 
     It 'accepts only the exact opt-in CLI pair and returns one safe JSON object without stderr' {
@@ -486,6 +566,59 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
                 $field | Should -Not -Match 'canary|credential|C:|<|>|&|\{|\}'
             }
         }
+    }
+}
+
+Describe 'Settings YASB colors' {
+    BeforeAll {
+        function Read-WithAppearance([string]$appearance, [string]$provider = '', [double]$fiveUsed = 12.5) {
+            $path = Join-Path $TestDrive 'yasb-quota.json'
+            $document = Get-Content -Raw (Join-Path $root 'fixtures/current.json') | ConvertFrom-Json
+            $document.fiveHour.percentageUsed = $fiveUsed
+            [IO.File]::WriteAllText($path, (ConvertTo-Json -InputObject $document -Depth 5 -Compress), [Text.UTF8Encoding]::new($false))
+            [IO.File]::WriteAllText((Join-Path $TestDrive 'appearance.json'), $appearance)
+            return & $readerModule {
+                param($path, $at, $provider)
+                $script:AIBarQuotaFixturePath = $path
+                $script:AIBarQuotaFixtureNow = $at
+                Invoke-AiBarQuotaReader -Provider $provider
+            } $path $now $provider
+        }
+    }
+    It 'uses exact provider brand colors while retaining six fields and usage text' {
+        foreach ($provider in @('', 'Claude')) {
+            $result = Read-WithAppearance '{"schema":1,"barColors":"brand","yasbColors":"brand"}' $provider
+            $result.progressColor | Should -BeExactly $(if ($provider -ceq 'Claude') { '#E0876A' } else { '#2FBF98' })
+            $result.compactText | Should -BeExactly '40%'
+            (@($result.PSObject.Properties.Name) -join ',') | Should -BeExactly 'label,compactText,progressGlyph,progressColor,tooltip,className'
+            $higherFive = Read-WithAppearance '{"schema":1,"barColors":"brand","yasbColors":"brand"}' $provider 92
+            $higherFive.compactText | Should -BeExactly '92%'
+            $higherFive.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA4))
+            $higherFive.progressColor | Should -BeExactly $result.progressColor
+            (@($higherFive.PSObject.Properties.Name) -join ',') | Should -BeExactly 'label,compactText,progressGlyph,progressColor,tooltip,className'
+        }
+    }
+    It 'strictly falls back to the usage ramp for missing invalid or unsupported preferences' {
+        foreach ($json in @('', '{', '{}', '{"schema":2,"yasbColors":"brand"}', '{"schema":true,"yasbColors":"brand"}', '{"schema":1,"yasbColors":"Brand"}', '{"schema":1,"yasbColors":true}', '{"schema":1,"yasbColors":"<unsafe>"}', ('x' * 4097), '{"schema":1,"yasbColors":"usage"}', '{"schema":1}')) {
+            $result = Read-WithAppearance $json
+            Assert-SafeFields $result
+            $result.progressColor | Should -BeExactly '#3DDC84'
+            $result.compactText | Should -BeExactly '40%'
+        }
+    }
+    It 'keeps unavailable gray in brand mode and reads settings without modifying bytes' {
+        $path = Join-Path $TestDrive 'yasb-quota.json'
+        $settings = Join-Path $TestDrive 'appearance.json'
+        Copy-Item (Join-Path $root 'fixtures/unavailable.json') $path -Force
+        [IO.File]::WriteAllText($settings, '{"schema":1,"yasbColors":"brand"}')
+        $before = (Get-FileHash $settings).Hash
+        $result = & $readerModule {
+            param($path, $at)
+            $script:AIBarQuotaFixturePath = $path; $script:AIBarQuotaFixtureNow = $at
+            Invoke-AiBarQuotaReader
+        } $path $now
+        $result.progressColor | Should -BeExactly '#8995A4'
+        (Get-FileHash $settings).Hash | Should -BeExactly $before
     }
 }
 

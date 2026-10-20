@@ -98,7 +98,7 @@ public sealed class ClaudeConsentCredentialSource(PrivateIntegrationPolicy polic
     }
 }
 
-public sealed class ClaudeQuotaHttpProvider : IQuotaProvider, IDisposable
+public sealed class ClaudeQuotaHttpProvider : IQuotaProvider, IQuotaPlanMetadata, IDisposable
 {
     private static readonly Uri Endpoint = new("https://api.anthropic.com/api/oauth/usage");
     private readonly HttpClient _client;
@@ -121,8 +121,12 @@ public sealed class ClaudeQuotaHttpProvider : IQuotaProvider, IDisposable
         _delay = delay ?? Task.Delay;
     }
 
+    private string? _planLabel;
+    public string? PlanLabel => _policy.IsEnabled ? _planLabel : null;
+
     public async ValueTask<QuotaProviderResult> GetQuotaAsync(CancellationToken cancellationToken)
     {
+        _planLabel = null;
         if (!_policy.IsEnabled) return Fail(QuotaErrorKind.Unavailable, "quota_disabled");
         cancellationToken.ThrowIfCancellationRequested();
         var read = await _credentials.ReadForQuotaAsync(cancellationToken);
@@ -134,6 +138,7 @@ public sealed class ClaudeQuotaHttpProvider : IQuotaProvider, IDisposable
             CredentialAvailability.Unusable => "quota_credential_unusable",
             _ => "quota_credentials_unavailable",
         });
+        _planLabel = QuotaPlanLabels.FromKnownValue(credential.SubscriptionType);
         if (credential.ExpiresAt is { } expiresAt && expiresAt - _utcNow() <= TimeSpan.FromSeconds(60))
             return Fail(QuotaErrorKind.Authentication, "quota_authentication");
 

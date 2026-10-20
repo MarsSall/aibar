@@ -14,6 +14,24 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
     private ConsentSettings Settings => new(Path.Combine(_root, "settings.json"));
 
+    [Fact]
+    public async Task Plan_metadata_is_local_only_and_disappears_on_source_switch_or_revoke()
+    {
+        var provider = new Provider { PlanLabel = "Max" };
+        await using var runtime = new ClaudeQuotaRuntime(Settings, new MemoryStore(), _ => provider, new Clock(),
+            remoteProviderFactory: _ => new Provider { PlanLabel = "Pro" }, remoteFileAvailable: () => false);
+        await runtime.InitializeAsync(default);
+        Assert.Null(runtime.PlanLabel);
+        await runtime.GrantConsentAsync(default);
+        Assert.Equal("Max", runtime.PlanLabel);
+        await runtime.SetSourceAsync(ClaudeQuotaSource.OtherMachine, default);
+        Assert.Null(runtime.PlanLabel); // Even a remote provider cannot borrow the local credential's plan.
+        await runtime.SetSourceAsync(ClaudeQuotaSource.ThisPc, default);
+        Assert.Equal("Max", runtime.PlanLabel);
+        await runtime.RevokeConsentAsync(default);
+        Assert.Null(runtime.PlanLabel);
+    }
+
     // a: schema 1, optional decision, and the existing two-property Codex contract.
     [Fact]
     public async Task Missing_and_legacy_settings_leave_Claude_off_without_changing_Codex()
@@ -214,20 +232,85 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
         var clock = new Clock(); var time = new PollTime(); var events = new Lifecycle();
         var cached = Snapshot(21); var store = new MemoryStore(cached); var provider = new Provider(Snapshot(73));
         await using var runtime = Runtime(store, provider, clock, events, time);
+        var published = new List<QuotaSnapshot?>();
+        runtime.StateChanged += () => published.Add(runtime.State.Snapshot);
         await runtime.InitializeAsync(default);
-        Assert.Equal(cached, runtime.State.Snapshot); Assert.Equal(0, provider.Calls);
+        await Until(() => provider.Calls == 1 && !runtime.State.IsLoading);
+        // S13 removes the freshness gate, including the initial poll. Cache still publishes first.
+        Assert.Equal(cached, published.First(snapshot => snapshot is not null));
+        var retrieved = runtime.State.Snapshot;
+        Assert.Equal(73m, retrieved!.Primary!.PercentageUsed);
         Assert.Equal(1, time.ActiveTimers); Assert.Equal(TimeSpan.FromMinutes(5), time.Period);
+        clock.UtcNow = Now.AddMinutes(5).AddTicks(-1);
+        await runtime.RefreshAsync(RefreshTrigger.Poll, default);
+        Assert.Equal(1, provider.Calls);
         clock.UtcNow = Now.AddMinutes(5); time.Advance(TimeSpan.FromMinutes(5));
-        Assert.Equal(0, provider.Calls);
+        await Until(() => provider.Calls == 2 && !runtime.State.IsLoading);
         clock.UtcNow = Now.AddMinutes(12); events.Sleep();
-        Assert.Equal(0, provider.Calls); Assert.Equal(FreshnessState.Stale, runtime.State.Freshness);
+        Assert.Equal(2, provider.Calls); Assert.Equal(FreshnessState.Stale, runtime.State.Freshness);
         provider.Result = new(null, new(QuotaErrorKind.Service, "quota_service"));
         events.Resume(); await Until(() => runtime.State.Failure is not null);
-        Assert.Equal(1, provider.Calls); Assert.Equal(cached, runtime.State.Snapshot);
+        Assert.Equal(3, provider.Calls); Assert.Equal(retrieved, runtime.State.Snapshot);
         events.ClockChangedNow(); await runtime.RefreshAsync(RefreshTrigger.Poll, default);
-        Assert.Equal(1, provider.Calls); Assert.Equal(TimeSpan.FromMinutes(12), runtime.CachedAge);
+        Assert.Equal(3, provider.Calls); Assert.Equal(TimeSpan.FromMinutes(12), runtime.CachedAge);
         clock.UtcNow = Now.AddMinutes(17); time.Advance(TimeSpan.FromMinutes(5));
-        await Until(() => provider.Calls == 2);
+        await Until(() => provider.Calls == 4);
+    }
+
+    [Theory]
+    [InlineData(ClaudeQuotaSource.ThisPc, 5)]
+    [InlineData(ClaudeQuotaSource.OtherMachine, 1)]
+    public async Task Resolved_source_controls_timer_and_coordinator_cadence(ClaudeQuotaSource source, int minutes)
+    {
+        await Settings.SaveClaudeSourceAsync(source, default);
+        var clock = new Clock(); var time = new PollTime(); var provider = new Provider();
+        await using var runtime = new ClaudeQuotaRuntime(Settings, new MemoryStore(), _ => provider, clock,
+            timeProvider: time, remoteProviderFactory: _ => provider, remoteFileAvailable: () => false);
+        await runtime.InitializeAsync(default);
+        await runtime.GrantConsentAsync(default);
+        Assert.Equal(TimeSpan.FromMinutes(minutes), time.Period);
+        clock.UtcNow = Now.AddMinutes(minutes).AddTicks(-1);
+        await runtime.RefreshAsync(RefreshTrigger.Poll, default);
+        Assert.Equal(1, provider.Calls);
+        clock.UtcNow = Now.AddMinutes(minutes); time.Advance(TimeSpan.FromMinutes(minutes));
+        await Until(() => provider.Calls == 2 && !runtime.State.IsLoading);
+        Assert.Equal(FreshnessState.Current, runtime.State.Freshness);
+
+        var other = source == ClaudeQuotaSource.ThisPc ? ClaudeQuotaSource.OtherMachine : ClaudeQuotaSource.ThisPc;
+        var nextMinutes = other == ClaudeQuotaSource.OtherMachine ? 1 : 5;
+        await runtime.SetSourceAsync(other, default);
+        Assert.Equal(3, provider.Calls);
+        Assert.Equal(TimeSpan.FromMinutes(nextMinutes), time.Period);
+        Assert.Equal(other, runtime.ResolvedSource);
+        clock.UtcNow = clock.UtcNow.AddMinutes(nextMinutes).AddTicks(-1);
+        await runtime.RefreshAsync(RefreshTrigger.Poll, default);
+        Assert.Equal(3, provider.Calls);
+        clock.UtcNow = clock.UtcNow.AddTicks(1); time.Advance(TimeSpan.FromMinutes(nextMinutes));
+        await Until(() => provider.Calls == 4 && !runtime.State.IsLoading);
+    }
+
+    [Fact]
+    public async Task Automatic_source_handoff_replaces_the_poll_cadence()
+    {
+        var remoteAvailable = false; var clock = new Clock(); var time = new PollTime(); var provider = new Provider();
+        await using var runtime = new ClaudeQuotaRuntime(Settings, new MemoryStore(), _ => provider, clock,
+            timeProvider: time, remoteProviderFactory: _ => provider, remoteFileAvailable: () => remoteAvailable);
+        await runtime.InitializeAsync(default);
+        await runtime.GrantConsentAsync(default);
+        Assert.Equal(TimeSpan.FromMinutes(5), time.Period);
+        remoteAvailable = true;
+        await runtime.RefreshAsync(RefreshTrigger.Poll, default);
+        Assert.Equal(ClaudeQuotaSource.Automatic, runtime.Source);
+        Assert.Equal(ClaudeQuotaSource.OtherMachine, runtime.ResolvedSource);
+        Assert.Equal(TimeSpan.FromMinutes(1), time.Period);
+        Assert.Equal(2, provider.Calls);
+        clock.UtcNow = Now.AddMinutes(1); time.Advance(TimeSpan.FromMinutes(1));
+        await Until(() => provider.Calls == 3 && !runtime.State.IsLoading);
+        remoteAvailable = false;
+        await runtime.RefreshAsync(RefreshTrigger.Poll, default);
+        Assert.Equal(ClaudeQuotaSource.ThisPc, runtime.ResolvedSource);
+        Assert.Equal(TimeSpan.FromMinutes(5), time.Period);
+        Assert.Equal(4, provider.Calls);
     }
 
     // f: deliberately non-cooperative provider exposes save-before-generation-check bugs.
@@ -373,8 +456,9 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
         { Started.TrySetResult(); await Release.Task; Snapshot = snapshot; }
         public ValueTask ClearAsync(CancellationToken cancellationToken) { Snapshot = null; return ValueTask.CompletedTask; }
     }
-    private sealed class Provider(QuotaSnapshot? snapshot = null) : IQuotaProvider
+    private sealed class Provider(QuotaSnapshot? snapshot = null) : IQuotaProvider, IQuotaPlanMetadata
     {
+        public string? PlanLabel { get; init; }
         public int Calls { get; private set; }
         public QuotaProviderResult Result { get; set; } = new(snapshot ?? Snapshot(), null);
         public ValueTask<QuotaProviderResult> GetQuotaAsync(CancellationToken cancellationToken) { Calls++; return ValueTask.FromResult(Result); }
@@ -421,7 +505,7 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
         private readonly List<Timer> _timers = [];
         private TimeSpan _elapsed;
         public int ActiveTimers => _timers.Count(timer => !timer.Disposed && timer.Due != Timeout.InfiniteTimeSpan);
-        public TimeSpan? Period => _timers.LastOrDefault()?.Period;
+        public TimeSpan? Period => _timers.LastOrDefault(timer => !timer.Disposed && timer.Period != Timeout.InfiniteTimeSpan)?.Period;
         public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
             var timer = new Timer(this, callback, state); timer.Change(dueTime, period); _timers.Add(timer); return timer;

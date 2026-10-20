@@ -8,7 +8,7 @@ public sealed class QuotaRefreshCoordinatorTests
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task Publishes_cached_state_before_refreshing_and_skips_fresh_polling()
+    public async Task Publishes_cached_state_before_refreshing_even_when_the_cached_snapshot_is_current()
     {
         var store = new FakeStore(Snapshot(Now.AddMinutes(-2)));
         var provider = new FakeProvider(new QuotaProviderResult(Snapshot(Now), null));
@@ -19,7 +19,94 @@ public sealed class QuotaRefreshCoordinatorTests
         Assert.Equal(FreshnessState.Current, coordinator.State.Freshness);
         await coordinator.RefreshAsync(RefreshTrigger.Poll, default);
 
+        // S13: freshness marks the display; it no longer prevents an eligible poll.
+        Assert.Equal(1, provider.Calls);
+        Assert.Equal(Now, coordinator.State.Snapshot!.RetrievedAt);
+    }
+
+    [Theory]
+    [InlineData(RefreshTrigger.Poll)]
+    [InlineData(RefreshTrigger.Resume)]
+    [InlineData(RefreshTrigger.ClockChanged)]
+    public async Task Automatic_refresh_uses_last_attempt_interval_not_snapshot_freshness(RefreshTrigger trigger)
+    {
+        var clock = new MutableClock(Now);
+        var provider = new FakeProvider(new QuotaProviderResult(Snapshot(Now), null));
+        await using var coordinator = Create(new FakeStore(null), provider, clock);
+        await coordinator.RefreshAsync(RefreshTrigger.Manual, default);
+        clock.UtcNow = Now.AddMinutes(5).AddTicks(-1);
+        await coordinator.ReevaluateAsync(trigger, default);
+        Assert.Equal(1, provider.Calls);
+        Assert.Equal(FreshnessState.Current, coordinator.State.Freshness);
+        clock.UtcNow = Now.AddMinutes(5);
+        await coordinator.ReevaluateAsync(trigger, default);
+        Assert.Equal(2, provider.Calls);
+        Assert.Equal(FreshnessState.Current, coordinator.State.Freshness);
+    }
+
+    [Fact]
+    public async Task Panel_open_requires_success_older_than_one_minute_and_throttles_failed_attempts()
+    {
+        var clock = new MutableClock(Now);
+        var provider = new FakeProvider(new QuotaProviderResult(null, new(QuotaErrorKind.Network, "network")));
+        await using var coordinator = Create(new FakeStore(Snapshot(Now)), provider, clock);
+        await coordinator.InitializeAsync(default);
+        clock.UtcNow = Now.AddMinutes(1).AddTicks(-1);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
         Assert.Equal(0, provider.Calls);
+        clock.UtcNow = Now.AddMinutes(1);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
+        Assert.Equal(0, provider.Calls); // Strictly older than one minute.
+        clock.UtcNow = clock.UtcNow.AddTicks(1);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
+        Assert.Equal(1, provider.Calls);
+        clock.UtcNow = clock.UtcNow.AddMinutes(1).AddTicks(-1);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
+        Assert.Equal(1, provider.Calls);
+        clock.UtcNow = clock.UtcNow.AddTicks(1);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
+        Assert.Equal(2, provider.Calls);
+        Assert.Equal(Now, coordinator.State.Snapshot!.RetrievedAt);
+        Assert.NotNull(coordinator.State.Failure);
+    }
+
+    [Fact]
+    public async Task Successful_panel_refresh_restarts_the_success_age_guard()
+    {
+        var clock = new MutableClock(Now.AddMinutes(2));
+        var provider = new FakeProvider(new QuotaProviderResult(Snapshot(clock.UtcNow), null));
+        await using var coordinator = Create(new FakeStore(Snapshot(Now)), provider, clock);
+        await coordinator.InitializeAsync(default);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
+        Assert.Equal(1, provider.Calls);
+        Assert.Equal(clock.UtcNow, coordinator.State.Snapshot!.RetrievedAt);
+        clock.UtcNow = clock.UtcNow.AddMinutes(1);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
+        Assert.Equal(1, provider.Calls);
+        clock.UtcNow = clock.UtcNow.AddTicks(1);
+        provider.Result = new(Snapshot(clock.UtcNow), null);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
+        Assert.Equal(2, provider.Calls);
+        Assert.Equal(FreshnessState.Current, coordinator.State.Freshness);
+    }
+
+    [Fact]
+    public async Task Panel_open_without_cache_refreshes_and_respects_recent_manual_attempts()
+    {
+        var clock = new MutableClock(Now);
+        var provider = new FakeProvider(new QuotaProviderResult(null, new(QuotaErrorKind.Network, "network")));
+        await using var coordinator = Create(new FakeStore(null), provider, clock);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
+        Assert.Equal(1, provider.Calls);
+        await coordinator.RefreshAsync(RefreshTrigger.Manual, default);
+        Assert.Equal(2, provider.Calls); // Manual is still unthrottled.
+        clock.UtcNow = Now.AddSeconds(59);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
+        Assert.Equal(2, provider.Calls);
+        clock.UtcNow = Now.AddMinutes(1);
+        await coordinator.RefreshAsync(RefreshTrigger.PopoverOpened, default);
+        Assert.Equal(3, provider.Calls);
     }
 
     [Fact]

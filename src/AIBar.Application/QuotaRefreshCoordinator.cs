@@ -9,7 +9,7 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
     private readonly IQuotaProvider _provider;
     private readonly IClock _clock;
     private readonly FreshnessPolicy _freshness;
-    private readonly TimeSpan _minimumPollInterval;
+    private TimeSpan _minimumPollInterval;
     private readonly object _gate = new();
     private readonly Queue<QuotaAuthorityUpdate> _updates = new();
     private CancellationTokenSource _lifetime = new();
@@ -30,7 +30,19 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
         _state = new(null, FreshnessState.Unavailable, false, null, null);
     }
 
+    // Preserve attempt history and in-flight work when the preference changes.
+    public void SetMinimumPollInterval(TimeSpan interval)
+    {
+        if (interval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(interval));
+        lock (_gate)
+        {
+            ThrowIfDisposed();
+            _minimumPollInterval = interval;
+        }
+    }
+
     public QuotaRefreshState State { get { lock (_gate) return _state; } }
+    public long RetrievalGeneration { get { lock (_gate) return _retrievalGeneration; } }
     public event Action<QuotaAuthorityUpdate>? AuthorityUpdated;
     public event Action<QuotaRefreshState>? StateChanged;
 
@@ -113,9 +125,22 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
 
     public void ResumeAfterClear() { lock (_gate) if (!_disposed) _paused = false; }
 
-    private bool Eligible(RefreshTrigger trigger) => trigger == RefreshTrigger.Manual ||
-        _freshness.Evaluate(_state.Snapshot, _clock.UtcNow) != FreshnessState.Current &&
-        _clock.UtcNow - _lastAttempt >= _minimumPollInterval;
+    private bool Eligible(RefreshTrigger trigger)
+    {
+        if (trigger == RefreshTrigger.Manual) return true;
+        if (trigger == RefreshTrigger.Sleep) return false;
+        var now = _clock.UtcNow;
+        if (trigger == RefreshTrigger.PopoverOpened)
+        {
+            var interval = TimeSpan.FromMinutes(1);
+            // Retrieval age controls whether an open needs new data; attempt age also
+            // throttles repeated opens after failures (including recent manual attempts).
+            return now - _lastAttempt >= interval &&
+                (_state.Snapshot is null || now - _state.Snapshot.RetrievedAt > interval);
+        }
+        // Freshness is display state, not a polling/lifecycle eligibility gate.
+        return now - _lastAttempt >= _minimumPollInterval;
+    }
 
     private async Task CompleteRefreshAsync(TaskCompletionSource completion, long generation, CancellationToken lifetime)
     {

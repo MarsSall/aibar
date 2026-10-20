@@ -20,12 +20,34 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private readonly PrivateIntegrationPolicy _policy = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _notificationGate = new();
-    private readonly List<Notification> _pendingNotifications = [];
+    private readonly List<(Notification Kind, QuotaAuthorityUpdate? Update, long Epoch)> _pendingNotifications = [];
+    private Action<QuotaAuthorityUpdate>? _authorityHandler;
+    // A deferral can span source replacement: never replay old-source authority after ExitGate.
+    private long _authorityEpoch;
+    private long _authorityRetrievalGeneration;
+    private long _coordinatorRetrievalGeneration;
     private int _notificationDeferrals;
-    private enum Notification { Source, State, Consent }
+    private enum Notification { Source, State, Consent, Authority }
+    public event Action<QuotaAuthorityUpdate>? AuthorityUpdated;
+    private void OnAuthorityUpdated(QuotaAuthorityUpdate update, long epoch)
+    {
+        lock (_notificationGate)
+        {
+            if (epoch != Interlocked.Read(ref _authorityEpoch)) return;
+            if (update.RetrievalGeneration > _coordinatorRetrievalGeneration)
+            {
+                _coordinatorRetrievalGeneration = update.RetrievalGeneration;
+                _authorityRetrievalGeneration++;
+            }
+            update = update with { RetrievalGeneration = _authorityRetrievalGeneration };
+        }
+        Notify(Notification.Authority, update, epoch);
+    }
     private readonly IQuotaExportWriter? _exportWriter;
     private QuotaExportPublisher? _publisher;
     private QuotaRefreshCoordinator? _coordinator;
+    private readonly IQuotaHistoryStore? _historyStore;
+    private QuotaHistoryRecorder? _historyRecorder;
     private IQuotaProvider? _provider;
     private CancellationTokenSource? _pollCancellation;
     private ITimer? _timer;
@@ -33,6 +55,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private ITimer? _remoteDeadlineTimer;
     private long _deadlineGeneration;
     private static readonly TimeSpan RemoteFreshness = TimeSpan.FromMinutes(15);
+    private int _refreshMinutes = 5;
     private bool _initialized;
     private bool _disposed;
     private volatile bool _enabled;
@@ -42,8 +65,9 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         IQuotaRefreshLifecycleEvents? lifecycle = null, TimeProvider? timeProvider = null,
         IQuotaExportWriter? exportWriter = null,
         Func<PrivateIntegrationPolicy, IQuotaProvider>? remoteProviderFactory = null,
-        Func<bool>? remoteFileAvailable = null)
+        Func<bool>? remoteFileAvailable = null, IQuotaHistoryStore? historyStore = null)
     {
+        _historyStore = historyStore;
         _remoteFileAvailable = remoteFileAvailable ?? (() => ClaudeRemoteUsageProvider.IsAvailableForAutomatic());
         _exportWriter = exportWriter;
         _remoteProviderFactory = remoteProviderFactory ?? (policy => new ClaudeRemoteUsageProvider(policy));
@@ -53,6 +77,24 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         {
             _lifecycle.Suspended += OnSuspended; _lifecycle.Resumed += OnResumed; _lifecycle.ClockChanged += OnClockChanged;
         }
+    }
+
+    // Serialize with consent/source replacement; never hold this gate over UI dispatch.
+    public async ValueTask SetRefreshMinutesAsync(int minutes, CancellationToken cancellationToken = default)
+    {
+        if (!AppearanceSettings.ValidRefreshMinutes(minutes)) throw new ArgumentOutOfRangeException(nameof(minutes));
+        await EnterGateAsync(cancellationToken);
+        try
+        {
+            if (_disposed) return;
+            if (_refreshMinutes == minutes) return;
+            _refreshMinutes = minutes;
+            if (_resolvedSource == ClaudeQuotaSource.OtherMachine) return;
+            var interval = TimeSpan.FromMinutes(minutes);
+            _coordinator?.SetMinimumPollInterval(interval);
+            _timer?.Change(interval, interval);
+        }
+        finally { ExitGate(); }
     }
 
     internal Task ExportCompletion => _publisher?.PublicationCompletion ?? Task.CompletedTask;
@@ -98,6 +140,9 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
                 ? state with { Freshness = FreshnessState.Stale } : state;
         }
     }
+    public string? PlanLabel => _enabled && _resolvedSource == ClaudeQuotaSource.ThisPc
+        ? (_provider as IQuotaPlanMetadata)?.PlanLabel : null;
+
     public TimeSpan? CachedAge => State.Snapshot is { } snapshot ? _clock.UtcNow - snapshot.RetrievedAt : null;
     public event Action? ConsentChanged;
     public event Action? StateChanged;
@@ -124,7 +169,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
 
     private void EndNotificationDeferral()
     {
-        Notification[] pending;
+        (Notification Kind, QuotaAuthorityUpdate? Update, long Epoch)[] pending;
         lock (_notificationGate)
         {
             if (--_notificationDeferrals != 0) return;
@@ -134,34 +179,37 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         // Initialization/teardown may forward State before the handoff queues Source.
         // Publish source identity first, retaining every queued notification thereafter.
         Exception? failure = null;
-        foreach (var notification in pending.OrderBy(value => value == Notification.Source ? 0 : 1))
+        foreach (var notification in pending.OrderBy(value => value.Kind == Notification.Source ? 0 : 1))
         {
-            try { RaiseNotification(notification); }
+            try { RaiseNotification(notification.Kind, notification.Update, notification.Epoch); }
             catch (Exception exception) { failure ??= exception; }
         }
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
-    private void Notify(Notification notification)
+    private void Notify(Notification notification, QuotaAuthorityUpdate? update = null, long epoch = 0)
     {
         lock (_notificationGate)
         {
             if (_notificationDeferrals != 0)
             {
-                _pendingNotifications.Add(notification);
+                _pendingNotifications.Add((notification, update, epoch));
                 return;
             }
         }
-        RaiseNotification(notification);
+        RaiseNotification(notification, update, epoch);
     }
 
-    private void RaiseNotification(Notification notification)
+    private void RaiseNotification(Notification notification, QuotaAuthorityUpdate? update = null, long epoch = 0)
     {
         switch (notification)
         {
             case Notification.Source: SourceChanged?.Invoke(); break;
             case Notification.State: StateChanged?.Invoke(); break;
             case Notification.Consent: ConsentChanged?.Invoke(); break;
+            case Notification.Authority:
+                if (_enabled && epoch == Interlocked.Read(ref _authorityEpoch) && update is not null) AuthorityUpdated?.Invoke(update);
+                break;
         }
     }
 
@@ -284,8 +332,17 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         try
         {
             _provider = (_resolvedSource == ClaudeQuotaSource.OtherMachine ? _remoteProviderFactory : _providerFactory)(_policy);
+            // Source handoffs recreate both timer and coordinator through this path.
+            var pollInterval = TimeSpan.FromMinutes(_resolvedSource == ClaudeQuotaSource.OtherMachine ? 1 : _refreshMinutes);
             _coordinator = new(new ConsentStore(_store, _policy, _pollCancellation.Token), _provider, _clock,
-                new FreshnessPolicy(TimeSpan.FromMinutes(_resolvedSource == ClaudeQuotaSource.OtherMachine ? 15 : 10)), TimeSpan.FromMinutes(5));
+                new FreshnessPolicy(TimeSpan.FromMinutes(_resolvedSource == ClaudeQuotaSource.OtherMachine ? 15 : 10)), pollInterval);
+            _coordinatorRetrievalGeneration = 0;
+            var epoch = Interlocked.Increment(ref _authorityEpoch);
+            _authorityHandler = update => OnAuthorityUpdated(update, epoch);
+            _coordinator.AuthorityUpdated += _authorityHandler;
+            if (_historyStore is not null)
+                _historyRecorder = new(_coordinator, _historyStore, _clock, QuotaHistoryProvider.Claude,
+                    _resolvedSource == ClaudeQuotaSource.OtherMachine ? QuotaHistorySource.ClaudeRemote : QuotaHistorySource.ClaudeLocal);
             _coordinator.StateChanged += OnStateChanged;
             await _coordinator.InitializeAsync(cancellationToken);
             if (_exportWriter is not null)
@@ -296,7 +353,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             _enabled = true;
             ScheduleRemoteDeadline();
             _timer = _timeProvider.CreateTimer(_ => Forward(RefreshTrigger.Poll), null,
-                TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+                pollInterval, pollInterval);
             Notify(Notification.Consent);
         }
         catch
@@ -354,9 +411,10 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         catch (ObjectDisposedException) when (!_enabled || !ReferenceEquals(coordinator, _coordinator)) { }
     }
 
-    private async ValueTask StopCoreAsync()
+    private async ValueTask StopCoreAsync(bool discardPendingHistory = false)
     {
         _enabled = false; _policy.Disable();
+        Interlocked.Increment(ref _authorityEpoch);
         CancelRemoteDeadline();
         _pollCancellation?.Cancel();
         if (_timer is not null) await _timer.DisposeAsync();
@@ -372,6 +430,9 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
                     // The wrapper rejects not-yet-entered saves. Awaiting drains an already-entered
                     // save before clearing it, even if an injected provider/store ignores cancellation.
                     await _coordinator.CancelAndWaitAsync(CancellationToken.None);
+                    if (discardPendingHistory && _historyRecorder is not null)
+                        await _historyRecorder.CancelAndWaitAsync(CancellationToken.None);
+                    await StopHistoryAsync();
                     await _coordinator.ClearAsync(CancellationToken.None);
                 }
             }
@@ -380,14 +441,23 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         {
             if (_coordinator is not null)
             {
+                _coordinator.AuthorityUpdated -= _authorityHandler;
                 _coordinator.StateChanged -= OnStateChanged;
                 await _coordinator.DisposeAsync();
             }
+            await StopHistoryAsync();
             if (_provider is IAsyncDisposable asyncProvider) await asyncProvider.DisposeAsync();
             else if (_provider is IDisposable provider) provider.Dispose();
             _coordinator = null; _provider = null; _timer = null;
             _pollCancellation?.Dispose(); _pollCancellation = null;
         }
+    }
+
+    private async ValueTask StopHistoryAsync()
+    {
+        var recorder = _historyRecorder;
+        _historyRecorder = null;
+        if (recorder is not null) await recorder.DisposeAsync();
     }
 
     private async ValueTask StopExportAsync()
@@ -411,7 +481,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         try
         {
             ThrowIfDisposed();
-            try { await StopCoreAsync(); }
+            try { await StopCoreAsync(discardPendingHistory: true); }
             finally
             {
                 await _settings.SaveClaudeAsync(false, CancellationToken.None);
@@ -451,6 +521,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             }
             // Shutdown retains the normalized cache and consent; unlike revoke/clear it is not a reset.
             _enabled = false; _policy.Disable(); _pollCancellation?.Cancel();
+            Interlocked.Increment(ref _authorityEpoch);
             CancelRemoteDeadline();
             if (_timer is not null) await _timer.DisposeAsync();
             try { await StopExportAsync(); }
@@ -458,9 +529,11 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             {
                 if (_coordinator is not null)
                 {
+                    _coordinator.AuthorityUpdated -= _authorityHandler;
                     _coordinator.StateChanged -= OnStateChanged;
                     await _coordinator.DisposeAsync();
                 }
+                await StopHistoryAsync();
                 if (_provider is IAsyncDisposable asyncProvider) await asyncProvider.DisposeAsync();
                 else if (_provider is IDisposable provider) provider.Dispose();
                 _pollCancellation?.Dispose();

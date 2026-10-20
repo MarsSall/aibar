@@ -30,7 +30,7 @@ endpoint is unsupported and may change. A login expiring within 60 seconds is
 not sent; expired/401/403 results become `authentication-required`.
 Other failures become `unavailable`; no login refresh is attempted.
 
-Only this UTF-8, schema-v1 contract (at most 4096 bytes) is pushed to Windows:
+The quota collector pushes this unchanged UTF-8, schema-v1 contract (at most 4096 bytes):
 
 ```json
 {"schemaVersion":1,"generatedAt":"2026-10-18T02:00:00Z","state":"current","fiveHour":{"percentageUsed":32,"resetAt":"2026-10-18T06:27:00Z"},"weekly":null}
@@ -40,9 +40,25 @@ The property order is fixed. Windows receive path:
 `%LOCALAPPDATA%\AIBar\claude-remote-usage.json`. Windows must run under the same
 account/home as the configured SSH destination. Usage is 0–100; reset timestamps
 are normalized to UTC `Z` and required: a window without a reset time is sent as
-null. Non-current states have both windows null. Tokens, account/plan/email, paths, error details and HTTP bodies
-are never output, logged, or pushed. Normal logs contain only state and UTC time.
+null. Non-current states have both windows null. Authentication tokens,
+account/plan/email, paths, error details and HTTP bodies are never output, logged,
+or pushed. This quota contract contains no token counts. Normal logs contain only state and UTC time.
 The token is necessarily handled in Python process memory, not erased securely.
+
+## Cost and tokens: separate aggregate file
+
+`claude_remote_tokens.py` additionally reads assistant usage in
+`projects/**/*.jsonl` under the same Claude config root. It does not open
+credentials or call an API. It sends the last 30 Linux local calendar days by
+model, deduplicated by message ID plus request ID; synthetic messages are ignored.
+Only dates, model IDs and input/output/cache-write/cache-read counts leave Linux.
+Malformed or unreadable log records mark the aggregate partial, not complete zero.
+
+Its destination is **`claude-remote-tokens.json`**, not the quota file above.
+It has an independent schema-1 contract, 1 MiB cap, and two-hour freshness limit.
+See [cost and tokens](../../docs/usage-cost.md) for fields, pricing and display rules.
+The service runs this collector as an independent pre-step; failure does not
+prevent the existing quota push. The quota CLI and its `--dry-run` are unchanged.
 
 ## Try once, then install (explicit opt-in)
 
@@ -55,12 +71,14 @@ Run these commands from this helper directory on Linux **only when ready**:
 
 ```sh
 python3 claude_remote_usage.py --dry-run
+python3 claude_remote_tokens.py --dry-run
 install -d -m 700 ~/.config/aibar ~/.local/lib/aibar ~/.config/systemd/user
 install -m 600 claude-remote-usage.conf.example ~/.config/aibar/claude-remote-usage.conf
 # Edit host and remote_dir in that config before the first push.
-install -m 700 claude_remote_usage.py ~/.local/lib/aibar/claude_remote_usage.py
+install -m 700 claude_remote_usage.py claude_remote_tokens.py ~/.local/lib/aibar/
 install -m 644 aibar-claude-remote-usage.service aibar-claude-remote-usage.timer ~/.config/systemd/user/
 python3 ~/.local/lib/aibar/claude_remote_usage.py --once
+python3 ~/.local/lib/aibar/claude_remote_tokens.py --once
 systemctl --user daemon-reload
 systemctl --user enable --now aibar-claude-remote-usage.timer
 ```
@@ -97,9 +115,9 @@ same destination. AIBar treats data older than 15 minutes as stale, not current.
   and state-only logs with `journalctl --user -u aibar-claude-remote-usage.service`.
 - To uninstall, run `systemctl --user disable --now aibar-claude-remote-usage.timer`,
   stop any active service with `systemctl --user stop aibar-claude-remote-usage.service`,
-  then remove the two installed unit files, installed helper, and
+  then remove the two installed unit files, both installed Python helpers, and
   `~/.config/aibar/claude-remote-usage.conf`; run `systemctl --user daemon-reload`.
-  Remove the remote JSON and `.tmp` file separately if desired; **Automatic**
+  Remove both remote JSON files and their `.tmp` files separately if desired; **Automatic**
   returns to the Windows login after the JSON is removed, on the next refresh.
   Alternatively, select **This PC** to force local use or disable Claude quota.
   Never remove Claude Code credentials. Leaving a stopped helper's JSON in place

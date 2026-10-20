@@ -237,8 +237,12 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     {
         if (_disposed) return;
         _presentation?.RecalculateFromClock();
-        _ = ReevaluateSafelyAsync(RefreshTrigger.PopoverOpened);
-        RunSafely(() => { _popover.Show(); _popover.Activate(); });
+        RunSafely(() =>
+        {
+            _popover.Show();
+            if (_popover.IsVisible) _ = ReevaluateSafelyAsync(RefreshTrigger.PopoverOpened);
+            _popover.Activate();
+        });
     }
     private void OnDeactivated()
     {
@@ -350,7 +354,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     public ValueTask DisposeAsync() => new(ExitAsync());
 }
 
-public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IClaudeQuotaTray, IClaudeQuotaSourceTray
+public sealed partial class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IClaudeQuotaTray, IClaudeQuotaSourceTray, IQuotaAlertTray
 {
     private readonly Forms.NotifyIcon _icon = new() { Icon = SystemIcons.Application, Text = "AIBar", Visible = false };
     private readonly Forms.ContextMenuStrip _menu = new();
@@ -375,6 +379,7 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IC
     private bool _privateIntegrationEnabled;
     public WindowsTrayRuntime()
     {
+        InitializeAlerts();
         var exit = new Forms.ToolStripMenuItem("Exit AIBar");
         _claudeSource.DropDownItems.AddRange(new Forms.ToolStripItem[] { _claudeAutomatic, _claudeThisPc, _claudeOtherMachine });
         _claudeAutomatic.Click += (_, _) => ClaudeSourceRequested?.Invoke(ClaudeQuotaSource.Automatic);
@@ -447,6 +452,21 @@ public sealed class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IC
         else { _menu.Items.Remove(_openCodeUsage); _menu.Items.Remove(_piUsage); _menu.Items.Remove(_chooseOpenCodeFolder); _menu.Items.Remove(_resetOpenCodeFolder); }
     }
     public void SetLocalUsagePolicy(LocalUsagePolicy policy) { _openCodeUsage.Checked = policy.OpenCodeEnabled; _piUsage.Checked = policy.PiEnabled; _resetOpenCodeFolder.Enabled = policy.OpenCodeDataRoot is not null; }
+    // Panel actions reuse the exact live tray menu and shutdown event, including consent and alerts.
+    public void ShowSettingsMenu(System.Windows.Window owner)
+    {
+        if (owner is MainWindow panel) panel.IsSettingsMenuOpen = true;
+        void Closed(object? sender, Forms.ToolStripDropDownClosedEventArgs args)
+        {
+            _menu.Closed -= Closed;
+            if (owner is MainWindow current) current.IsSettingsMenuOpen = false;
+            if (!owner.IsActive) owner.Hide();
+        }
+        _menu.Closed += Closed;
+        _menu.Show(Forms.Cursor.Position);
+        _menu.Focus();
+    }
+    public void RequestExit() => ExitRequested?.Invoke();
     public void Show() => _icon.Visible = true;
     public void Hide() => _icon.Visible = false;
     public ValueTask DisposeAsync() { _icon.Dispose(); return ValueTask.CompletedTask; }
@@ -486,7 +506,7 @@ public static class WindowsPopoverPlacementContextProvider
 {
     public static PopoverPlacementContext Get(Window window)
     {
-        var width = Math.Max(window.MinWidth, Positive(window.ActualWidth, window.Width, 420));
+        var width = Math.Max(window.MinWidth, Positive(window.ActualWidth, window.Width, 360));
         var height = Math.Max(window.MinHeight, Positive(window.ActualHeight, window.Height, window.MinHeight));
         try
         {
@@ -530,7 +550,7 @@ public sealed class WpfPopoverRuntime : IPopoverRuntime
     }
     public event Action? Deactivated;
     public bool IsVisible => _window.IsVisible;
-    public bool IsOwnedDialogActive => _window.OwnedWindows.OfType<Window>().Any(candidate => candidate.IsVisible);
+    public bool IsOwnedDialogActive => _window is MainWindow { IsSettingsMenuOpen: true } || _window.OwnedWindows.OfType<Window>().Any(candidate => candidate.IsVisible);
     public void Show()
     {
         _theme?.Reevaluate();

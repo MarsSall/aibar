@@ -16,8 +16,12 @@ To use a Linux Claude Code login, follow
 [the optional remote usage helper instructions](../tools/claude-remote-usage/README.md).
 No tray change is needed after installing the helper: **Claude source: Automatic**
 detects `%LOCALAPPDATA%\AIBar\claude-remote-usage.json` on initialization and each
-refresh, including five-minute polls. Claude consent is still required once.
-The helper pushes only usage percentages, reset times and availability—not credentials.
+refresh, including polls (the saved refresh interval when resolved to This PC,
+default five minutes; every minute when resolved to Other machine). Claude consent is still required once.
+The quota helper pushes only usage percentages, reset times and availability—not credentials.
+A separate log collector also pushes daily model/token aggregates to
+`claude-remote-tokens.json` for [estimated cost and tokens](usage-cost.md).
+This does not change the quota payload or its 4096-byte limit.
 Renew an expired session in Claude Code on Linux; data that stops updating is
 marked stale after 15 minutes. An existing stale or invalid file stays remote;
 AIBar never silently falls back to the local login. Reparse-point files are not
@@ -38,11 +42,20 @@ Claude has its own loading, unavailable and stale-cache status. If its login is 
 
 **Refresh** refreshes both enabled integrations; **Copy summary** remains Codex-only. Enabling or disabling Claude updates the open panel without restarting. When Claude is off, its section disappears from layout and UI Automation and the panel shows only the **CODEX** section.
 
+## Cost and tokens
+
+While Claude is enabled, **Pace & details** shows **Today** and **Last 30 days**
+rows from Linux log aggregates, independently of the selected quota source.
+No prompt, source path, message ID or authentication token is sent. Estimates use
+the checked-in official list-price catalog; unpriced models are visibly partial,
+never silently charged at zero. Missing, invalid or more-than-two-hour-old token
+files show **Unavailable**. See [cost and tokens](usage-cost.md).
+
 ## Local data and privacy
 
-While enabled, Claude uses the same five-minute polling cadence, cache-first freshness and throttling policy as Codex. Its normalized usage windows live in `%LOCALAPPDATA%\AIBar\claude-quota.db`, separate from Codex's `quota.db`. Consent is a separate decision in `settings.json`. Credential contents, tokens and credential paths are never logged or persisted in quota data.
+While enabled, Claude This PC polls at **Settings › Providers › Refresh every**: 1, 2, 5, 15 or 30 minutes (default 5). Save updates both the timer and coordinator minimum interval live, without restart; selecting 1 minute shows **May hit provider rate limits.** Other machine stays at one minute regardless of the setting, including Automatic resolved to remote. Source changes reconfigure both the timer and minimum interval and preserve the local choice. Polls use time since the last attempt, even while the cached data is current; freshness still marks local data stale after 10 minutes and remote data after 15 minutes. Opening the panel refreshes enabled providers whose last successful retrieval is older than one minute, with at least one minute between attempts. Manual **Refresh** remains unthrottled. Its normalized usage windows live in `%LOCALAPPDATA%\AIBar\claude-quota.db`, separate from Codex's `quota.db`. Consent is a separate decision in `settings.json`. Credential contents, tokens and credential paths are never logged or persisted in quota data.
 
-**Clear AIBar Data** cancels Claude work before removing `claude-quota.db`, its `-wal` and `-shm` sidecars, consent settings and the Claude YASB export (alongside the other AIBar-owned data). Claude stays off until explicitly enabled again. The Claude Code login is never deleted or modified.
+**Clear AIBar Data** cancels Claude work before removing `claude-quota.db`, its `-wal` and `-shm` sidecars, consent settings and the Claude YASB export (alongside the other AIBar-owned data). Claude stays off until explicitly enabled again. The separate token reader also cancels and drains, clears its display and removes `claude-remote-tokens.json`; Linux source logs and the existing remote quota payload remain untouched. A running helper may republish the aggregate. The Claude Code login is never deleted or modified.
 
 ## YASB: add the second widget
 

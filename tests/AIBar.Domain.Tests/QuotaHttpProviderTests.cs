@@ -7,6 +7,23 @@ namespace AIBar.Domain.Tests;
 
 public sealed class QuotaHttpProviderTests
 {
+    [Theory]
+    [InlineData("\"plus\"", "Plus")]
+    [InlineData("\"unexpected-private-text\"", null)]
+    [InlineData("null", null)]
+    public async Task Plan_is_optional_metadata_from_existing_usage_response(string plan, string? expected)
+    {
+        var handler = new StubHandler(
+            Json("{\"plan_type\":" + plan + ",\"rate_limit\":{\"primary_window\":{\"used_percent\":25,\"reset_at\":1893459600,\"limit_window_seconds\":18000}}}"),
+            Json("{\"available_count\":0}"));
+        var provider = Provider(handler);
+        var result = await provider.GetQuotaAsync(default);
+        Assert.Null(result.Failure);
+        Assert.Equal(expected, provider.PlanLabel);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal(25m, result.Snapshot!.Primary!.PercentageUsed);
+    }
+
     [Fact]
     public async Task Maps_official_windows_with_unix_resets_and_available_credits()
     {

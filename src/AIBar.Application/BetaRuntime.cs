@@ -18,14 +18,24 @@ public sealed class BetaRuntime : IAsyncDisposable
     private readonly ILocalAnalyticsLifecycle? _analytics;
     private readonly QuotaExportPublisher? _publisher;
     private readonly CancellationTokenSource _lifetime = new();
-    private readonly PeriodicTimer _pollTimer = new(TimeSpan.FromMinutes(5));
+    private readonly PeriodicTimer _pollTimer;
     private readonly SemaphoreSlim _consentGate = new(1, 1);
     private Task? _polling;
     private bool _disposed;
 
-    public BetaRuntime(ConsentSettings settings, PrivateIntegrationPolicy policy, QuotaRefreshCoordinator coordinator, IClock clock, ConsentCredentialSource? credentials = null, ILocalAnalyticsLifecycle? analytics = null, QuotaExportPublisher? publisher = null)
+    public BetaRuntime(ConsentSettings settings, PrivateIntegrationPolicy policy, QuotaRefreshCoordinator coordinator, IClock clock, ConsentCredentialSource? credentials = null, ILocalAnalyticsLifecycle? analytics = null, QuotaExportPublisher? publisher = null, TimeProvider? timeProvider = null)
     {
         _settings = settings; _policy = policy; _coordinator = coordinator; _clock = clock; _credentials = credentials; _analytics = analytics; _publisher = publisher;
+        _pollTimer = new(TimeSpan.FromMinutes(5), timeProvider ?? TimeProvider.System);
+    }
+
+    public void SetRefreshMinutes(int minutes)
+    {
+        if (!AppearanceSettings.ValidRefreshMinutes(minutes)) throw new ArgumentOutOfRangeException(nameof(minutes));
+        if (_disposed) return;
+        var interval = TimeSpan.FromMinutes(minutes);
+        _coordinator.SetMinimumPollInterval(interval);
+        _pollTimer.Period = interval;
     }
 
     public string Disclosure => _policy.Disclosure;
