@@ -14,6 +14,24 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
     private ConsentSettings Settings => new(Path.Combine(_root, "settings.json"));
 
+    [Fact]
+    public async Task Plan_metadata_is_local_only_and_disappears_on_source_switch_or_revoke()
+    {
+        var provider = new Provider { PlanLabel = "Max" };
+        await using var runtime = new ClaudeQuotaRuntime(Settings, new MemoryStore(), _ => provider, new Clock(),
+            remoteProviderFactory: _ => new Provider { PlanLabel = "Pro" }, remoteFileAvailable: () => false);
+        await runtime.InitializeAsync(default);
+        Assert.Null(runtime.PlanLabel);
+        await runtime.GrantConsentAsync(default);
+        Assert.Equal("Max", runtime.PlanLabel);
+        await runtime.SetSourceAsync(ClaudeQuotaSource.OtherMachine, default);
+        Assert.Null(runtime.PlanLabel); // Even a remote provider cannot borrow the local credential's plan.
+        await runtime.SetSourceAsync(ClaudeQuotaSource.ThisPc, default);
+        Assert.Equal("Max", runtime.PlanLabel);
+        await runtime.RevokeConsentAsync(default);
+        Assert.Null(runtime.PlanLabel);
+    }
+
     // a: schema 1, optional decision, and the existing two-property Codex contract.
     [Fact]
     public async Task Missing_and_legacy_settings_leave_Claude_off_without_changing_Codex()
@@ -373,8 +391,9 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
         { Started.TrySetResult(); await Release.Task; Snapshot = snapshot; }
         public ValueTask ClearAsync(CancellationToken cancellationToken) { Snapshot = null; return ValueTask.CompletedTask; }
     }
-    private sealed class Provider(QuotaSnapshot? snapshot = null) : IQuotaProvider
+    private sealed class Provider(QuotaSnapshot? snapshot = null) : IQuotaProvider, IQuotaPlanMetadata
     {
+        public string? PlanLabel { get; init; }
         public int Calls { get; private set; }
         public QuotaProviderResult Result { get; set; } = new(snapshot ?? Snapshot(), null);
         public ValueTask<QuotaProviderResult> GetQuotaAsync(CancellationToken cancellationToken) { Calls++; return ValueTask.FromResult(Result); }

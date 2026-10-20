@@ -130,9 +130,11 @@ public sealed class PanelIdentityTests
             Assert.Contains("78% used", text); Assert.Contains("92% used", text);
             Assert.Contains("Resets in 3d 20h", text); Assert.Contains("Resets in 3h 53m", text);
             var titles = Visuals<TextBlock>(window).Where(item => item.IsVisible && item.Text is "Codex" or "Claude").ToArray();
-            Assert.Equal(new[] { "Codex", "Claude" }, titles.Select(AutomationProperties.GetName));
-            var claudeBars = Visuals<ProgressBar>(window).Where(bar => bar.IsVisible && AutomationProperties.GetName(bar).StartsWith("Claude", StringComparison.Ordinal)).ToArray();
+            Assert.Contains(titles, title => AutomationProperties.GetName(title) == "Claude");
+            var claudeBars = Visuals<PanelMeter>(window).Where(meter => meter.IsVisible && meter.Provider == "Claude").SelectMany(Visuals<ProgressBar>).ToArray();
             Assert.Equal(new[] { Parse("#C4703F"), Parse("#C4703F") }, claudeBars.Select(bar => Assert.IsAssignableFrom<SolidColorBrush>(bar.Foreground).Color));
+            window.SelectProvider("Codex"); window.UpdateLayout();
+            Assert.DoesNotContain(Visuals<PanelMeter>(window), meter => meter.IsVisible && meter.Provider == "Claude");
             var codexBar = Visuals<ProgressBar>(window).First(bar => bar.IsVisible && AutomationProperties.GetName(bar) == "Weekly quota progress");
             Assert.Equal(Parse("#10A37F"), Assert.IsAssignableFrom<SolidColorBrush>(codexBar.Foreground).Color);
         });

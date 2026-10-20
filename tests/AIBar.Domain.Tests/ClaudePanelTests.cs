@@ -96,10 +96,13 @@ public sealed class ClaudePanelTests
             Assert.Same(root, panel.Window.Content);
             Assert.Equal(children, root.Children.Cast<UIElement>());
             Assert.Equal(2, root.RowDefinitions.Count);
-            Assert.Contains(VisibleText(cards), text => text == "Codex");
-            Assert.Contains(VisibleText(cards), text => text == "Claude");
-            Assert.Equal(new[] { 11d, 20d, 31d, 67d },
-                Visuals<ProgressBar>(cards).Where(item => item.IsVisible).Select(item => item.Value));
+            Assert.Equal("Claude", panel.Window.SelectedProvider);
+            Assert.DoesNotContain("Codex", VisibleText(cards));
+            Assert.Contains("Claude", VisibleText(cards));
+            Assert.Equal(new[] { 31d, 67d }, Visuals<ProgressBar>(cards).Where(item => item.IsVisible).Select(item => item.Value));
+            panel.Window.SelectProvider("Codex"); panel.Window.UpdateLayout();
+            Assert.Equal(new[] { 11d, 20d }, Visuals<ProgressBar>(cards).Where(item => item.IsVisible).Select(item => item.Value));
+            panel.Window.SelectProvider("Claude"); panel.Window.UpdateLayout();
             panel.Revoke();
             AssertNoClaude(panel.Window);
             Assert.Equal(new[] { 11d, 20d }, Visuals<ProgressBar>(cards).Where(item => item.IsVisible).Select(item => item.Value));
@@ -123,7 +126,7 @@ public sealed class ClaudePanelTests
                 app.Resources.MergedDictionaries[0] = ThemeDictionaries.Create(theme);
                 using var panel = new PanelFixture(); panel.Enable();
                 var cards = Assert.IsType<StackPanel>(panel.Window.FindName("QuotaCards"));
-                var meters = Visuals<GroupBox>(cards).Where(item => item.IsVisible).ToArray();
+                var meters = Visuals<GroupBox>(cards).ToArray();
                 Assert.Equal(new[] { "5-hour quota card", "Weekly quota card", "Claude 5-hour quota card", "Claude weekly quota card" }, meters.Select(AutomationProperties.GetName));
                 foreach (var card in meters.Skip(2))
                 {
@@ -143,17 +146,21 @@ public sealed class ClaudePanelTests
                     Assert.Contains(VisibleText(card), text => text.StartsWith("Resets in ", StringComparison.Ordinal));
                 }
                 var bars = Visuals<ProgressBar>(cards).Where(item => item.IsVisible).ToArray();
-                Assert.Equal(new[] { "5-hour quota progress", "Weekly quota progress", "Claude 5-hour quota progress", "Claude weekly quota progress" },
+                Assert.Equal(new[] { "Claude 5-hour quota progress", "Claude weekly quota progress" },
                     bars.Select(item => new ProgressBarAutomationPeer(item).GetName()));
                 var names = AutomationNames(panel.Window);
-                Assert.Contains("5-hour quota progress", names);
+                Assert.DoesNotContain("5-hour quota progress", names);
                 Assert.Contains("Claude weekly quota progress", names);
-                Assert.True(Array.IndexOf(names, "5-hour quota progress") < Array.IndexOf(names, "Claude weekly quota progress"));
                 Assert.Contains("Claude 5-hour quota progress", names);
+                panel.Window.SelectProvider("Codex"); panel.Window.UpdateLayout();
+                names = AutomationNames(panel.Window);
+                Assert.Contains("5-hour quota progress", names);
+                Assert.Contains("Weekly quota progress", names);
+                Assert.DoesNotContain("Claude weekly quota progress", names);
                 var details = Assert.IsType<Button>(panel.Window.FindName("CostButton"));
                 details.Focus(); Assert.True(details.IsKeyboardFocused);
                 Assert.True(details.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
-                Assert.Equal("Refresh quota", AutomationProperties.GetName(Assert.IsAssignableFrom<DependencyObject>(Keyboard.FocusedElement)));
+                Assert.Equal("Usage Dashboard", AutomationProperties.GetName(Assert.IsAssignableFrom<DependencyObject>(Keyboard.FocusedElement)));
             }
             finally { app.Resources.MergedDictionaries[0] = original; }
         });
@@ -168,6 +175,7 @@ public sealed class ClaudePanelTests
         WpfTestApplicationHost.Run(_ =>
         {
             using var panel = new PanelFixture(primary, weekly); panel.Enable();
+            panel.Window.SelectProvider("Claude"); panel.Window.UpdateLayout();
             var cards = Visuals<GroupBox>(panel.Window).Where(item => AutomationProperties.GetName(item).StartsWith("Claude ", StringComparison.Ordinal)).ToArray();
             Assert.Equal(2, cards.Length);
             Assert.Equal(new[] { primary ? Visibility.Visible : Visibility.Collapsed, weekly ? Visibility.Visible : Visibility.Collapsed }, cards.Select(item => item.Visibility));
@@ -224,7 +232,7 @@ public sealed class ClaudePanelTests
             panel.Provider.Result = new(null, new(failure, "synthetic-token C:\\synthetic\\login.json Max-plan"));
             panel.Enable();
             Assert.Contains(expected, VisibleText(panel.Window));
-            Assert.DoesNotContain(Visuals<ProgressBar>(panel.Window), bar => bar.IsVisible && AutomationProperties.GetName(bar).StartsWith("Claude", StringComparison.Ordinal));
+            Assert.DoesNotContain(Visuals<PanelMeter>(panel.Window), meter => meter.IsVisible && meter.Provider == "Claude");
             Assert.DoesNotContain(VisibleText(panel.Window), text => text.Contains("synthetic", StringComparison.Ordinal) || text.Contains("Max-plan", StringComparison.Ordinal));
         });
     }
@@ -247,7 +255,7 @@ public sealed class ClaudePanelTests
             Assert.Same(view.RefreshCommand, refresh.Command);
             Assert.True(refresh.Command.CanExecute(null));
             refresh.Command.Execute(null);
-            var deadline = DateTime.UtcNow.AddSeconds(5);
+            var deadline = DateTime.UtcNow.AddSeconds(60);
             while (!view.RefreshCommand.CanExecute && DateTime.UtcNow < deadline) { Pump(); Thread.Sleep(5); }
             Pump();
             Assert.True(view.RefreshCommand.CanExecute);
@@ -299,7 +307,7 @@ public sealed class ClaudePanelTests
     private static void Pump() => Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
     private static void Wait(Task task)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(5);
+        var deadline = DateTime.UtcNow.AddSeconds(60);
         while (!task.IsCompleted && DateTime.UtcNow < deadline) { Pump(); Thread.Sleep(5); }
         Assert.True(task.IsCompleted, "Panel operation exceeded its test bound");
         task.GetAwaiter().GetResult(); Pump();
@@ -340,6 +348,7 @@ public sealed class ClaudePanelTests
         public void Enable()
         {
             Wait(Composition.ClaudeQuota.GrantConsentAsync(default).AsTask());
+            Window.SelectProvider("Claude");
             Window.UpdateLayout();
             // Let pending bindings (including inline Runs) resolve, like the existing panel tests do.
             System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);

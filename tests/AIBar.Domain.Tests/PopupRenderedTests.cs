@@ -56,7 +56,7 @@ public sealed class PopupRenderedTests
                 cost.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Layout();
                 var children = root.Children.Cast<UIElement>().ToArray(); var cards = Assert.IsType<StackPanel>(window.FindName("QuotaCards")); var secondary = Assert.IsType<ScrollViewer>(children[0]); var footer = Assert.IsType<StackPanel>(children[1]);
-                var quotaCards = cards.Children.OfType<GroupBox>().ToArray();
+                var quotaCards = ((StackPanel)window.FindName("CodexQuotaSection")).Children.OfType<GroupBox>().ToArray();
                 var claudeSection = Assert.IsType<StackPanel>(window.FindName("ClaudeQuotaSection"));
                 Assert.Equal(Visibility.Collapsed, claudeSection.Visibility);
                 // A collapsed section is never measured, so count its meters in the logical tree.
@@ -126,7 +126,7 @@ public sealed class PopupRenderedTests
                     root.Measure(new Size(420, 720)); root.Arrange(new Rect(0, 0, 420, 720)); root.UpdateLayout();
                     System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle); root.UpdateLayout();
                     var cards = Assert.IsType<StackPanel>(window.FindName("QuotaCards"));
-                    var quotaCards = cards.Children.OfType<GroupBox>().ToArray();
+                    var quotaCards = ((StackPanel)window.FindName("CodexQuotaSection")).Children.OfType<GroupBox>().ToArray();
                     Assert.Equal(new[] { "5-hour quota card", "Weekly quota card" }, quotaCards.Select(card => AutomationProperties.GetName(card)));
                     Assert.Equal(new[] { scenario.Primary ? Visibility.Visible : Visibility.Collapsed, scenario.Weekly ? Visibility.Visible : Visibility.Collapsed }, quotaCards.Select(card => card.Visibility));
                     Assert.All(quotaCards.Where(card => card.Visibility == Visibility.Collapsed), card => { Assert.False(card.IsVisible); Assert.Equal(0, card.ActualHeight); });

@@ -36,10 +36,8 @@ public sealed class ProviderStatusPanelTests
                 presentation.Start();
                 Pump();
                 Assert.Empty(calls);
-                var usage = Descendants<Button>(window).Where(button => Equals(button.Content, "Dashboard ↗")).ToArray();
-                Assert.Equal(2, usage.Length);
-                Assert.All(usage, button => Assert.True(button.Focusable));
-                Assert.True(usage.Single(button => AutomationProperties.GetName(button).Contains("Codex")).IsVisible);
+                var usage = Descendants<Button>(window).Single(button => Equals(button.Content, "Usage Dashboard"));
+                Assert.True(usage.Focusable && usage.IsVisible);
                 var codexBadge = Descendants<Button>(window).Single(button => AutomationProperties.GetName(button) == "Open OpenAI service status");
                 var claudeBadge = Descendants<Button>(window).Single(button => AutomationProperties.GetName(button) == "Open Anthropic service status");
                 Assert.Equal(Visibility.Collapsed, codexBadge.Visibility);
@@ -52,7 +50,10 @@ public sealed class ProviderStatusPanelTests
                 Assert.Contains(Descendants<System.Windows.Shapes.Ellipse>(codexBadge), dot => dot.IsVisible && dot.Width == 7);
                 Assert.Contains(Descendants<TextBlock>(codexBadge), text => text.IsVisible && text.Text == "API incident");
                 Assert.Equal(Visibility.Collapsed, claudeBadge.Visibility);
-                Assert.True(usage.Single(button => AutomationProperties.GetName(button).Contains("Claude")).IsVisible);
+                window.SelectProvider("Claude"); window.UpdateLayout();
+                Assert.True(usage.IsVisible);
+                Assert.False(codexBadge.IsVisible);
+                window.SelectProvider("Codex"); window.UpdateLayout();
                 codex.Set(false);
                 Pump();
                 Assert.Equal(Visibility.Collapsed, codexBadge.Visibility);

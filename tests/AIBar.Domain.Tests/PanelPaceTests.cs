@@ -22,15 +22,21 @@ public sealed class PanelPaceTests
     [InlineData(WindowsTheme.HighContrast)]
     public void Summary_shows_inline_pace_with_accessible_rows_and_no_second_meter(WindowsTheme theme)
     {
+        // Session projections remain available to data consumers even though S7 renders only Weekly pace.
+        var state = new QuotaPresentationMapper(new Clock()).Map(new(
+            new(new(70, Now.AddHours(2.5)), new(35, Now.AddDays(3.5)), Now), FreshnessState.Current, false, null, null));
+        Assert.Equal("Pace: Ahead (+40%) · Runs out in 1h 4m", state.Primary.Pace!.Text);
+        Assert.Equal(PanelTone.Near, state.Primary.Pace.Tone);
         WithPanel(theme, true, true, window =>
         {
             Assert.Equal(Visibility.Collapsed, ((System.Windows.Controls.StackPanel)window.FindName("DetailView")).Visibility);
             var rows = Visuals<PanelPaceRow>(window).Where(row => row.IsVisible).ToArray();
-            Assert.Equal(new[] { "Codex 5-hour", "Codex weekly", "Claude 5-hour", "Claude weekly" }, rows.Select(row => row.Data.Label));
-            Assert.Equal("Pace: Ahead (+40%) · Runs out in 1h 4m", rows[0].Data.Text);
-            Assert.Equal("Pace: Behind (−30%) · Lasts to reset", rows[1].Data.Text);
-            Assert.Equal(PanelTone.Near, rows[0].Data.Tone);
-            Assert.Equal(PanelTone.Muted, rows[1].Data.Tone);
+            Assert.Equal(new[] { "Codex weekly" }, rows.Select(row => row.Data.Label));
+            Assert.Equal("Pace: Behind (−30%) · Lasts to reset", rows[0].Data.Text);
+            Assert.Equal(PanelTone.Muted, rows[0].Data.Tone);
+            window.SelectProvider("Claude"); window.UpdateLayout();
+            Assert.Equal(new[] { "Claude weekly" }, Visuals<PanelPaceRow>(window).Where(row => row.IsVisible).Select(row => row.Data.Label));
+            window.SelectProvider("Codex"); window.UpdateLayout();
             foreach (var row in rows)
             {
                 Assert.Equal(row.Data.Label + " pace", AutomationProperties.GetName(row));
@@ -52,7 +58,7 @@ public sealed class PanelPaceTests
         WithPanel(WindowsTheme.Dark, false, true, window =>
         {
             window.UpdateLayout();
-            Assert.Equal(2, Visuals<PanelPaceRow>(window).Count(row => row.IsVisible));
+            Assert.Single(Visuals<PanelPaceRow>(window).Where(row => row.IsVisible));
             Assert.DoesNotContain(Visuals<PanelPaceRow>(window).Where(row => row.IsVisible), row => row.Data.Label.StartsWith("Claude"));
         });
     }
@@ -80,15 +86,18 @@ public sealed class PanelPaceTests
         {
             window.UpdateLayout();
             var rows = Visuals<PanelPaceRow>(window).Where(row => row.IsVisible).ToArray();
-            Assert.Equal(new[] { "Codex 5-hour", "Claude 5-hour" }, rows.Select(row => row.Data.Label));
-            Assert.All(rows, row =>
-            {
-                Assert.Equal("Pace: Limit reached", row.Data.Text);
-                Assert.Equal(PanelTone.Muted, row.Data.Tone);
-                var text = Visuals<TextBlock>(row).Single(item => item.Text == "Pace: Limit reached");
-                Assert.Equal(PanelPalette.ToneColor(PanelTone.Muted, true), Assert.IsAssignableFrom<SolidColorBrush>(text.Foreground).Color);
-            });
+            // S7 places pace only below Weekly; absent Weekly means no summary pace.
+            Assert.Empty(rows);
+            var session = Visuals<PanelMeter>(window).First(meter => meter.IsVisible);
+            Assert.Equal(100m, session.Usage);
+            Assert.Null(session.Pace);
+            window.SelectProvider("Claude"); window.UpdateLayout();
+            Assert.Empty(Visuals<PanelPaceRow>(window).Where(row => row.IsVisible));
         }, primary: 100, includeWeekly: false);
+        var state = new QuotaPresentationMapper(new Clock()).Map(new(
+            new(new(100, Now.AddHours(2.5)), null, Now), FreshnessState.Current, false, null, null));
+        Assert.Equal("Pace: Limit reached", state.Primary.Pace!.Text);
+        Assert.Equal(PanelTone.Muted, state.Primary.Pace.Tone);
     }
 
     private static void WithPanel(WindowsTheme theme, bool enabled, bool current, Action<MainWindow> assert, decimal primary = 70, bool includeWeekly = true)

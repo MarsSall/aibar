@@ -42,11 +42,20 @@ public sealed class CodexBarPanelTests
                     }
                 };
                 window.Show(); window.UpdateLayout();
+                window.SelectProvider("Claude"); window.UpdateLayout();
+                Assert.True(((StackPanel)window.FindName("ClaudeQuotaSection")).IsVisible);
+                Assert.Contains(Visuals<TextBlock>(window), text => text.IsVisible && text.Text == "Today: unavailable");
+                Assert.Contains(Visuals<TextBlock>(window), text => text.IsVisible && text.Text == "Last 30 days: $254.24 · 918M tokens (partial)");
+                window.SelectProvider("Codex"); window.UpdateLayout();
                 var titles = Visuals<TextBlock>(window).Where(text => text.Text is "Codex" or "Claude").ToArray();
-                Assert.Equal(new[] { "Codex", "Claude" }, titles.Select(text => text.Text));
-                Assert.All(titles, text => { Assert.Equal(17d, text.FontSize); Assert.Equal(FontWeights.SemiBold, text.FontWeight); });
-                Assert.Equal(new[] { "5-hour quota progress", "Weekly quota progress", "Claude 5-hour quota progress", "Claude weekly quota progress" }, Visuals<ProgressBar>(window).Select(AutomationProperties.GetName));
-                Assert.All(Visuals<ProgressBar>(window), bar =>
+                Assert.Contains(titles, text => text.Text == "Codex");
+                Assert.Contains(titles, text => text.Text == "Claude");
+                Assert.Equal("Codex", window.SelectedProvider);
+                Assert.False(((StackPanel)window.FindName("ClaudeQuotaSection")).IsVisible);
+                var heading = Visuals<TextBlock>(window).Single(text => text.IsVisible && AutomationProperties.GetName(text) == "Codex");
+                Assert.Equal(21d, heading.FontSize); Assert.Equal(FontWeights.Bold, heading.FontWeight);
+                Assert.Equal(new[] { "5-hour quota progress", "Weekly quota progress", "Claude 5-hour quota progress", "Claude weekly quota progress" }, Visuals<PanelMeter>(window).Select(meter => meter.MeterName));
+                Assert.All(Visuals<PanelMeter>(window).SelectMany(Visuals<ProgressBar>), bar =>
                 {
                     Assert.Equal(6d, bar.Height);
                     Assert.Equal(theme == WindowsTheme.HighContrast ? System.Windows.SystemColors.HighlightColor :
@@ -56,10 +65,10 @@ public sealed class CodexBarPanelTests
                 var texts = Visuals<TextBlock>(window).Select(text => text.Text).ToArray();
                 Assert.Contains("Updated 2 min ago · from other machine", texts);
                 Assert.Contains("Session", texts); Assert.Contains("Weekly", texts);
-                Assert.Contains("Codex · Today: $0.04 · 15K tokens", texts);
-                Assert.Contains("Codex · Last 30 days: $12.80+ · 9.4M tokens (some models unpriced)", texts);
-                Assert.Contains("Claude · Today: unavailable", texts);
-                Assert.Contains("Claude · Last 30 days: $254.24 · 918M tokens (partial)", texts);
+                Assert.Contains("Today: $0.04 · 15K tokens", texts);
+                Assert.Contains("Last 30 days: $12.80+ · 9.4M tokens (some models unpriced)", texts);
+                Assert.Contains("Today: unavailable", texts);
+                Assert.Contains("Last 30 days: $254.24 · 918M tokens (partial)", texts);
                 var cost = Assert.IsType<Button>(window.FindName("CostButton"));
                 var back = Assert.IsType<Button>(window.FindName("BackButton"));
                 var summary = Assert.IsType<StackPanel>(window.FindName("SummaryView"));
@@ -89,7 +98,7 @@ public sealed class CodexBarPanelTests
                 window.UpdateLayout(); Assert.Equal(Visibility.Collapsed, detail.Visibility);
                 var menu = Assert.IsType<StackPanel>(window.FindName("PanelActions"));
                 var buttons = menu.Children.OfType<Button>().ToArray();
-                Assert.Equal(new[] { "Refresh quota", "Copy quota summary", "Status Page", "Settings", "Quit AIBar" }, buttons.Select(AutomationProperties.GetName));
+                Assert.Equal(new[] { "Usage Dashboard", "Status Page", "Refresh quota", "Copy quota summary", "Settings", "About AIBar", "Quit AIBar" }, buttons.Select(AutomationProperties.GetName));
                 Assert.All(buttons, button =>
                 {
                     Assert.True(button.Focusable && button.IsTabStop); Assert.NotNull(button.FocusVisualStyle);
@@ -100,7 +109,7 @@ public sealed class CodexBarPanelTests
                 var settings = 0; var quit = 0;
                 window.SettingsRequested += () => settings++;
                 window.QuitRequested += () => quit++;
-                Invoke(buttons[3]); Invoke(buttons[4]);
+                Invoke(buttons[4]); Invoke(buttons[6]);
                 Assert.Equal(1, settings); Assert.Equal(1, quit);
                 Assert.DoesNotContain(Visuals<TextBlock>(window), text => text.Text is "AIBAR" or "Pace & details");
             }
@@ -127,13 +136,13 @@ public sealed class CodexBarPanelTests
             {
                 window.Show(); window.UpdateLayout();
                 var buttons = ((StackPanel)window.FindName("PanelActions")).Children.OfType<Button>().ToArray();
-                Invoke(buttons[0]); Assert.Equal(1, refreshes);
-                Invoke(buttons[1]); Assert.NotNull(copied); Assert.Contains("14%", copied, StringComparison.Ordinal);
+                Invoke(buttons[2]); Assert.Equal(1, refreshes);
+                Invoke(buttons[3]); Assert.NotNull(copied); Assert.Contains("14%", copied, StringComparison.Ordinal);
                 Assert.DoesNotContain("Claude", copied, StringComparison.Ordinal);
                 Assert.False(string.IsNullOrWhiteSpace(copy.Feedback));
-                Invoke(buttons[2]);
-                foreach (var dashboard in Visuals<Button>(window).Where(button => Equals(button.Content, "Dashboard ↗"))) Invoke(dashboard);
-                Assert.Equal(new[] { "https://status.openai.com", "https://status.claude.com", "https://chatgpt.com/codex/settings/usage", "https://claude.ai/settings/usage" }, links);
+                window.SelectProvider("Codex"); Invoke(buttons[1]); Invoke(buttons[0]);
+                window.SelectProvider("Claude"); Invoke(buttons[1]); Invoke(buttons[0]);
+                Assert.Equal(new[] { "https://status.openai.com", "https://chatgpt.com/codex/settings/usage", "https://status.claude.com", "https://claude.ai/settings/usage" }, links);
             }
             finally { window.Close(); }
         });
