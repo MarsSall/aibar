@@ -4,7 +4,10 @@ using System.Windows.Threading;
 using AIBar.Application;
 using AIBar.Domain;
 namespace AIBar.Desktop;
-public sealed record QuotaWindowPresentation(string Label, decimal? PercentageUsed, string? ResetCountdown);
+public sealed record QuotaWindowPresentation(string Label, decimal? PercentageUsed, string? ResetCountdown)
+{
+    public PanelPacePresentation? Pace { get; init; }
+}
 
 public sealed record BetaPresentationState(
     QuotaWindowPresentation Primary,
@@ -32,7 +35,11 @@ public sealed record BetaPresentationState(
     string? WarningLabel,
     string Disclosure,
     bool IsPrivateIntegrationDisabled = false,
-    string? DiagnosticCode = null);
+    string? DiagnosticCode = null)
+{
+    public string? UpdatedLabel { get; init; }
+    public string? SourceLabel { get; init; }
+}
 
 public sealed class QuotaPresentationMapper(IClock clock)
 {
@@ -52,8 +59,8 @@ public sealed class QuotaPresentationMapper(IClock clock)
         var warning = WarningLabel(failure, isMissingCredential, isOffline);
         var freshness = isLoading ? "Loading" : isFresh ? "Current" : isCached ? "Stale" : isMissingCredential ? "Missing credential" : isOffline ? "Offline" : "Unavailable";
         return new(
-            Window("5-hour quota", snapshot?.Primary),
-            Window("Weekly quota", snapshot?.Weekly),
+            Window("5-hour quota", snapshot?.Primary, isFresh, QuotaPaceWindow.FiveHour),
+            Window("Weekly quota", snapshot?.Weekly, isFresh, QuotaPaceWindow.Weekly),
             snapshot?.Primary is not null,
             snapshot?.Weekly is not null,
             isFresh,
@@ -77,13 +84,20 @@ public sealed class QuotaPresentationMapper(IClock clock)
             warning,
             "Private quota access is optional, disabled by default, and can be revoked at any time.",
             false,
-            DiagnosticCode(failure));
+            DiagnosticCode(failure))
+        {
+            UpdatedLabel = snapshot is null ? null : RelativeUpdatedLabel(clock.UtcNow - snapshot.RetrievedAt)
+        };
     }
 
-    private QuotaWindowPresentation Window(string label, QuotaWindow? window) => new(
+    private QuotaWindowPresentation Window(string label, QuotaWindow? window, bool current, QuotaPaceWindow kind) => new(
         label,
         window?.PercentageUsed,
-        window is null ? null : FormatCountdown(window.CountdownAt(clock.UtcNow)));
+        window is null ? null : FormatCountdown(window.CountdownAt(clock.UtcNow)))
+    {
+        Pace = PanelPacePresentation.Create(kind == QuotaPaceWindow.Weekly ? "Codex weekly" : "Codex 5-hour",
+            window?.PercentageUsed, QuotaPacePolicy.Calculate(window?.PercentageUsed, window?.ResetAt, kind, clock.UtcNow), current, clock.UtcNow)
+    };
 
     private static string FormatCountdown(TimeSpan value)
     {
@@ -91,6 +105,15 @@ public sealed class QuotaPresentationMapper(IClock clock)
         return duration < TimeSpan.FromDays(1)
             ? $"{duration.Hours:00}h {duration.Minutes:00}m"
             : $"{duration.Days}d {duration.Hours:00}h {duration.Minutes:00}m";
+    }
+
+    private static string RelativeUpdatedLabel(TimeSpan age)
+    {
+        age = NonNegative(age);
+        return age < TimeSpan.FromMinutes(1) ? "Updated just now"
+            : age < TimeSpan.FromHours(1) ? $"Updated {(int)age.TotalMinutes}m ago"
+            : age < TimeSpan.FromDays(1) ? $"Updated {(int)age.TotalHours}h ago"
+            : $"Updated {(int)age.TotalDays}d ago";
     }
 
     private static TimeSpan NonNegative(TimeSpan value) => value < TimeSpan.Zero ? TimeSpan.Zero : value;

@@ -75,11 +75,11 @@ public sealed class PopupRenderedTests
                     foreach (var item in children.Cast<FrameworkElement>()) { var bounds = item.TransformToAncestor(root).TransformBounds(new Rect(item.RenderSize)); Assert.True(item.ActualHeight > 0 && bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= root.ActualWidth + .1 && bounds.Bottom <= root.ActualHeight + .1); }
                     Assert.Equal(new[] { "Weekly quota card", "5-hour quota card" }, quotaCards.Select(card => new GroupBoxAutomationPeer(card).GetName())); Assert.All(quotaCards, card => Assert.Contains("percentage, reset, and state", new GroupBoxAutomationPeer(card).GetHelpText(), StringComparison.Ordinal));
                     Assert.Equal(new[] { 73d, 42d }, progress.Select(item => item.Value)); Assert.Equal(new[] { "Weekly quota progress", "5-hour quota progress" }, progress.Select(item => new ProgressBarAutomationPeer(item).GetName())); Assert.All(progress, item => { Assert.False(item.Focusable || item.IsHitTestVisible); Assert.Equal(item.Value, Assert.IsAssignableFrom<System.Windows.Automation.Provider.IRangeValueProvider>(new ProgressBarAutomationPeer(item).GetPattern(PatternInterface.RangeValue)).Value); });
-                    var cardText = quotaCards.SelectMany(Visuals<TextBlock>).ToArray(); Assert.Equal(new[] { "Reset 06d 00h", "Reset 01h 00m" }, cardText.Where(item => item.Text.StartsWith("Reset ", StringComparison.Ordinal)).Select(item => new TextBlockAutomationPeer(item).GetName())); Assert.DoesNotContain(cardText, item => new TextBlockAutomationPeer(item).GetName() == "Stale");
+                    var cardText = quotaCards.SelectMany(Visuals<TextBlock>).ToArray(); static string Rendered(TextBlock item) => new System.Windows.Documents.TextRange(item.ContentStart, item.ContentEnd).Text; Assert.Equal(new[] { "Resets in 06d 00h", "Resets in 1h 0m" }, cardText.Select(Rendered).Where(text => text.StartsWith("Resets in ", StringComparison.Ordinal))); Assert.DoesNotContain(cardText, item => Rendered(item) == "Stale");
                     var freshness = Assert.Single(Visuals<TextBlock>(children[0]).Where(item => new TextBlockAutomationPeer(item).GetName() == "Stale"));
                     Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(freshness));
                     Assert.All(quotaCards, card => Assert.Equal("Stale", new GroupBoxAutomationPeer(card).GetItemStatus()));
-                    Assert.Equal("Refresh quota", new ButtonAutomationPeer(refresh).GetName()); var footerText = Visuals<TextBlock>(footer).Where(item => item.Visibility == Visibility.Visible && item.ActualHeight > 0).Select(item => new TextBlockAutomationPeer(item).GetName()).ToArray(); Assert.Contains("Cached 00h 05m", footerText); Assert.Contains("Network unavailable", footerText); Assert.True(secondary.ScrollableHeight > 0);
+                    Assert.Equal("Refresh quota", new ButtonAutomationPeer(refresh).GetName()); var statusText = Visuals<TextBlock>(cards).Where(item => item.Visibility == Visibility.Visible && item.ActualHeight > 0).Select(item => new TextBlockAutomationPeer(item).GetName()).ToArray(); Assert.Contains("Cached 00h 05m", statusText); Assert.Contains("Network unavailable", statusText); Assert.True(secondary.ScrollableHeight > 0);
                     var image = new RenderTargetBitmap(420, 720, 96, 96, PixelFormats.Pbgra32); image.Render(root); var pixels = new byte[420 * 720 * 4]; image.CopyPixels(pixels, 420 * 4, 0); Assert.Contains(pixels.Where((_, index) => index % 4 == 3), alpha => alpha > 0);
                 }
             }
@@ -181,13 +181,13 @@ public sealed class PopupRenderedTests
     private sealed class FakeSurface : IOpaquePopupSurface
     {
         public List<string> Calls { get; } = []; public bool Dark { get; private set; } public bool Corners { get; private set; } public bool Backdrop { get; private set; }
-        public void UseOpaqueBase() => Calls.Add("opaque"); public void SetDarkMode() { Dark = true; Calls.Add("dark"); } public void SetCorners() { Corners = true; Calls.Add("corners"); } public void SetBackdrop() { Backdrop = true; Calls.Add("backdrop"); }
+        public void UseOpaqueBase() => Calls.Add("opaque"); public void UseTranslucentBase() => Calls.Add("translucent"); public void SetDarkMode() { Dark = true; Calls.Add("dark"); } public void SetCorners() { Corners = true; Calls.Add("corners"); } public void SetBackdrop() { Backdrop = true; Calls.Add("backdrop"); }
     }
 
     private sealed class FakeHints(bool supports = true, bool remote = false, bool failDark = false, bool failCorners = false, bool failBackdrop = false) : IDwmSurfaceHints
     {
         public int DarkCalls { get; private set; } public int CornerCalls { get; private set; } public int BackdropCalls { get; private set; }
-        public bool SupportsHints => supports; public bool IsRemoteSession => remote;
+        public bool SupportsHints => supports; public bool IsRemoteSession => remote; public bool IsTransparencyEnabled => true;
         public void ApplyDarkMode(IOpaquePopupSurface surface) { DarkCalls++; if (failDark) throw new InvalidOperationException(); surface.SetDarkMode(); }
         public void ApplyCorners(IOpaquePopupSurface surface) { CornerCalls++; if (failCorners) throw new InvalidOperationException(); surface.SetCorners(); }
         public void ApplyBackdrop(IOpaquePopupSurface surface) { BackdropCalls++; if (failBackdrop) throw new InvalidOperationException(); surface.SetBackdrop(); }

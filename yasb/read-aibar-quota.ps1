@@ -20,7 +20,13 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
         if ($null -eq $Window -or $null -eq $Window.resetAt) { return "$Name reset: --" }
         $reset = [DateTimeOffset]$Window.resetAt
         if ($reset -le $Now) { return "$Name reset: due" }
-        return "$Name reset: $($reset.UtcDateTime.ToString('u').TrimEnd('Z'))Z"
+        # Compact countdown like the panel; no seconds and no markup characters in the tooltip.
+        $left = $reset - $Now
+        $text = if ($left.TotalDays -ge 1) { '{0}d {1}h' -f [math]::Floor($left.TotalDays), $left.Hours }
+            elseif ($left.TotalHours -ge 1) { '{0}h {1}m' -f [math]::Floor($left.TotalHours), $left.Minutes }
+            elseif ($left.TotalMinutes -ge 1) { '{0}m' -f [math]::Floor($left.TotalMinutes) }
+            else { 'under 1m' }
+        return "$Name resets in $text"
     }
     $stateText = switch -CaseSensitive ($State) {
         'current' { 'current' }; 'refreshing' { 'refreshing' }; 'stale' { 'stale' }
@@ -56,7 +62,8 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
     if ($null -ne $hero) {
         $used = [double]$hero.percentageUsed
         $glyphIndex = [int][math]::Min(8, [math]::Floor($used / 12.5))
-        $color = if ($used -lt 50) { '#58A6FF' } elseif ($used -lt 75) { '#E3B341' } elseif ($used -lt 90) { '#F0883E' } else { '#FF7B72' }
+        # Same 8-step fill and breakpoints; green, yellow, orange and red as usage grows.
+        $color = if ($used -lt 50) { '#3DDC84' } elseif ($used -lt 75) { '#FFC531' } elseif ($used -lt 90) { '#FF8A3D' } else { '#FF4D5E' }
         $compact += $used.ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%'
     }
     if ($null -eq $hero -or $State -ceq 'stale') {
@@ -153,12 +160,8 @@ function Invoke-AiBarQuotaReader {
     if ($Provider -cne '' -and $Provider -cne 'Claude') { return Get-SafeOutput -Now $now }
     $result = Invoke-AiBarQuotaReaderCore -Provider $Provider -now $now
     if ($Provider -ceq 'Claude') {
-        # Include the provider prefix in the same closed plain-text safety budget.
-        if (($result.compactText.Length + 7) -gt 64 -or $result.compactText -cmatch '[<>&{}]') {
-            $result = Get-SafeOutput -Now $now
-        }
+        # The widget shows the Claude mark beside the compact text; words name Claude in the alternate label and tooltip.
         $result.label = 'Claude ' + $result.label
-        $result.compactText = 'Claude ' + $result.compactText
         $result.tooltip = 'Claude ' + $result.tooltip
     }
     return $result

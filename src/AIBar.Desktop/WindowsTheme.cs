@@ -127,6 +127,7 @@ public static class ThemeDictionaries
 public interface IOpaquePopupSurface
 {
     void UseOpaqueBase();
+    void UseTranslucentBase();
     void SetDarkMode();
     void SetCorners();
     void SetBackdrop();
@@ -136,6 +137,7 @@ public interface IDwmSurfaceHints
 {
     bool SupportsHints { get; }
     bool IsRemoteSession { get; }
+    bool IsTransparencyEnabled { get; }
     void ApplyDarkMode(IOpaquePopupSurface surface);
     void ApplyCorners(IOpaquePopupSurface surface);
     void ApplyBackdrop(IOpaquePopupSurface surface);
@@ -143,44 +145,110 @@ public interface IDwmSurfaceHints
 
 public static class PopupSurface
 {
-    public static void Apply(IOpaquePopupSurface surface, WindowsTheme theme, IDwmSurfaceHints hints)
+    /// <summary>Returns true only when the acrylic backdrop is active and the panel may use a translucent tint.</summary>
+    public static bool Apply(IOpaquePopupSurface surface, WindowsTheme theme, IDwmSurfaceHints hints)
     {
         surface.UseOpaqueBase();
-        if (theme == WindowsTheme.HighContrast) return;
-        if (!hints.SupportsHints) return;
-        if (hints.IsRemoteSession) return;
+        if (theme == WindowsTheme.HighContrast) return false;
+        if (!hints.SupportsHints) return false;
+        if (hints.IsRemoteSession) return false;
         if (theme == WindowsTheme.Dark) Try(() => hints.ApplyDarkMode(surface));
         Try(() => hints.ApplyCorners(surface));
-        Try(() => hints.ApplyBackdrop(surface));
+        // Windows "Transparency effects" off means the user asked for solid surfaces.
+        if (!hints.IsTransparencyEnabled) return false;
+        if (!Try(() => hints.ApplyBackdrop(surface))) return false;
+        surface.UseTranslucentBase();
+        return true;
     }
 
-    private static void Try(Action apply) { try { apply(); } catch { } }
+    private static bool Try(Action apply)
+    {
+        try { apply(); return true; }
+        catch { return false; }
+    }
 }
 
 public sealed class WindowsDwmSurfaceHints : IDwmSurfaceHints
 {
     public bool SupportsHints => OperatingSystem.IsWindows();
     public bool IsRemoteSession => GetSystemMetrics(0x1000) != 0;
+    public bool IsTransparencyEnabled
+    {
+        get
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                return WindowsTransparencySetting.IsEnabled(key?.GetValue("EnableTransparency"));
+            }
+            catch { return false; }
+        }
+    }
     public void ApplyDarkMode(IOpaquePopupSurface surface) => surface.SetDarkMode();
     public void ApplyCorners(IOpaquePopupSurface surface) => surface.SetCorners();
     public void ApplyBackdrop(IOpaquePopupSurface surface) => surface.SetBackdrop();
     [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
 }
 
+public static class WindowsTransparencySetting
+{
+    /// <summary>EnableTransparency is a DWORD; a missing value means the Windows default (on).</summary>
+    public static bool IsEnabled(object? registryValue) => registryValue is not int value || value != 0;
+}
+
 public sealed class WpfOpaquePopupSurface(Window window) : IOpaquePopupSurface
 {
+    private const int SystemBackdropType = 38;
+    private const int BackdropNone = 1;
+    private const int BackdropTransientAcrylic = 3;
+
     public void UseOpaqueBase()
     {
         if (window.AllowsTransparency) window.AllowsTransparency = false;
         window.Opacity = 1;
+        if (window is not MainWindow { IsTranslucent: true } panel) return;
+        // Undo the acrylic composition so an opaque panel never shows the DWM frame.
+        panel.IsTranslucent = false;
+        try
+        {
+            var handle = new WindowInteropHelper(window).EnsureHandle();
+            var none = BackdropNone;
+            DwmSetWindowAttribute(handle, SystemBackdropType, ref none, sizeof(int));
+            var margins = new Margins();
+            DwmExtendFrameIntoClientArea(handle, ref margins);
+            if (HwndSource.FromHwnd(handle)?.CompositionTarget is { } target && panel.OpaqueCompositionColor is { } color)
+                target.BackgroundColor = color;
+        }
+        catch { }
     }
+
+    public void UseTranslucentBase()
+    {
+        if (window is MainWindow panel) panel.IsTranslucent = true;
+    }
+
     public void SetDarkMode() => Set(20, 1);
     public void SetCorners() => Set(33, 2);
-    public void SetBackdrop() => Set(38, 2);
+
+    /// <summary>Acrylic first; the frame and transparent composition change only after DWM accepts it.</summary>
+    public void SetBackdrop()
+    {
+        Set(SystemBackdropType, BackdropTransientAcrylic);
+        var handle = new WindowInteropHelper(window).EnsureHandle();
+        var margins = new Margins { Left = -1, Right = -1, Top = -1, Bottom = -1 };
+        if (DwmExtendFrameIntoClientArea(handle, ref margins) != 0) throw new InvalidOperationException();
+        var target = HwndSource.FromHwnd(handle)?.CompositionTarget ?? throw new InvalidOperationException();
+        if (window is MainWindow panel) panel.OpaqueCompositionColor ??= target.BackgroundColor;
+        target.BackgroundColor = System.Windows.Media.Colors.Transparent;
+    }
+
     private void Set(int attribute, int value)
     {
         var handle = new WindowInteropHelper(window).EnsureHandle();
         if (DwmSetWindowAttribute(handle, attribute, ref value, sizeof(int)) != 0) throw new InvalidOperationException();
     }
+
+    [StructLayout(LayoutKind.Sequential)] private struct Margins { public int Left, Right, Top, Bottom; }
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+    [DllImport("dwmapi.dll")] private static extern int DwmExtendFrameIntoClientArea(IntPtr window, ref Margins margins);
 }

@@ -32,11 +32,11 @@ work, clears its cached quota, and refreshes the newly resolved source.
 
 ## Opened panel
 
-While Claude is enabled, the panel shows **Codex** and **Claude** headings, with Claude below the Codex meters. Each provider shows weekly quota first, then the 5-hour window: percentage used, a slim progress bar and reset countdown. Missing windows are omitted. The meters use the same light, dark and high-contrast semantic styles.
+While Claude is enabled, a **CLAUDE** section appears below **CODEX**, with a pill naming where its quota is read (**This PC** or **Other machine**). Each provider shows weekly quota first, then the 5-hour window: percentage used, a status-colored bar and a compact reset. Missing windows are omitted. Meter colors, flags and translucency are described in [the panel appearance](panel-details.md#panel-appearance).
 
 Claude has its own loading, unavailable and stale-cache status. If its login is missing or expired, renewal guidance names **this PC** or **the other machine**, following the resolved source even in Automatic. Cached values remain visible after a failed refresh and are marked stale; raw errors, credential paths, tokens and plan details are not shown.
 
-**Refresh** refreshes both enabled integrations; **Copy summary** remains Codex-only. Enabling or disabling Claude updates the open panel without restarting. When Claude is off, its section and both provider headings disappear from layout and UI Automation, leaving the existing Codex panel unchanged.
+**Refresh** refreshes both enabled integrations; **Copy summary** remains Codex-only. Enabling or disabling Claude updates the open panel without restarting. When Claude is off, its section disappears from layout and UI Automation and the panel shows only the **CODEX** section.
 
 ## Local data and privacy
 
@@ -48,7 +48,7 @@ While enabled, Claude uses the same five-minute polling cadence, cache-first fre
 
 1. In `yasb/custom-widget.example.yaml`, configure `<AIBarRoot>` as your extracted AIBar directory. Keep the existing `aibar_quota` definition and add `aibar_claude_quota` to your YASB configuration.
 2. Add `aibar_claude_quota` beside `aibar_quota` in your bar's widget list, then reload YASB. Both use the same stylesheet and left-click `AIBar.Desktop.exe --show` callback to open the panel.
-3. Enable Claude quota in AIBar. The second widget displays, for example, **Claude 37%**; the weekly window is preferred, with 5-hour usage used when weekly is absent. Alternate text and the tooltip identify Claude too. Invalid or missing data displays **Claude unavailable**.
+3. Enable Claude quota in AIBar. The second widget shows the Claude mark followed by, for example, **37%**; the weekly window is preferred, with 5-hour usage used when weekly is absent. Alternate text and the tooltip name Claude in words. Invalid or missing data displays the mark and **unavailable**.
 
 The no-argument reader and Codex export remain unchanged. Claude opts in with the exact, case-sensitive arguments `-Provider Claude` and reads `%LOCALAPPDATA%\AIBar\yasb-claude-quota.json`, not Codex's `yasb-quota.json`. Other nonempty argument lists return the existing safe unavailable output and exit code 1.
 

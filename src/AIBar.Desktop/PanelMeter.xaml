@@ -1,0 +1,88 @@
+<UserControl x:Class="AIBar.Desktop.PanelMeter"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:AIBar.Desktop"
+             xmlns:automation="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             Focusable="False" IsTabStop="False">
+    <UserControl.Resources>
+        <local:ProviderVisuals x:Key="Palette" />
+        <local:PanelFlagConverter x:Key="Flag" />
+        <local:PanelResetConverter x:Key="Reset" />
+        <local:PanelWindowLabelConverter x:Key="WindowLabel" />
+        <!-- Shared accessible progress semantics, with the approved 8px rounded meter. -->
+        <Style x:Key="PanelMeterProgressStyle" TargetType="{x:Type ProgressBar}" BasedOn="{StaticResource QuotaProgressStyle}">
+            <Setter Property="Height" Value="8" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ProgressBar}">
+                        <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="4" SnapsToDevicePixels="True">
+                            <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="4" HorizontalAlignment="Left" MinWidth="6">
+                                <!-- Lit top edge, as in the approved design. -->
+                                <Border CornerRadius="4,4,0,0" Height="1" VerticalAlignment="Top" Margin="2,0" Background="#59FFFFFF" />
+                            </Border>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    <Grid x:Name="MeterRoot" Tag="{DynamicResource SurfaceBrush}" Margin="0,0,0,14">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center">
+                <Ellipse.Fill><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="Meter">
+                    <Binding Path="Usage" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                    <Binding Path="Tag" ElementName="MeterRoot" /><Binding Path="Tag.Color" ElementName="MeterRoot" />
+                    <Binding Path="IsCurrent" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                </MultiBinding></Ellipse.Fill>
+            </Ellipse>
+            <TextBlock Text="{Binding Label, RelativeSource={RelativeSource AncestorType=local:PanelMeter}, Converter={StaticResource WindowLabel}}"
+                       FontSize="14" FontWeight="Medium" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" />
+            <Border x:Name="FlagPill" Margin="8,0,0,0" Padding="7,1" CornerRadius="9" BorderThickness="1" VerticalAlignment="Center">
+                <Border.Visibility><MultiBinding Converter="{StaticResource Flag}" ConverterParameter="Visibility">
+                    <Binding Path="Usage" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                    <Binding Path="IsCurrent" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                </MultiBinding></Border.Visibility>
+                <Border.BorderBrush><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="Meter">
+                    <Binding Path="Usage" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                    <Binding Path="Tag" ElementName="MeterRoot" /><Binding Path="Tag.Color" ElementName="MeterRoot" />
+                    <Binding Path="IsCurrent" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                </MultiBinding></Border.BorderBrush>
+                <Border.Background><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="FlagFill">
+                    <Binding Path="Usage" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                    <Binding Path="Tag" ElementName="MeterRoot" /><Binding Path="Tag.Color" ElementName="MeterRoot" />
+                    <Binding Path="IsCurrent" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                </MultiBinding></Border.Background>
+                <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{Binding BorderBrush, ElementName=FlagPill}">
+                    <TextBlock.Text><MultiBinding Converter="{StaticResource Flag}" ConverterParameter="Text">
+                        <Binding Path="Usage" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                        <Binding Path="IsCurrent" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                    </MultiBinding></TextBlock.Text>
+                </TextBlock>
+            </Border>
+        </StackPanel>
+        <TextBlock x:Name="MeterPercent" Grid.Column="1" FontSize="14" FontWeight="Bold" VerticalAlignment="Center" Tag="{DynamicResource TextBrush}"
+                   Text="{Binding Usage, RelativeSource={RelativeSource AncestorType=local:PanelMeter}, StringFormat={}{0:0}% used, TargetNullValue=--}">
+            <TextBlock.Foreground><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="MeterText">
+                <Binding Path="Usage" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                <Binding Path="Tag" ElementName="MeterRoot" /><Binding Path="Tag.Color" ElementName="MeterRoot" />
+                <Binding Path="IsCurrent" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                <Binding Path="Tag" RelativeSource="{RelativeSource Self}" />
+            </MultiBinding></TextBlock.Foreground>
+        </TextBlock>
+        <ProgressBar x:Name="MeterBar" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,7,0,0" Style="{StaticResource PanelMeterProgressStyle}"
+                     Value="{Binding Usage, RelativeSource={RelativeSource AncestorType=local:PanelMeter}}"
+                     automation:AutomationProperties.Name="{Binding MeterName, RelativeSource={RelativeSource AncestorType=local:PanelMeter}}">
+            <ProgressBar.Foreground><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="Meter">
+                <Binding Path="Usage" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+                <Binding Path="Tag" ElementName="MeterRoot" /><Binding Path="Tag.Color" ElementName="MeterRoot" />
+                <Binding Path="IsCurrent" RelativeSource="{RelativeSource AncestorType=local:PanelMeter}" />
+            </MultiBinding></ProgressBar.Foreground>
+            <ProgressBar.Background><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="Well">
+                <Binding Source="0" /><Binding Path="Tag" ElementName="MeterRoot" /><Binding Path="Tag.Color" ElementName="MeterRoot" />
+            </MultiBinding></ProgressBar.Background>
+        </ProgressBar>
+        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Margin="0,6,0,0" FontSize="12" Style="{StaticResource QuotaCardSecondaryTextStyle}"><Run Text="Resets in " /><Run Text="{Binding ResetCountdown, RelativeSource={RelativeSource AncestorType=local:PanelMeter}, Converter={StaticResource Reset}, TargetNullValue=unavailable}" /></TextBlock>
+    </Grid>
+</UserControl>

@@ -44,7 +44,7 @@ Invoke-AiBarQuotaReader
         ($names -join ',') | Should -Be 'label,compactText,progressGlyph,progressColor,tooltip,className'
         $result.compactText.Length | Should -BeLessOrEqual 64
         $result.compactText | Should -Not -Match '[<>&{}]'
-        ($result.progressColor -cin @('#58A6FF', '#E3B341', '#F0883E', '#FF7B72', '#8995A4')) | Should -Be $true
+        ($result.progressColor -cin @('#3DDC84', '#FFC531', '#FF8A3D', '#FF4D5E', '#8995A4')) | Should -Be $true
     }
     function Assert-Compact($result, [string]$text) {
         $result.compactText | Should -BeExactly $text
@@ -78,9 +78,9 @@ Describe 'AIBar YASB reader' {
         $source | Should -Match '-cnotin'
         $source | Should -Not -Match 'Start-Process|Invoke-WebRequest|Remove-Item|Set-Content|Add-Content|WriteAll|CreateDirectory'
         $ci = Get-Content -Raw (Join-Path (Split-Path -Parent $root) '.github/workflows/ci.yml')
-        $ci | Should -Match '\$result.TotalCount -ne 19'
-        $ci | Should -Match 'Expected 19 passing YASB tests'
-        ([regex]::Matches((Get-Content -Raw (Join-Path $root 'tests/read-aibar-quota.Tests.ps1')), '(?m)^\s*It\s+')).Count | Should -Be 19
+        $ci | Should -Match '\$result.TotalCount -ne 21'
+        $ci | Should -Match 'Expected 21 passing YASB tests'
+        ([regex]::Matches((Get-Content -Raw (Join-Path $root 'tests/read-aibar-quota.Tests.ps1')), '(?m)^\s*It\s+')).Count | Should -Be 21
         $stderrPath = [IO.Path]::GetTempFileName()
         try {
             $start = [Diagnostics.ProcessStartInfo]::new('powershell.exe', ('-NoProfile -NonInteractive -File "{0}" unexpected' -f $reader))
@@ -100,14 +100,14 @@ Describe 'AIBar YASB reader' {
 
     It 'renders every valid fixture as its exact state, warning, text, and class' {
         $cases = @(
-            @{ Name = 'current.json'; Label = '5h: 12.5% | 7d: 40% | current'; Tooltip = 'current | 5h reset: 2026-07-12 13:00:00Z | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'refreshing.json'; Label = '5h: 12% | refreshing'; Tooltip = 'refreshing | 5h reset: 2026-07-12 13:00:00Z | age: 2h'; ClassName = 'aibar-quota state-refreshing' },
-            @{ Name = 'stale-refresh.json'; Label = '5h: 12% | 7d: 40% | stale | refresh failed'; Tooltip = 'stale | refresh failed | 5h reset: due | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-stale warning-refresh-failed' },
-            @{ Name = 'stale-auth.json'; Label = '5h: 12% | 7d: 40% | stale | authentication failed'; Tooltip = 'stale | authentication failed | 5h reset: -- | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-stale warning-authentication-failed' },
+            @{ Name = 'current.json'; Label = '5h: 12.5% | 7d: 40% | current'; Tooltip = 'current | 5h resets in 1h 0m | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'refreshing.json'; Label = '5h: 12% | refreshing'; Tooltip = 'refreshing | 5h resets in 1h 0m | age: 2h'; ClassName = 'aibar-quota state-refreshing' },
+            @{ Name = 'stale-refresh.json'; Label = '5h: 12% | 7d: 40% | stale | refresh failed'; Tooltip = 'stale | refresh failed | 5h reset: due | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-stale warning-refresh-failed' },
+            @{ Name = 'stale-auth.json'; Label = '5h: 12% | 7d: 40% | stale | authentication failed'; Tooltip = 'stale | authentication failed | 5h reset: -- | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-stale warning-authentication-failed' },
             @{ Name = 'unavailable.json'; Label = 'unavailable'; Tooltip = 'unavailable | age: --'; ClassName = 'aibar-quota state-unavailable warning-unavailable' },
             @{ Name = 'disabled.json'; Label = 'disabled'; Tooltip = 'disabled | age: --'; ClassName = 'aibar-quota state-disabled warning-disabled' },
-            @{ Name = 'partial.json'; Label = '7d: 40% | current'; Tooltip = 'current | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'nullable-reset.json'; Label = '5h: 12% | 7d: 40% | current'; Tooltip = 'current | 5h reset: -- | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'partial.json'; Label = '7d: 40% | current'; Tooltip = 'current | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'nullable-reset.json'; Label = '5h: 12% | 7d: 40% | current'; Tooltip = 'current | 5h reset: -- | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
             @{ Name = 'reset-equal.json'; Label = '5h: 12% | current'; Tooltip = 'current | 5h reset: due | age: 0m'; ClassName = 'aibar-quota state-current' }
         )
         $compact = @('40%', '12%', '40% | stale | refresh failed', '40% | stale | authentication failed', 'unavailable', 'disabled', '40%', '40%', '12%')
@@ -126,13 +126,13 @@ Describe 'AIBar YASB reader' {
         $weekly25 = [ordered]@{ percentageUsed = 25; resetAt = '2026-07-14T10:00:00Z' }
         $source = '2026-07-12T10:00:00Z'
         $nullableCases = @(
-            @{ Name = 'both windows'; Five = $five; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = '5h: 12.5% | 7d: 35% | current'; Tooltip = 'current | 5h reset: 2026-07-12 13:00:00Z | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'weekly-only 35'; Five = $null; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = '7d: 35% | current'; Tooltip = 'current | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'weekly-only 25'; Five = $null; Weekly = $weekly25; State = 'current'; Warning = $null; Source = $source; Label = '7d: 25% | current'; Tooltip = 'current | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'five-hour-only'; Five = $five; Weekly = $null; State = 'current'; Warning = $null; Source = $source; Label = '5h: 12.5% | current'; Tooltip = 'current | 5h reset: 2026-07-12 13:00:00Z | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'stale weekly-only'; Five = $null; Weekly = $weekly35; State = 'stale'; Warning = 'refresh-failed'; Source = $source; Label = '7d: 35% | stale | refresh failed'; Tooltip = 'stale | refresh failed | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-stale warning-refresh-failed' },
-            @{ Name = 'stale service unavailable'; Five = $null; Weekly = $weekly35; State = 'stale'; Warning = 'unavailable'; Source = $source; Label = '7d: 35% | stale | service unavailable'; Tooltip = 'stale | service unavailable | 7d reset: 2026-07-14 10:00:00Z | age: 2h'; ClassName = 'aibar-quota state-stale warning-unavailable' },
-            @{ Name = 'stale five-hour-only'; Five = $five; Weekly = $null; State = 'stale'; Warning = 'authentication-failed'; Source = $source; Label = '5h: 12.5% | stale | authentication failed'; Tooltip = 'stale | authentication failed | 5h reset: 2026-07-12 13:00:00Z | age: 2h'; ClassName = 'aibar-quota state-stale warning-authentication-failed' },
+            @{ Name = 'both windows'; Five = $five; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = '5h: 12.5% | 7d: 35% | current'; Tooltip = 'current | 5h resets in 1h 0m | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'weekly-only 35'; Five = $null; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = '7d: 35% | current'; Tooltip = 'current | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'weekly-only 25'; Five = $null; Weekly = $weekly25; State = 'current'; Warning = $null; Source = $source; Label = '7d: 25% | current'; Tooltip = 'current | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'five-hour-only'; Five = $five; Weekly = $null; State = 'current'; Warning = $null; Source = $source; Label = '5h: 12.5% | current'; Tooltip = 'current | 5h resets in 1h 0m | age: 2h'; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'stale weekly-only'; Five = $null; Weekly = $weekly35; State = 'stale'; Warning = 'refresh-failed'; Source = $source; Label = '7d: 35% | stale | refresh failed'; Tooltip = 'stale | refresh failed | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-stale warning-refresh-failed' },
+            @{ Name = 'stale service unavailable'; Five = $null; Weekly = $weekly35; State = 'stale'; Warning = 'unavailable'; Source = $source; Label = '7d: 35% | stale | service unavailable'; Tooltip = 'stale | service unavailable | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-stale warning-unavailable' },
+            @{ Name = 'stale five-hour-only'; Five = $five; Weekly = $null; State = 'stale'; Warning = 'authentication-failed'; Source = $source; Label = '5h: 12.5% | stale | authentication failed'; Tooltip = 'stale | authentication failed | 5h resets in 1h 0m | age: 2h'; ClassName = 'aibar-quota state-stale warning-authentication-failed' },
             @{ Name = 'refreshing without windows'; Five = $null; Weekly = $null; State = 'refreshing'; Warning = $null; Source = $null; Label = 'refreshing'; Tooltip = 'refreshing | age: --'; ClassName = 'aibar-quota state-refreshing' },
             @{ Name = 'unavailable without warning'; Five = $null; Weekly = $null; State = 'unavailable'; Warning = $null; Source = $null; Label = 'unavailable'; Tooltip = 'unavailable | age: --'; ClassName = 'aibar-quota state-unavailable' },
             @{ Name = 'zero-window current fails closed'; Five = $null; Weekly = $null; State = 'current'; Warning = $null; Source = $source; Label = 'unavailable'; Tooltip = 'unavailable | age: --'; ClassName = 'aibar-quota state-unavailable warning-unavailable' },
@@ -159,8 +159,8 @@ Describe 'AIBar YASB reader' {
             $result.label | Should -Not -Match '5h: --|7d: --|partial'
             $result.tooltip | Should -Not -Match 'state:|warning:'
             $result.className | Should -Not -Match 'partial'
-            if ($null -eq $case.Five) { $result.tooltip | Should -Not -Match '5h reset:' }
-            if ($null -eq $case.Weekly) { $result.tooltip | Should -Not -Match '7d reset:' }
+            if ($null -eq $case.Five) { $result.tooltip | Should -Not -Match '5h reset' }
+            if ($null -eq $case.Weekly) { $result.tooltip | Should -Not -Match '7d reset' }
         }
         $stages = @(
             @(0, 12.5, 0xF0766), @(12.5, 25, 0xF0A9E), @(25, 37.5, 0xF0A9F),
@@ -173,7 +173,7 @@ Describe 'AIBar YASB reader' {
             foreach ($stage in $stages) {
                 $values = if ($stage[0] -eq 100) { @(100) } else { @($stage[0], ($stage[0] + 0.000001), ($stage[1] - 0.000001)) }
                 foreach ($value in $values) {
-                    $color = if ($value -lt 50) { '#58A6FF' } elseif ($value -lt 75) { '#E3B341' } elseif ($value -lt 90) { '#F0883E' } else { '#FF7B72' }
+                    $color = if ($value -lt 50) { '#3DDC84' } elseif ($value -lt 75) { '#FFC531' } elseif ($value -lt 90) { '#FF8A3D' } else { '#FF4D5E' }
                     foreach ($weeklyHero in @($true, $false)) {
                         $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'refreshing'; warning = $null; sourceRetrievedAt = $source; fiveHour = [ordered]@{ percentageUsed = $value; resetAt = $null }; weekly = $null }
                         if ($weeklyHero) { $document.weekly = $document.fiveHour; $document.fiveHour = $five }
@@ -188,7 +188,7 @@ Describe 'AIBar YASB reader' {
         } finally { [Threading.Thread]::CurrentThread.CurrentCulture = $culture }
         foreach ($value in @(89.999999, 90, 90.000001)) {
             $document.fiveHour.percentageUsed = $value
-            (Read-Document $document).progressColor | Should -BeExactly $(if ($value -lt 90) { '#F0883E' } else { '#FF7B72' })
+            (Read-Document $document).progressColor | Should -BeExactly $(if ($value -lt 90) { '#FF8A3D' } else { '#FF4D5E' })
         }
         $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'unavailable'; warning = 'authentication-failed'; sourceRetrievedAt = $null; fiveHour = $null; weekly = $null }
         Assert-Compact (Read-Document $document) 'unavailable | authentication failed'
@@ -223,7 +223,7 @@ Describe 'AIBar YASB reader' {
 aibar_quota:
   type: "yasb.custom.CustomWidget"
   options:
-    label: "<font color='{data[progressColor]}'>{data[progressGlyph]}</font> {data[compactText]}"
+    label: "<img src='<AIBarRoot>\\yasb\\icons\\openai.svg' style='vertical-align: middle'/> <font color='{data[progressColor]}'>{data[progressGlyph]}</font> {data[compactText]}"
     label_alt: "{data[label]}"
     class_name: "aibar-quota"
     tooltip: true
@@ -240,7 +240,7 @@ aibar_quota:
         $actualYaml = $blocks[0].TrimEnd()
         $expectedYaml = ($expected -replace "`r`n", "`n").TrimEnd()
         $actualYaml | Should -BeExactly $expectedYaml
-        $expectedClaude = $expectedYaml.Replace('aibar_quota:', 'aibar_claude_quota:').Replace('read-aibar-quota.ps1"''', 'read-aibar-quota.ps1" -Provider Claude''')
+        $expectedClaude = $expectedYaml.Replace('aibar_quota:', 'aibar_claude_quota:').Replace('read-aibar-quota.ps1"''', 'read-aibar-quota.ps1" -Provider Claude''').Replace('icons\\openai.svg', 'icons\\claude.svg')
         $blocks[1].TrimEnd() | Should -BeExactly $expectedClaude
         $yaml | Should -Match '(?m)^    exec_options:\r?$'
         $yaml | Should -Match '(?m)^      run_cmd: ''powershell\.exe .*<AIBarRoot>\\yasb\\read-aibar-quota\.ps1"''\r?$'
@@ -261,6 +261,37 @@ aibar_quota:
             $parsed['aibar_quota']['options']['exec_options']['return_format'] | Should -Be 'json'
             $parsed['aibar_quota']['options']['exec_options']['run_cmd'] | Should -Be 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "<AIBarRoot>\yasb\read-aibar-quota.ps1"'
             $parsed['aibar_quota']['options']['callbacks']['on_left'] | Should -Be 'exec "<AIBarRoot>\AIBar.Desktop.exe" --show'
+        }
+    }
+
+    It 'shows each reset as a compact countdown without seconds' {
+        $cases = @(
+            @('2026-07-12T12:00:30Z', '5h resets in under 1m'), @('2026-07-12T12:05:59Z', '5h resets in 5m'),
+            @('2026-07-12T15:53:00Z', '5h resets in 3h 53m'), @('2026-07-13T11:59:59Z', '5h resets in 23h 59m'),
+            @('2026-07-13T12:00:00Z', '5h resets in 1d 0h'), @('2026-07-15T20:30:00Z', '5h resets in 3d 8h'),
+            @('2026-07-12T12:00:00Z', '5h reset: due'), @('2026-07-12T11:00:00Z', '5h reset: due')
+        )
+        foreach ($case in $cases) {
+            $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 12; resetAt = $case[0] }; weekly = $null }
+            $result = Read-Document $document
+            $result.tooltip | Should -BeExactly ('current | ' + $case[1] + ' | age: 2h')
+            # Tooltips may render as rich text: no seconds, no UTC suffix, no markup characters.
+            $result.tooltip | Should -Not -Match '[0-9]{2}:[0-9]{2}:[0-9]{2}|Z\b|[<>&]'
+        }
+    }
+
+    It 'ships both official marks as fixed-size local SVG images' {
+        foreach ($name in @('openai.svg', 'claude.svg')) {
+            $path = Join-Path $root (Join-Path 'icons' $name)
+            Test-Path -LiteralPath $path -PathType Leaf | Should -Be $true
+            [xml]$svg = Get-Content -Raw -LiteralPath $path
+            $svg.svg.width | Should -BeExactly '14'
+            $svg.svg.height | Should -BeExactly '14'
+            $svg.svg.viewBox | Should -BeExactly '0 0 24 24'
+            @($svg.svg.ChildNodes | Where-Object { $_.LocalName -ne 'path' }).Count | Should -Be 0
+            $svg.svg.NamespaceURI | Should -BeExactly 'http://www.w3.org/2000/svg'
+            # Only the SVG namespace itself may name a URL; no scripts, links or external references.
+            (Get-Content -Raw -LiteralPath $path).Replace('xmlns="http://www.w3.org/2000/svg"', '') | Should -Not -Match '(?i)<script|href|https?:|xlink|on[a-z]+='
         }
     }
 
@@ -335,7 +366,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         $paths[1] | Should -BeExactly (Join-Path $local 'AIBar\yasb-claude-quota.json')
     }
 
-    It 'prefixes both texts and identifies Claude across valid states and nullable windows' {
+    It 'names Claude in the alternate label and tooltip while the compact text matches Codex' {
         $cases = @(
             @('current.json', '40%'), @('partial.json', '40%'), @('nullable-reset.json', '40%'),
             @('refreshing.json', '12%'), @('stale-refresh.json', '40% | stale | refresh failed'),
@@ -345,7 +376,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         foreach ($case in $cases) {
             $codex = Read-Fixture $case[0]
             $claude = Read-ClaudeFixture $case[0]
-            $claude.compactText | Should -BeExactly ('Claude ' + $case[1])
+            $claude.compactText | Should -BeExactly $case[1]
             $claude.label | Should -BeExactly ('Claude ' + $codex.label)
             $claude.tooltip | Should -BeExactly ('Claude ' + $codex.tooltip)
             $claude.progressGlyph | Should -BeExactly $codex.progressGlyph
@@ -364,7 +395,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
             'non-utc-generated.json', 'non-utc-source.json', 'non-utc-reset.json')) {
             $result = Read-ClaudeFixture $name
             $result.label | Should -BeExactly 'Claude unavailable'
-            Assert-Compact $result 'Claude unavailable'
+            Assert-Compact $result 'unavailable'
             $result.tooltip | Should -BeExactly 'Claude unavailable | age: --'
         }
     }
@@ -379,10 +410,10 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
                     $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $window; weekly = $null }
                     if ($weekly) { $document.weekly = $window; $document.fiveHour = [ordered]@{ percentageUsed = 99; resetAt = $null } }
                     $result = Read-ClaudeDocument $document
-                    Assert-Compact $result ('Claude ' + ([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%')
+                    Assert-Compact $result (([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%')
                     $glyphs = @(0xF0766, 0xF0A9E, 0xF0A9F, 0xF0AA0, 0xF0AA1, 0xF0AA2, 0xF0AA3, 0xF0AA4, 0xF0AA5)
                     $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32($glyphs[[int][math]::Min(8, [math]::Floor($value / 12.5))]))
-                    $result.progressColor | Should -BeExactly $(if ($value -lt 50) { '#58A6FF' } elseif ($value -lt 75) { '#E3B341' } elseif ($value -lt 90) { '#F0883E' } else { '#FF7B72' })
+                    $result.progressColor | Should -BeExactly $(if ($value -lt 50) { '#3DDC84' } elseif ($value -lt 75) { '#FFC531' } elseif ($value -lt 90) { '#FF8A3D' } else { '#FF4D5E' })
                 }
             }
         } finally { [Threading.Thread]::CurrentThread.CurrentCulture = $culture }
@@ -402,7 +433,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
             $result = $output | ConvertFrom-Json -ErrorAction Stop
             Assert-SafeFields $result
             $result.label | Should -Match '^Claude '
-            $result.compactText | Should -Match '^Claude '
+            $result.compactText | Should -Not -Match 'Claude'
             $result.tooltip | Should -Match '^Claude '
         } finally { $process.Dispose() }
     }
@@ -437,7 +468,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         $parts.Count | Should -Be 2
         $codex = $parts[0].TrimEnd()
         $claude = $parts[1].TrimEnd()
-        $expected = $codex.Replace('aibar_quota:', 'aibar_claude_quota:').Replace('read-aibar-quota.ps1"''', 'read-aibar-quota.ps1" -Provider Claude''')
+        $expected = $codex.Replace('aibar_quota:', 'aibar_claude_quota:').Replace('read-aibar-quota.ps1"''', 'read-aibar-quota.ps1" -Provider Claude''').Replace('icons\\openai.svg', 'icons\\claude.svg')
         $claude | Should -BeExactly $expected
         ([regex]::Matches($yaml, 'on_left: ''exec "<AIBarRoot>\\AIBar.Desktop.exe" --show''')).Count | Should -Be 2
     }
@@ -446,11 +477,11 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         foreach ($attack in @('token-canary', 'C:\private\credentials.json', 'plan-canary', '<font>&{}', ('x' * 256))) {
             $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $null; weekly = [ordered]@{ percentageUsed = 37; resetAt = $null }; plan = $attack }
             $result = Read-ClaudeDocument $document
-            Assert-Compact $result 'Claude unavailable'
+            Assert-Compact $result 'unavailable'
             $document.Remove('plan')
             $document.weekly.percentageUsed = $attack
             $result = Read-ClaudeDocument $document
-            Assert-Compact $result 'Claude unavailable'
+            Assert-Compact $result 'unavailable'
             foreach ($field in @($result.label, $result.compactText, $result.tooltip)) {
                 $field | Should -Not -Match 'canary|credential|C:|<|>|&|\{|\}'
             }

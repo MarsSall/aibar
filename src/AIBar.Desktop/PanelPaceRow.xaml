@@ -1,0 +1,40 @@
+<UserControl x:Class="AIBar.Desktop.PanelPaceRow" x:Name="Row"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:AIBar.Desktop"
+             Focusable="False" IsTabStop="False"
+             Visibility="{Binding Data.IsVisible, ElementName=Row, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}"
+             AutomationProperties.Name="{Binding Data.AutomationName, ElementName=Row}"
+             AutomationProperties.HelpText="{Binding Data.HelpText, ElementName=Row}">
+    <UserControl.Resources>
+        <local:ProviderVisuals x:Key="Palette" />
+        <local:PanelPacePositionConverter x:Key="Position" />
+    </UserControl.Resources>
+    <Grid DataContext="{Binding Data, ElementName=Row}" Tag="{DynamicResource SurfaceBrush}" x:Name="PaceRoot" Margin="0,0,0,14">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition /></Grid.ColumnDefinitions>
+        <TextBlock Text="{Binding Label}" FontSize="12" Foreground="{DynamicResource TextBrush}" Margin="0,0,8,0" />
+        <TextBlock Grid.Column="1" Text="{Binding Text}" FontSize="12" HorizontalAlignment="Stretch" TextAlignment="Right" TextWrapping="Wrap">
+            <TextBlock.Foreground><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="PaceText">
+                <Binding Path="Tone" /><Binding Path="Tag" ElementName="PaceRoot" /><Binding Path="Tag.Color" ElementName="PaceRoot" />
+            </MultiBinding></TextBlock.Foreground>
+        </TextBlock>
+        <Grid Grid.Row="1" Grid.ColumnSpan="2" Height="8" Margin="0,6,0,0" x:Name="PaceTrack"
+              ToolTip="Even-use guide: the marker shows the percentage expected at this point in the window.">
+            <Border Height="4" VerticalAlignment="Center" CornerRadius="2">
+                <Border.Background><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="Well">
+                    <Binding Source="0" /><Binding Path="Tag" ElementName="PaceRoot" /><Binding Path="Tag.Color" ElementName="PaceRoot" />
+                </MultiBinding></Border.Background>
+            </Border>
+            <Border Height="4" VerticalAlignment="Center" HorizontalAlignment="Left" CornerRadius="2">
+                <Border.Width><MultiBinding Converter="{StaticResource Position}"><Binding Path="Usage" /><Binding Path="ActualWidth" ElementName="PaceTrack" /></MultiBinding></Border.Width>
+                <Border.Background><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="Meter">
+                    <Binding Path="Usage" /><Binding Path="Tag" ElementName="PaceRoot" /><Binding Path="Tag.Color" ElementName="PaceRoot" /><Binding Path="IsCurrent" />
+                </MultiBinding></Border.Background>
+            </Border>
+            <Border Width="2" Height="8" HorizontalAlignment="Left" Background="{DynamicResource TextBrush}" AutomationProperties.Name="Even-use guide">
+                <Border.Margin><MultiBinding Converter="{StaticResource Position}" ConverterParameter="Marker"><Binding Path="ExpectedPercentage" /><Binding Path="ActualWidth" ElementName="PaceTrack" /></MultiBinding></Border.Margin>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
