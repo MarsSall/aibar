@@ -153,6 +153,9 @@ public partial class App : System.Windows.Application
         if (composition.Appearance is { } appearance && composition.Alerts is { } settingsAlerts)
         {
             _settingsWindowHost = new(appearance, settingsAlerts);
+            // The colour choice applies live; Changed can run during clear, so never wait on the UI thread.
+            appearance.Changed += options => Dispatcher.BeginInvoke(new Action(() => window.BarColorMode = ToBarColorMode(options)));
+            _ = ApplyInitialAppearanceAsync(appearance, window);
             window.SettingsRequested += () => _settingsWindowHost.Show(window);
             tray.SettingsRequested += () => _settingsWindowHost.Show(window);
         }
@@ -178,6 +181,15 @@ public partial class App : System.Windows.Application
         internal QuotaAlertObserver? Alerts { get; init; }
         internal AppearanceSettings? Appearance { get; init; }
         internal static StartupComposition Unavailable => new(new UnavailableQuotaPresentation(), null, null, new EmptyAsyncResource(), () => Task.CompletedTask, () => { });
+    }
+
+    internal static PanelBarColorMode ToBarColorMode(AppearanceOptions options) =>
+        options.BarColors == "usage" ? PanelBarColorMode.Usage : PanelBarColorMode.Brand;
+
+    private static async Task ApplyInitialAppearanceAsync(AppearanceSettings appearance, MainWindow window)
+    {
+        try { window.BarColorMode = ToBarColorMode(await appearance.LoadAsync(default)); }
+        catch (Exception) { /* Unreadable appearance keeps the default brand colours. */ }
     }
 
     internal sealed record CompositionSeams(string? DataDirectory = null, string? CodexHome = null, TimeSpan? AnalyticsShutdownBound = null, Action<string>? BeforeAnalyticsStability = null, Action<string>? LifecycleObservation = null, string? UserProfile = null, IQuotaExportWriter? ExportWriter = null, Func<PrivateIntegrationPolicy, IQuotaProvider>? ClaudeProviderFactory = null, TimeProvider? ClaudeTimeProvider = null, IQuotaExportWriter? ClaudeExportWriter = null, Func<PrivateIntegrationPolicy, IQuotaProvider>? ClaudeRemoteProviderFactory = null);
