@@ -36,6 +36,9 @@
     <SolidColorBrush x:Key="UsageOkBrush" Color="#1E9E5A" />
     <SolidColorBrush x:Key="UsageWarnBrush" Color="#B88400" />
     <SolidColorBrush x:Key="UsageHighBrush" Color="#D13B2A" />
+    <SolidColorBrush x:Key="SettingsWindowBorderBrush" Color="#D6D6D6"/>
+    <SolidColorBrush x:Key="SettingsControlBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="SettingsControlBorderBrush" Color="#D0D0D0"/>
     <SolidColorBrush x:Key="SettingsSurfaceBrush" Color="#F3F3F3"/>
     <SolidColorBrush x:Key="SettingsCardBrush" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="SettingsFooterBrush" Color="#EBEBEB"/>

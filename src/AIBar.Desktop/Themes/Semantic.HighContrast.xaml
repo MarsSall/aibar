@@ -36,6 +36,9 @@
     <SolidColorBrush x:Key="UsageOkBrush" Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" />
     <SolidColorBrush x:Key="UsageWarnBrush" Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" />
     <SolidColorBrush x:Key="UsageHighBrush" Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" />
+    <SolidColorBrush x:Key="SettingsWindowBorderBrush" Color="{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"/>
+    <SolidColorBrush x:Key="SettingsControlBrush" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}"/>
+    <SolidColorBrush x:Key="SettingsControlBorderBrush" Color="{DynamicResource {x:Static SystemColors.ControlTextColorKey}}"/>
     <SolidColorBrush x:Key="SettingsSurfaceBrush" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}"/>
     <SolidColorBrush x:Key="SettingsCardBrush" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}"/>
     <SolidColorBrush x:Key="SettingsFooterBrush" Color="{DynamicResource {x:Static SystemColors.WindowColorKey}}"/>

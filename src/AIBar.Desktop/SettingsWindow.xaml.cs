@@ -60,7 +60,9 @@ public partial class SettingsWindow : Window
         _theme = new WindowsThemeController(Resources, _themeSource, Dispatcher);
         _themeSource.Changed += OnThemeChanged;
         Closed += (_, _) => { _themeSource.Changed -= OnThemeChanged; _theme.Dispose(); };
-        SourceInitialized += (_, _) => PopupSurface.Apply(new WpfOpaquePopupSurface(this), _themeSource.Current, new WindowsDwmSurfaceHints());
+        // The layered host stays transparent: applying the opaque popup policy here
+        // would remove AllowsTransparency and clip the exterior Settings glow.
+        UpdateWindowDecoration();
         CodexEnabled.IsEnabled = ClaudeEnabled.IsEnabled = SourceChoices.IsEnabled = providers is not null;
         UpdateThemeDescription();
         ValidateThresholds();
@@ -147,7 +149,25 @@ public partial class SettingsWindow : Window
     }
     private void OnThemeChanged(object? sender, EventArgs e)
     {
-        if (!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(new Action(UpdateThemeDescription));
+        if (!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(new Action(() =>
+        {
+            UpdateThemeDescription();
+            UpdateWindowDecoration();
+        }));
+    }
+    private void UpdateWindowDecoration()
+    {
+        var dark = _themeSource.Current == WindowsTheme.Dark;
+        SettingsSurface.Effect = dark ? new System.Windows.Media.Effects.DropShadowEffect
+        {
+            Color = System.Windows.Media.Color.FromRgb(0x6E, 0x9B, 0xFF),
+            ShadowDepth = 0, BlurRadius = 29, Opacity = .27
+        } : null;
+        SettingsShadow.Effect = dark ? new System.Windows.Media.Effects.DropShadowEffect
+        {
+            Color = System.Windows.Media.Colors.Black,
+            Direction = 270, ShadowDepth = 12, BlurRadius = 32, Opacity = .6
+        } : null;
     }
     private void UpdateThemeDescription() => ThemeDescription.Text = $"Currently {_themeSource.Current}. Change it in Windows Settings › Personalization › Colors.";
     private void OnTickSizeChanged(object sender, SizeChangedEventArgs e) => DrawThresholdTicks();

@@ -2,13 +2,14 @@
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
- Title="AIBar Settings" Width="520" Height="600" MinWidth="460" MinHeight="480"
+ Title="AIBar Settings" Width="600" Height="680" MinWidth="540" MinHeight="560"
  WindowStyle="None" WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
- Background="{DynamicResource SettingsSurfaceBrush}" Foreground="{DynamicResource SettingsTextBrush}"
+ AllowsTransparency="True" Background="Transparent" Foreground="{DynamicResource SettingsTextBrush}"
+ UseLayoutRounding="True" SnapsToDevicePixels="True"
  FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="14" PreviewKeyDown="OnSettingsKeyDown">
  <shell:WindowChrome.WindowChrome><shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="5" CornerRadius="8" GlassFrameThickness="0"/></shell:WindowChrome.WindowChrome>
  <Window.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="SettingsProviderMarks.xaml"/></ResourceDictionary.MergedDictionaries>
-  <Style x:Key="SettingsFocus" TargetType="Control"><Setter Property="Template"><Setter.Value><ControlTemplate><Border BorderBrush="{DynamicResource SettingsFocusBrush}" BorderThickness="2" CornerRadius="6" Margin="-4"/></ControlTemplate></Setter.Value></Setter></Style>
+  <Style x:Key="SettingsFocus" TargetType="Control"><Setter Property="Template"><Setter.Value><ControlTemplate><Border BorderBrush="{DynamicResource SettingsFocusBrush}" BorderThickness="2" CornerRadius="6" Margin="-4"><Border BorderBrush="{DynamicResource SettingsSurfaceBrush}" BorderThickness="1" CornerRadius="4"/></Border></ControlTemplate></Setter.Value></Setter></Style>
   <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap"/></Style>
   <Style x:Key="SettingsMeta" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}"><Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="Foreground" Value="{DynamicResource SettingsSecondaryBrush}"/><Style.Triggers><DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True"><Setter Property="Foreground" Value="{DynamicResource SettingsHoverTextBrush}"/></DataTrigger></Style.Triggers></Style>
   <Style x:Key="SettingsHeading" TargetType="TextBlock" BasedOn="{StaticResource SettingsMeta}"><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Margin" Value="0,0,0,8"/></Style>
@@ -26,7 +27,7 @@
    <EventSetter Event="Checked" Handler="OnToggleMotion"/><EventSetter Event="Unchecked" Handler="OnToggleMotion"/>
    <Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/><Setter Property="VerticalAlignment" Value="Center"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><StackPanel Orientation="Horizontal">
-    <TextBlock x:Name="StateText" Text="Off" VerticalAlignment="Center" Margin="0,0,12,0"/>
+    <TextBlock x:Name="StateText" Text="Off" Foreground="{DynamicResource SettingsSecondaryBrush}" FontWeight="Normal" VerticalAlignment="Center" Margin="0,0,12,0"/>
     <Border x:Name="Track" Width="40" Height="20" CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource SettingsSecondaryBrush}" Background="{DynamicResource SettingsCardBrush}">
      <Ellipse x:Name="Knob" Width="12" Height="12" Fill="{DynamicResource SettingsSecondaryBrush}" HorizontalAlignment="Left" Margin="3,0"><Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform></Ellipse>
     </Border></StackPanel>
@@ -36,7 +37,23 @@
      <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
     </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
   </Style>
-  <Style TargetType="CheckBox"><Setter Property="Foreground" Value="{DynamicResource SettingsTextBrush}"/><Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/></Style>
+  <Style TargetType="CheckBox">
+   <Setter Property="Foreground" Value="{DynamicResource SettingsTextBrush}"/>
+   <Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/>
+   <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Border x:Name="SettingsCheckBox" Width="18" Height="18" CornerRadius="4" VerticalAlignment="Center" BorderThickness="1" BorderBrush="{DynamicResource SettingsControlBorderBrush}" Background="{DynamicResource SettingsControlBrush}">
+      <Path x:Name="SettingsCheckGlyph" Data="M 3,8 L 6,11 L 12,4" Stroke="{DynamicResource SettingsOnAccentBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Visibility="Collapsed"/>
+     </Border>
+     <ContentPresenter Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" RecognizesAccessKey="True"/>
+    </Grid>
+    <ControlTemplate.Triggers>
+     <Trigger Property="IsChecked" Value="True"><Setter TargetName="SettingsCheckBox" Property="Background" Value="{DynamicResource SettingsAccentBrush}"/><Setter TargetName="SettingsCheckBox" Property="BorderBrush" Value="{DynamicResource SettingsAccentBrush}"/><Setter TargetName="SettingsCheckGlyph" Property="Visibility" Value="Visible"/></Trigger>
+     <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+    </ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
   <Style x:Key="SettingsRadio" TargetType="RadioButton">
    <Setter Property="Foreground" Value="{DynamicResource SettingsTextBrush}"/><Setter Property="Background" Value="{DynamicResource SettingsCardBrush}"/>
    <Setter Property="Padding" Value="14,10"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/>
@@ -63,15 +80,17 @@
   <Style TargetType="Slider"><Setter Property="Foreground" Value="{DynamicResource SettingsAccentBrush}"/><Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Slider"><Grid Height="24">
     <Track x:Name="PART_Track" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" IsDirectionReversed="{TemplateBinding IsDirectionReversed}">
-     <Track.DecreaseRepeatButton><RepeatButton Command="Slider.DecreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Height="6" CornerRadius="3" Background="{DynamicResource SettingsAccentBrush}"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
+     <Track.DecreaseRepeatButton><RepeatButton Command="Slider.DecreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border x:Name="SettingsSliderFill" Height="6" CornerRadius="3" Background="{DynamicResource SettingsAccentBrush}"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
      <Track.IncreaseRepeatButton><RepeatButton Command="Slider.IncreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Height="6" CornerRadius="3" Background="{DynamicResource SettingsTrackBrush}"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
-     <Track.Thumb><Thumb Width="18" Height="18"><Thumb.Template><ControlTemplate TargetType="Thumb"><Ellipse Fill="{DynamicResource SettingsSecondaryBrush}" Stroke="{DynamicResource SettingsCardBrush}" StrokeThickness="2"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+     <Track.Thumb><Thumb Width="18" Height="18"><Thumb.Template><ControlTemplate TargetType="Thumb"><Ellipse x:Name="SettingsSliderThumb" Fill="{DynamicResource SettingsAccentBrush}" Stroke="{DynamicResource SettingsOnAccentBrush}" StrokeThickness="2"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
     </Track>
    </Grid></ControlTemplate></Setter.Value></Setter>
   </Style>
   <Style TargetType="ProgressBar"><Setter Property="Focusable" Value="False"/><Setter Property="IsHitTestVisible" Value="False"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ProgressBar"><Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3"><Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left" CornerRadius="3"/></Border></ControlTemplate></Setter.Value></Setter></Style>
  </ResourceDictionary></Window.Resources>
- <Border BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="1" CornerRadius="8">
+ <!-- A transparent host reserves the spec's 40 DIP exterior shadow margin. -->
+ <Border x:Name="SettingsShadow" Margin="40" CornerRadius="8" Background="{DynamicResource SettingsSurfaceBrush}">
+ <Border x:Name="SettingsSurface" Background="{DynamicResource SettingsSurfaceBrush}" BorderBrush="{DynamicResource SettingsWindowBorderBrush}" BorderThickness="1" CornerRadius="8">
   <DockPanel>
    <Grid DockPanel.Dock="Top" Height="32" MouseLeftButtonDown="OnTitleDrag">
     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="46"/><ColumnDefinition Width="46"/><ColumnDefinition Width="46"/></Grid.ColumnDefinitions>
@@ -80,7 +99,7 @@
     <Button Grid.Column="2" Content="□" AutomationProperties.Name="Maximize or restore" Click="OnMaximize" shell:WindowChrome.IsHitTestVisibleInChrome="True" Background="Transparent" BorderBrush="Transparent"/>
     <Button Grid.Column="3" Style="{StaticResource SettingsCaptionClose}" Content="×" AutomationProperties.Name="Close settings" Click="OnClose" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
    </Grid>
-   <Border DockPanel.Dock="Bottom" Height="56" Background="{DynamicResource SettingsFooterBrush}" BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="0,1,0,0" Padding="24,0">
+   <Border DockPanel.Dock="Bottom" CornerRadius="0,0,7,7" Height="56" Background="{DynamicResource SettingsFooterBrush}" BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="0,1,0,0" Padding="24,0">
     <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="96"/><ColumnDefinition Width="8"/><ColumnDefinition Width="96"/></Grid.ColumnDefinitions>
      <TextBlock x:Name="SaveStatus" Style="{StaticResource SettingsMeta}" Text="Changes apply when you save" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" Margin="0,0,8,0"/>
      <Button Grid.Column="1" Content="Cancel" Click="OnClose" IsCancel="True"/>
@@ -182,5 +201,6 @@
     </TabItem>
    </TabControl>
   </DockPanel>
+ </Border>
  </Border>
 </Window>
