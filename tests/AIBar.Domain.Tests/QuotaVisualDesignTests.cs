@@ -363,7 +363,8 @@ public sealed class QuotaVisualDesignTests
         // Row spacing now lives in the shared meter row instead of each card.
         Assert.Equal(new string?[] { null, null }, cards.Select(card => card.Attribute("Margin")?.Value));
         var meter = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/PanelMeter.xaml"));
-        Assert.Equal("0,12,0,0", meter.Descendants(presentation + "Grid").First().Attribute("Margin")?.Value);
+        // Tighter meter spacing keeps the Claude Design summary within its 640 px cap.
+        Assert.Equal("0,8,0,0", meter.Descendants(presentation + "Grid").First().Attribute("Margin")?.Value);
         Assert.Equal(new[] { "{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}", "{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" }, cards.Select(card => card.Attribute("Visibility")?.Value));
         Assert.All(cards, card => Assert.Contains("percentage, reset, and state", card.Attribute(presentation + "AutomationProperties.HelpText")?.Value));
         var values = window.Descendants().Attributes().Select(attribute => attribute.Value).ToArray();

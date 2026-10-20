@@ -45,7 +45,8 @@ public sealed class PanelRenderRegressionTests
                 }
                 AssertOpaque(window);
                 // Genuinely oversized content must still scroll; do not fix clipping by hiding overflow.
-                window.Height = 400; window.SizeToContent = SizeToContent.Manual; Pump(window);
+                // The cap lives on the summary viewport; lower it to force genuine overflow.
+                scroll.MaxHeight = 300; Pump(window);
                 Assert.True(scroll.ScrollableHeight > 0);
             }
             finally { window.Close(); app.Resources.MergedDictionaries[0] = original; }
