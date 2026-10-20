@@ -120,7 +120,14 @@ public partial class App : System.Windows.Application
                 localUsageSettings.LoadAsync, localUsageSettings.SaveAsync, async (value, token) => { await localUsagePresentation.ApplyPolicyAsync(value, token); }),
             new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, publisher, analyticsOwner, store, localUsage, localUsageLedger, seams.LifecycleObservation, claudeRuntime, historyRecorder, historyStore, claudeCost, providerStatus, alerts, paceHistory),
             async () => { await Task.WhenAll(InitializeCompositionAsync(betaRuntime, presentation, localUsagePresentation, default), claudeRuntime.InitializeAsync(default).AsTask()); await claudeCost.RefreshAsync(default); }, presentation.ReportUnavailable,
-            async (trigger, token) => { await ReevaluateCompositionAsync(coordinator, localUsagePresentation, trigger, token); await claudeRuntime.RefreshAsync(trigger, token); await claudeCost.RefreshAsync(token); }, localUsagePresentation.RefreshAsync)
+            async (trigger, token) =>
+            {
+                // Runtime entry points enforce each provider's consent independently.
+                // Start both before awaiting so a slow network request cannot delay the local remote file.
+                await Task.WhenAll(betaRuntime.RefreshAsync(trigger, token).AsTask(), claudeRuntime.RefreshAsync(trigger, token).AsTask());
+                if (trigger == RefreshTrigger.PopoverOpened) await localUsagePresentation.RefreshAsync(token);
+                await claudeCost.RefreshAsync(token);
+            }, localUsagePresentation.RefreshAsync)
             { ClaudeQuota = claudeRuntime, QuotaHistory = historyStore, ProviderStatus = providerStatus, Alerts = alerts, Appearance = appearance, PaceHistory = paceHistory };
     }
     internal static async Task InitializeCompositionAsync(BetaRuntime runtime, QuotaPresentationHost presentation, LocalUsagePresentationHost localUsage, CancellationToken cancellationToken)

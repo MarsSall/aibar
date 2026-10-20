@@ -14,6 +14,12 @@ Each available quota window has a tracked uppercase section label, a large right
 
 `MainWindow.BarColorMode` remains Brand by default or Usage (75/90 thresholds). Mini-bars follow the same choice. Shared semantic colors live in `Themes/Semantic.Light.xaml`, `Semantic.Dark.xaml` and `Semantic.HighContrast.xaml`; every old key is retained. The dictionaries also expose the complete S10 shared color-token set for Settings and notification consumers. High contrast maps colors to the specified system keys, not hard-coded RGB approximations.
 
+## Refresh cadence
+
+Opening the panel requests fresh quota from each enabled provider when its last successful retrieval is older than one minute (or no snapshot exists), with at least one minute since the last attempt. Repeated opens after a failure do not bypass this throttle. Manual **Refresh** is unchanged and unthrottled.
+
+Automatic polls refresh every five minutes for Codex and Claude This PC, or every minute for Claude Other machine, measured since the last attempt regardless of snapshot freshness. Source changes update Claude's timer and minimum interval together. Resume and clock-change notifications follow the same minimum interval; sleep only reevaluates freshness. Freshness thresholds, cached values, failure handling and consent remain unchanged.
+
 ## States
 
 - Incident: the existing safe provider status description appears in a warning banner with a warning symbol and View status. Activating it opens the existing allowlisted provider status page.

@@ -114,9 +114,22 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
 
     public void ResumeAfterClear() { lock (_gate) if (!_disposed) _paused = false; }
 
-    private bool Eligible(RefreshTrigger trigger) => trigger == RefreshTrigger.Manual ||
-        _freshness.Evaluate(_state.Snapshot, _clock.UtcNow) != FreshnessState.Current &&
-        _clock.UtcNow - _lastAttempt >= _minimumPollInterval;
+    private bool Eligible(RefreshTrigger trigger)
+    {
+        if (trigger == RefreshTrigger.Manual) return true;
+        if (trigger == RefreshTrigger.Sleep) return false;
+        var now = _clock.UtcNow;
+        if (trigger == RefreshTrigger.PopoverOpened)
+        {
+            var interval = TimeSpan.FromMinutes(1);
+            // Retrieval age controls whether an open needs new data; attempt age also
+            // throttles repeated opens after failures (including recent manual attempts).
+            return now - _lastAttempt >= interval &&
+                (_state.Snapshot is null || now - _state.Snapshot.RetrievedAt > interval);
+        }
+        // Freshness is display state, not a polling/lifecycle eligibility gate.
+        return now - _lastAttempt >= _minimumPollInterval;
+    }
 
     private async Task CompleteRefreshAsync(TaskCompletionSource completion, long generation, CancellationToken lifetime)
     {

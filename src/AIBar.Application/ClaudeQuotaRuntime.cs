@@ -313,8 +313,10 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         try
         {
             _provider = (_resolvedSource == ClaudeQuotaSource.OtherMachine ? _remoteProviderFactory : _providerFactory)(_policy);
+            // Source handoffs recreate both timer and coordinator through this path.
+            var pollInterval = TimeSpan.FromMinutes(_resolvedSource == ClaudeQuotaSource.OtherMachine ? 1 : 5);
             _coordinator = new(new ConsentStore(_store, _policy, _pollCancellation.Token), _provider, _clock,
-                new FreshnessPolicy(TimeSpan.FromMinutes(_resolvedSource == ClaudeQuotaSource.OtherMachine ? 15 : 10)), TimeSpan.FromMinutes(5));
+                new FreshnessPolicy(TimeSpan.FromMinutes(_resolvedSource == ClaudeQuotaSource.OtherMachine ? 15 : 10)), pollInterval);
             _coordinatorRetrievalGeneration = 0;
             var epoch = Interlocked.Increment(ref _authorityEpoch);
             _authorityHandler = update => OnAuthorityUpdated(update, epoch);
@@ -332,7 +334,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             _enabled = true;
             ScheduleRemoteDeadline();
             _timer = _timeProvider.CreateTimer(_ => Forward(RefreshTrigger.Poll), null,
-                TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+                pollInterval, pollInterval);
             Notify(Notification.Consent);
         }
         catch

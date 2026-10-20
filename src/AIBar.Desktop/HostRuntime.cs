@@ -237,8 +237,12 @@ public sealed class TrayHostRuntime : IAsyncDisposable
     {
         if (_disposed) return;
         _presentation?.RecalculateFromClock();
-        _ = ReevaluateSafelyAsync(RefreshTrigger.PopoverOpened);
-        RunSafely(() => { _popover.Show(); _popover.Activate(); });
+        RunSafely(() =>
+        {
+            _popover.Show();
+            if (_popover.IsVisible) _ = ReevaluateSafelyAsync(RefreshTrigger.PopoverOpened);
+            _popover.Activate();
+        });
     }
     private void OnDeactivated()
     {
