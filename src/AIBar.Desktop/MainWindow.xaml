@@ -110,6 +110,8 @@
         </Grid>
 
         <StackPanel Grid.Row="1" Margin="20,0,20,12" automation:AutomationProperties.Name="Quota cards">
+            <TextBlock Text="Codex" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="{DynamicResource TextBrush}"
+                       Visibility="{Binding Claude.IsEnabled, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}" />
             <GroupBox automation:AutomationProperties.Name="Weekly quota card" automation:AutomationProperties.HelpText="Weekly quota percentage, reset, and state" automation:AutomationProperties.ItemStatus="{Binding FreshnessLabel}" Visibility="{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource ChromeLessGroupBoxStyle}" Margin="0,0,0,8">
                 <Border Style="{StaticResource PanelQuotaCardStyle}">
                     <Grid Margin="0,4,0,12">
@@ -139,6 +141,44 @@
                     </Grid>
                 </Border>
             </GroupBox>
+
+            <StackPanel x:Name="ClaudeQuotaSection" Margin="0,8,0,0"
+                        Visibility="{Binding Claude.IsEnabled, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}">
+                <TextBlock Text="Claude" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,8" />
+                <GroupBox automation:AutomationProperties.Name="Claude weekly quota card" automation:AutomationProperties.HelpText="Claude weekly quota percentage, reset, and state" automation:AutomationProperties.ItemStatus="{Binding Claude.State.FreshnessLabel}"
+                          Visibility="{Binding Claude.State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}" Style="{StaticResource ChromeLessGroupBoxStyle}" Margin="0,0,0,8">
+                    <Border Style="{StaticResource PanelQuotaCardStyle}">
+                        <Grid Margin="0,4,0,12">
+                            <Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Claude.State.Weekly.Label}" Style="{StaticResource QuotaLabelTextStyle}" />
+                            <TextBlock Grid.Column="1" Text="{Binding Claude.State.Weekly.PercentageUsed, StringFormat={}{0:0}%, TargetNullValue=--}" Style="{StaticResource QuotaPercentageTextStyle}" FontSize="20" />
+                            <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource QuotaProgressStyle}" Value="{Binding Claude.State.Weekly.PercentageUsed}" Margin="0,8,0,0" automation:AutomationProperties.Name="Claude weekly quota progress" />
+                            <StackPanel Grid.Row="2" Margin="0,6,0,0">
+                                <TextBlock Style="{StaticResource QuotaCardSecondaryTextStyle}"><Run Text="Reset " /><Run Text="{Binding Claude.State.Weekly.ResetCountdown, TargetNullValue=unavailable}" /></TextBlock>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </GroupBox>
+                <GroupBox automation:AutomationProperties.Name="Claude 5-hour quota card" automation:AutomationProperties.HelpText="Claude 5-hour quota percentage, reset, and state" automation:AutomationProperties.ItemStatus="{Binding Claude.State.FreshnessLabel}"
+                          Visibility="{Binding Claude.State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}" Style="{StaticResource ChromeLessGroupBoxStyle}">
+                    <Border Style="{StaticResource PanelQuotaCardStyle}">
+                        <Grid Margin="0,4,0,12">
+                            <Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Claude.State.Primary.Label}" Style="{StaticResource QuotaLabelTextStyle}" />
+                            <TextBlock Grid.Column="1" Text="{Binding Claude.State.Primary.PercentageUsed, StringFormat={}{0:0}%, TargetNullValue=--}" Style="{StaticResource QuotaPercentageTextStyle}" FontSize="20" />
+                            <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource QuotaProgressStyle}" Value="{Binding Claude.State.Primary.PercentageUsed}" Margin="0,8,0,0" automation:AutomationProperties.Name="Claude 5-hour quota progress" />
+                            <StackPanel Grid.Row="2" Margin="0,6,0,0">
+                                <TextBlock Style="{StaticResource QuotaCardSecondaryTextStyle}"><Run Text="Reset " /><Run Text="{Binding Claude.State.Primary.ResetCountdown, TargetNullValue=unavailable}" /></TextBlock>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </GroupBox>
+                <TextBlock Text="{Binding Claude.State.FreshnessLabel}" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" />
+                <TextBlock Text="{Binding Claude.State.CachedAgeLabel}" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" />
+                <TextBlock Text="{Binding Claude.State.WarningLabel}" TextWrapping="Wrap" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" />
+            </StackPanel>
         </StackPanel>
 
         <ScrollViewer x:Name="SecondaryScrollViewer" Grid.Row="2" Margin="20,0,20,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PreviewGotKeyboardFocus="OnSecondaryPreviewGotKeyboardFocus" automation:AutomationProperties.Name="Secondary analytics">

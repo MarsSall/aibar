@@ -41,6 +41,8 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     public QuotaRefreshState State => _enabled ? _coordinator?.State ?? Empty : Empty;
     public TimeSpan? CachedAge => State.Snapshot is { } snapshot ? _clock.UtcNow - snapshot.RetrievedAt : null;
     public event Action? ConsentChanged;
+    public event Action? StateChanged;
+    private void OnStateChanged(QuotaRefreshState state) => StateChanged?.Invoke();
 
     public async ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
@@ -86,6 +88,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             _provider = _providerFactory(_policy);
             _coordinator = new(new ConsentStore(_store, _policy, _pollCancellation.Token), _provider, _clock,
                 new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromMinutes(5));
+            _coordinator.StateChanged += OnStateChanged;
             await _coordinator.InitializeAsync(cancellationToken);
             _enabled = true;
             _timer = _timeProvider.CreateTimer(_ => Forward(RefreshTrigger.Poll), null,
@@ -142,7 +145,11 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         }
         finally
         {
-            if (_coordinator is not null) await _coordinator.DisposeAsync();
+            if (_coordinator is not null)
+            {
+                _coordinator.StateChanged -= OnStateChanged;
+                await _coordinator.DisposeAsync();
+            }
             if (_provider is IAsyncDisposable asyncProvider) await asyncProvider.DisposeAsync();
             else if (_provider is IDisposable provider) provider.Dispose();
             _coordinator = null; _provider = null; _timer = null;
@@ -170,7 +177,12 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     public void ResumeAfterClear() { }
     private void OnSuspended() => Forward(RefreshTrigger.Sleep);
     private void OnResumed() => Forward(RefreshTrigger.Resume);
-    private void OnClockChanged() => Forward(RefreshTrigger.ClockChanged);
+    private void OnClockChanged()
+    {
+        Forward(RefreshTrigger.ClockChanged);
+        // Recalculate reset countdowns even when freshness and polling eligibility did not change.
+        StateChanged?.Invoke();
+    }
     private async void Forward(RefreshTrigger trigger)
     {
         try { await RefreshAsync(trigger, CancellationToken.None); }
@@ -191,7 +203,11 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             // Shutdown retains the normalized cache and consent; unlike revoke/clear it is not a reset.
             _enabled = false; _policy.Disable(); _pollCancellation?.Cancel();
             if (_timer is not null) await _timer.DisposeAsync();
-            if (_coordinator is not null) await _coordinator.DisposeAsync();
+            if (_coordinator is not null)
+            {
+                _coordinator.StateChanged -= OnStateChanged;
+                await _coordinator.DisposeAsync();
+            }
             if (_provider is IAsyncDisposable asyncProvider) await asyncProvider.DisposeAsync();
             else if (_provider is IDisposable provider) provider.Dispose();
             _pollCancellation?.Dispose();
