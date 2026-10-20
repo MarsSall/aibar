@@ -16,7 +16,7 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal("Themes/Semantic.Light.xaml", mergedSource);
         var semanticKeys = XDocument.Parse(ReadProjectFile($"src/AIBar.Desktop/{mergedSource}")).Descendants()
             .Select(element => element.Attribute(x + "Key")?.Value).Where(key => key is not null).Cast<string>().Order().ToArray();
-        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, semanticKeys);
+        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "NotificationBadgeTextBrush", "NotificationBorderBrush", "NotificationClaudeBrush", "NotificationClaudeTileBrush", "NotificationCodexBrush", "NotificationCodexTileBrush", "NotificationFocusBrush", "NotificationHoverBrush", "NotificationHoverTextBrush", "NotificationPaceBrush", "NotificationResetBrush", "NotificationSecondaryTextBrush", "NotificationSurfaceBrush", "NotificationTextBrush", "NotificationThresholdBrush", "NotificationTimerBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, semanticKeys);
         var window = ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml");
 
         foreach (var key in new[] { "SpacingSmall", "SpacingMedium", "CardRadius" })
@@ -227,13 +227,29 @@ public sealed class QuotaVisualDesignTests
             .Select(name => XDocument.Parse(ReadProjectFile($"src/AIBar.Desktop/Themes/Semantic.{name}.xaml"))).ToArray();
         var keySets = dictionaries.Select(dictionary => dictionary.Descendants().Select(element => element.Attribute(x + "Key")?.Value).Where(key => key is not null).Cast<string>().Order().ToArray()).ToArray();
         Assert.All(keySets.Skip(1), keys => Assert.Equal(keySets[0], keys));
-        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, keySets[0]);
+        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "NotificationBadgeTextBrush", "NotificationBorderBrush", "NotificationClaudeBrush", "NotificationClaudeTileBrush", "NotificationCodexBrush", "NotificationCodexTileBrush", "NotificationFocusBrush", "NotificationHoverBrush", "NotificationHoverTextBrush", "NotificationPaceBrush", "NotificationResetBrush", "NotificationSecondaryTextBrush", "NotificationSurfaceBrush", "NotificationTextBrush", "NotificationThresholdBrush", "NotificationTimerBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, keySets[0]);
             var highContrastMappings = new[]
             {
                 ("SurfaceBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("CardBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("TextBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
                 ("MutedTextBrush", "{DynamicResource {x:Static SystemColors.GrayTextColorKey}}"),
+                ("NotificationSurfaceBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("NotificationTextBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("NotificationSecondaryTextBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("NotificationBorderBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("NotificationThresholdBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("NotificationResetBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("NotificationPaceBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("NotificationTimerBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("NotificationCodexBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("NotificationClaudeBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("NotificationCodexTileBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("NotificationClaudeTileBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("NotificationFocusBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("NotificationHoverBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("NotificationHoverTextBrush", "{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"),
+                ("NotificationBadgeTextBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("PanelMenuHighlightBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
                 ("PanelMenuHighlightTextBrush", "{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"),
                 ("PanelRowHoverBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
