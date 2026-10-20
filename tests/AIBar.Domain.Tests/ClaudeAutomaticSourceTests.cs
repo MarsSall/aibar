@@ -298,14 +298,15 @@ public sealed class ClaudeAutomaticSourceTests : IDisposable
     [Fact]
     public async Task Automatically_resolved_remote_expires_at_its_deadline_without_a_poll()
     {
-        var time = new VirtualTime(); var remote = new Provider(73, Now.AddMinutes(-14));
+        // Expire before S13's one-minute poll so this remains a deadline-only test.
+        var time = new VirtualTime(); var remote = new Provider(73, Now.AddMinutes(-14).AddSeconds(-30));
         await using var runtime = Runtime(new Store(), _ => new Provider(11), _ => remote, () => true, time);
         await runtime.InitializeAsync(default);
         await runtime.GrantConsentAsync(default);
         Assert.Equal(FreshnessState.Current, runtime.State.Freshness);
         var reads = remote.Calls; var changes = 0;
         runtime.StateChanged += () => changes++;
-        time.Advance(TimeSpan.FromSeconds(59));
+        time.Advance(TimeSpan.FromSeconds(29));
         Assert.Equal(0, changes);
         time.Advance(TimeSpan.FromSeconds(1));
         Assert.Equal(1, changes);
@@ -503,12 +504,13 @@ public sealed class ClaudeAutomaticSourceTests : IDisposable
     {
         var time = new VirtualTime();
         await using var runtime = Runtime(new Store(), _ => new Provider(11),
-            _ => new Provider(73, Now.AddMinutes(-14)), () => true, time);
+            _ => new Provider(73, Now.AddMinutes(-14).AddSeconds(-30)), () => true, time);
         await runtime.InitializeAsync(default);
         await runtime.GrantConsentAsync(default);
         var probe = new ReentryProbe(runtime);
         runtime.StateChanged += probe.Handle;
-        await Task.Run(() => time.Advance(TimeSpan.FromMinutes(1))).WaitAsync(TimeSpan.FromSeconds(15));
+        // Isolate deadline reentry from the new one-minute periodic poll.
+        await Task.Run(() => time.Advance(TimeSpan.FromSeconds(30))).WaitAsync(TimeSpan.FromSeconds(15));
         probe.AssertSucceeded();
     }
 

@@ -1,11 +1,35 @@
 using AIBar.Desktop;
 using AIBar.Application;
+using AIBar.Domain;
 using System.Windows.Threading;
 
 namespace AIBar.Domain.Tests;
 
 public sealed class HostRuntimeTests
 {
+    [Fact]
+    public async Task Opening_panel_raises_refresh_after_show_but_hiding_does_not()
+    {
+        using var instance = new SingleInstanceHost($"AIBar.Tests.{Guid.NewGuid():N}");
+        var tray = new FakeTray(); var popover = new FakePopover(); var triggers = new List<RefreshTrigger>();
+        await using var host = new TrayHostRuntime(instance, tray, popover, new FakeRecreationEvents(),
+            _ => Task.CompletedTask, new ProbeResource(), () => { }, reevaluate: (trigger, _) =>
+            {
+                Assert.True(popover.IsVisible);
+                triggers.Add(trigger);
+                return ValueTask.CompletedTask;
+            });
+        host.Start();
+        Assert.Empty(triggers);
+        tray.Click();
+        Assert.Equal(new[] { RefreshTrigger.PopoverOpened }, triggers);
+        tray.Click();
+        Assert.Single(triggers);
+        host.RequestShow(); // Includes activation requests / notification-card clicks.
+        Assert.Equal(new[] { RefreshTrigger.PopoverOpened, RefreshTrigger.PopoverOpened }, triggers);
+        instance.Dispose();
+    }
+
     [Fact]
     public async Task Tray_toggle_recreation_activation_and_deactivation_are_deterministic()
     {

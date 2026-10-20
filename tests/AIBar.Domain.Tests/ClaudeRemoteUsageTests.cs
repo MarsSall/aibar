@@ -379,13 +379,13 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
         Assert.Empty(store.Saved);
     }
 
-    // T3, S2: an open panel expires without waiting for the five-minute poll.
+    // Deadline isolation: expiry precedes even S13's one-minute remote poll.
     [Fact]
     public async Task Remote_deadline_marks_cached_values_stale_without_polling_or_changing_guidance()
     {
         var time = new AdvancingTimeProvider();
         var clock = new AdvancingClock(time);
-        var files = new Files(GeneratedAt(Now.AddMinutes(-14)));
+        var files = new Files(GeneratedAt(Now.AddMinutes(-14).AddSeconds(-30)));
         await using var runtime = await RemoteRuntime(time, clock, files);
         var mapper = new ClaudeQuotaPresentationMapper(clock);
         var panel = mapper.Map(runtime.State, true, runtime.Source);
@@ -396,7 +396,7 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
         runtime.StateChanged += () => { changes++; panel = mapper.Map(runtime.State, true, runtime.Source); };
         var reads = files.Paths.Count;
 
-        time.Advance(TimeSpan.FromSeconds(59));
+        time.Advance(TimeSpan.FromSeconds(29));
         Assert.True(panel.IsCurrent);
         Assert.Equal(0, changes);
         time.Advance(TimeSpan.FromSeconds(1)); // generatedAt + 15 minutes, not the next poll
@@ -408,7 +408,7 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
         Assert.Equal(warning, panel.WarningLabel);
         Assert.Equal(error, panel.ErrorLabel);
         Assert.Equal(1, changes);
-        time.Advance(TimeSpan.FromMinutes(1)); // file is now 16 minutes old
+        time.Advance(TimeSpan.FromSeconds(15)); // still expired, before the next poll
         Assert.False(panel.IsCurrent);
         Assert.Equal(reads, files.Paths.Count);
     }
@@ -418,20 +418,21 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
     {
         var time = new AdvancingTimeProvider();
         var clock = new AdvancingClock(time);
-        var files = new Files(GeneratedAt(Now.AddMinutes(-14)));
+        // Both deadlines precede the first periodic poll; retain the no-read assertions.
+        var files = new Files(GeneratedAt(Now.AddMinutes(-14).AddSeconds(-30)));
         await using var runtime = await RemoteRuntime(time, clock, files);
-        time.Advance(TimeSpan.FromSeconds(30));
-        files.Content = Encoding.UTF8.GetBytes(GeneratedAt(time.GetUtcNow().AddMinutes(-12)));
+        time.Advance(TimeSpan.FromSeconds(15));
+        files.Content = Encoding.UTF8.GetBytes(GeneratedAt(time.GetUtcNow().AddMinutes(-14).AddSeconds(-30)));
         await runtime.RefreshAsync(RefreshTrigger.Manual, default);
         var changes = 0;
         runtime.StateChanged += () => changes++;
         var reads = files.Paths.Count;
-        time.Advance(TimeSpan.FromSeconds(30)); // old deadline
+        time.Advance(TimeSpan.FromSeconds(15)); // old deadline
         Assert.Equal(FreshnessState.Current, runtime.State.Freshness);
         Assert.Equal(0, changes);
-        time.Advance(TimeSpan.FromMinutes(2));
+        time.Advance(TimeSpan.FromSeconds(14));
         Assert.Equal(FreshnessState.Current, runtime.State.Freshness);
-        time.Advance(TimeSpan.FromSeconds(30)); // replacement deadline
+        time.Advance(TimeSpan.FromSeconds(1)); // replacement deadline
         Assert.Equal(FreshnessState.Stale, runtime.State.Freshness);
         Assert.Equal(1, changes);
         Assert.Equal(reads, files.Paths.Count);
