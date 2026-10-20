@@ -77,6 +77,10 @@ public sealed class PanelMockupRenderTests
                     }
                 };
                 window.Show();
+                // The reference frames intentionally show Claude, including when it
+                // has no cache. Do not let highest-usage default selection render Codex
+                // instead of the sign-in scenario being compared.
+                if (claudeEnabled) window.SelectProvider("Claude");
                 window.UpdateLayout();
                 Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 window.UpdateLayout();

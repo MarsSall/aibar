@@ -47,8 +47,13 @@ public sealed class ProviderStatusPanelTests
                 Assert.Equal(new[] { StatusProvider.Codex, StatusProvider.Claude }, calls);
                 Assert.Equal(Visibility.Visible, codexBadge.Visibility);
                 Assert.Equal("API incident", codexBadge.Content);
-                Assert.Contains(Descendants<System.Windows.Shapes.Ellipse>(codexBadge), dot => dot.IsVisible && dot.Width == 7);
+                // S10 replaces the header's 7 px dot with a warning banner (frame 02).
+                // Keep the actual incident description, accessible help and status action contract.
+                Assert.Contains(Descendants<TextBlock>(codexBadge), text => text.IsVisible && text.Text == "⚠");
                 Assert.Contains(Descendants<TextBlock>(codexBadge), text => text.IsVisible && text.Text == "API incident");
+                Assert.Contains(Descendants<TextBlock>(codexBadge), text => text.IsVisible && text.Text == "View status");
+                Assert.Equal("API incident", AutomationProperties.GetHelpText(codexBadge));
+                Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(codexBadge));
                 Assert.Equal(Visibility.Collapsed, claudeBadge.Visibility);
                 window.SelectProvider("Claude"); window.UpdateLayout();
                 Assert.True(usage.IsVisible);
