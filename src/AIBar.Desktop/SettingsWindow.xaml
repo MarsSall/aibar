@@ -97,7 +97,18 @@
    </Grid></ControlTemplate></Setter.Value></Setter>
   </Style>
   <Style TargetType="ProgressBar"><Setter Property="Focusable" Value="False"/><Setter Property="IsHitTestVisible" Value="False"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ProgressBar"><Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3"><Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left" CornerRadius="3"/></Border></ControlTemplate></Setter.Value></Setter></Style>
- </ResourceDictionary></Window.Resources>
+ <!-- Same slim scroll bar as the panel: rounded thumb, no arrow buttons. -->
+<Style TargetType="ScrollBar">
+ <Setter Property="Width" Value="6"/><Setter Property="MinWidth" Value="6"/><Setter Property="Margin" Value="4,2,0,2"/>
+ <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar">
+  <Track x:Name="PART_Track" IsDirectionReversed="True">
+   <Track.DecreaseRepeatButton><RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Focusable="False" IsTabStop="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
+   <Track.IncreaseRepeatButton><RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Focusable="False" IsTabStop="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
+   <Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType="Thumb"><Border CornerRadius="3" Background="{DynamicResource MutedTextBrush}" Opacity="0.6"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+  </Track>
+ </ControlTemplate></Setter.Value></Setter>
+</Style>
+</ResourceDictionary></Window.Resources>
  <!-- A transparent host reserves the spec's 40 DIP exterior shadow margin. -->
  <Border x:Name="SettingsShadow" Margin="40" CornerRadius="8" Background="{DynamicResource SettingsSurfaceBrush}">
  <Border x:Name="SettingsSurface" Background="{DynamicResource SettingsSurfaceBrush}" BorderBrush="{DynamicResource SettingsWindowBorderBrush}" BorderThickness="1" CornerRadius="8">
@@ -199,7 +210,7 @@
         <Border BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="0,1,0,0"/>
         <Grid MinHeight="44" Margin="16,6"><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Border Background="{DynamicResource SettingsFooterBrush}" Width="32" Height="32" CornerRadius="6"><Path x:Name="ClaudeMark" Data="{StaticResource SettingsClaudeMark}" Width="20" Height="20" Stretch="Uniform" Fill="{DynamicResource SettingsClaudeBrush}"/></Border><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Claude"/><TextBlock Text="Anthropic · session and weekly limits" Style="{StaticResource SettingsMeta}"/></StackPanel><CheckBox x:Name="ClaudeEnabled" Grid.Column="2" Style="{StaticResource SettingsToggle}" AutomationProperties.Name="Show Claude in AIBar"/></Grid>
        </StackPanel></Border>
-       <TextBlock Text="Refresh every" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
+       <TextBlock Text="REFRESH EVERY" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
        <UniformGrid x:Name="RefreshChoices" Rows="1" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Contained" PreviewKeyDown="OnRefreshKeyDown" AutomationProperties.Name="Refresh every">
         <RadioButton x:Name="Refresh1" Style="{StaticResource SettingsRefreshRadio}" GroupName="RefreshInterval" Content="1 min" Tag="1" IsTabStop="False" Checked="OnRefreshSelected" AutomationProperties.Name="Refresh every 1 min"/>
         <RadioButton x:Name="Refresh2" Style="{StaticResource SettingsRefreshRadio}" GroupName="RefreshInterval" Content="2 min" Tag="2" IsTabStop="False" Checked="OnRefreshSelected" AutomationProperties.Name="Refresh every 2 min"/>
