@@ -18,10 +18,10 @@ public sealed class SettingsDeliveryTests : IDisposable
             var tray = new Tray(); var confetti = 0;
             using var controller = new QuotaAlertTrayController(tray, observer, Dispatcher.CurrentDispatcher, () => { }, _ => { }, _ => confetti++);
             Observe(1, now, now.AddHours(1)); observer.Completion.GetAwaiter().GetResult();
-            Observe(2, now.AddSeconds(1), now.AddHours(2)); observer.Completion.GetAwaiter().GetResult();
+            Observe(2, now.AddSeconds(1), now.AddHours(6)); observer.Completion.GetAwaiter().GetResult();
             PumpUntil(() => confetti == 1); Assert.Equal(1, confetti); Assert.Equal(0, tray.Messages);
             observer.ChangeSettingsAsync(o => o with { Resets = false }).GetAwaiter().GetResult();
-            Observe(3, now.AddSeconds(2), now.AddHours(3)); observer.Completion.GetAwaiter().GetResult();
+            Observe(3, now.AddSeconds(2), now.AddHours(11)); observer.Completion.GetAwaiter().GetResult();
             Pump(); Assert.Equal(1, confetti); Assert.Equal(0, tray.Messages);
             void Observe(long generation, DateTimeOffset retrieved, DateTimeOffset reset) => observer.Observe("Codex",
                 new(new(new(new(1, reset), null, retrieved), FreshnessState.Current, false, null, null), generation, generation), () => true);

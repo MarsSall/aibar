@@ -28,11 +28,13 @@ public sealed class QuotaResetJitterTests
     [Fact]
     public void Jitter_keeps_the_threshold_key_so_a_crossed_threshold_never_fires_again()
     {
-        var first = Assert.Single(Evaluate(Weekly(76, WeeklyReset), Weekly(70, WeeklyReset, minutesAgo: 5)));
+        // 76 % with three of seven days left also runs out before the reset; only the threshold matters here.
+        var first = Assert.Single(Evaluate(Weekly(76, WeeklyReset), Weekly(70, WeeklyReset, minutesAgo: 5)), alert => alert.Kind == QuotaAlertKind.ThresholdCrossed);
         Assert.Equal(QuotaAlertKind.ThresholdCrossed, first.Kind);
         var anchored = QuotaAlertPolicy.Anchor(Weekly(77, WeeklyReset.AddSeconds(0.8)), Weekly(76, WeeklyReset, minutesAgo: 5));
         Assert.Equal(WeeklyReset, anchored.ResetAt);
-        Assert.Empty(Evaluate(Weekly(77, WeeklyReset.AddSeconds(0.8)), Weekly(76, WeeklyReset, minutesAgo: 5), [first.Key]));
+        Assert.DoesNotContain(Evaluate(Weekly(77, WeeklyReset.AddSeconds(0.8)), Weekly(76, WeeklyReset, minutesAgo: 5), [first.Key]),
+            alert => alert.Kind is QuotaAlertKind.ThresholdCrossed or QuotaAlertKind.Reset);
     }
 
     [Fact]
