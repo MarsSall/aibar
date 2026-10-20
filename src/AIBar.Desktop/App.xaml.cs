@@ -157,7 +157,7 @@ public partial class App : System.Windows.Application
             _settingsWindowHost = new(appearance, settingsAlerts, providerSettings,
                 () => tray.ShowAlert("AIBar · Window reset", "A session or weekly window starts over."));
             // The colour choice applies live; Changed can run during clear, so never wait on the UI thread.
-            appearance.Changed += options => Dispatcher.BeginInvoke(new Action(() => window.BarColorMode = ToBarColorMode(options)));
+            appearance.Changed += options => Dispatcher.BeginInvoke(new Action(() => ApplyAppearance(options, window)));
             _ = ApplyInitialAppearanceAsync(appearance, window);
             window.SettingsRequested += () => _settingsWindowHost.Show(window);
             tray.SettingsRequested += () => _settingsWindowHost.Show(window);
@@ -174,7 +174,7 @@ public partial class App : System.Windows.Application
             _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation, new WindowsPrivateIntegrationConsentPrompt(), new WindowsOpenCodeDataFolderPicker(), composition.ClaudeQuota);
         if (composition.Alerts is { } alerts)
             _alertController = new(tray, alerts, Dispatcher, () => _runtime.RequestShow(),
-                cards: new NotificationStack(() => _runtime.RequestShow(), () => window.Width <= 300));
+                cards: new NotificationStack(() => _runtime.RequestShow(), () => window.Width <= 300)) { BackgroundOpacity = window.BackgroundOpacity };
         _runtime.Start();
         composition.ProviderStatus?.Start();
     }
@@ -193,12 +193,22 @@ public partial class App : System.Windows.Application
         internal static StartupComposition Unavailable => new(new UnavailableQuotaPresentation(), null, null, new EmptyAsyncResource(), () => Task.CompletedTask, () => { });
     }
 
+    internal static double ToBackgroundOpacity(AppearanceOptions options) => Math.Clamp(options.BackgroundOpacity, 30, 100) / 100d;
+
+    // Only the window backgrounds take the opacity; text, bars and buttons stay opaque.
+    private void ApplyAppearance(AppearanceOptions options, MainWindow window)
+    {
+        window.BarColorMode = ToBarColorMode(options);
+        window.BackgroundOpacity = ToBackgroundOpacity(options);
+        if (_alertController is { } controller) controller.BackgroundOpacity = window.BackgroundOpacity;
+    }
+
     internal static PanelBarColorMode ToBarColorMode(AppearanceOptions options) =>
         options.BarColors == "usage" ? PanelBarColorMode.Usage : PanelBarColorMode.Brand;
 
-    private static async Task ApplyInitialAppearanceAsync(AppearanceSettings appearance, MainWindow window)
+    private async Task ApplyInitialAppearanceAsync(AppearanceSettings appearance, MainWindow window)
     {
-        try { window.BarColorMode = ToBarColorMode(await appearance.LoadAsync(default)); }
+        try { ApplyAppearance(await appearance.LoadAsync(default), window); }
         catch (Exception) { /* Unreadable appearance keeps the default brand colours. */ }
     }
 
