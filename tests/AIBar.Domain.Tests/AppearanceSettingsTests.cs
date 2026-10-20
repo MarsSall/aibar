@@ -32,7 +32,7 @@ public sealed class AppearanceSettingsTests : IDisposable
         Assert.Equal(options, await settings.LoadAsync(default));
         Assert.Equal(options, Assert.Single(changes));
         using var json = JsonDocument.Parse(await File.ReadAllTextAsync(path));
-        Assert.Equal(new[] { "schema", "barColors", "yasbColors", "backgroundOpacity" }, json.RootElement.EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.Equal(new[] { "schema", "barColors", "yasbColors", "backgroundOpacity", "refreshMinutes" }, json.RootElement.EnumerateObject().Select(p => p.Name).ToArray());
         Assert.Equal(1, json.RootElement.GetProperty("schema").GetInt32());
         using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => settings.SaveAsync(new(), cancelled.Token).AsTask());
