@@ -14,6 +14,7 @@ public partial class App : System.Windows.Application
     private TrayHostRuntime? _runtime;
     private IThemeController? _theme;
     private QuotaAlertTrayController? _alertController;
+    private SettingsWindowHost? _settingsWindowHost;
 
     public App() : this(false) { }
     internal App(bool suppressHostStartup) => _suppressHostStartup = suppressHostStartup;
@@ -101,6 +102,7 @@ public partial class App : System.Windows.Application
             token => ClaudeRemoteTokens.ReadAsync(Path.Combine(dataDirectory, "claude-remote-tokens.json"), clock.UtcNow, token));
         claudeRuntime.ConsentChanged += () => { _ = claudeCost.RefreshAsync(default); };
         claudeRuntime.StateChanged += () => { _ = claudeCost.RefreshAsync(default); };
+        var appearance = new AppearanceSettings(Path.Combine(dataDirectory, "appearance.json"));
         var alerts = new QuotaAlertObserver(dataDirectory, clock);
         coordinator.AuthorityUpdated += update => alerts.Observe("Codex", update,
             () => policy.IsEnabled && coordinator.State.Freshness == FreshnessState.Current && coordinator.State.Failure is null);
@@ -112,13 +114,13 @@ public partial class App : System.Windows.Application
         var localUsagePresentation = new LocalUsagePresentationHost(localUsage, new LocalUsagePresentationMapper());
         var providerStatus = new ProviderStatusPresentation(presentation, claudePresentation, () => policy.IsEnabled);
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
-        var clear = new ClearAiBarDataService(dataDirectory, [paceHistory, claudeCost, claudeRuntime, publisher, coordinator, historyRecorder, historyStore, alerts, localUsage, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics, publisher));
+        var clear = new ClearAiBarDataService(dataDirectory, [paceHistory, claudeCost, claudeRuntime, publisher, coordinator, historyRecorder, historyStore, alerts, appearance, localUsage, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics, publisher));
         return new(new BetaAnalyticsPresentation(presentation, analytics, localUsagePresentation, claudePresentation, claudeCost), presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy, betaRuntime.RevokeConsentAsync, betaRuntime.GrantConsentAsync,
                 localUsageSettings.LoadAsync, localUsageSettings.SaveAsync, async (value, token) => { await localUsagePresentation.ApplyPolicyAsync(value, token); }),
             new QuotaRuntimeResource(presentation, lifecycleAdapter, lifecycleEvents, betaRuntime, publisher, analyticsOwner, store, localUsage, localUsageLedger, seams.LifecycleObservation, claudeRuntime, historyRecorder, historyStore, claudeCost, providerStatus, alerts, paceHistory),
             async () => { await Task.WhenAll(InitializeCompositionAsync(betaRuntime, presentation, localUsagePresentation, default), claudeRuntime.InitializeAsync(default).AsTask()); await claudeCost.RefreshAsync(default); }, presentation.ReportUnavailable,
             async (trigger, token) => { await ReevaluateCompositionAsync(coordinator, localUsagePresentation, trigger, token); await claudeRuntime.RefreshAsync(trigger, token); await claudeCost.RefreshAsync(token); }, localUsagePresentation.RefreshAsync)
-            { ClaudeQuota = claudeRuntime, QuotaHistory = historyStore, ProviderStatus = providerStatus, Alerts = alerts, PaceHistory = paceHistory };
+            { ClaudeQuota = claudeRuntime, QuotaHistory = historyStore, ProviderStatus = providerStatus, Alerts = alerts, Appearance = appearance, PaceHistory = paceHistory };
     }
     internal static async Task InitializeCompositionAsync(BetaRuntime runtime, QuotaPresentationHost presentation, LocalUsagePresentationHost localUsage, CancellationToken cancellationToken)
     {
@@ -147,7 +149,13 @@ public partial class App : System.Windows.Application
         _taskbar = new TaskbarRecreationMonitor(window);
         var trayPresentation = composition.Presentation is BetaAnalyticsPresentation analyticsPresentation ? analyticsPresentation.QuotaPresentation : composition.Presentation as QuotaPresentationHost;
         var tray = new WindowsTrayRuntime();
-        window.SettingsRequested += () => tray.ShowSettingsMenu(window);
+        if (composition.Appearance is { } appearance && composition.Alerts is { } settingsAlerts)
+        {
+            _settingsWindowHost = new(appearance, settingsAlerts);
+            window.SettingsRequested += () => _settingsWindowHost.Show(window);
+            tray.SettingsRequested += () => _settingsWindowHost.Show(window);
+        }
+        else window.SettingsRequested += () => tray.ShowSettingsMenu(window);
         window.QuitRequested += tray.RequestExit;
         _runtime = new TrayHostRuntime(_instance!, tray, new WpfPopoverRuntime(window, _theme, () => WindowsPopoverPlacementContextProvider.Get(window), null, () => themeSource.Current), _taskbar,
             _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation, new WindowsPrivateIntegrationConsentPrompt(), new WindowsOpenCodeDataFolderPicker(), composition.ClaudeQuota);
@@ -167,6 +175,7 @@ public partial class App : System.Windows.Application
         internal PanelPaceHistory? PaceHistory { get; init; }
         internal ProviderStatusPresentation? ProviderStatus { get; init; }
         internal QuotaAlertObserver? Alerts { get; init; }
+        internal AppearanceSettings? Appearance { get; init; }
         internal static StartupComposition Unavailable => new(new UnavailableQuotaPresentation(), null, null, new EmptyAsyncResource(), () => Task.CompletedTask, () => { });
     }
 
@@ -203,6 +212,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _settingsWindowHost?.Dispose();
         _alertController?.Dispose();
         _theme?.Dispose();
         _taskbar?.Dispose();

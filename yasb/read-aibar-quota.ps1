@@ -154,11 +154,34 @@ function Invoke-AiBarQuotaReaderCore {
     } catch { return Get-SafeOutput -Now $now }
 }
 
+function Get-YasbColorMode([string]$QuotaPath) {
+    # Optional, bounded, read-only preference. Failure must never affect quota output.
+    try {
+        $path = Join-Path ([IO.Path]::GetDirectoryName($QuotaPath)) 'appearance.json'
+        $stream = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+        try {
+            $bytes = New-Object byte[] 4097
+            $count = $stream.Read($bytes, 0, $bytes.Length)
+            if ($count -eq 0 -or $count -gt 4096) { return 'usage' }
+            $json = [Text.UTF8Encoding]::new($false, $true).GetString($bytes, 0, $count) | ConvertFrom-Json -ErrorAction Stop
+        } finally { $stream.Dispose() }
+        if ($json -isnot [pscustomobject]) { return 'usage' }
+        $names = @($json.PSObject.Properties.Name)
+        if ($names -cnotcontains 'schema' -or $names -cnotcontains 'yasbColors') { return 'usage' }
+        if ($json.schema -isnot [int] -or $json.schema -ne 1 -or $json.yasbColors -isnot [string]) { return 'usage' }
+        if ($json.yasbColors -ceq 'brand') { return 'brand' }
+    } catch { return 'usage' }
+    return 'usage'
+}
+
 function Invoke-AiBarQuotaReader {
     param([string]$Provider)
     $now = Get-ReaderNow
     if ($Provider -cne '' -and $Provider -cne 'Claude') { return Get-SafeOutput -Now $now }
     $result = Invoke-AiBarQuotaReaderCore -Provider $Provider -now $now
+    if ($result.progressColor -cne '#8995A4' -and (Get-YasbColorMode (Get-ReaderPath -Provider $Provider)) -ceq 'brand') {
+        $result.progressColor = if ($Provider -ceq 'Claude') { '#E0876A' } else { '#2FBF98' }
+    }
     if ($Provider -ceq 'Claude') {
         # The widget shows the Claude mark beside the compact text; words name Claude in the alternate label and tooltip.
         $result.label = 'Claude ' + $result.label

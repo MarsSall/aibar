@@ -20,9 +20,10 @@ public sealed partial class WindowsTrayRuntime
     private readonly Dictionary<string, Forms.ToolStripMenuItem> _alertItems = [];
     public event Action<string>? AlertToggleRequested;
     public event Action? AlertClicked;
+    public event Action? SettingsRequested;
     private void InitializeAlerts()
     {
-        foreach (var (key, text) in new[] { ("resets", "Window resets"), ("thresholds", "75 / 90 / 100% thresholds"),
+        foreach (var (key, text) in new[] { ("resets", "Window resets"), ("thresholds", "Threshold alerts"),
                      ("runOut", "May run out before reset"), ("edgeGlow", "Edge glow at 100%") })
         {
             // The persisted decision drives the checkmark; failed saves never lie about the choice.
@@ -30,6 +31,12 @@ public sealed partial class WindowsTrayRuntime
             item.Click += (_, _) => AlertToggleRequested?.Invoke(key);
             _alertItems.Add(key, item); _alerts.DropDownItems.Add(item);
         }
+        var settings = new Forms.ToolStripMenuItem("Settings…");
+        settings.Click += (_, _) => SettingsRequested?.Invoke();
+        _menu.Items.Add(settings);
+        var configure = new Forms.ToolStripMenuItem("Configure alerts…");
+        configure.Click += (_, _) => SettingsRequested?.Invoke();
+        _alerts.DropDownItems.Add(configure);
         _menu.Items.Add(_alerts);
         _icon.BalloonTipClicked += (_, _) => AlertClicked?.Invoke();
     }
@@ -37,6 +44,7 @@ public sealed partial class WindowsTrayRuntime
     {
         _alertItems["resets"].Checked = options.Resets;
         _alertItems["thresholds"].Checked = options.Thresholds;
+        _alertItems["thresholds"].Text = string.Join(" / ", options.ThresholdValues) + "% thresholds";
         _alertItems["runOut"].Checked = options.RunOut;
         _alertItems["edgeGlow"].Checked = options.EdgeGlow;
     }
@@ -51,12 +59,14 @@ public sealed class QuotaAlertTrayController : IDisposable
     private readonly Dispatcher _dispatcher;
     private readonly Action _showPanel;
     private readonly Action<bool> _glow;
+    private readonly Action<bool> _confetti;
     private bool _disposed;
     public QuotaAlertTrayController(IQuotaAlertTray tray, QuotaAlertObserver observer, Dispatcher dispatcher,
-        Action showPanel, Action<bool>? glow = null)
+        Action showPanel, Action<bool>? glow = null, Action<bool>? confetti = null)
     {
         _tray = tray; _observer = observer; _dispatcher = dispatcher; _showPanel = showPanel;
         _glow = glow ?? (enabled => { EdgeGlowWindow.ShowOnAllMonitors(enabled); });
+        _confetti = confetti ?? (enabled => { ConfettiWindow.ShowOnAllMonitors(enabled); });
         tray.AlertToggleRequested += Toggle; tray.AlertClicked += Clicked;
         observer.AlertReady += Deliver; observer.SettingsChanged += SettingsChanged;
         _ = LoadAsync();
@@ -93,11 +103,11 @@ public sealed class QuotaAlertTrayController : IDisposable
             var balloon = alert.Kind switch
             {
                 QuotaAlertKind.Reset => options.Resets,
-                QuotaAlertKind.ThresholdCrossed => options.Thresholds,
+                QuotaAlertKind.ThresholdCrossed => options.Thresholds && options.ThresholdValues.Contains(alert.Threshold ?? -1),
                 QuotaAlertKind.RunsOutBeforeReset => options.RunOut,
                 _ => false
             };
-            if (balloon)
+            if (balloon && options.Notification)
             {
                 var (title, body) = alert.Kind switch
                 {
@@ -109,6 +119,7 @@ public sealed class QuotaAlertTrayController : IDisposable
                 _tray.ShowAlert(title, body);
             }
             if (alert.Kind == QuotaAlertKind.ThresholdCrossed && alert.Threshold == 100 && options.EdgeGlow) _glow(true);
+            if (alert.Kind == QuotaAlertKind.Reset && options.Resets && options.Confetti) _confetti(true);
         }
         catch (Exception) { /* Windows notification failures must not affect the quota authority. */ }
     });
