@@ -56,9 +56,10 @@ public sealed class PanelDetailsTests
                         Assert.Equal(expected, Assert.IsType<SolidColorBrush>(text.Foreground).Color);
                 }
                 back.Focus(); Assert.True(back.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
-                var selector = Assert.IsType<ComboBox>(Assert.Single(Visuals<QuotaHistoryChart>(detail)).FindName("HistoryRange"));
-                Assert.True(selector.IsKeyboardFocused); Assert.Equal("Usage history range", AutomationProperties.GetName(selector));
-                Assert.True(selector.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
+                // The segmented ListBox owns one Tab stop; focus lives on its selected segment.
+                var selector = Assert.IsType<ListBox>(Assert.Single(Visuals<QuotaHistoryChart>(detail)).FindName("HistoryRange"));
+                Assert.True(selector.IsKeyboardFocusWithin); Assert.Equal("Usage history range", AutomationProperties.GetName(selector));
+                Assert.True(((UIElement)Keyboard.FocusedElement).MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
                 Assert.True(provider.IsKeyboardFocused); window.UpdateLayout(); AssertInViewports(provider);
                 toggle.Collapse(); window.UpdateLayout();
                 Assert.DoesNotContain(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
@@ -81,7 +82,8 @@ public sealed class PanelDetailsTests
                 });
                 Assert.False(app.Resources.Contains("PanelQuotaCardStyle"));
                 var percentage = Assert.Single(Visuals<TextBlock>(cards[1]).Where(text => text.Text == "40% used"));
-                Assert.Equal(13.5, percentage.FontSize); Assert.Equal(expected, Assert.IsType<SolidColorBrush>(percentage.Foreground).Color);
+                // Reference percentage text is approximately 22 physical pixels at 2x.
+                Assert.Equal(11d, percentage.FontSize); Assert.Equal(expected, Assert.IsType<SolidColorBrush>(percentage.Foreground).Color);
                 var menu = Assert.IsType<StackPanel>(window.FindName("PanelActions"));
                 Assert.All(menu.Children.OfType<Button>(), button =>
                 {

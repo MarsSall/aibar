@@ -1,7 +1,7 @@
 using AIBar.Desktop;
 using AIBar.Domain;
 using System.Windows.Automation;
-using ComboBox = System.Windows.Controls.ComboBox;
+using ListBox = System.Windows.Controls.ListBox;
 
 namespace AIBar.Domain.Tests;
 
@@ -44,12 +44,13 @@ public sealed class QuotaHistoryChartTests
         WpfTestApplicationHost.Run(_ =>
         {
             var chart = new QuotaHistoryChart();
-            var selector = Assert.IsType<ComboBox>(chart.FindName("HistoryRange"));
+            // S9 replaces dropdown chrome, not the range/data/accessibility contract.
+            var selector = Assert.IsType<ListBox>(chart.FindName("HistoryRange"));
             Assert.True(selector.Focusable); Assert.True(selector.IsTabStop);
             Assert.Equal("Usage history range", AutomationProperties.GetName(selector));
             Assert.Equal(0, selector.SelectedIndex); Assert.Equal(3, selector.Items.Count);
-            Assert.Equal(new[] { "24h", "7d", "30d" }, selector.Items.Cast<System.Windows.Controls.ComboBoxItem>().Select(item => (string)item.Content));
-            Assert.All(selector.Items.Cast<System.Windows.Controls.ComboBoxItem>(), item => Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(item))));
+            Assert.Equal(new[] { "24h", "7d", "30d" }, selector.Items.Cast<System.Windows.Controls.ListBoxItem>().Select(item => (string)item.Content));
+            Assert.All(selector.Items.Cast<System.Windows.Controls.ListBoxItem>(), item => Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(item))));
             chart.Data = new(Now, Now, []);
             Assert.Equal("Usage history unavailable", ((System.Windows.Controls.TextBlock)chart.FindName("HistoryMessage")).Text);
             chart.Data = new(Now.AddDays(-1), Now, []);
@@ -95,7 +96,7 @@ public sealed class QuotaHistoryChartTests
                         PanelPalette.ProviderColor(Array.IndexOf(lines, line) < expectedSegments / 2 ? "Codex" : "Claude"),
                         Assert.IsType<System.Windows.Media.SolidColorBrush>(line.Stroke).Color);
                 });
-                ((ComboBox)chart.FindName("HistoryRange")).SelectedIndex = 2;
+                ((ListBox)chart.FindName("HistoryRange")).SelectedIndex = 2;
                 Assert.Empty(plot.Children.Cast<object>());
                 chart.Data = QuotaHistoryChartData.LoadAsync(store, QuotaHistoryChartRange.Month, Now, default).GetAwaiter().GetResult();
                 Assert.Equal(expectedSegments, plot.Children.OfType<System.Windows.Shapes.Polyline>().Count());

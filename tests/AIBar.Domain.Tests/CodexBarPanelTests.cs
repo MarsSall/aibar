@@ -45,7 +45,7 @@ public sealed class CodexBarPanelTests
                 window.SelectProvider("Claude"); window.UpdateLayout();
                 Assert.True(((StackPanel)window.FindName("ClaudeQuotaSection")).IsVisible);
                 Assert.Contains(Visuals<TextBlock>(window), text => text.IsVisible && text.Text == "Today: unavailable");
-                Assert.Contains(Visuals<TextBlock>(window), text => text.IsVisible && text.Text == "Last 30 days: $254.24 · 918M tokens (partial)");
+                Assert.Contains(Visuals<TextBlock>(window), text => text.IsVisible && text.Text == "Last 30 days: $ 254.24 · 918M tokens (partial)");
                 window.SelectProvider("Codex"); window.UpdateLayout();
                 var titles = Visuals<TextBlock>(window).Where(text => text.Text is "Codex" or "Claude").ToArray();
                 Assert.Contains(titles, text => text.Text == "Codex");
@@ -53,7 +53,8 @@ public sealed class CodexBarPanelTests
                 Assert.Equal("Codex", window.SelectedProvider);
                 Assert.False(((StackPanel)window.FindName("ClaudeQuotaSection")).IsVisible);
                 var heading = Visuals<TextBlock>(window).Single(text => text.IsVisible && AutomationProperties.GetName(text) == "Codex");
-                Assert.Equal(21d, heading.FontSize); Assert.Equal(FontWeights.Bold, heading.FontWeight);
+                // Reference is 2x: the 28px heading is 14 DIPs, not the former 21-DIP mockup title.
+                Assert.Equal(14d, heading.FontSize); Assert.Equal(FontWeights.Bold, heading.FontWeight);
                 Assert.Equal(new[] { "5-hour quota progress", "Weekly quota progress", "Claude 5-hour quota progress", "Claude weekly quota progress" }, Visuals<PanelMeter>(window).Select(meter => meter.MeterName));
                 Assert.All(Visuals<PanelMeter>(window).SelectMany(Visuals<ProgressBar>), bar =>
                 {
@@ -65,10 +66,11 @@ public sealed class CodexBarPanelTests
                 var texts = Visuals<TextBlock>(window).Select(text => text.Text).ToArray();
                 Assert.Contains("Updated 2 min ago · from other machine", texts);
                 Assert.Contains("Session", texts); Assert.Contains("Weekly", texts);
-                Assert.Contains("Today: $0.04 · 15K tokens", texts);
-                Assert.Contains("Last 30 days: $12.80+ · 9.4M tokens (some models unpriced)", texts);
+                // S9 adds currency spacing only; exact amounts, tokens and partial markers stay asserted.
+                Assert.Contains("Today: $ 0.04 · 15K tokens", texts);
+                Assert.Contains("Last 30 days: $ 12.80+ · 9.4M tokens (some models unpriced)", texts);
                 Assert.Contains("Today: unavailable", texts);
-                Assert.Contains("Last 30 days: $254.24 · 918M tokens (partial)", texts);
+                Assert.Contains("Last 30 days: $ 254.24 · 918M tokens (partial)", texts);
                 var cost = Assert.IsType<Button>(window.FindName("CostButton"));
                 var back = Assert.IsType<Button>(window.FindName("BackButton"));
                 var summary = Assert.IsType<StackPanel>(window.FindName("SummaryView"));

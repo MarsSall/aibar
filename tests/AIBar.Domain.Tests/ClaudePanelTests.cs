@@ -141,7 +141,8 @@ public sealed class ClaudePanelTests
                     var expectedBar = theme == WindowsTheme.HighContrast ? SystemColors.HighlightColor : (Color)ColorConverter.ConvertFromString("#C4703F");
                     Assert.Equal(expectedBar, ColorOf(bar.Foreground));
                     var percentage = Assert.Single(Visuals<TextBlock>(card).Where(text => text.Text.EndsWith("% used", StringComparison.Ordinal)));
-                    Assert.Equal(13.5d, percentage.FontSize);
+                    // S9 normalizes the 2x reference's percentage text to 11 DIPs.
+                    Assert.Equal(11d, percentage.FontSize);
                     Assert.Equal(ColorOf(panel.Window.FindResource("TextBrush")), ColorOf(percentage.Foreground));
                     Assert.Contains(VisibleText(card), text => text.StartsWith("Resets in ", StringComparison.Ordinal));
                 }
