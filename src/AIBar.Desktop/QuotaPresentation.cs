@@ -37,6 +37,10 @@ public sealed record BetaPresentationState(
     bool IsPrivateIntegrationDisabled = false,
     string? DiagnosticCode = null)
 {
+    // View-only state, derived from the existing safe diagnostic; no credential reads.
+    public bool NeedsLogin => IsMissingCredential || DiagnosticCode == "quota_authentication";
+    public bool ShowStaleBanner => !IsCurrent && !NeedsLogin && RetrievedAt is not null;
+    public string LastReadingLabel => RetrievedAt is { } at ? $"Last sync {at.ToLocalTime():HH:mm}." : "Not updated yet.";
     public string? UpdatedLabel { get; init; }
     public string? SourceLabel { get; init; }
     public string? PlanLabel { get; init; }

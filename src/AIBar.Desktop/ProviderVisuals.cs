@@ -16,20 +16,20 @@ public enum PanelTone { Ok, Near, Full, Muted }
 public static partial class PanelPalette
 {
     public static Color ToneColor(PanelTone tone, bool dark) => tone == PanelTone.Near
-        ? dark ? Color.FromRgb(0xFF, 0x9F, 0x5A) : Color.FromRgb(0xC4, 0x58, 0x1F)
-        : dark ? Color.FromRgb(0xA1, 0xA1, 0xA6) : Color.FromRgb(0x6E, 0x6E, 0x73);
+        ? dark ? Color.FromRgb(0xF5, 0xB8, 0x3D) : Color.FromRgb(0x8F, 0x56, 0x00)
+        : dark ? Color.FromRgb(0xA9, 0xA9, 0xB2) : Color.FromRgb(0x57, 0x57, 0x57);
 
     /// <summary>Mockup tint (82% opacity), opaque unless acrylic succeeds.</summary>
     public static Color Surface(bool dark, bool translucent) => dark
-        ? Color.FromArgb(translucent ? (byte)0xD1 : (byte)0xFF, 0x24, 0x24, 0x28)
-        : Color.FromArgb(translucent ? (byte)0xD1 : (byte)0xFF, 0xEC, 0xEC, 0xF6);
+        ? Color.FromArgb(translucent ? (byte)0xD9 : (byte)0xFF, 0x0C, 0x0C, 0x10)
+        : Color.FromArgb(translucent ? (byte)0xCC : (byte)0xFF, 0xF7, 0xF7, 0xF7);
 
     // Restore the pre-CodexBar semantic ramp without changing pace-warning colors.
     public static Color UsageColor(decimal usage, bool dark) => usage >= 90
-        ? dark ? Color.FromRgb(0xFF, 0x4D, 0x5E) : Color.FromRgb(0xC8, 0x20, 0x3C)
+        ? dark ? Color.FromRgb(0xF2, 0x5C, 0x4A) : Color.FromRgb(0xD1, 0x3B, 0x2A)
         : usage >= 75
-            ? dark ? Color.FromRgb(0xFF, 0xC5, 0x31) : Color.FromRgb(0xA8, 0x6B, 0x00)
-            : dark ? Color.FromRgb(0x3D, 0xDC, 0x84) : Color.FromRgb(0x15, 0x92, 0x4A);
+            ? dark ? Color.FromRgb(0xE9, 0xB9, 0x2F) : Color.FromRgb(0xB8, 0x84, 0x00)
+            : dark ? Color.FromRgb(0x3F, 0xB9, 0x7A) : Color.FromRgb(0x1E, 0x9E, 0x5A);
 
     public static Color ProviderColor(string provider) => provider == "Claude"
         ? Color.FromRgb(0xC4, 0x70, 0x3F) : Color.FromRgb(0x10, 0xA3, 0x7F);
@@ -74,8 +74,8 @@ public sealed class ProviderVisuals : IMultiValueConverter
         var current = values.Length < 4 || values[3] is not bool flag || flag;
         return kind switch
         {
-            "Surface" => Frozen(PanelPalette.Surface(dark, values[0] is true)),
-            "Well" => Frozen(dark ? Color.FromArgb(0x29, 0xEB, 0xEB, 0xF5) : Color.FromArgb(0x24, 0x3C, 0x3C, 0x43)),
+            "Surface" => Surface(dark, values),
+            "Well" => Frozen(dark ? Color.FromRgb(0x1F, 0x1F, 0x25) : Color.FromRgb(0xE1, 0xE1, 0xE1)),
             "Border" => Frozen(Color.FromArgb(dark ? (byte)0x1F : (byte)0x99, 0xFF, 0xFF, 0xFF)),
             "Line" => Frozen(dark ? Color.FromArgb(0x24, 0xEB, 0xEB, 0xF5) : Color.FromArgb(0x2E, 0x3C, 0x3C, 0x43)),
             "Muted" => Frozen(PanelPalette.ToneColor(PanelTone.Muted, dark)),
@@ -101,6 +101,15 @@ public sealed class ProviderVisuals : IMultiValueConverter
         int number => number,
         _ => null
     };
+
+    private static Brush Surface(bool dark, object[] values)
+    {
+        var color = PanelPalette.Surface(dark, values[0] is true);
+        // Opacity is ignored when Windows transparency is disabled or in HC (handled above).
+        if (new WindowsDwmSurfaceHints().IsTransparencyEnabled && values.Length > 3 && values[3] is double opacity)
+            color.A = (byte)Math.Round(color.A * Math.Clamp(opacity, .3, 1));
+        return Frozen(color);
+    }
 
     private static Brush Frozen(Color color)
     {
@@ -145,8 +154,8 @@ public sealed class PanelWindowLabelConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value switch
     {
-        "Weekly quota" => "Weekly",
-        "5-hour quota" or "5-hour" => "Session",
+        "Weekly quota" or "Weekly" => "WEEKLY · ALL MODELS",
+        "5-hour quota" or "5-hour" => "SESSION · 5 H",
         _ => value
     };
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();

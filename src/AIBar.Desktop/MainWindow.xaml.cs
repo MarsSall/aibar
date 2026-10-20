@@ -7,6 +7,12 @@ public enum PanelBarColorMode { Brand, Usage }
 
 public partial class MainWindow : Window
 {
+    public static readonly DependencyProperty BackgroundOpacityProperty = DependencyProperty.Register(
+        nameof(BackgroundOpacity), typeof(double), typeof(MainWindow), new FrameworkPropertyMetadata(1d, null,
+            (_, value) => value is double number && double.IsFinite(number) ? Math.Clamp(number, .30, 1) : 1d));
+    /// <summary>Alpha of the background brush only; never UIElement.Opacity.</summary>
+    public double BackgroundOpacity { get => (double)GetValue(BackgroundOpacityProperty); set => SetValue(BackgroundOpacityProperty, value); }
+
     public static readonly DependencyProperty BarColorModeProperty = DependencyProperty.Register(
         nameof(BarColorMode), typeof(PanelBarColorMode), typeof(MainWindow), new PropertyMetadata(PanelBarColorMode.Brand));
     public PanelBarColorMode BarColorMode { get => (PanelBarColorMode)GetValue(BarColorModeProperty); set => SetValue(BarColorModeProperty, value); }
@@ -29,8 +35,10 @@ public partial class MainWindow : Window
     public void SelectProvider(string provider)
     {
         if (provider is not ("Codex" or "Claude") || provider == "Claude" && !ClaudeEnabled) return;
+        var changed = SelectedProvider != provider;
         _rememberedProvider = provider;
         UpdateSelection();
+        if (changed && IsLoaded) AnimateBody(SummaryView, 0, 83);
     }
     private void OnProviderTab(object sender, RoutedEventArgs e)
     {
@@ -65,6 +73,8 @@ public partial class MainWindow : Window
     {
         _launchLink = launchLink;
         InitializeComponent();
+        PreviewKeyDown += OnPanelKeyDown;
+        IsVisibleChanged += (_, _) => { if (IsVisible) AnimateBody((FrameworkElement)Content, 8, 167, vertical: true); };
         SetBinding(ClaudeEnabledProperty, new System.Windows.Data.Binding("Claude.IsEnabled") { FallbackValue = false });
         BindUsage(CodexUsageProperty, "Primary.PercentageUsed", "Weekly.PercentageUsed");
         BindUsage(ClaudeUsageProperty, "Claude.State.Primary.PercentageUsed", "Claude.State.Weekly.PercentageUsed");
@@ -80,6 +90,8 @@ public partial class MainWindow : Window
 
     public event Action? SettingsRequested;
     public event Action? QuitRequested;
+    public event Action? UseOtherMachineRequested;
+    private void OnUseOtherMachine(object sender, RoutedEventArgs e) => UseOtherMachineRequested?.Invoke();
     internal bool IsSettingsMenuOpen { get; set; }
 
     private void OnCost(object sender, RoutedEventArgs e)
@@ -88,6 +100,7 @@ public partial class MainWindow : Window
         DetailView.Visibility = Visibility.Visible;
         SecondaryScrollViewer.ScrollToTop();
         BackButton.Focus();
+        AnimateBody(DetailView, 24, 167);
     }
 
     private void OnBack(object sender, RoutedEventArgs e)
@@ -96,6 +109,7 @@ public partial class MainWindow : Window
         SummaryView.Visibility = Visibility.Visible;
         CostButton.Focus();
         CostButton.BringIntoView();
+        AnimateBody(SummaryView, -24, 167);
     }
 
     private void OnNavigationKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -104,6 +118,64 @@ public partial class MainWindow : Window
         if (ReferenceEquals(sender, CostButton)) OnCost(sender, e);
         else if (ReferenceEquals(sender, BackButton)) OnBack(sender, e);
         e.Handled = true;
+    }
+
+    private static void AnimateBody(FrameworkElement body, double offset, int duration, bool vertical = false)
+    {
+        // With animation effects off, there are no translations or bar tweens.
+        var milliseconds = SystemParameters.ClientAreaAnimation ? duration : 83;
+        body.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(milliseconds))
+            { FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop });
+        if (offset == 0 || !SystemParameters.ClientAreaAnimation || SystemParameters.HighContrast) return;
+        var transform = new System.Windows.Media.TranslateTransform();
+        body.RenderTransform = transform;
+        transform.BeginAnimation(vertical ? System.Windows.Media.TranslateTransform.YProperty : System.Windows.Media.TranslateTransform.XProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(offset, 0, TimeSpan.FromMilliseconds(duration))
+            { EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }, FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop });
+    }
+
+    /// <summary>HostRuntime should use this instead of Window.Hide for outside-click dismissal.</summary>
+    public void Dismiss()
+    {
+        if (!IsVisible) return;
+        var body = (FrameworkElement)Content;
+        var fade = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(SystemParameters.ClientAreaAnimation ? 120 : 83));
+        fade.Completed += (_, _) => { Hide(); body.BeginAnimation(OpacityProperty, null); };
+        body.BeginAnimation(OpacityProperty, fade);
+    }
+
+    internal bool ExecuteShortcut(Key key)
+    {
+        if (key == Key.OemComma) { SettingsRequested?.Invoke(); return true; }
+        if (key == Key.Q) { QuitRequested?.Invoke(); return true; }
+        var index = key == Key.R ? 2 : key == Key.C ? 3 : -1;
+        if (index < 0) return false;
+        var button = PanelActions.Children.OfType<System.Windows.Controls.Button>().ElementAt(index);
+        if (button.IsEnabled && button.Command?.CanExecute(button.CommandParameter) == true) button.Command.Execute(button.CommandParameter);
+        return true;
+    }
+
+    private void OnPanelKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Handled) return;
+        if (Keyboard.Modifiers == ModifierKeys.Control && ExecuteShortcut(e.Key)) { e.Handled = true; return; }
+        if (Keyboard.Modifiers != ModifierKeys.None) return;
+        if (e.Key == Key.Escape) { Dismiss(); e.Handled = true; return; }
+        if (e.Key == Key.Back && DetailView.Visibility == Visibility.Visible) { OnBack(this, e); e.Handled = true; return; }
+        if (e.Key is Key.Left or Key.Right && SummaryView.Visibility == Visibility.Visible)
+        {
+            SelectProvider(SelectedProvider == "Claude" ? "Codex" : "Claude");
+            (SelectedProvider == "Claude" ? ClaudeTab : CodexTab).Focus();
+            e.Handled = true; return;
+        }
+        if (e.Key is not (Key.Up or Key.Down)) return;
+        // Preserve arrow navigation in the chart range and other detail disclosures.
+        if (DetailView.Visibility == Visibility.Visible && !PanelActions.IsKeyboardFocusWithin) return;
+        var buttons = PanelActions.Children.OfType<System.Windows.Controls.Button>().Where(button => button.IsVisible && button.IsEnabled).ToArray();
+        if (buttons.Length == 0) return;
+        var index = Array.FindIndex(buttons, button => button.IsKeyboardFocusWithin);
+        index = index < 0 ? (e.Key == Key.Down ? 0 : buttons.Length - 1) : (index + (e.Key == Key.Down ? 1 : buttons.Length - 1)) % buttons.Length;
+        buttons[index].Focus(); e.Handled = true;
     }
 
     private void OnSettings(object sender, RoutedEventArgs e) => SettingsRequested?.Invoke();

@@ -161,6 +161,12 @@ public partial class App : System.Windows.Application
         }
         else window.SettingsRequested += () => tray.ShowSettingsMenu(window);
         window.QuitRequested += tray.RequestExit;
+        window.UseOtherMachineRequested += async () =>
+        {
+            if (composition.ClaudeQuota is not { } claude) return;
+            try { await claude.SetSourceAsync(ClaudeQuotaSource.OtherMachine, default); }
+            catch (Exception error) { ReportFault(error); }
+        };
         _runtime = new TrayHostRuntime(_instance!, tray, new WpfPopoverRuntime(window, _theme, () => WindowsPopoverPlacementContextProvider.Get(window), null, () => themeSource.Current), _taskbar,
             _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation, new WindowsPrivateIntegrationConsentPrompt(), new WindowsOpenCodeDataFolderPicker(), composition.ClaudeQuota);
         if (composition.Alerts is { } alerts)
