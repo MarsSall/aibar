@@ -2,6 +2,8 @@
 
 The opened panel shows **one provider at a time**, selected from a CodexBar-style tab strip. Codex and enabled Claude tabs show their official marks, names, mini usage bars and incident indicators; the selected tab uses an accent pill. The highest available usage (maximum of Session and Weekly, Codex on ties) is selected until the user chooses a tab. That choice is remembered for the lifetime of the panel, including hide/reopen and refresh. Revoking Claude temporarily falls back to Codex without losing the choice. No new preferences file is written.
 
+The tab columns divide the available width equally (including at 300 px); their mini bars stretch across each tab. The selected pill uses CodexBar blue with white marks/text, while unselected tabs use muted gray. High contrast substitutes system highlight/highlight text. Thin theme-colored rules separate tabs, header, usage windows, Cost and menu groups.
+
 The compact YASB widget is unchanged. The default width is 360 px; the panel supports 300 px and scrolls when content exceeds the available height.
 
 ## Summary
@@ -30,13 +32,13 @@ The underlying observed-pace policy is unchanged: after 5% of the cycle and at l
 
 ## Cost and details
 
-**Cost ›** shows the existing Today and Last 30 days aggregate labels for the selected provider only, without redundant provider prefixes. Partial data, unpriced models, unavailable values and token formatting retain the existing cost presentation rules; the panel does not reinterpret missing cost as zero.
+**Cost ›** is a flat full-width row, with bold Cost left and a chevron at the far right. It and **‹ Back** use explicit WPF templates with no native button border or persistent background, subtle hover/pressed shading and a keyboard-only focus indicator. Cost shows the existing Today and Last 30 days aggregate labels for the selected provider only, without redundant provider prefixes. Panel-only currency spacing reads **Today: $ 0.04 · 15K tokens** and **Last 30 days: $ 254.24 · 218M tokens**. The converter changes only spacing after the dollar sign; underlying aggregate labels and copy/export output are untouched. Partial data, unpriced models, unavailable values and token formatting retain the existing cost presentation rules; the panel does not reinterpret missing cost as zero.
 
 Click **Cost ›**, or focus it and press Enter/Space, to open an in-panel detail view. Focus moves to **‹ Back**. The summary is replaced, while the menu remains available. Back (mouse, Enter or Space) restores the summary and focus to Cost.
 
 The detail view contains:
 
-1. **Usage history**, with a named keyboard-focusable **24h / 7d / 30d** selector (default 24h; arrow keys change range), a fixed **0–100%** chart and wrapping legends.
+1. **Usage history**, with a named keyboard-focusable **24h / 7d / 30d** segmented selector, not a dropdown (default 24h; arrows and Home/End change range and focus; Tab enters once and exits to the next control). A rounded track contains equal-width segments, with the selected segment raised by a thin rule and surface fill, a fixed **0–100%** chart and wrapping legends.
 2. **Local usage**, retaining local Codex source, exact totals, models, coverage, scan time and warnings, plus OpenCode/Pi provider disclosures and exact daily/model/token breakdowns.
 3. **Quota access**, including the full existing private-endpoint disclosure.
 
@@ -52,7 +54,9 @@ The same vertical menu remains available in both views:
 
 1. **Usage Dashboard** and **Status Page** (with icons) open the selected provider's existing fixed, allowlisted destinations.
 2. After a rule: **Refresh** uses the existing combined refresh command (disabled when unavailable), then **Copy summary** uses the existing Codex-only command and polite live feedback. Copy output is unchanged even when Claude is selected.
-3. After a rule: **Settings…**, **About AIBar**, **Quit**. Settings raises the existing `SettingsRequested` event; the composition owner routes this to the S8 Settings window. About toggles an in-panel version/attribution note. Quit raises the existing `QuitRequested` event and enters the tray shutdown path.
+3. After a rule: **Settings…**, **About AIBar**, **Quit**, without icons but aligned to the icon-group labels. Settings raises the existing `SettingsRequested` event; the composition owner routes this to the S8 Settings window. About toggles an in-panel version/attribution note. Quit raises the existing `QuitRequested` event and enters the tray shutdown path.
+
+Menu rows are 28 DIPs high, without native button chrome. Hover/pressed states use a rounded accent highlight with white text; high contrast uses system highlight colors. Keyboard focus retains the shared visible focus adorner. Section spacing and typography are normalized from the 2x reference (14-DIP bold headings/menu text, 11-DIP usage/cost text); the reference's unrelated providers, account enrollment and unselected Sonnet/extra-usage features are not added.
 
 Integration: `App.xaml.cs` retains the Codex provider solely to pass its optional display metadata to `QuotaPresentationHost`. The parent owns S8 appearance persistence and routing: bind `MainWindow.BarColorMode` to the appearance setting, replace the existing tray-menu Settings handler with the new Settings window, and keep Quit wiring unchanged.
 

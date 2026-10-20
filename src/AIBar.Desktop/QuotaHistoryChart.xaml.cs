@@ -5,7 +5,9 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Canvas = System.Windows.Controls.Canvas;
-using ComboBox = System.Windows.Controls.ComboBox;
+using ListBoxItem = System.Windows.Controls.ListBoxItem;
+using Key = System.Windows.Input.Key;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using StackPanel = System.Windows.Controls.StackPanel;
 using TextBlock = System.Windows.Controls.TextBlock;
 using UserControl = System.Windows.Controls.UserControl;
@@ -56,6 +58,22 @@ public partial class QuotaHistoryChart : UserControl
     {
         if (Plot is not null) { Reset(); Refresh(); }
     }
+    private void OnRangeKeyDown(object sender, KeyEventArgs e)
+    {
+        var index = HistoryRange.SelectedIndex;
+        var next = e.Key switch
+        {
+            Key.Left or Key.Up => Math.Max(0, index - 1),
+            Key.Right or Key.Down => Math.Min(HistoryRange.Items.Count - 1, index + 1),
+            Key.Home => 0,
+            Key.End => HistoryRange.Items.Count - 1,
+            _ => -1
+        };
+        if (next < 0) return; // Tab is deliberately left to normal focus traversal.
+        HistoryRange.SelectedIndex = next;
+        ((ListBoxItem)HistoryRange.Items[next]).Focus();
+        e.Handled = true;
+    }
     private void OnPlotSizeChanged(object sender, SizeChangedEventArgs e) => Draw();
     private void Reset()
     {
@@ -73,7 +91,7 @@ public partial class QuotaHistoryChart : UserControl
         var revision = ++_revision;
         var historyRevision = history.Revision;
         var cancellation = new CancellationTokenSource(); _read = cancellation;
-        var range = (QuotaHistoryChartRange)((ComboBox)HistoryRange).SelectedIndex;
+        var range = (QuotaHistoryChartRange)HistoryRange.SelectedIndex;
         RangeStart.Text = range switch { QuotaHistoryChartRange.Day => "24h ago", QuotaHistoryChartRange.Week => "7d ago", _ => "30d ago" };
         try
         {

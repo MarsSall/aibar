@@ -3,14 +3,38 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
  Focusable="False" Margin="0,8,0,16">
+ <UserControl.Resources>
+  <Style x:Key="RangeSegment" TargetType="ListBoxItem">
+   <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusVisual}" />
+   <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+   <Setter Property="Padding" Value="12,4" /><Setter Property="HorizontalContentAlignment" Value="Center" />
+   <Setter Property="Background" Value="Transparent" />
+   <Setter Property="BorderThickness" Value="0.5" /><Setter Property="BorderBrush" Value="Transparent" />
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+    <Border x:Name="SegmentChrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" Margin="2" Padding="{TemplateBinding Padding}">
+     <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Border>
+   </ControlTemplate></Setter.Value></Setter>
+   <Style.Triggers>
+    <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource PanelRowHoverBrush}" /></Trigger>
+    <Trigger Property="IsMouseCaptureWithin" Value="True"><Setter Property="Background" Value="{DynamicResource PanelRowHoverBrush}" /></Trigger>
+    <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}" /><Setter Property="Foreground" Value="{DynamicResource TextBrush}" /><Setter Property="BorderBrush" Value="{DynamicResource SecondaryBorderBrush}" /></Trigger>
+    <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="Background" Value="{DynamicResource PanelMenuHighlightBrush}" /><Setter Property="Foreground" Value="{DynamicResource PanelMenuHighlightTextBrush}" /></Trigger>
+   </Style.Triggers>
+  </Style>
+ </UserControl.Resources>
  <StackPanel>
   <TextBlock Text="Usage history" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,8" />
-  <ComboBox x:Name="HistoryRange" SelectedIndex="0" HorizontalAlignment="Left" MinWidth="100" Margin="0,0,0,8"
-   Focusable="True" IsTabStop="True" SelectionChanged="OnRangeChanged" automation:AutomationProperties.Name="Usage history range">
-   <ComboBoxItem Content="24h" automation:AutomationProperties.Name="Last 24 hours" />
-   <ComboBoxItem Content="7d" automation:AutomationProperties.Name="Last 7 days" />
-   <ComboBoxItem Content="30d" automation:AutomationProperties.Name="Last 30 days" />
-  </ComboBox>
+  <ListBox x:Name="HistoryRange" SelectedIndex="0" HorizontalAlignment="Left" Margin="0,0,0,8"
+   Focusable="True" IsTabStop="True" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Contained"
+   PreviewKeyDown="OnRangeKeyDown" SelectionChanged="OnRangeChanged" ItemContainerStyle="{StaticResource RangeSegment}"
+   automation:AutomationProperties.Name="Usage history range">
+   <ListBox.Template><ControlTemplate TargetType="ListBox"><Border Background="{DynamicResource ProgressTrackBrush}" CornerRadius="7" Padding="1"><ItemsPresenter /></Border></ControlTemplate></ListBox.Template>
+   <ListBox.ItemsPanel><ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate></ListBox.ItemsPanel>
+   <ListBoxItem Content="24h" automation:AutomationProperties.Name="Last 24 hours" />
+   <ListBoxItem Content="7d" automation:AutomationProperties.Name="Last 7 days" />
+   <ListBoxItem Content="30d" automation:AutomationProperties.Name="Last 30 days" />
+  </ListBox>
   <Grid Height="124" Margin="0,4,0,0">
    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition /></Grid.ColumnDefinitions>
    <TextBlock Text="100%" VerticalAlignment="Top" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />

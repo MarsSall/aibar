@@ -7,4 +7,7 @@
     <SolidColorBrush x:Key="FocusBrush" Color="#FF005FB8" />
     <SolidColorBrush x:Key="ProgressTrackBrush" Color="#243C3C43" />
     <SolidColorBrush x:Key="SecondaryBorderBrush" Color="#2E3C3C43" />
+    <SolidColorBrush x:Key="PanelMenuHighlightBrush" Color="#FF3478F6" />
+    <SolidColorBrush x:Key="PanelMenuHighlightTextBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="PanelRowHoverBrush" Color="#10000000" />
 </ResourceDictionary>
