@@ -4,18 +4,20 @@ AIBar alerts on **Codex and Claude** subscription quota, independently for the 5
 
 ## Choose alerts
 
-Open the tray menu → **Alerts**. All four choices default to on:
+Open **Settings… → Alerts** to choose events, thresholds, and effects. The existing tray **Alerts** toggles still work; **Configure alerts…** opens the same window. The original four choices default to on, Windows notifications default to on, and confetti defaults to off. See [Settings](settings.md) for keyboard controls and color preferences.
 
 | Choice | Behavior |
 | --- | --- |
 | Window resets | Notify when a current reading moves the reset timestamp to a later cycle. |
-| 75 / 90 / 100% thresholds | Notify once at each crossed threshold in each cycle. A first current reading already above a threshold can notify too. |
+| Crossed thresholds | Notify once at each configured threshold in each cycle (default 75 / 90 / 100%). Values must be ascending integers from 1 to 100. A first current reading already above a threshold can notify too. |
 | May run out before reset | Notify once per cycle when `QuotaPacePolicy` estimates exhaustion before the reset. This is an estimate, not a promise. |
-| Edge glow at 100% | Brief red glow on every monitor when the limit is reached, independently of threshold balloons. |
+| Edge glow at 100% | Brief red glow on every monitor when the limit is reached, independently of threshold balloons and whether the custom list includes 100. |
+| Windows notification | Deliver enabled events as standard Windows tray notifications. Turning this off does not disable visual effects. |
+| Confetti on window reset | Confetti on every monitor for approximately 2.5 seconds, only for enabled reset alerts. Off by default. High contrast or disabled client-area animation suppresses it entirely. |
 
 A reading that jumps from below 75% to 100% crosses all three thresholds. Each is an independent alert. Windows may coalesce or suppress tray notifications under its notification settings or Do Not Disturb; AIBar does not bypass those settings. Clicking an AIBar notification **opens the panel** (it never toggles an already open panel closed).
 
-The glow is transparent, topmost, click-through, absent from the taskbar, and does not activate or take focus. It fades for approximately three seconds. High contrast disables the glow entirely. With Windows client-area animations disabled, the border is static for three seconds instead. Turning off the glow does not turn off notifications.
+The glow is transparent, topmost, click-through, absent from the taskbar, and does not activate or take focus. It fades for approximately three seconds. High contrast disables the glow entirely. With Windows client-area animations disabled, the border is static for three seconds instead. Turning off the glow does not turn off notifications. Confetti has the same click-through/no-activate properties, but is entirely skipped when animations are off. Simultaneous resets share one active confetti effect.
 
 ## What does not alert
 
@@ -27,15 +29,15 @@ A reset is not inferred from a percentage decrease alone, nor from a backward-mo
 
 Under `%LOCALAPPDATA%\AIBar`:
 
-- `alerts.json`: schema 1, `{ "schema": 1, "resets": true, "thresholds": true, "runOut": true, "edgeGlow": true }`.
+- `alerts.json`: schema 1, `{ "schema": 1, "resets": true, "thresholds": true, "runOut": true, "edgeGlow": true, "notification": true, "confetti": false, "thresholdValues": [75,90,100] }`. Existing schema-1 documents that omit the new fields retain their toggles and receive these defaults. Invalid integer threshold lists fall back to 75/90/100; the Settings editor rejects invalid input with an inline error before saving.
 - `alert-state.json`: schema 1, fired keys and the last accepted current sample for each provider/window. This preserves deduplication and reset detection across restarts. It contains normalized quota values only.
 
 Writes use a same-directory temporary file and atomic replacement. The serialized observer performs disk work off the UI thread, persists keys **before** delivery, and never delivers if state persistence fails. Consequently a crash after persistence but before delivery may lose a notification rather than duplicate it. Turning an event off still records its key; turning it on later does not replay old alerts. Missing, malformed, or unknown-schema settings use the defaults; a lost/corrupt state file starts new deduplication history.
 
-**Clear AIBar Data** pauses and drains alert work, removes both files, drops in-memory keys/samples, restores the default menu checks, and resumes the observer. It leaves provider consent handling to the existing clear lifecycle. No remote payloads, Codex export v1 fields, or copied quota summaries change.
+**Clear AIBar Data** pauses and drains alert work, removes these files and `appearance.json`, drops in-memory keys/samples, restores the default menu checks, and resumes the observer. It leaves provider consent handling to the existing clear lifecycle. No remote payloads, Codex export v1 fields, or copied quota summaries change.
 
 ## Validation on Windows
 
-The focused xUnit tests live in `AlertSettingsTests`, `QuotaAlertPolicyTests`, `QuotaAlertObserverTests`, `QuotaAlertClaudeHookTests`, `QuotaAlertTrayTests`, and `EdgeGlowPolicyTests`. They cover policy boundaries, persistence/restarts, generation/time deduplication, failure suppression, clearing, independent settings, source recreation, notification copy/click routing, and accessibility planning. This Linux authoring environment has no .NET runtime; compilation and test execution must occur in Windows CI.
+The focused xUnit tests live in `AlertSettingsTests`, `QuotaAlertPolicyTests`, `QuotaAlertObserverTests`, `QuotaAlertClaudeHookTests`, `QuotaAlertTrayTests`, `EdgeGlowPolicyTests`, `SettingsAlertOptionsTests`, `SettingsDeliveryTests`, and `ConfettiPolicyTests`. They cover policy boundaries, persistence/restarts, generation/time deduplication, failure suppression, clearing, independent settings, source recreation, notification copy/click routing, and accessibility planning. This Linux authoring environment has no .NET runtime; compilation and test execution must occur in Windows CI.
 
 For a Windows desktop smoke check, use synthetic quota data, cross 100%, and verify: each monitor gets a border; another application's focus is unchanged; clicks reach the application under the border; borders disappear after about three seconds; high contrast shows no border; disabled animations show a static border; a notification click opens the existing panel. Native monitor/DPI placement and actual Windows balloon presentation require this interactive check, not just headless policy tests.

@@ -78,9 +78,9 @@ Describe 'AIBar YASB reader' {
         $source | Should -Match '-cnotin'
         $source | Should -Not -Match 'Start-Process|Invoke-WebRequest|Remove-Item|Set-Content|Add-Content|WriteAll|CreateDirectory'
         $ci = Get-Content -Raw (Join-Path (Split-Path -Parent $root) '.github/workflows/ci.yml')
-        $ci | Should -Match '\$result.TotalCount -ne 21'
-        $ci | Should -Match 'Expected 21 passing YASB tests'
-        ([regex]::Matches((Get-Content -Raw (Join-Path $root 'tests/read-aibar-quota.Tests.ps1')), '(?m)^\s*It\s+')).Count | Should -Be 21
+        $ci | Should -Match '\$result.TotalCount -ne 24'
+        $ci | Should -Match 'Expected 24 passing YASB tests'
+        ([regex]::Matches((Get-Content -Raw (Join-Path $root 'tests/read-aibar-quota.Tests.ps1')), '(?m)^\s*It\s+')).Count | Should -Be 24
         $stderrPath = [IO.Path]::GetTempFileName()
         try {
             $start = [Diagnostics.ProcessStartInfo]::new('powershell.exe', ('-NoProfile -NonInteractive -File "{0}" unexpected' -f $reader))
@@ -486,6 +486,52 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
                 $field | Should -Not -Match 'canary|credential|C:|<|>|&|\{|\}'
             }
         }
+    }
+}
+
+Describe 'Settings YASB colors' {
+    BeforeAll {
+        function Read-WithAppearance([string]$appearance, [string]$provider = '') {
+            $path = Join-Path $TestDrive 'yasb-quota.json'
+            Copy-Item (Join-Path $root 'fixtures/current.json') $path -Force
+            [IO.File]::WriteAllText((Join-Path $TestDrive 'appearance.json'), $appearance)
+            return & $readerModule {
+                param($path, $at, $provider)
+                $script:AIBarQuotaFixturePath = $path
+                $script:AIBarQuotaFixtureNow = $at
+                Invoke-AiBarQuotaReader -Provider $provider
+            } $path $now $provider
+        }
+    }
+    It 'uses exact provider brand colors while retaining six fields and usage text' {
+        foreach ($provider in @('', 'Claude')) {
+            $result = Read-WithAppearance '{"schema":1,"barColors":"brand","yasbColors":"brand"}' $provider
+            $result.progressColor | Should -BeExactly $(if ($provider -ceq 'Claude') { '#E0876A' } else { '#2FBF98' })
+            $result.compactText | Should -BeExactly '40%'
+            (@($result.PSObject.Properties.Name) -join ',') | Should -BeExactly 'label,compactText,progressGlyph,progressColor,tooltip,className'
+        }
+    }
+    It 'strictly falls back to the usage ramp for missing invalid or unsupported preferences' {
+        foreach ($json in @('', '{', '{}', '{"schema":2,"yasbColors":"brand"}', '{"schema":true,"yasbColors":"brand"}', '{"schema":1,"yasbColors":"Brand"}', '{"schema":1,"yasbColors":true}', '{"schema":1,"yasbColors":"<unsafe>"}', ('x' * 4097), '{"schema":1,"yasbColors":"usage"}', '{"schema":1}')) {
+            $result = Read-WithAppearance $json
+            Assert-SafeFields $result
+            $result.progressColor | Should -BeExactly '#3DDC84'
+            $result.compactText | Should -BeExactly '40%'
+        }
+    }
+    It 'keeps unavailable gray in brand mode and reads settings without modifying bytes' {
+        $path = Join-Path $TestDrive 'yasb-quota.json'
+        $settings = Join-Path $TestDrive 'appearance.json'
+        Copy-Item (Join-Path $root 'fixtures/unavailable.json') $path -Force
+        [IO.File]::WriteAllText($settings, '{"schema":1,"yasbColors":"brand"}')
+        $before = (Get-FileHash $settings).Hash
+        $result = & $readerModule {
+            param($path, $at)
+            $script:AIBarQuotaFixturePath = $path; $script:AIBarQuotaFixtureNow = $at
+            Invoke-AiBarQuotaReader
+        } $path $now
+        $result.progressColor | Should -BeExactly '#8995A4'
+        (Get-FileHash $settings).Hash | Should -BeExactly $before
     }
 }
 

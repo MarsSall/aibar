@@ -43,13 +43,15 @@ public sealed class QuotaAlertObserver : IAiBarClearWork, IAsyncDisposable
             });
         }
     }
-    public Task ChangeSettingsAsync(Func<AlertOptions, AlertOptions> change)
+    public Task SaveSettingsAsync(AlertOptions options) => QueueSettingsAsync(_ => options, reportFailure: true);
+    public Task ChangeSettingsAsync(Func<AlertOptions, AlertOptions> change) => QueueSettingsAsync(change, reportFailure: false);
+    private Task QueueSettingsAsync(Func<AlertOptions, AlertOptions> change, bool reportFailure)
     {
         lock (_gate)
         {
-            if (_paused || _disposed) return Task.CompletedTask;
+            if (_paused || _disposed) return reportFailure ? Task.FromException(new InvalidOperationException("Alert settings are unavailable during clear or shutdown.")) : Task.CompletedTask;
             var previous = _tail;
-            return _tail = Task.Run(async () =>
+            var operation = Task.Run(async () =>
             {
                 await previous;
                 try
@@ -58,14 +60,20 @@ public sealed class QuotaAlertObserver : IAiBarClearWork, IAsyncDisposable
                     await Settings.SaveAsync(options, default);
                     SettingsChanged?.Invoke(options);
                 }
-                catch (Exception) { /* Keep the persisted choice and menu unchanged on failure. */ }
+                catch (Exception) when (!reportFailure) { /* Keep the persisted choice and menu unchanged on failure. */ }
             });
+            // A failed editor save is reported to its caller, but must not poison the observer queue.
+            _tail = operation.ContinueWith(_ => { }, TaskScheduler.Default);
+            return operation;
         }
     }
     private async Task ProcessAsync(string provider, QuotaRefreshState state, Func<bool> consent)
     {
         if (!consent() || state.Freshness != FreshnessState.Current || state.Failure is not null || state.Snapshot is not { } snapshot) return;
         var now = _clock.UtcNow;
+        var settings = await Settings.LoadAsync(default);
+        // The hard limit remains an independent glow event even if the user's list omits 100.
+        var evaluatedThresholds = settings.ThresholdValues.Append(100).Distinct().OrderBy(value => value).ToArray();
         _state ??= await QuotaAlertJson.ReadAsync<StoredState>(_statePath, default) is { Schema: 1, Fired: not null, Previous: not null } stored
             ? stored : new(1, [], []);
         var fired = new HashSet<string>(_state.Fired);
@@ -79,7 +87,7 @@ public sealed class QuotaAlertObserver : IAiBarClearWork, IAsyncDisposable
             var id = $"{provider}|{window}";
             previous.TryGetValue(id, out var prior);
             if (prior is not null && sample.RetrievedAt <= prior.RetrievedAt) continue;
-            events.AddRange(QuotaAlertPolicy.Evaluate(sample, prior, fired, state.Freshness, true, now));
+            events.AddRange(QuotaAlertPolicy.Evaluate(sample, prior, fired, state.Freshness, true, now, evaluatedThresholds));
             previous[id] = sample;
         }
         if (!consent()) return;
@@ -88,14 +96,13 @@ public sealed class QuotaAlertObserver : IAiBarClearWork, IAsyncDisposable
         // Persist before delivery: a crash may lose a notification, never duplicate it.
         await QuotaAlertJson.WriteAsync(_statePath, next, default);
         _state = next;
-        var settings = await Settings.LoadAsync(default);
         foreach (var alert in events)
         {
             if (!CanDeliver(alert)) return;
             if (alert.Kind switch
             {
                 QuotaAlertKind.Reset => settings.Resets,
-                QuotaAlertKind.ThresholdCrossed => settings.Thresholds || alert.Threshold == 100 && settings.EdgeGlow,
+                QuotaAlertKind.ThresholdCrossed => settings.Thresholds && settings.ThresholdValues.Contains(alert.Threshold ?? -1) || alert.Threshold == 100 && settings.EdgeGlow,
                 QuotaAlertKind.RunsOutBeforeReset => settings.RunOut,
                 _ => false
             }) AlertReady?.Invoke(alert);

@@ -40,7 +40,7 @@ public sealed class AlertSettingsTests : IDisposable
         await settings.SaveAsync(options, default);
         Assert.Equal(options, await settings.LoadAsync(default));
         using var json = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(_root, "alerts.json")));
-        Assert.Equal(new[] { "edgeGlow", "resets", "runOut", "schema", "thresholds" }, json.RootElement.EnumerateObject().Select(p => p.Name).OrderBy(n => n));
+        Assert.Equal(new[] { "confetti", "edgeGlow", "notification", "resets", "runOut", "schema", "thresholds", "thresholdValues" }, json.RootElement.EnumerateObject().Select(p => p.Name).OrderBy(n => n));
         Assert.Equal(1, json.RootElement.GetProperty("schema").GetInt32());
         Assert.Single(Directory.GetFiles(_root));
     }
