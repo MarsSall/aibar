@@ -126,8 +126,8 @@ jobs:
           $configuration.TestResult.OutputFormat = 'NUnitXml'
 
           $result = Invoke-Pester -Configuration $configuration
-          if ($result.FailedCount -ne 0 -or $result.SkippedCount -ne 0 -or $result.TotalCount -ne 24) {
-              Write-Error "Expected 24 passing YASB tests, but total=$($result.TotalCount) failed=$($result.FailedCount) skipped=$($result.SkippedCount)."
+          if ($result.FailedCount -ne 0 -or $result.SkippedCount -ne 0 -or $result.TotalCount -ne 29) {
+              Write-Error "Expected 29 passing YASB tests, but total=$($result.TotalCount) failed=$($result.FailedCount) skipped=$($result.SkippedCount)."
               exit 1
           }
 
