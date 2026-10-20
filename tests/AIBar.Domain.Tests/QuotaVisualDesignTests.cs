@@ -16,7 +16,7 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal("Themes/Semantic.Light.xaml", mergedSource);
         var semanticKeys = XDocument.Parse(ReadProjectFile($"src/AIBar.Desktop/{mergedSource}")).Descendants()
             .Select(element => element.Attribute(x + "Key")?.Value).Where(key => key is not null).Cast<string>().Order().ToArray();
-        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, semanticKeys);
+        Assert.Equal(SpecTokenKeys.Order(), semanticKeys);
         var window = ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml");
 
         foreach (var key in new[] { "SpacingSmall", "SpacingMedium", "CardRadius" })
@@ -227,7 +227,7 @@ public sealed class QuotaVisualDesignTests
             .Select(name => XDocument.Parse(ReadProjectFile($"src/AIBar.Desktop/Themes/Semantic.{name}.xaml"))).ToArray();
         var keySets = dictionaries.Select(dictionary => dictionary.Descendants().Select(element => element.Attribute(x + "Key")?.Value).Where(key => key is not null).Cast<string>().Order().ToArray()).ToArray();
         Assert.All(keySets.Skip(1), keys => Assert.Equal(keySets[0], keys));
-        Assert.Equal(new[] { "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush" }, keySets[0]);
+        Assert.Equal(SpecTokenKeys.Order(), keySets[0]);
             var highContrastMappings = new[]
             {
                 ("SurfaceBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
@@ -238,7 +238,7 @@ public sealed class QuotaVisualDesignTests
                 ("PanelMenuHighlightTextBrush", "{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"),
                 ("PanelRowHoverBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("AccentBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
-                ("FocusBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("FocusBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
                 ("ProgressTrackBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("SecondaryBorderBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}")
             };
@@ -380,7 +380,7 @@ public sealed class QuotaVisualDesignTests
     public void Unit_4b_measurement_limits_preserve_the_Unit_3_semantic_surface()
     {
         var window = XDocument.Parse(ReadProjectFile("src/AIBar.Desktop/MainWindow.xaml")).Root!;
-        Assert.Equal("300", window.Attribute("MinWidth")?.Value); Assert.Equal("260", window.Attribute("MinHeight")?.Value); Assert.Equal("720", window.Attribute("MaxHeight")?.Value);
+        Assert.Equal("300", window.Attribute("MinWidth")?.Value); Assert.Equal("260", window.Attribute("MinHeight")?.Value); Assert.Equal("640", window.Attribute("MaxHeight")?.Value);
         Assert.Contains("SurfaceBrush", ReadProjectFile("src/AIBar.Desktop/Themes/Semantic.Light.xaml"), StringComparison.Ordinal);
         Assert.Contains("SurfaceBrush", ReadProjectFile("src/AIBar.Desktop/Themes/Semantic.Dark.xaml"), StringComparison.Ordinal);
     }
@@ -453,6 +453,12 @@ public sealed class QuotaVisualDesignTests
             foreach (var descendant in FindVisualChildren<T>(child)) yield return descendant;
         }
     }
+    // S10 adds every shared color token; legacy keys remain for other windows.
+    private static readonly string[] SpecTokenKeys =
+    [
+        "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush",
+        "BackdropBrush", "SettingsBackgroundBrush", "NotificationBackgroundBrush", "FooterBrush", "TabSelectedBrush", "PressedBrush", "ControlBrush", "WindowBorderBrush", "CardBorderBrush", "ControlBorderBrush", "TertiaryTextBrush", "ClaudeUiBrush", "CodexUiBrush", "AccentIndicatorBrush", "LinkBrush", "WarningTextBrush", "WarningBackgroundBrush", "DangerTextBrush", "SuccessTextBrush", "CodexBrush", "CodexTintBrush", "ClaudeBrush", "ClaudeTintBrush", "UsageOkBrush", "UsageWarnBrush", "UsageHighBrush"
+    ];
     private static readonly XNamespace PanelNamespace = "clr-namespace:AIBar.Desktop";
 
     private static string ReadProjectFile(string relativePath)

@@ -44,15 +44,18 @@ public sealed class PanelPolishTests
                     row.ApplyTemplate();
                     Assert.NotNull(row.Template.FindName("FlatChrome", row));
                 }
-                Assert.Equal("Cost", ((TextBlock)window.FindName("CostTitle")).Text);
+                Assert.Equal("COST", ((TextBlock)window.FindName("CostTitle")).Text); // S10 uppercase card label.
                 var chevron = (TextBlock)window.FindName("CostChevron");
                 Assert.Equal("›", chevron.Text); Assert.Equal(HorizontalAlignment.Right, chevron.HorizontalAlignment);
                 Assert.Equal(((RadioButton)window.FindName("CodexTab")).ActualWidth,
                     ((RadioButton)window.FindName("ClaudeTab")).ActualWidth, 2);
                 var plan = Visuals<TextBlock>(window).Single(text => AutomationProperties.GetName(text) == "Codex plan");
-                Assert.Equal("Plus", plan.Text); Assert.Equal(1, Grid.GetRow(plan));
-                Assert.Equal(HorizontalAlignment.Right, plan.HorizontalAlignment);
-                Assert.Equal(((SolidColorBrush)window.FindResource("MutedTextBrush")).Color, ((SolidColorBrush)plan.Foreground).Color);
+                Assert.Equal("Plus", plan.Text);
+                var planPill = Assert.IsType<Border>(plan.Parent);
+                Assert.Equal(0, Grid.GetRow(planPill));
+                Assert.Equal(new CornerRadius(10), planPill.CornerRadius);
+                Assert.Equal(HorizontalAlignment.Right, planPill.HorizontalAlignment);
+                Assert.Equal(((SolidColorBrush)window.FindResource("CodexUiBrush")).Color, ((SolidColorBrush)plan.Foreground).Color);
                 var summary = (StackPanel)window.FindName("SummaryView");
                 var rules = summary.Children.OfType<Border>().ToArray();
                 Assert.Equal(new[] { "TabsRule", "WindowsRule" }, rules.Select(rule => rule.Name));
@@ -64,17 +67,17 @@ public sealed class PanelPolishTests
                 Assert.Equal(new[] { typeof(Button), typeof(Button), typeof(Border), typeof(Button), typeof(Button), typeof(Border), typeof(Button), typeof(Button), typeof(Button) }, menu.Children.Cast<UIElement>().Select(item => item.GetType()));
                 var buttons = menu.Children.OfType<Button>().ToArray();
                 Assert.All(buttons.Take(4), row => Assert.False(string.IsNullOrWhiteSpace(row.Tag as string)));
-                Assert.All(buttons.Skip(4), row => Assert.Null(row.Tag));
+                Assert.All(buttons.Skip(4), row => Assert.False(string.IsNullOrWhiteSpace(row.Tag as string))); // S10 gives every menu action an icon.
                 Assert.All(buttons, row =>
                 {
-                    Assert.Equal(28d, row.MinHeight); Assert.NotNull(row.FocusVisualStyle);
+                    Assert.Equal(30d, row.MinHeight); Assert.NotNull(row.FocusVisualStyle);
                     var hover = row.Style.Triggers.OfType<Trigger>().Single(trigger => trigger.Property == UIElement.IsMouseOverProperty);
                     var brush = hover.Setters.OfType<Setter>().Single(setter => setter.Property == Control.BackgroundProperty);
                     Assert.Equal("PanelMenuHighlightBrush", Assert.IsType<DynamicResourceExtension>(brush.Value).ResourceKey);
                     var highlight = (SolidColorBrush)window.FindResource("PanelMenuHighlightBrush");
                     var highlightText = (SolidColorBrush)window.FindResource("PanelMenuHighlightTextBrush");
-                    Assert.Equal(theme == WindowsTheme.HighContrast ? SystemColors.HighlightColor : Color.FromRgb(52, 120, 246), highlight.Color);
-                    Assert.Equal(theme == WindowsTheme.HighContrast ? SystemColors.HighlightTextColor : Colors.White, highlightText.Color);
+                    Assert.Equal(theme == WindowsTheme.HighContrast ? SystemColors.HighlightColor : theme == WindowsTheme.Dark ? Color.FromRgb(42, 42, 42) : Color.FromRgb(234, 234, 234), highlight.Color);
+                    Assert.Equal(theme == WindowsTheme.HighContrast ? SystemColors.HighlightTextColor : ((SolidColorBrush)window.FindResource("TextBrush")).Color, highlightText.Color);
                     Assert.Contains(row.Style.Triggers.OfType<Trigger>(), trigger => trigger.Property == ButtonBase.IsPressedProperty);
                 });
             }

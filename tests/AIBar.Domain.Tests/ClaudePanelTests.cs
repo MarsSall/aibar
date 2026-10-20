@@ -140,9 +140,9 @@ public sealed class ClaudePanelTests
                     // Both Claude fixtures are below 75%: green, or the system highlight in high contrast.
                     var expectedBar = theme == WindowsTheme.HighContrast ? SystemColors.HighlightColor : (Color)ColorConverter.ConvertFromString("#C4703F");
                     Assert.Equal(expectedBar, ColorOf(bar.Foreground));
-                    var percentage = Assert.Single(Visuals<TextBlock>(card).Where(text => text.Text.EndsWith("% used", StringComparison.Ordinal)));
+                    var percentage = Assert.Single(Visuals<TextBlock>(card).Where(text => text.Name == "MeterPercent"));
                     // S9 normalizes the 2x reference's percentage text to 11 DIPs.
-                    Assert.Equal(13d, percentage.FontSize);
+                    Assert.Equal(22d, percentage.FontSize); // S10 display percentage replaces the small below-bar value.
                     Assert.Equal(ColorOf(panel.Window.FindResource("TextBrush")), ColorOf(percentage.Foreground));
                     Assert.Contains(VisibleText(card), text => text.StartsWith("Resets in ", StringComparison.Ordinal));
                 }

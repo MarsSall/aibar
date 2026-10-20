@@ -44,8 +44,9 @@ public sealed class CodexBarPanelTests
                 window.Show(); window.UpdateLayout();
                 window.SelectProvider("Claude"); window.UpdateLayout();
                 Assert.True(((StackPanel)window.FindName("ClaudeQuotaSection")).IsVisible);
-                Assert.Contains(Visuals<TextBlock>(window), text => text.IsVisible && text.Text == "Today: unavailable");
-                Assert.Contains(Visuals<TextBlock>(window), text => text.IsVisible && text.Text == "Last 30 days: $ 254.24 · 918M tokens (partial)");
+                Assert.Contains(Visuals<TextBlock>(window), text => text.IsVisible && text.Text == "unavailable");
+                Assert.Contains(Visuals<TextBlock>(window), text => text.IsVisible && text.Text == "$ 254.24");
+                Assert.Contains(Visuals<TextBlock>(window), text => text.IsVisible && text.Text == "30 days · 918M tokens (partial)");
                 window.SelectProvider("Codex"); window.UpdateLayout();
                 var titles = Visuals<TextBlock>(window).Where(text => text.Text is "Codex" or "Claude").ToArray();
                 Assert.Contains(titles, text => text.Text == "Codex");
@@ -54,23 +55,24 @@ public sealed class CodexBarPanelTests
                 Assert.False(((StackPanel)window.FindName("ClaudeQuotaSection")).IsVisible);
                 var heading = Visuals<TextBlock>(window).Single(text => text.IsVisible && AutomationProperties.GetName(text) == "Codex");
                 // Reference is 2x: the 28px heading is 14 DIPs, not the former 21-DIP mockup title.
-                Assert.Equal(17d, heading.FontSize); Assert.Equal(FontWeights.Bold, heading.FontWeight);
+                // S10 specifies a 16/22 semibold provider title.
+                Assert.Equal(16d, heading.FontSize); Assert.Equal(FontWeights.SemiBold, heading.FontWeight);
                 Assert.Equal(new[] { "5-hour quota progress", "Weekly quota progress", "Claude 5-hour quota progress", "Claude weekly quota progress" }, Visuals<PanelMeter>(window).Select(meter => meter.MeterName));
                 Assert.All(Visuals<PanelMeter>(window).SelectMany(Visuals<ProgressBar>), bar =>
                 {
-                    Assert.Equal(6d, bar.Height);
+                    Assert.Equal(4d, bar.Height); // S10 usage bars are four DIPs.
                     Assert.Equal(theme == WindowsTheme.HighContrast ? System.Windows.SystemColors.HighlightColor :
                         PanelPalette.ProviderColor(AutomationProperties.GetName(bar).StartsWith("Claude", StringComparison.Ordinal) ? "Claude" : "Codex"),
                         Assert.IsType<SolidColorBrush>(bar.Foreground).Color);
                 });
                 var texts = Visuals<TextBlock>(window).Select(text => text.Text).ToArray();
                 Assert.Contains("Updated 2 min ago · from other machine", texts);
-                Assert.Contains("Session", texts); Assert.Contains("Weekly", texts);
-                // S9 adds currency spacing only; exact amounts, tokens and partial markers stay asserted.
-                Assert.Contains("Today: $ 0.04 · 15K tokens", texts);
-                Assert.Contains("Last 30 days: $ 12.80+ · 9.4M tokens (some models unpriced)", texts);
-                Assert.Contains("Today: unavailable", texts);
-                Assert.Contains("Last 30 days: $ 254.24 · 918M tokens (partial)", texts);
+                Assert.Contains("SESSION · 5 H", texts); Assert.Contains("WEEKLY · ALL MODELS", texts);
+                // S10 splits amount/meta into two columns; every exact value and partial marker stays asserted.
+                Assert.Contains("$ 0.04", texts); Assert.Contains("Today · 15K tokens", texts);
+                Assert.Contains("$ 12.80+", texts); Assert.Contains("30 days · 9.4M tokens (some models unpriced)", texts);
+                Assert.Contains("unavailable", texts);
+                Assert.Contains("$ 254.24", texts); Assert.Contains("30 days · 918M tokens (partial)", texts);
                 var cost = Assert.IsType<Button>(window.FindName("CostButton"));
                 var back = Assert.IsType<Button>(window.FindName("BackButton"));
                 var summary = Assert.IsType<StackPanel>(window.FindName("SummaryView"));

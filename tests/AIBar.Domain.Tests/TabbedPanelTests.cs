@@ -99,10 +99,11 @@ public sealed class TabbedPanelTests
     }
 
     [Theory]
-    [InlineData(74, "#FF15924A")]
-    [InlineData(75, "#FFA86B00")]
-    [InlineData(89, "#FFA86B00")]
-    [InlineData(90, "#FFC8203C")]
+    // S10 light usage tokens; exact 75/90 boundaries are unchanged.
+    [InlineData(74, "#FF1E9E5A")]
+    [InlineData(75, "#FFB88400")]
+    [InlineData(89, "#FFB88400")]
+    [InlineData(90, "#FFD13B2A")]
     public void Usage_mode_restores_semantic_thresholds_and_stale_is_gray(int usage, string expected)
     {
         WpfTestApplicationHost.Run(_ =>

@@ -81,15 +81,15 @@ public sealed class PanelDetailsTests
                     Assert.Equal(Colors.Transparent, Assert.IsType<SolidColorBrush>(border.Background).Color);
                 });
                 Assert.False(app.Resources.Contains("PanelQuotaCardStyle"));
-                var percentage = Assert.Single(Visuals<TextBlock>(cards[1]).Where(text => text.Text == "40% used"));
-                // Reference percentage text is approximately 22 physical pixels at 2x.
-                Assert.Equal(13d, percentage.FontSize); Assert.Equal(expected, Assert.IsType<SolidColorBrush>(percentage.Foreground).Color);
+                var percentage = Assert.Single(Visuals<TextBlock>(cards[1]).Where(text => text.Text == "40%"));
+                // S10 moves the 22-DIP value to the label row.
+                Assert.Equal(22d, percentage.FontSize); Assert.Equal(expected, Assert.IsType<SolidColorBrush>(percentage.Foreground).Color);
                 var menu = Assert.IsType<StackPanel>(window.FindName("PanelActions"));
                 Assert.All(menu.Children.OfType<Button>(), button =>
                 {
                     Assert.True(button.Focusable && button.IsTabStop); Assert.NotNull(button.FocusVisualStyle);
                     button.ApplyTemplate();
-                    Assert.Equal(new CornerRadius(6), Assert.IsType<Border>(button.Template.FindName("ActionChrome", button)).CornerRadius);
+                    Assert.Equal(new CornerRadius(4), Assert.IsType<Border>(button.Template.FindName("ActionChrome", button)).CornerRadius);
                 });
             }
             finally { window.Close(); app.Resources.MergedDictionaries[0] = original; }

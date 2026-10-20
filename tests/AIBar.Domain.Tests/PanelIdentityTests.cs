@@ -18,10 +18,11 @@ public sealed class PanelIdentityTests
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
 
     [Theory]
-    [InlineData(PanelTone.Near, true, "#FF9F5A")]
-    [InlineData(PanelTone.Muted, true, "#A1A1A6")]
-    [InlineData(PanelTone.Near, false, "#C4581F")]
-    [InlineData(PanelTone.Muted, false, "#6E6E73")]
+    // S10 replaces the S7 palette; state semantics remain unchanged.
+    [InlineData(PanelTone.Near, true, "#F5B83D")]
+    [InlineData(PanelTone.Muted, true, "#A9A9B2")]
+    [InlineData(PanelTone.Near, false, "#8F5600")]
+    [InlineData(PanelTone.Muted, false, "#575757")]
     public void Pace_warning_and_secondary_text_follow_the_mockup(PanelTone tone, bool dark, string expected) =>
         Assert.Equal(Parse(expected), PanelPalette.ToneColor(tone, dark));
 
@@ -96,17 +97,17 @@ public sealed class PanelIdentityTests
         Assert.Equal(expected, WindowsTransparencySetting.IsEnabled(value));
 
     [Theory]
-    [InlineData(true, false, "#D1242428")]
-    [InlineData(false, false, "#FF242428")]
-    [InlineData(true, true, "#D1ECECF6")]
-    [InlineData(false, true, "#FFECECF6")]
+    [InlineData(true, false, "#D90C0C10")]
+    [InlineData(false, false, "#FF0C0C10")]
+    [InlineData(true, true, "#CCF7F7F7")]
+    [InlineData(false, true, "#FFF7F7F7")]
     public void Surface_tint_is_translucent_only_with_acrylic(bool translucent, bool light, string expected) =>
         Assert.Equal(Parse(expected), PanelPalette.Surface(dark: !light, translucent));
 
     [Theory]
-    [InlineData(WindowsTheme.Dark, true, 0xD1)]
+    [InlineData(WindowsTheme.Dark, true, 0xD9)]
     [InlineData(WindowsTheme.Dark, false, 0xFF)]
-    [InlineData(WindowsTheme.Light, true, 0xD1)]
+    [InlineData(WindowsTheme.Light, true, 0xCC)]
     public void Rendered_surface_follows_the_window_translucency(WindowsTheme theme, bool translucent, byte alpha)
     {
         WithPanel(theme, 14, 7, ClaudeQuotaSource.OtherMachine, window =>
@@ -127,7 +128,8 @@ public sealed class PanelIdentityTests
             Assert.Contains("Codex", text); Assert.Contains("Claude", text);
             Assert.Contains(text, value => value.Contains("from other machine", StringComparison.Ordinal));
             Assert.DoesNotContain("High usage", text); Assert.DoesNotContain("Near limit", text);
-            Assert.Contains("78% used", text); Assert.Contains("92% used", text);
+            // S10 places the percent above the bar, with a non-color warning at >=90%.
+            Assert.Contains("78%", text); Assert.Contains("⚠ 92%", text);
             Assert.Contains("Resets in 3d 20h", text); Assert.Contains("Resets in 3h 53m", text);
             var titles = Visuals<TextBlock>(window).Where(item => item.IsVisible && item.Text is "Codex" or "Claude").ToArray();
             Assert.Contains(titles, title => AutomationProperties.GetName(title) == "Claude");
