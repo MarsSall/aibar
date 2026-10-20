@@ -14,6 +14,16 @@ function Get-ReaderPath {
     return (Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) 'AIBar\yasb-quota.json')
 }
 
+function Get-BlockingWindow($Five, $Weekly) {
+    if ($null -eq $Five) { return $Weekly }
+    if ($null -eq $Weekly) { return $Five }
+    if ($Weekly.percentageUsed -gt $Five.percentageUsed) { return $Weekly }
+    if ($Five.percentageUsed -gt $Weekly.percentageUsed) { return $Five }
+    # Equal usage: a known reset sorts before an unknown one. Exact ties stay stable on 5h.
+    if ($null -ne $Weekly.resetAt -and ($null -eq $Five.resetAt -or $Weekly.resetAt -lt $Five.resetAt)) { return $Weekly }
+    return $Five
+}
+
 function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable', $Five = $null, $Weekly = $null, $Source = $null, [Parameter(Mandatory = $true)][DateTimeOffset]$Now) {
     function Slot([string]$Name, $Window) { if ($null -eq $Window) { return "${Name}: --" }; return ('{0}: {1}%' -f $Name, ([double]$Window.percentageUsed).ToString('0.#', [Globalization.CultureInfo]::InvariantCulture)) }
     function Reset([string]$Name, $Window) {
@@ -54,7 +64,7 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
     if ($null -ne $Five) { $tooltip += Reset '5h' $Five }
     if ($null -ne $Weekly) { $tooltip += Reset '7d' $Weekly }
     $tooltip += "age: $age"
-    $hero = if ($null -ne $Weekly) { $Weekly } else { $Five }
+    $hero = Get-BlockingWindow $Five $Weekly
     $glyphCodes = @(0xF0766, 0xF0A9E, 0xF0A9F, 0xF0AA0, 0xF0AA1, 0xF0AA2, 0xF0AA3, 0xF0AA4, 0xF0AA5)
     $glyphIndex = 0
     $color = '#8995A4'
