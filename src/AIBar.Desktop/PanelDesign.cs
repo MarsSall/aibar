@@ -80,7 +80,9 @@ public sealed class PanelTabDecorationConverter : IMultiValueConverter
         var claude = values.ElementAtOrDefault(0) as string == "Claude";
         var surface = values.ElementAtOrDefault(1) as SolidColorBrush;
         var hc = SystemParameters.HighContrast || surface is not null && DependencyPropertyHelper.GetValueSource(surface, SolidColorBrush.ColorProperty).IsExpression;
-        if (hc) return parameter as string == "Border" ? System.Windows.SystemColors.WindowTextBrush : System.Windows.SystemColors.HighlightBrush;
+        if (hc) return parameter as string == "Border" ? System.Windows.SystemColors.WindowTextBrush
+            : parameter as string == "Text" ? System.Windows.SystemColors.HighlightTextBrush : System.Windows.SystemColors.HighlightBrush;
+        if (parameter as string == "Text") return System.Windows.Application.Current.TryFindResource("TextBrush") ?? Brushes.Black;
         var dark = surface is not null && PanelPalette.IsDark(surface);
         var usage = ProviderVisuals.Usage(values.ElementAtOrDefault(claude ? 3 : 2) ?? -1m) ?? -1;
         var current = values.ElementAtOrDefault(claude ? 5 : 4) is not false;

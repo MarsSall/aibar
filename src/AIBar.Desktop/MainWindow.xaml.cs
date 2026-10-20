@@ -68,13 +68,27 @@ public partial class MainWindow : Window
         nameof(IsTranslucent), typeof(bool), typeof(MainWindow), new PropertyMetadata(false));
 
     private readonly Action<System.Diagnostics.ProcessStartInfo>? _launchLink;
+    private readonly PanelMotion _motion = new();
+    private int _showGeneration;
     public MainWindow() : this(null) { }
     public MainWindow(Action<System.Diagnostics.ProcessStartInfo>? launchLink)
     {
         _launchLink = launchLink;
         InitializeComponent();
         PreviewKeyDown += OnPanelKeyDown;
-        IsVisibleChanged += (_, _) => { if (IsVisible) AnimateBody((FrameworkElement)Content, 8, 167, vertical: true); };
+        IsVisibleChanged += (_, _) =>
+        {
+            var generation = ++_showGeneration;
+            _motion.Complete();
+            if (!IsVisible) return;
+            // IsVisibleChanged can precede Loaded and the host's final placement.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                if (generation == _showGeneration && IsVisible)
+                    AnimateBody((FrameworkElement)Content, 8, 167, vertical: true);
+            }));
+        };
+        Closed += (_, _) => { ++_showGeneration; _motion.Complete(); };
         SetBinding(ClaudeEnabledProperty, new System.Windows.Data.Binding("Claude.IsEnabled") { FallbackValue = false });
         BindUsage(CodexUsageProperty, "Primary.PercentageUsed", "Weekly.PercentageUsed");
         BindUsage(ClaudeUsageProperty, "Claude.State.Primary.PercentageUsed", "Claude.State.Weekly.PercentageUsed");
@@ -120,28 +134,18 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private static void AnimateBody(FrameworkElement body, double offset, int duration, bool vertical = false)
-    {
-        // With animation effects off, there are no translations or bar tweens.
-        var milliseconds = SystemParameters.ClientAreaAnimation ? duration : 83;
-        body.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(milliseconds))
-            { FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop });
-        if (offset == 0 || !SystemParameters.ClientAreaAnimation || SystemParameters.HighContrast) return;
-        var transform = new System.Windows.Media.TranslateTransform();
-        body.RenderTransform = transform;
-        transform.BeginAnimation(vertical ? System.Windows.Media.TranslateTransform.YProperty : System.Windows.Media.TranslateTransform.XProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(offset, 0, TimeSpan.FromMilliseconds(duration))
-            { EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }, FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop });
-    }
+    private void AnimateBody(FrameworkElement body, double offset, int duration, bool vertical = false) =>
+        _motion.Begin(body, PanelMotion.CanAnimate(this, SystemParameters.ClientAreaAnimation, SystemParameters.HighContrast),
+            offset, duration, vertical);
 
     /// <summary>HostRuntime should use this instead of Window.Hide for outside-click dismissal.</summary>
     public void Dismiss()
     {
         if (!IsVisible) return;
-        var body = (FrameworkElement)Content;
-        var fade = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(SystemParameters.ClientAreaAnimation ? 120 : 83));
-        fade.Completed += (_, _) => { Hide(); body.BeginAnimation(OpacityProperty, null); };
-        body.BeginAnimation(OpacityProperty, fade);
+        ++_showGeneration;
+        _motion.Begin((FrameworkElement)Content,
+            PanelMotion.CanAnimate(this, SystemParameters.ClientAreaAnimation, SystemParameters.HighContrast),
+            0, 120, closing: true, onCompleted: Hide);
     }
 
     internal bool ExecuteShortcut(Key key)

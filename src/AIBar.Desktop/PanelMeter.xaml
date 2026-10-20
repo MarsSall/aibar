@@ -24,11 +24,11 @@
             </ControlTemplate></Setter.Value></Setter>
         </Style>
     </UserControl.Resources>
-    <Grid x:Name="MeterRoot" Tag="{DynamicResource SurfaceBrush}" Margin="0,12,0,0">
+    <Grid x:Name="MeterRoot" Tag="{DynamicResource SurfaceBrush}" Margin="0,8,0,0">
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
         <local:PanelSectionLabel x:Name="MeterLabel" Text="{Binding Label, RelativeSource={RelativeSource AncestorType=local:PanelMeter}, Converter={StaticResource WindowLabel}}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
-        <ProgressBar x:Name="MeterBar" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,7,0,0" Style="{StaticResource PanelMeterProgressStyle}"
+        <ProgressBar x:Name="MeterBar" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,4,0,0" Style="{StaticResource PanelMeterProgressStyle}"
                      Value="{Binding Usage, RelativeSource={RelativeSource AncestorType=local:PanelMeter}}"
                      automation:AutomationProperties.Name="{Binding MeterName, RelativeSource={RelativeSource AncestorType=local:PanelMeter}}">
             <ProgressBar.Foreground><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="Meter">
@@ -43,10 +43,10 @@
             </MultiBinding></ProgressBar.Background>
         </ProgressBar>
         <Border x:Name="MidpointTick" Grid.Row="1" Grid.ColumnSpan="2" Width="1" Height="10" Background="{DynamicResource MutedTextBrush}" Opacity="0.35" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,-3" IsHitTestVisible="False" />
-        <TextBlock x:Name="MeterPercent" Grid.Column="1" HorizontalAlignment="Right" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"
+        <TextBlock x:Name="MeterPercent" Grid.Column="1" HorizontalAlignment="Right" FontSize="22" LineHeight="26" LineStackingStrategy="BlockLineHeight" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"
                    Text="{Binding Usage, RelativeSource={RelativeSource AncestorType=local:PanelMeter}, Converter={StaticResource Percent}, TargetNullValue=--}" />
-        <TextBlock x:Name="UsedLabel" Grid.Row="2" Margin="0,6,4,0" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Text="used" />
-        <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,6,0,0" FontSize="12" Foreground="{DynamicResource MutedTextBrush}"><Run Text="Resets in " /><Run Text="{Binding ResetCountdown, RelativeSource={RelativeSource AncestorType=local:PanelMeter}, Converter={StaticResource Reset}, TargetNullValue=unavailable}" /></TextBlock>
+        <TextBlock x:Name="UsedLabel" Grid.Row="2" Margin="0,4,4,0" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Text="used" />
+        <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,4,0,0" FontSize="12" Foreground="{DynamicResource MutedTextBrush}"><Run Text="Resets in " /><Run Text="{Binding ResetCountdown, RelativeSource={RelativeSource AncestorType=local:PanelMeter}, Converter={StaticResource Reset}, TargetNullValue=unavailable}" /></TextBlock>
         <local:PanelPaceRow Grid.Row="3" Grid.ColumnSpan="2" Data="{Binding Pace, RelativeSource={RelativeSource AncestorType=local:PanelMeter}}" />
     </Grid>
 </UserControl>

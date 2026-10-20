@@ -40,7 +40,7 @@
                 <Trigger Property="IsChecked" Value="True">
                     <Setter Property="Background"><Setter.Value><MultiBinding Converter="{StaticResource TabDecoration}" ConverterParameter="Fill"><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="State.IsCurrent" /><Binding Path="Claude.State.IsCurrent" /></MultiBinding></Setter.Value></Setter>
                     <Setter Property="BorderBrush"><Setter.Value><MultiBinding Converter="{StaticResource TabDecoration}" ConverterParameter="Border"><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="State.IsCurrent" /><Binding Path="Claude.State.IsCurrent" /></MultiBinding></Setter.Value></Setter>
-                    <Setter Property="Foreground" Value="{DynamicResource PanelMenuHighlightTextBrush}" /><Setter Property="FontWeight" Value="SemiBold" />
+                    <Setter Property="Foreground"><Setter.Value><MultiBinding Converter="{StaticResource TabDecoration}" ConverterParameter="Text"><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /></MultiBinding></Setter.Value></Setter><Setter Property="FontWeight" Value="SemiBold" />
                 </Trigger>
                 <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource FocusBrush}" /></Trigger>
             </Style.Triggers>
@@ -109,7 +109,7 @@
             <Setter Property="MinHeight" Value="28" />
             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
                 <Border x:Name="FlatChrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4" Padding="{TemplateBinding Padding}">
-                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
+                    <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
                 </Border>
             </ControlTemplate></Setter.Value></Setter>
             <Style.Triggers>
@@ -204,7 +204,7 @@
                         </RadioButton>
                     </UniformGrid>
                     <Border x:Name="TabsRule" Style="{StaticResource PanelHeaderRule}" Margin="0,0,0,8" />
-                    <StackPanel x:Name="QuotaCards" automation:AutomationProperties.Name="Quota cards" Margin="0,4,0,10">
+                    <StackPanel x:Name="QuotaCards" automation:AutomationProperties.Name="Quota cards" Margin="0,4,0,4">
                         <StackPanel x:Name="CodexQuotaSection" Visibility="{Binding SelectedProvider, RelativeSource={RelativeSource AncestorType=local:MainWindow}, Converter={StaticResource ProviderSelection}, ConverterParameter=Codex}">
                         <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                             <TextBlock Grid.ColumnSpan="2" Text="Codex" Style="{StaticResource PanelProviderTitle}" automation:AutomationProperties.Name="Codex" />
@@ -229,15 +229,14 @@
                         <TextBlock Text="Private quota integration is disabled" Visibility="{Binding State.IsPrivateIntegrationDisabled, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
                         <TextBlock Text="Quota error" Visibility="{Binding State.IsSafeError, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource QuotaStatusTextStyle}" />
                         <ContentControl Content="{Binding State}" ContentTemplate="{StaticResource PanelStateBanners}" Focusable="False" IsTabStop="False" />
-                        <Border x:Name="CodexHeaderRule" Style="{StaticResource PanelHeaderRule}" Margin="0,8,0,4" />
-                        <StackPanel Visibility="{Binding State.NeedsLogin, Converter={StaticResource LoginVisibility}, FallbackValue=Visible}">
+                        <Border x:Name="CodexHeaderRule" Style="{StaticResource PanelHeaderRule}" Margin="0,4,0,0" />
+                        <!-- Availability, not authentication, controls cached meter visibility. -->
                         <GroupBox automation:AutomationProperties.Name="5-hour quota card" automation:AutomationProperties.HelpText="5-hour quota percentage, reset, and state" automation:AutomationProperties.ItemStatus="{Binding FreshnessLabel}" Visibility="{Binding State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource ChromeLessGroupBoxStyle}">
                             <Border Style="{StaticResource PanelQuotaCardStyle}"><local:PanelMeter Label="{Binding Primary.Label}" Usage="{Binding Primary.PercentageUsed}" IsCurrent="{Binding State.IsCurrent, FallbackValue=True}" ResetCountdown="{Binding Primary.ResetCountdown}" MeterName="5-hour quota progress" /></Border>
                         </GroupBox>
                         <GroupBox automation:AutomationProperties.Name="Weekly quota card" automation:AutomationProperties.HelpText="Weekly quota percentage, reset, and state" automation:AutomationProperties.ItemStatus="{Binding FreshnessLabel}" Visibility="{Binding State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource ChromeLessGroupBoxStyle}">
                             <Border Style="{StaticResource PanelQuotaCardStyle}"><local:PanelMeter Label="{Binding Weekly.Label}" Usage="{Binding Weekly.PercentageUsed}" IsCurrent="{Binding State.IsCurrent, FallbackValue=True}" ResetCountdown="{Binding Weekly.ResetCountdown}" Pace="{Binding State.Weekly.Pace}" MeterName="Weekly quota progress" /></Border>
                         </GroupBox>
-                        </StackPanel>
                         </StackPanel>
                         <StackPanel x:Name="ClaudeQuotaSection" Visibility="{Binding SelectedProvider, RelativeSource={RelativeSource AncestorType=local:MainWindow}, Converter={StaticResource ProviderSelection}, ConverterParameter=Claude}">
                             <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
@@ -256,31 +255,34 @@
                             <TextBlock Text="{Binding Claude.State.CachedAgeLabel}" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" />
                             <TextBlock Text="{Binding Claude.State.WarningLabel}" Style="{StaticResource QuotaStatusTextStyle}" automation:AutomationProperties.LiveSetting="Polite" />
                             <ContentControl Content="{Binding Claude.State}" ContentTemplate="{StaticResource PanelStateBanners}" Focusable="False" IsTabStop="False" />
-                            <Border x:Name="ClaudeHeaderRule" Style="{StaticResource PanelHeaderRule}" Margin="0,8,0,4" />
-                            <StackPanel Visibility="{Binding Claude.State.NeedsLogin, Converter={StaticResource LoginVisibility}, FallbackValue=Visible}">
+                            <Border x:Name="ClaudeHeaderRule" Style="{StaticResource PanelHeaderRule}" Margin="0,4,0,0" />
+                            <!-- Keep safe cached values visible next to the sign-in warning. -->
                             <GroupBox automation:AutomationProperties.Name="Claude 5-hour quota card" automation:AutomationProperties.HelpText="Claude 5-hour quota percentage, reset, and state" automation:AutomationProperties.ItemStatus="{Binding Claude.State.FreshnessLabel}" Visibility="{Binding Claude.State.IsPrimaryAvailable, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}" Style="{StaticResource ChromeLessGroupBoxStyle}">
                                 <Border Style="{StaticResource PanelQuotaCardStyle}"><local:PanelMeter Provider="Claude" Label="{Binding Claude.State.Primary.Label}" Usage="{Binding Claude.State.Primary.PercentageUsed}" IsCurrent="{Binding Claude.State.IsCurrent, FallbackValue=True}" ResetCountdown="{Binding Claude.State.Primary.ResetCountdown}" MeterName="Claude 5-hour quota progress" /></Border>
                             </GroupBox>
                             <GroupBox automation:AutomationProperties.Name="Claude weekly quota card" automation:AutomationProperties.HelpText="Claude weekly quota percentage, reset, and state" automation:AutomationProperties.ItemStatus="{Binding Claude.State.FreshnessLabel}" Visibility="{Binding Claude.State.IsWeeklyAvailable, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}" Style="{StaticResource ChromeLessGroupBoxStyle}">
                                 <Border Style="{StaticResource PanelQuotaCardStyle}"><local:PanelMeter Provider="Claude" Label="{Binding Claude.State.Weekly.Label}" Usage="{Binding Claude.State.Weekly.PercentageUsed}" IsCurrent="{Binding Claude.State.IsCurrent, FallbackValue=True}" ResetCountdown="{Binding Claude.State.Weekly.ResetCountdown}" Pace="{Binding Claude.State.Weekly.Pace}" MeterName="Claude weekly quota progress" /></Border>
                             </GroupBox>
-                            </StackPanel>
                         </StackPanel>
                     </StackPanel>
-                    <Border x:Name="WindowsRule" Style="{StaticResource PanelRule}" Margin="0,2,0,10" />
+                    <Border x:Name="WindowsRule" Style="{StaticResource PanelRule}" Margin="0,2,0,6" />
                     <Button x:Name="CostButton" Click="OnCost" PreviewKeyDown="OnNavigationKeyDown" Style="{StaticResource PanelLinkStyle}" Foreground="{DynamicResource TextBrush}" Padding="0" Margin="-8,0,-8,10" automation:AutomationProperties.Name="Cost details">
                         <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12,8">
                             <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="24" /></Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <local:PanelSectionLabel x:Name="CostTitle" Text="COST" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,0,6" />
-                                    <UniformGrid Rows="1" Visibility="{Binding SelectedProvider, RelativeSource={RelativeSource AncestorType=local:MainWindow}, Converter={StaticResource ProviderSelection}, ConverterParameter=Codex}">
-                                        <StackPanel><TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding Analytics.UsageCost.TodayLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Amount}" /><TextBlock FontSize="12" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Text="{Binding Analytics.UsageCost.TodayLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Meta}" /></StackPanel>
-                                        <StackPanel><TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding Analytics.UsageCost.Last30DaysLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Amount}" /><TextBlock FontSize="12" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Text="{Binding Analytics.UsageCost.Last30DaysLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Meta}" /></StackPanel>
-                                    </UniformGrid>
-                                    <UniformGrid Rows="1" Visibility="{Binding SelectedProvider, RelativeSource={RelativeSource AncestorType=local:MainWindow}, Converter={StaticResource ProviderSelection}, ConverterParameter=Claude}">
-                                        <StackPanel><TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding ClaudeCost.State.TodayLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Amount}" /><TextBlock FontSize="12" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Text="{Binding ClaudeCost.State.TodayLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Meta}" /></StackPanel>
-                                        <StackPanel><TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding ClaudeCost.State.Last30DaysLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Amount}" /><TextBlock FontSize="12" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Text="{Binding ClaudeCost.State.Last30DaysLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Meta}" /></StackPanel>
-                                    </UniformGrid>
+                                    <!-- Explicit bounded columns: long/partial labels wrap without
+                                         painting into their neighbour or the chevron. -->
+                                    <Grid Visibility="{Binding SelectedProvider, RelativeSource={RelativeSource AncestorType=local:MainWindow}, Converter={StaticResource ProviderSelection}, ConverterParameter=Codex}">
+                                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="12" /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                        <StackPanel><TextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Analytics.UsageCost.TodayLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Amount}" /><TextBlock FontSize="12" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Text="{Binding Analytics.UsageCost.TodayLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Meta}" /></StackPanel>
+                                        <StackPanel Grid.Column="2"><TextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Analytics.UsageCost.Last30DaysLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Amount}" /><TextBlock FontSize="12" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Text="{Binding Analytics.UsageCost.Last30DaysLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Meta}" /></StackPanel>
+                                    </Grid>
+                                    <Grid Visibility="{Binding SelectedProvider, RelativeSource={RelativeSource AncestorType=local:MainWindow}, Converter={StaticResource ProviderSelection}, ConverterParameter=Claude}">
+                                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="12" /><ColumnDefinition /></Grid.ColumnDefinitions>
+                                        <StackPanel><TextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding ClaudeCost.State.TodayLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Amount}" /><TextBlock FontSize="12" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Text="{Binding ClaudeCost.State.TodayLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Meta}" /></StackPanel>
+                                        <StackPanel Grid.Column="2"><TextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding ClaudeCost.State.Last30DaysLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Amount}" /><TextBlock FontSize="12" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Text="{Binding ClaudeCost.State.Last30DaysLabel, Converter={StaticResource PanelCostLabel}, ConverterParameter=Meta}" /></StackPanel>
+                                    </Grid>
                                 </StackPanel>
                                 <TextBlock x:Name="CostChevron" Grid.Column="1" Text="›" HorizontalAlignment="Right" Foreground="{DynamicResource MutedTextBrush}" FontSize="20" FontWeight="Normal" VerticalAlignment="Center" />
                             </Grid>
