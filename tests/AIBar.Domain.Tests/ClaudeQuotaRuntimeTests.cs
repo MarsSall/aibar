@@ -291,13 +291,13 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
     public async Task Clear_default_allowlist_deletes_Claude_database_sidecars_and_consent_only()
     {
         Directory.CreateDirectory(_root);
-        foreach (var name in new[] { "claude-quota.db", "claude-quota.db-wal", "claude-quota.db-shm", "settings.json", "unrelated.txt" })
+        foreach (var name in new[] { "claude-quota.db", "claude-quota.db-wal", "claude-quota.db-shm", "settings.json", "yasb-claude-quota.json", "unrelated.txt" })
             await File.WriteAllTextAsync(Path.Combine(_root, name), "synthetic");
         var work = new ClearProbe(() => Assert.True(File.Exists(Path.Combine(_root, "claude-quota.db"))));
         var clear = new ClearAiBarDataService(_root, [work], _ => ValueTask.CompletedTask);
         await clear.ClearAsync(default);
         Assert.True(work.Cancelled); Assert.True(work.Resumed);
-        foreach (var name in new[] { "claude-quota.db", "claude-quota.db-wal", "claude-quota.db-shm", "settings.json" })
+        foreach (var name in new[] { "claude-quota.db", "claude-quota.db-wal", "claude-quota.db-shm", "settings.json", "yasb-claude-quota.json" })
             Assert.False(File.Exists(Path.Combine(_root, name)), name);
         Assert.True(File.Exists(Path.Combine(_root, "unrelated.txt")));
         Assert.False(await Settings.LoadClaudeAsync(default));

@@ -4,10 +4,15 @@ This optional integration uses YASB's stock CustomWidget. AIBar remains the only
 
 Setup
 1. Manually extract the unsigned, self-contained Windows x64 private-beta ZIP to one stable location you choose: <AIBarRoot>.
-2. Copy custom-widget.example.yaml into your YASB configuration and retain <AIBarRoot> as the location you configure once.
+2. Copy the widget definitions in custom-widget.example.yaml into your YASB configuration and configure <AIBarRoot> once. Keep aibar_quota for Codex; add aibar_claude_quota beside it in your bar's widget list for Claude. Reload YASB after editing.
 3. Copy or customize custom-widget.example.css in your YASB stylesheet.
 4. Start AIBar normally. The widget reads its local sanitized snapshot; left-click invokes AIBar.Desktop.exe --show directly, without an extra cmd /c or show-aibar.cmd layer. The legacy CMD launcher remains available for manual use.
 The secondary launch makes one best-effort foreground grant to a unique existing AIBar window belonging to the same executable and Windows session, then sends the existing show signal. Windows can refuse the grant; missing/ambiguous targets or refusal do not suppress showing the popup. No focus retries are performed. After opening from YASB, verify that clicking outside dismisses the popup without first clicking inside; also check the tray path. Source/unit checks alone cannot establish foreground behavior on the interactive desktop.
+
+Claude widget
+Enable Claude quota separately in AIBar's tray menu. The second widget uses exactly -Provider Claude (case-sensitive), reads %LOCALAPPDATA%\AIBar\yasb-claude-quota.json, and prefixes compact/full text and tooltip with "Claude ". For example: "Claude 37%" or "Claude unavailable". Both widgets use the same options, stylesheet and left-click --show callback; both open the panel.
+The no-argument reader still selects Codex's yasb-quota.json with unchanged output. Only the exact argument pair -Provider Claude opts into Claude; other nonempty argument lists return the default safe unavailable JSON and exit 1. There is no script parameter block.
+Claude uses the same schema-v1 sanitized fields, atomic replacement, ACL verification and reparse rejection as Codex. A new post-enable retrieval unlocks valued publication; cache alone does not. Revocation and shutdown drain pending writes and leave Claude's export disabled; Clear AIBar Data drains them and deletes yasb-claude-quota.json. No token, credential path or plan text is exported or shown by the reader.
 
 Presentation
 Only supplied quota windows appear, in 5h then 7d order. Weekly-only input can display "7d: 35% | current" without an empty 5h slot.
@@ -27,8 +32,8 @@ Upgrade
 Stop AIBar before manually replacing the extracted directory. If AIBar cannot be stopped, stop the upgrade and leave the current directory in place.
 
 Rollback
-1. Stop AIBar.
-2. From <AIBarRoot>, run yasb\remove-aibar-quota.ps1 with no arguments.
+1. Disable Claude quota while AIBar is running and confirm yasb-claude-quota.json is a disabled schema-v1 document with null sourceRetrievedAt, fiveHour and weekly values; then stop AIBar. Remove aibar_claude_quota from your YASB widget list if configured. Normal shutdown also disables Claude's export.
+2. From <AIBarRoot>, run yasb\remove-aibar-quota.ps1 with no arguments (this existing cleanup command targets Codex only).
 3. Continue only when the cleanup command exits 0.
 4. Remove or replace the YASB assets.
 5. Verify that the fixed snapshot is absent or is a schema-v1 disabled document with null sourceRetrievedAt, fiveHour, and weekly values.

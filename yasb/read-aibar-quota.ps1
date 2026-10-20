@@ -5,8 +5,12 @@ function Get-ReaderNow {
 }
 
 function Get-ReaderPath {
+    param([string]$Provider)
     $fixture = Get-Variable -Name AIBarQuotaFixturePath -Scope Script -ErrorAction SilentlyContinue
     if ($null -ne $fixture -and -not [string]::IsNullOrWhiteSpace($fixture.Value)) { return $fixture.Value }
+    if ($Provider -ceq 'Claude') {
+        return (Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) 'AIBar\yasb-claude-quota.json')
+    }
     return (Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) 'AIBar\yasb-quota.json')
 }
 
@@ -109,10 +113,10 @@ function Get-Window($Window, [AllowNull()]$Source) {
     return [pscustomobject][ordered]@{ percentageUsed = $percentage; resetAt = $reset }
 }
 
-function Invoke-AiBarQuotaReader {
-    $now = Get-ReaderNow
+function Invoke-AiBarQuotaReaderCore {
+    param([string]$Provider, [DateTimeOffset]$now)
     try {
-        $path = Get-ReaderPath
+        $path = Get-ReaderPath -Provider $Provider
         $stream = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
         try {
             $bytes = New-Object byte[] 16385
@@ -143,8 +147,29 @@ function Invoke-AiBarQuotaReader {
     } catch { return Get-SafeOutput -Now $now }
 }
 
+function Invoke-AiBarQuotaReader {
+    param([string]$Provider)
+    $now = Get-ReaderNow
+    if ($Provider -cne '' -and $Provider -cne 'Claude') { return Get-SafeOutput -Now $now }
+    $result = Invoke-AiBarQuotaReaderCore -Provider $Provider -now $now
+    if ($Provider -ceq 'Claude') {
+        # Include the provider prefix in the same closed plain-text safety budget.
+        if (($result.compactText.Length + 7) -gt 64 -or $result.compactText -cmatch '[<>&{}]') {
+            $result = Get-SafeOutput -Now $now
+        }
+        $result.label = 'Claude ' + $result.label
+        $result.compactText = 'Claude ' + $result.compactText
+        $result.tooltip = 'Claude ' + $result.tooltip
+    }
+    return $result
+}
+
 if ($MyInvocation.InvocationName -ne '.') {
     [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
-    if ($args.Count -ne 0) { Get-SafeOutput -Now (Get-ReaderNow) | ConvertTo-Json -Compress; exit 1 }
-    Invoke-AiBarQuotaReader | ConvertTo-Json -Compress
+    # No script parameter block: accept only this exact, case-sensitive opt-in pair.
+    if ($args.Count -eq 0) { Invoke-AiBarQuotaReader | ConvertTo-Json -Compress }
+    elseif ($args.Count -eq 2 -and $args[0] -ceq '-Provider' -and $args[1] -ceq 'Claude') {
+        Invoke-AiBarQuotaReader -Provider Claude | ConvertTo-Json -Compress
+    }
+    else { Get-SafeOutput -Now (Get-ReaderNow) | ConvertTo-Json -Compress; exit 1 }
 }

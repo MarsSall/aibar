@@ -10,6 +10,10 @@ namespace AIBar.Desktop;
 
 public static class WindowsQuotaExportPath
 {
+    public static string ForClaudeCurrentUser() => ForClaudeRoot(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+    internal static string ForClaudeRoot(string localApplicationData)
+        => Path.Combine(Path.GetDirectoryName(ForRoot(localApplicationData))!, "yasb-claude-quota.json");
+
     public static string ForCurrentUser() => ForRoot(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
     internal static string ForRoot(string localApplicationData)
     {
@@ -50,25 +54,37 @@ public sealed class WindowsAtomicQuotaExportWriter : IQuotaExportWriter
     private readonly SemaphoreSlim _gate = new(1, 1);
     private long _requested;
 
+    public static WindowsAtomicQuotaExportWriter ForClaudeCurrentUser()
+        => ForClaudeRoot(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), new());
+    internal static WindowsAtomicQuotaExportWriter ForClaudeRoot(string localApplicationData, QuotaExportWriterSeams seams)
+        => new(WindowsQuotaExportPath.ForClaudeRoot(localApplicationData), localApplicationData, seams, claude: true);
+
     public WindowsAtomicQuotaExportWriter() : this(WindowsQuotaExportPath.ForCurrentUser()) { }
     public WindowsAtomicQuotaExportWriter(string path) : this(path, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), new()) { }
+    internal static WindowsAtomicQuotaExportWriter ForClaudeOwnedSyntheticDataDirectory(string dataDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
+        return new(new DirectoryInfo(Path.GetFullPath(dataDirectory)), "yasb-claude-quota.json");
+    }
     internal static WindowsAtomicQuotaExportWriter ForOwnedSyntheticDataDirectory(string dataDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
         return new(new DirectoryInfo(Path.GetFullPath(dataDirectory)));
     }
-    private WindowsAtomicQuotaExportWriter(DirectoryInfo dataDirectory)
+    private WindowsAtomicQuotaExportWriter(DirectoryInfo dataDirectory, string fileName = "yasb-quota.json")
     {
         _directory = Path.TrimEndingDirectorySeparator(dataDirectory.FullName);
-        _path = Path.Combine(_directory, "yasb-quota.json");
+        _path = Path.Combine(_directory, fileName);
         _seams = new();
         _protectDirectoryAcl = false;
     }
     internal WindowsAtomicQuotaExportWriter(string localApplicationData, QuotaExportWriterSeams seams)
         : this(WindowsQuotaExportPath.ForRoot(localApplicationData), localApplicationData, seams) { }
     internal WindowsAtomicQuotaExportWriter(string path, string localApplicationData, QuotaExportWriterSeams seams)
+        : this(path, localApplicationData, seams, claude: false) { }
+    private WindowsAtomicQuotaExportWriter(string path, string localApplicationData, QuotaExportWriterSeams seams, bool claude)
     {
-        var expected = WindowsQuotaExportPath.ForRoot(localApplicationData);
+        var expected = claude ? WindowsQuotaExportPath.ForClaudeRoot(localApplicationData) : WindowsQuotaExportPath.ForRoot(localApplicationData);
         if (!string.Equals(path, expected, StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Quota export must use the exact owned snapshot path.", nameof(path));
         _path = expected;
