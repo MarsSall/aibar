@@ -38,7 +38,7 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal("180", detailScroller.Attribute("MaxHeight")?.Value); Assert.Equal("Auto", detailScroller.Attribute("VerticalScrollBarVisibility")?.Value);
         var localUsageBreakdowns = localUsage.Descendants().Where(element => element.Attribute("Text")?.Value == "{Binding TokenBreakdownLabel}").ToArray();
         Assert.Equal(2, localUsageBreakdowns.Length); Assert.All(localUsageBreakdowns, breakdown => Assert.Equal("Wrap", breakdown.Attribute("TextWrapping")?.Value));
-        Assert.Equal(2, window.Split("Style=\"{StaticResource QuotaCardStyle}\"", StringSplitOptions.None).Length - 1);
+        Assert.Equal(2, window.Split("Style=\"{StaticResource PanelQuotaCardStyle}\"", StringSplitOptions.None).Length - 1);
         Assert.Equal(2, window.Split("Style=\"{StaticResource SecondaryCardStyle}\"", StringSplitOptions.None).Length - 1);
         Assert.Contains("AutomationProperties.Name=\"Refresh quota\"", window, StringComparison.Ordinal); Assert.Contains("IsTabStop=\"True\"", window, StringComparison.Ordinal);
         Assert.DoesNotContain("<DoubleAnimation", resources, StringComparison.Ordinal);
@@ -86,7 +86,7 @@ public sealed class QuotaVisualDesignTests
         Assert.All(groups.Take(2), group => Assert.Equal("{StaticResource ChromeLessGroupBoxStyle}", group.Attribute("Style")?.Value));
         Assert.All(groups.Skip(2), group => Assert.Equal("{StaticResource SecondaryGroupBoxStyle}", group.Attribute("Style")?.Value));
         Assert.Equal(2, window.Descendants(presentation + "Border").Count(border => border.Attribute("Style")?.Value == "{StaticResource SecondaryCardStyle}"));
-        Assert.Equal("{StaticResource AccessibleExpanderStyle}", window.Descendants(presentation + "Expander").Single(element => element.Attributes().Any(attribute => attribute.Value == "{Binding AutomationLabel}")).Attribute("Style")?.Value);
+        Assert.Equal("{StaticResource PanelDetailsExpanderStyle}", window.Descendants(presentation + "Expander").Single(element => element.Attributes().Any(attribute => attribute.Value == "{Binding AutomationLabel}")).Attribute("Style")?.Value);
     }
     [Fact]
     public void Uses_4a_quota_presentation_bindings_without_new_business_state()
@@ -337,7 +337,7 @@ public sealed class QuotaVisualDesignTests
         Assert.Equal("False", progressStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "Focusable").Attribute("Value")?.Value);
         Assert.Equal("False", progressStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "IsHitTestVisible").Attribute("Value")?.Value);
         var expander = window.Descendants(presentation + "Expander").Single(element => element.Attributes().Any(attribute => attribute.Value == "{Binding AutomationLabel}"));
-        Assert.Equal("{StaticResource AccessibleExpanderStyle}", expander.Attribute("Style")?.Value);
+        Assert.Equal("{StaticResource PanelDetailsExpanderStyle}", expander.Attribute("Style")?.Value);
         var expanderStyle = resources.Descendants(presentation + "Style").Single(style => style.Attribute(x + "Key")?.Value == "AccessibleExpanderStyle");
         Assert.Equal("{StaticResource KeyboardFocusVisual}", expanderStyle.Elements(presentation + "Setter").Single(setter => setter.Attribute("Property")?.Value == "FocusVisualStyle").Attribute("Value")?.Value);
         var requested = false; Exception? failure = null;
