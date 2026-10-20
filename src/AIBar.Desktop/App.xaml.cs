@@ -128,7 +128,7 @@ public partial class App : System.Windows.Application
                 if (trigger == RefreshTrigger.PopoverOpened) await localUsagePresentation.RefreshAsync(token);
                 await claudeCost.RefreshAsync(token);
             }, localUsagePresentation.RefreshAsync)
-            { ClaudeQuota = claudeRuntime, QuotaHistory = historyStore, ProviderStatus = providerStatus, Alerts = alerts, Appearance = appearance, PaceHistory = paceHistory };
+            { CodexQuota = betaRuntime, ClaudeQuota = claudeRuntime, QuotaHistory = historyStore, ProviderStatus = providerStatus, Alerts = alerts, Appearance = appearance, PaceHistory = paceHistory };
     }
     internal static async Task InitializeCompositionAsync(BetaRuntime runtime, QuotaPresentationHost presentation, LocalUsagePresentationHost localUsage, CancellationToken cancellationToken)
     {
@@ -164,8 +164,8 @@ public partial class App : System.Windows.Application
             _settingsWindowHost = new(appearance, settingsAlerts, providerSettings,
                 () => tray.ShowAlert("AIBar · Window reset", "A session or weekly window starts over."));
             // The colour choice applies live; Changed can run during clear, so never wait on the UI thread.
-            appearance.Changed += options => Dispatcher.BeginInvoke(new Action(() => ApplyAppearance(options, window)));
-            _ = ApplyInitialAppearanceAsync(appearance, window);
+            appearance.Changed += options => Dispatcher.BeginInvoke(new Action(() => { _ = ApplyAppearance(options, window, composition); }));
+            _ = ApplyInitialAppearanceAsync(appearance, window, composition);
             window.SettingsRequested += () => _settingsWindowHost.Show(window);
             tray.SettingsRequested += () => _settingsWindowHost.Show(window);
         }
@@ -191,6 +191,7 @@ public partial class App : System.Windows.Application
         internal StartupComposition(object presentation, IManualRefreshCommand? refreshCommand, IAsyncDisposable resource, Func<Task> initialize, Action reportUnavailable)
             : this(presentation, refreshCommand, null, resource, initialize, reportUnavailable) { }
         // Unavailable/legacy compositions have no Claude capability; production always supplies it.
+        internal BetaRuntime? CodexQuota { get; init; }
         internal ClaudeQuotaRuntime ClaudeQuota { get; init; } = null!;
         internal IQuotaHistoryStore? QuotaHistory { get; init; }
         internal PanelPaceHistory? PaceHistory { get; init; }
@@ -203,19 +204,28 @@ public partial class App : System.Windows.Application
     internal static double ToBackgroundOpacity(AppearanceOptions options) => Math.Clamp(options.BackgroundOpacity, 30, 100) / 100d;
 
     // Only the window backgrounds take the opacity; text, bars and buttons stay opaque.
-    private void ApplyAppearance(AppearanceOptions options, MainWindow window)
+    private async Task ApplyAppearance(AppearanceOptions options, MainWindow window, StartupComposition composition)
     {
         window.BarColorMode = ToBarColorMode(options);
         window.BackgroundOpacity = ToBackgroundOpacity(options);
         if (_alertController is { } controller) controller.BackgroundOpacity = window.BackgroundOpacity;
+        try { await ApplyRefreshIntervalAsync(options, composition.CodexQuota, composition.ClaudeQuota); }
+        catch (ObjectDisposedException) { /* A queued appearance change may outlive shutdown. */ }
+        catch (Exception error) { ReportFault(error); }
+    }
+
+    internal static async Task ApplyRefreshIntervalAsync(AppearanceOptions options, BetaRuntime? codex, ClaudeQuotaRuntime? claude)
+    {
+        codex?.SetRefreshMinutes(options.RefreshMinutes);
+        if (claude is not null) await claude.SetRefreshMinutesAsync(options.RefreshMinutes).ConfigureAwait(false);
     }
 
     internal static PanelBarColorMode ToBarColorMode(AppearanceOptions options) =>
         options.BarColors == "usage" ? PanelBarColorMode.Usage : PanelBarColorMode.Brand;
 
-    private async Task ApplyInitialAppearanceAsync(AppearanceSettings appearance, MainWindow window)
+    private async Task ApplyInitialAppearanceAsync(AppearanceSettings appearance, MainWindow window, StartupComposition composition)
     {
-        try { ApplyAppearance(await appearance.LoadAsync(default), window); }
+        try { await ApplyAppearance(await appearance.LoadAsync(default), window, composition); }
         catch (Exception) { /* Unreadable appearance keeps the default brand colours. */ }
     }
 

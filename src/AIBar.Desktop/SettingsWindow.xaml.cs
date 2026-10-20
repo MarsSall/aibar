@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using TextBlock = System.Windows.Controls.TextBlock;
+using RadioButton = System.Windows.Controls.RadioButton;
 
 namespace AIBar.Desktop;
 
@@ -74,6 +75,8 @@ public partial class SettingsWindow : Window
         BarUsage.IsChecked = appearance.BarColors == "usage"; BarBrand.IsChecked = !BarUsage.IsChecked;
         YasbBrand.IsChecked = appearance.YasbColors == "brand"; YasbUsage.IsChecked = !YasbBrand.IsChecked;
         BackgroundOpacity.Value = appearance.BackgroundOpacity;
+        foreach (var choice in RefreshChoices.Children.OfType<RadioButton>())
+            choice.IsChecked = RefreshMinutes(choice) == appearance.RefreshMinutes;
         if (_providers is { } providers)
         {
             CodexEnabled.IsChecked = providers.CodexEnabled; ClaudeEnabled.IsChecked = providers.ClaudeEnabled;
@@ -121,12 +124,39 @@ public partial class SettingsWindow : Window
             }
             await _saveAlerts(new(Resets.IsChecked == true, Thresholds.IsChecked == true, RunOut.IsChecked == true,
                 EdgeGlow.IsChecked == true, Notification.IsChecked == true, Confetti.IsChecked == true) { ThresholdValues = values });
-            await _appearance.SaveAsync(new(BarUsage.IsChecked == true ? "usage" : "brand", YasbBrand.IsChecked == true ? "brand" : "usage", (int)BackgroundOpacity.Value), default);
+            await _appearance.SaveAsync(new(BarUsage.IsChecked == true ? "usage" : "brand", YasbBrand.IsChecked == true ? "brand" : "usage", (int)BackgroundOpacity.Value,
+                RefreshChoices.Children.OfType<RadioButton>().Where(choice => choice.IsChecked == true).Select(RefreshMinutes).Single()), default);
             SaveStatus.Text = "Changes saved.";
             if (_providers is { } currentProviders) SourceStatus.Text = "ⓘ " + currentProviders.SourceDescription;
         }
         catch (Exception) { SaveStatus.Text = "Could not save all changes. Please try again."; }
         finally { _saving = false; ValidateThresholds(false); }
+    }
+    private static int RefreshMinutes(RadioButton choice) => int.Parse((string)choice.Tag, CultureInfo.InvariantCulture);
+    private void OnRefreshSelected(object sender, RoutedEventArgs e)
+    {
+        // Checked also fires while InitializeComponent connects the default segment.
+        if (RefreshChoices is null || RefreshRateLimitNote is null) return;
+        foreach (var choice in RefreshChoices.Children.OfType<RadioButton>())
+            choice.IsTabStop = choice.IsChecked == true;
+        RefreshRateLimitNote.Visibility = Refresh1.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+    }
+    private void OnRefreshKeyDown(object sender, KeyEventArgs e)
+    {
+        var choices = RefreshChoices.Children.OfType<RadioButton>().ToArray();
+        var index = Array.FindIndex(choices, choice => choice.IsChecked == true);
+        var next = e.Key switch
+        {
+            Key.Left or Key.Up => (index + choices.Length - 1) % choices.Length,
+            Key.Right or Key.Down => (index + 1) % choices.Length,
+            Key.Home => 0,
+            Key.End => choices.Length - 1,
+            _ => -1
+        };
+        if (next < 0) return;
+        choices[next].IsChecked = true;
+        choices[next].Focus();
+        e.Handled = true;
     }
     private void OnClose(object sender, RoutedEventArgs e) { if (!_saving) Close(); }
     private void OnMinimize(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;

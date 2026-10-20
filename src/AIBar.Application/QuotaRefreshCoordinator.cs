@@ -9,7 +9,7 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
     private readonly IQuotaProvider _provider;
     private readonly IClock _clock;
     private readonly FreshnessPolicy _freshness;
-    private readonly TimeSpan _minimumPollInterval;
+    private TimeSpan _minimumPollInterval;
     private readonly object _gate = new();
     private readonly Queue<QuotaAuthorityUpdate> _updates = new();
     private CancellationTokenSource _lifetime = new();
@@ -28,6 +28,17 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
         _store = store; _provider = provider; _clock = clock; _freshness = freshness;
         _minimumPollInterval = minimumPollInterval;
         _state = new(null, FreshnessState.Unavailable, false, null, null);
+    }
+
+    // Preserve attempt history and in-flight work when the preference changes.
+    public void SetMinimumPollInterval(TimeSpan interval)
+    {
+        if (interval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(interval));
+        lock (_gate)
+        {
+            ThrowIfDisposed();
+            _minimumPollInterval = interval;
+        }
     }
 
     public QuotaRefreshState State { get { lock (_gate) return _state; } }

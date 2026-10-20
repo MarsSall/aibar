@@ -55,6 +55,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private ITimer? _remoteDeadlineTimer;
     private long _deadlineGeneration;
     private static readonly TimeSpan RemoteFreshness = TimeSpan.FromMinutes(15);
+    private int _refreshMinutes = 5;
     private bool _initialized;
     private bool _disposed;
     private volatile bool _enabled;
@@ -76,6 +77,24 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         {
             _lifecycle.Suspended += OnSuspended; _lifecycle.Resumed += OnResumed; _lifecycle.ClockChanged += OnClockChanged;
         }
+    }
+
+    // Serialize with consent/source replacement; never hold this gate over UI dispatch.
+    public async ValueTask SetRefreshMinutesAsync(int minutes, CancellationToken cancellationToken = default)
+    {
+        if (!AppearanceSettings.ValidRefreshMinutes(minutes)) throw new ArgumentOutOfRangeException(nameof(minutes));
+        await EnterGateAsync(cancellationToken);
+        try
+        {
+            if (_disposed) return;
+            if (_refreshMinutes == minutes) return;
+            _refreshMinutes = minutes;
+            if (_resolvedSource == ClaudeQuotaSource.OtherMachine) return;
+            var interval = TimeSpan.FromMinutes(minutes);
+            _coordinator?.SetMinimumPollInterval(interval);
+            _timer?.Change(interval, interval);
+        }
+        finally { ExitGate(); }
     }
 
     internal Task ExportCompletion => _publisher?.PublicationCompletion ?? Task.CompletedTask;
@@ -314,7 +333,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         {
             _provider = (_resolvedSource == ClaudeQuotaSource.OtherMachine ? _remoteProviderFactory : _providerFactory)(_policy);
             // Source handoffs recreate both timer and coordinator through this path.
-            var pollInterval = TimeSpan.FromMinutes(_resolvedSource == ClaudeQuotaSource.OtherMachine ? 1 : 5);
+            var pollInterval = TimeSpan.FromMinutes(_resolvedSource == ClaudeQuotaSource.OtherMachine ? 1 : _refreshMinutes);
             _coordinator = new(new ConsentStore(_store, _policy, _pollCancellation.Token), _provider, _clock,
                 new FreshnessPolicy(TimeSpan.FromMinutes(_resolvedSource == ClaudeQuotaSource.OtherMachine ? 15 : 10)), pollInterval);
             _coordinatorRetrievalGeneration = 0;

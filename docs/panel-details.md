@@ -18,7 +18,7 @@ Each available quota window has a tracked uppercase section label, a large right
 
 Opening the panel requests fresh quota from each enabled provider when its last successful retrieval is older than one minute (or no snapshot exists), with at least one minute since the last attempt. Repeated opens after a failure do not bypass this throttle. Manual **Refresh** is unchanged and unthrottled.
 
-Automatic polls refresh every five minutes for Codex and Claude This PC, or every minute for Claude Other machine, measured since the last attempt regardless of snapshot freshness. Source changes update Claude's timer and minimum interval together. Resume and clock-change notifications follow the same minimum interval; sleep only reevaluates freshness. Freshness thresholds, cached values, failure handling and consent remain unchanged.
+Automatic polls refresh at the saved **Settings › Providers › Refresh every** interval for Codex and Claude This PC: **1 / 2 / 5 / 15 / 30 min**, default **5 min**. Save updates their timers and coordinator minimum intervals live; the 1-minute choice shows **May hit provider rate limits.** Claude Other machine always reads its synced local file every minute (not a change to the helper's push cadence). Intervals are measured since the last attempt regardless of snapshot freshness. Source changes update Claude's timer and minimum interval together, restoring the saved interval when switching to This PC. Resume and clock-change notifications follow the same minimum interval; sleep only reevaluates freshness. Freshness thresholds, cached values, failure handling and consent remain unchanged.
 
 ## States
 

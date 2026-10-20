@@ -64,6 +64,16 @@
     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource SettingsHoverBrush}"/><Setter Property="Foreground" Value="{DynamicResource SettingsHoverTextBrush}"/></Trigger>
    </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
   </Style>
+  <Style x:Key="SettingsRefreshRadio" TargetType="RadioButton" BasedOn="{StaticResource SettingsRadio}">
+   <Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="MinHeight" Value="36"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
+    <Border x:Name="Segment" Background="{DynamicResource SettingsCardBrush}" BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="1" CornerRadius="4" Margin="2,0" Padding="4,8"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+    <ControlTemplate.Triggers>
+     <Trigger Property="IsChecked" Value="True"><Setter TargetName="Segment" Property="Background" Value="{DynamicResource SettingsAccentBrush}"/><Setter TargetName="Segment" Property="BorderBrush" Value="{DynamicResource SettingsIndicatorBrush}"/><Setter Property="Foreground" Value="{DynamicResource SettingsOnAccentBrush}"/><Setter Property="FontWeight" Value="SemiBold"/></Trigger>
+     <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsChecked" Value="False"/><Condition Property="IsMouseOver" Value="True"/></MultiTrigger.Conditions><Setter TargetName="Segment" Property="Background" Value="{DynamicResource SettingsHoverBrush}"/><Setter Property="Foreground" Value="{DynamicResource SettingsHoverTextBrush}"/></MultiTrigger>
+    </ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
   <Style TargetType="RadioButton" BasedOn="{StaticResource SettingsRadio}"/>
   <Style x:Key="SettingsSourceRadio" TargetType="RadioButton" BasedOn="{StaticResource SettingsRadio}">
    <Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="16,8"/>
@@ -189,6 +199,15 @@
         <Border BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="0,1,0,0"/>
         <Grid MinHeight="44" Margin="16,6"><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Border Background="{DynamicResource SettingsFooterBrush}" Width="32" Height="32" CornerRadius="6"><Path x:Name="ClaudeMark" Data="{StaticResource SettingsClaudeMark}" Width="20" Height="20" Stretch="Uniform" Fill="{DynamicResource SettingsClaudeBrush}"/></Border><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Claude"/><TextBlock Text="Anthropic · session and weekly limits" Style="{StaticResource SettingsMeta}"/></StackPanel><CheckBox x:Name="ClaudeEnabled" Grid.Column="2" Style="{StaticResource SettingsToggle}" AutomationProperties.Name="Show Claude in AIBar"/></Grid>
        </StackPanel></Border>
+       <TextBlock Text="Refresh every" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
+       <UniformGrid x:Name="RefreshChoices" Rows="1" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Contained" PreviewKeyDown="OnRefreshKeyDown" AutomationProperties.Name="Refresh every">
+        <RadioButton x:Name="Refresh1" Style="{StaticResource SettingsRefreshRadio}" GroupName="RefreshInterval" Content="1 min" Tag="1" IsTabStop="False" Checked="OnRefreshSelected" AutomationProperties.Name="Refresh every 1 min"/>
+        <RadioButton x:Name="Refresh2" Style="{StaticResource SettingsRefreshRadio}" GroupName="RefreshInterval" Content="2 min" Tag="2" IsTabStop="False" Checked="OnRefreshSelected" AutomationProperties.Name="Refresh every 2 min"/>
+        <RadioButton x:Name="Refresh5" Style="{StaticResource SettingsRefreshRadio}" GroupName="RefreshInterval" Content="5 min" Tag="5" IsChecked="True" Checked="OnRefreshSelected" AutomationProperties.Name="Refresh every 5 min"/>
+        <RadioButton x:Name="Refresh15" Style="{StaticResource SettingsRefreshRadio}" GroupName="RefreshInterval" Content="15 min" Tag="15" IsTabStop="False" Checked="OnRefreshSelected" AutomationProperties.Name="Refresh every 15 min"/>
+        <RadioButton x:Name="Refresh30" Style="{StaticResource SettingsRefreshRadio}" GroupName="RefreshInterval" Content="30 min" Tag="30" IsTabStop="False" Checked="OnRefreshSelected" AutomationProperties.Name="Refresh every 30 min"/>
+       </UniformGrid>
+       <TextBlock x:Name="RefreshRateLimitNote" Text="May hit provider rate limits." Style="{StaticResource SettingsMeta}" Margin="2,8,0,0" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
        <TextBlock Text="CLAUDE SOURCE" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
        <Border Style="{StaticResource SettingsCard}"><StackPanel x:Name="SourceChoices" KeyboardNavigation.DirectionalNavigation="Contained">
         <RadioButton x:Name="SourceThisPc" Style="{StaticResource SettingsSourceRadio}" GroupName="ClaudeSource" AutomationProperties.Name="Claude source: This PC"><StackPanel><TextBlock Text="This PC"/><TextBlock Text="Use the Claude Code sign-in on this computer" Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>

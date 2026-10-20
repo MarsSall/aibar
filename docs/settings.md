@@ -8,7 +8,7 @@ Changes apply when you select **Save**. **Cancel**, Escape and closing the windo
 
 - **Ctrl+Tab** cycles pivots; **Ctrl+Shift+Tab** cycles backwards.
 - **Tab / Shift+Tab** move through controls; **Space** toggles checkboxes and switches.
-- **Arrow keys** move through radio groups (panel colors, YASB colors and Claude source).
+- **Arrow keys** move through radio groups (panel colors, YASB colors, refresh interval and Claude source). **Home / End** select the first / last refresh interval; the refresh group has one Tab stop.
 - **Enter** saves, unless validation fails; **Escape** cancels.
 - The opacity slider supports arrows in 5-point steps and Page Up/Down in 10-point steps.
 
@@ -48,6 +48,10 @@ Delivery policy, freshness checks, consent checks and deduplication remain owned
 
 Enabling a disabled provider shows the existing provider-specific consent disclosure. Declining either required disclosure performs no provider/source writes and leaves the draft open. Disabling requires no prompt. Runtime commands remain the only consent writers; Settings never reads or writes credentials.
 
+**Refresh every** offers **1 min / 2 min / 5 min / 15 min / 30 min**, default **5 min**. Save applies the choice live to both the poll timers and minimum intervals for Codex and Claude **This PC**, without restarting. Selecting **1 min** shows **May hit provider rate limits.** The warning disappears for the other choices. Claude **Other machine** continues reading its synced local file every **1 min**, including when Automatic resolves to Other machine; this does not change the helper's push cadence. Switching back to This PC uses the saved interval.
+
+Opening the panel still refreshes data older than one minute, with a one-minute attempt throttle; manual **Refresh** is unchanged. The interval does not change freshness thresholds, consent, or YASB.
+
 Claude source radio cards select:
 
 - **This PC** — existing Claude Code sign-in on this computer.
@@ -61,10 +65,10 @@ The selected source is saved through `ClaudeQuotaRuntime.SetSourceAsync` before 
 `%LOCALAPPDATA%\AIBar\appearance.json` remains schema 1:
 
 ```json
-{"schema":1,"barColors":"brand","yasbColors":"usage","backgroundOpacity":100}
+{"schema":1,"barColors":"brand","yasbColors":"usage","backgroundOpacity":100,"refreshMinutes":5}
 ```
 
-Existing schema-1 files without `backgroundOpacity` load with **100**. Invalid numeric opacity falls back to 100 without discarding valid color choices. Saves reject out-of-range/non-step opacity and unknown color modes. Successful writes atomically replace the destination via a same-directory temporary file and raise `AppearanceSettings.Changed` with all three values; failed/cancelled writes do not publish a change.
+Existing schema-1 files without `backgroundOpacity` load with **100**; missing `refreshMinutes` loads with **5**. Invalid numeric opacity falls back to 100, and invalid numeric refresh intervals fall back to 5, without discarding valid color choices. Saves reject out-of-range/non-step opacity, unknown color modes and refresh intervals outside 1/2/5/15/30. Successful writes atomically replace the destination via a same-directory temporary file and raise `AppearanceSettings.Changed` with all four values; failed/cancelled writes do not publish a change.
 
 **Clear AIBar Data** drains appearance writes with alert work, removes the existing appearance/alert files, and publishes the actual post-clear appearance (defaults on success, surviving values after rollback). Clear/dispose paths never await the WPF dispatcher.
 
@@ -84,6 +88,6 @@ Only `Settings*` tokens were added to `Semantic.Light.xaml`, `Semantic.Dark.xaml
 
 No local .NET/PowerShell verification is available in the Linux worktree. The parent runs tests-only RED followed by implementation GREEN in Windows CI.
 
-Focused coverage: `AppearanceSettingsTests`, `SettingsWindowTests`, `SettingsProviderTests`, `SettingsAlertOptionsTests`; existing delivery/clear/privacy tests must remain green. Test deadlines remain at least 60 seconds for asynchronous WPF saves.
+Focused coverage: `RefreshIntervalSettingsTests`, `RefreshIntervalWindowTests`, `RefreshIntervalRuntimeTests`, `AppearanceSettingsTests`, `SettingsWindowTests`, `SettingsProviderTests`, `SettingsAlertOptionsTests`; existing delivery/clear/privacy tests must remain green. Test deadlines remain at least 60 seconds for asynchronous WPF saves.
 
 Native frame comparison is still required against export frames **09** (Alerts dark), **10** (Appearance light), **11** (threshold error light) and **12** (Providers dark), and all four spec sheets. Exercise save/reopen, Cancel with edits in all pivots, Ctrl+Tab, radio arrows, Space, Enter, Escape, declined consent, failed persistence, live theme changes, minimum size, mixed DPI, high contrast and reduced motion. Check effect preview placement and verify overlays never take focus or intercept clicks.
