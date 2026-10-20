@@ -88,7 +88,8 @@ public sealed class QuotaAlertObserver : IAiBarClearWork, IAsyncDisposable
             previous.TryGetValue(id, out var prior);
             if (prior is not null && sample.RetrievedAt <= prior.RetrievedAt) continue;
             events.AddRange(QuotaAlertPolicy.Evaluate(sample, prior, fired, state.Freshness, true, now, evaluatedThresholds));
-            previous[id] = sample;
+            // Store the anchored cycle so reset jitter never drifts the identity used by later keys.
+            previous[id] = QuotaAlertPolicy.Anchor(sample, prior);
         }
         if (!consent()) return;
         foreach (var alert in events) fired.Add(alert.Key);

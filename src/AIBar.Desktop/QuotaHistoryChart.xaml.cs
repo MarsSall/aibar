@@ -150,7 +150,10 @@ public partial class QuotaHistoryChart : UserControl
             foreach (var sample in series.Samples)
             {
                 // Never draw an artificial consumption segment across a reset cycle.
-                var beginsSegment = previous is null || previous.ResetAt != sample.ResetAt || sample.Percentage < previous.Percentage;
+                var paceWindow = sample.Window == AIBar.Domain.QuotaHistoryWindow.FiveHour ? AIBar.Domain.QuotaPaceWindow.FiveHour : AIBar.Domain.QuotaPaceWindow.Weekly;
+                // Reset jitter (sub-second differences) is the same cycle; only a real reset starts a new line.
+                var beginsSegment = previous is null || !AIBar.Domain.QuotaAlertPolicy.IsSameCycle(previous.ResetAt, sample.ResetAt, paceWindow) ||
+                    sample.Percentage < previous.Percentage;
                 if (beginsSegment)
                 {
                     line = new Polyline { StrokeThickness = 2, StrokeDashArray = new DoubleCollection(Dashes[index % Dashes.Length]) };
