@@ -8,7 +8,7 @@
              AutomationProperties.HelpText="{Binding Data.HelpText, ElementName=Row}" AutomationProperties.LiveSetting="Polite">
     <UserControl.Resources><local:ProviderVisuals x:Key="Palette" /></UserControl.Resources>
     <Grid DataContext="{Binding Data, ElementName=Row}" Tag="{DynamicResource SurfaceBrush}" x:Name="PaceRoot" Margin="0,6,0,0">
-        <TextBlock Text="{Binding Text}" FontSize="11" TextWrapping="Wrap">
+        <TextBlock Text="{Binding Text}" FontSize="12" TextWrapping="Wrap">
             <TextBlock.Foreground><MultiBinding Converter="{StaticResource Palette}" ConverterParameter="PaceText">
                 <Binding Path="Tone" /><Binding Path="Tag" ElementName="PaceRoot" /><Binding Path="Tag.Color" ElementName="PaceRoot" />
             </MultiBinding></TextBlock.Foreground>

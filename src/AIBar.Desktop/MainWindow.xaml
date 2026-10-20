@@ -25,7 +25,7 @@
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="6,5" /><Setter Property="MinWidth" Value="0" />
-            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="Margin" Value="3,0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
@@ -43,7 +43,7 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style x:Key="PanelProviderTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="14" /><Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="FontSize" Value="17" /><Setter Property="FontWeight" Value="Bold" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style x:Key="QuotaStatusTextStyle" TargetType="TextBlock" BasedOn="{StaticResource QuotaStatusTextStyle}">
@@ -66,7 +66,7 @@
             <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusVisual}" />
             <Setter Property="BorderBrush" Value="Transparent" /><Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="6,3" /><Setter Property="MinHeight" Value="28" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="FontSize" Value="14" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="FontSize" Value="15" />
             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
                 <Border x:Name="ActionChrome" CornerRadius="6" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="26" /><ColumnDefinition /></Grid.ColumnDefinitions>
@@ -83,7 +83,7 @@
         </Style>
         <Style x:Key="PanelLinkStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" /><Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" /><Setter Property="Padding" Value="2" /><Setter Property="FontSize" Value="12.5" />
+            <Setter Property="BorderThickness" Value="0" /><Setter Property="Padding" Value="2" /><Setter Property="FontSize" Value="13" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusVisual}" />
             <Setter Property="MinHeight" Value="28" />
@@ -163,8 +163,8 @@
                         <StackPanel x:Name="CodexQuotaSection" Visibility="{Binding SelectedProvider, RelativeSource={RelativeSource AncestorType=local:MainWindow}, Converter={StaticResource ProviderSelection}, ConverterParameter=Codex}">
                         <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                             <TextBlock Grid.ColumnSpan="2" Text="Codex" Style="{StaticResource PanelProviderTitle}" automation:AutomationProperties.Name="Codex" />
-                            <TextBlock Grid.Row="1" Text="{Binding State.UpdatedLabel, Converter={StaticResource PanelUpdated}}" Style="{StaticResource QuotaStatusTextStyle}" Margin="0,3,8,0" FontSize="11" />
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding State.PlanLabel}" FontSize="11" HorizontalAlignment="Right" Visibility="{Binding State.PlanLabel, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Bottom" automation:AutomationProperties.Name="Codex plan" />
+                            <TextBlock Grid.Row="1" Text="{Binding State.UpdatedLabel, Converter={StaticResource PanelUpdated}}" Style="{StaticResource QuotaStatusTextStyle}" Margin="0,3,8,0" FontSize="12" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding State.PlanLabel}" FontSize="12" HorizontalAlignment="Right" Visibility="{Binding State.PlanLabel, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Bottom" automation:AutomationProperties.Name="Codex plan" />
                         </Grid>
                         <Button Content="{Binding ProviderStatus.CodexDescription, RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource PanelIncidentStyle}" Click="OnCodexStatus"
                                 Visibility="{Binding ProviderStatus.CodexDescription, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}"
@@ -192,8 +192,8 @@
                         <StackPanel x:Name="ClaudeQuotaSection" Visibility="{Binding SelectedProvider, RelativeSource={RelativeSource AncestorType=local:MainWindow}, Converter={StaticResource ProviderSelection}, ConverterParameter=Claude}">
                             <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                 <TextBlock Grid.ColumnSpan="2" Text="Claude" Style="{StaticResource PanelProviderTitle}" automation:AutomationProperties.Name="Claude" />
-                                <TextBlock Grid.Row="1" Style="{StaticResource QuotaStatusTextStyle}" Margin="0,3,8,0" FontSize="11"><TextBlock.Text><MultiBinding Converter="{StaticResource PanelUpdated}"><Binding Path="Claude.State.UpdatedLabel" /><Binding Path="Claude.State.SourceLabel" /></MultiBinding></TextBlock.Text></TextBlock>
-                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Claude.PlanLabel}" FontSize="11" HorizontalAlignment="Right" Visibility="{Binding Claude.PlanLabel, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Bottom" automation:AutomationProperties.Name="Claude plan" />
+                                <TextBlock Grid.Row="1" Style="{StaticResource QuotaStatusTextStyle}" Margin="0,3,8,0" FontSize="12"><TextBlock.Text><MultiBinding Converter="{StaticResource PanelUpdated}"><Binding Path="Claude.State.UpdatedLabel" /><Binding Path="Claude.State.SourceLabel" /></MultiBinding></TextBlock.Text></TextBlock>
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Claude.PlanLabel}" FontSize="12" HorizontalAlignment="Right" Visibility="{Binding Claude.PlanLabel, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Bottom" automation:AutomationProperties.Name="Claude plan" />
                             </Grid>
                             <Button Content="{Binding ProviderStatus.ClaudeDescription, RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource PanelIncidentStyle}" Click="OnClaudeStatus"
                                     Visibility="{Binding ProviderStatus.ClaudeDescription, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource PanelTextVisibility}, FallbackValue=Collapsed}"
@@ -213,13 +213,13 @@
                         </StackPanel>
                     </StackPanel>
                     <Border x:Name="WindowsRule" Style="{StaticResource PanelRule}" Margin="0,2,0,10" />
-                    <Button x:Name="CostButton" Click="OnCost" PreviewKeyDown="OnNavigationKeyDown" Style="{StaticResource PanelLinkStyle}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" Padding="0,2" automation:AutomationProperties.Name="Cost details">
+                    <Button x:Name="CostButton" Click="OnCost" PreviewKeyDown="OnNavigationKeyDown" Style="{StaticResource PanelLinkStyle}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" Padding="0,2" automation:AutomationProperties.Name="Cost details">
                         <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <TextBlock x:Name="CostTitle" Text="Cost" />
-                            <TextBlock x:Name="CostChevron" Grid.Column="1" Text="›" HorizontalAlignment="Right" Foreground="{DynamicResource MutedTextBrush}" FontSize="22" FontWeight="Normal" />
+                            <TextBlock x:Name="CostChevron" Grid.Column="1" Text="›" HorizontalAlignment="Right" Foreground="{DynamicResource MutedTextBrush}" FontSize="17" FontWeight="Normal" VerticalAlignment="Center" Margin="0,-2,0,0" />
                         </Grid>
                     </Button>
-                    <StackPanel Margin="0,0,0,12" TextElement.FontSize="11">
+                    <StackPanel Margin="0,0,0,12" TextElement.FontSize="13">
                         <StackPanel Visibility="{Binding SelectedProvider, RelativeSource={RelativeSource AncestorType=local:MainWindow}, Converter={StaticResource ProviderSelection}, ConverterParameter=Codex}">
                             <TextBlock Text="{Binding Analytics.UsageCost.TodayLabel, Converter={StaticResource PanelCostLabel}}" TextWrapping="Wrap" Margin="0,5,0,0" />
                             <TextBlock Text="{Binding Analytics.UsageCost.Last30DaysLabel, Converter={StaticResource PanelCostLabel}}" TextWrapping="Wrap" Margin="0,5,0,0" />
