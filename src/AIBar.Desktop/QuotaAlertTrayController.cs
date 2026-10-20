@@ -59,14 +59,22 @@ public sealed class QuotaAlertTrayController : IDisposable
     private readonly Dispatcher _dispatcher;
     private readonly Action _showPanel;
     private readonly Action<bool> _glow;
-    private readonly Action<bool> _confetti;
+    private readonly Action<bool>? _confetti;
+    private readonly INotificationDelivery? _cards;
     private bool _disposed;
+    // The shared Appearance unit can bind its percentage setting without changing delivery policy.
+    public double BackgroundOpacity
+    {
+        get => _cards is NotificationStack stack ? stack.BackgroundOpacity : 1;
+        set { if (_cards is NotificationStack stack) stack.BackgroundOpacity = Math.Clamp(value, .3, 1); }
+    }
     public QuotaAlertTrayController(IQuotaAlertTray tray, QuotaAlertObserver observer, Dispatcher dispatcher,
-        Action showPanel, Action<bool>? glow = null, Action<bool>? confetti = null)
+        Action showPanel, Action<bool>? glow = null, Action<bool>? confetti = null, INotificationDelivery? cards = null)
     {
         _tray = tray; _observer = observer; _dispatcher = dispatcher; _showPanel = showPanel;
+        _cards = cards ?? (tray is WindowsTrayRuntime ? new NotificationStack(showPanel) : null);
         _glow = glow ?? (enabled => { EdgeGlowWindow.ShowOnAllMonitors(enabled); });
-        _confetti = confetti ?? (enabled => { ConfettiWindow.ShowOnAllMonitors(enabled); });
+        _confetti = confetti;
         tray.AlertToggleRequested += Toggle; tray.AlertClicked += Clicked;
         observer.AlertReady += Deliver; observer.SettingsChanged += SettingsChanged;
         _ = LoadAsync();
@@ -116,10 +124,16 @@ public sealed class QuotaAlertTrayController : IDisposable
                     _ => ($"{label} may run out in {Duration((alert.RunsOutAt ?? DateTimeOffset.UtcNow) - DateTimeOffset.UtcNow)}",
                         $"At this pace it runs out before the reset in {remaining}")
                 };
-                _tray.ShowAlert(title, body);
+                // Keep the balloon strictly as a fallback when a custom card cannot be shown.
+                if (_cards?.TryShow(alert.Kind, sample.Provider, title, body) != true)
+                    _tray.ShowAlert(title, body);
             }
             if (alert.Kind == QuotaAlertKind.ThresholdCrossed && alert.Threshold == 100 && options.EdgeGlow) _glow(true);
-            if (alert.Kind == QuotaAlertKind.Reset && options.Resets && options.Confetti) _confetti(true);
+            if (alert.Kind == QuotaAlertKind.Reset && options.Resets && options.Confetti)
+            {
+                if (_confetti is not null) _confetti(true);
+                else ConfettiWindow.ShowOnAllMonitors(true, sample.Provider);
+            }
         }
         catch (Exception) { /* Windows notification failures must not affect the quota authority. */ }
     });
@@ -132,6 +146,7 @@ public sealed class QuotaAlertTrayController : IDisposable
     public void Dispose()
     {
         _disposed = true;
+        _cards?.Dispose();
         _tray.AlertToggleRequested -= Toggle; _tray.AlertClicked -= Clicked;
         _observer.AlertReady -= Deliver; _observer.SettingsChanged -= SettingsChanged;
     }

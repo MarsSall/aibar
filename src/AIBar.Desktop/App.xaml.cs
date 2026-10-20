@@ -164,7 +164,8 @@ public partial class App : System.Windows.Application
         _runtime = new TrayHostRuntime(_instance!, tray, new WpfPopoverRuntime(window, _theme, () => WindowsPopoverPlacementContextProvider.Get(window), null, () => themeSource.Current), _taskbar,
             _ => Task.CompletedTask, composition.Resource, Shutdown, composition.RefreshCommand, composition.Settings, composition.ReportUnavailable, composition.Reevaluate, trayPresentation, new WindowsPrivateIntegrationConsentPrompt(), new WindowsOpenCodeDataFolderPicker(), composition.ClaudeQuota);
         if (composition.Alerts is { } alerts)
-            _alertController = new(tray, alerts, Dispatcher, () => _runtime.RequestShow());
+            _alertController = new(tray, alerts, Dispatcher, () => _runtime.RequestShow(),
+                cards: new NotificationStack(() => _runtime.RequestShow(), () => window.Width <= 300));
         _runtime.Start();
         composition.ProviderStatus?.Start();
     }
