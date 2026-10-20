@@ -9,7 +9,6 @@ using Brushes = System.Windows.Media.Brushes;
 using Size = System.Windows.Size;
 using Point = System.Windows.Point;
 using Color = System.Windows.Media.Color;
-using Application = System.Windows.Application;
 
 namespace AIBar.Desktop;
 
@@ -115,7 +114,7 @@ public sealed class PanelWindowDecorationConverter : IMultiValueConverter
         if (hc) return System.Windows.SystemColors.WindowTextBrush;
         if (parameter as string == "Divider")
         {
-            if (!dark) return Application.Current.TryFindResource("SecondaryBorderBrush") ?? Brushes.Gray;
+            if (!dark) return System.Windows.Application.Current.TryFindResource("SecondaryBorderBrush") ?? Brushes.Gray;
             var line = new LinearGradientBrush();
             line.GradientStops.Add(new(Colors.Transparent, 0));
             line.GradientStops.Add(new(Color.FromArgb(115, color.R, color.G, color.B), .5));
