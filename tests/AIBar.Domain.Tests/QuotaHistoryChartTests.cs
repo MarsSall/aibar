@@ -46,7 +46,9 @@ public sealed class QuotaHistoryChartTests
             var chart = new QuotaHistoryChart();
             // S9 replaces dropdown chrome, not the range/data/accessibility contract.
             var selector = Assert.IsType<ListBox>(chart.FindName("HistoryRange"));
-            Assert.True(selector.Focusable); Assert.True(selector.IsTabStop);
+            // One Tab stop: the selected segment, not the ListBox shell (arrows/Home/End move within it).
+            Assert.False(selector.IsTabStop); Assert.Equal(System.Windows.Input.KeyboardNavigationMode.Once, System.Windows.Input.KeyboardNavigation.GetTabNavigation(selector));
+            Assert.All(selector.Items.Cast<System.Windows.Controls.ListBoxItem>(), item => Assert.True(item.Focusable));
             Assert.Equal("Usage history range", AutomationProperties.GetName(selector));
             Assert.Equal(0, selector.SelectedIndex); Assert.Equal(3, selector.Items.Count);
             Assert.Equal(new[] { "24h", "7d", "30d" }, selector.Items.Cast<System.Windows.Controls.ListBoxItem>().Select(item => (string)item.Content));
