@@ -27,18 +27,35 @@ public sealed class SettingsWindowTests
                 window.Show(); window.UpdateLayout();
                 Assert.Equal("AIBar Settings", window.Title);
                 var tabs = Assert.IsType<TabControl>(window.FindName("Sections"));
-                Assert.Equal(new[] { "Colors", "Alerts" }, tabs.Items.Cast<TabItem>().Select(t => t.Header.ToString()).ToArray());
-                Assert.All(Visuals<ComboBox>(window), choice => Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(choice))));
+                Assert.Equal(3, tabs.Items.Count);
+                Assert.Equal("Appearance", AutomationProperties.GetName((TabItem)tabs.Items[0]));
+                Assert.Equal("Alerts", AutomationProperties.GetName((TabItem)tabs.Items[1]));
+                Assert.Equal("Providers", AutomationProperties.GetName((TabItem)tabs.Items[2]));
+                Assert.Equal(520, window.Width);
+                Assert.Equal(600, window.Height);
+                Assert.Equal(WindowStyle.None, window.WindowStyle);
+                var opacity = Assert.IsType<Slider>(window.FindName("BackgroundOpacity"));
+                Assert.Equal(30, opacity.Minimum); Assert.Equal(100, opacity.Maximum);
+                Assert.Equal(5, opacity.TickFrequency); Assert.True(opacity.IsSnapToTickEnabled);
+                Assert.All(Visuals<RadioButton>(window), choice => Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(choice))));
                 tabs.SelectedIndex = 1; window.UpdateLayout();
                 var input = Assert.IsType<TextBox>(window.FindName("ThresholdInput"));
                 Assert.Equal("Alert thresholds (%)", AutomationProperties.GetName(input));
                 input.Text = "90, 75, 100"; window.UpdateLayout();
                 Assert.False(Assert.IsType<Button>(window.FindName("SaveButton")).IsEnabled);
                 Assert.False(string.IsNullOrWhiteSpace(Assert.IsType<TextBlock>(window.FindName("ThresholdError")).Text));
+                Assert.Equal(Visibility.Visible, Assert.IsType<TextBlock>(window.FindName("AlertsErrorDot")).Visibility);
+                Assert.Contains("thresholds", Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text);
                 input.Text = "1, 75, 100";
                 Assert.True(Assert.IsType<Button>(window.FindName("SaveButton")).IsEnabled);
                 Assert.True(input.Focusable);
-                Assert.Equal(((SolidColorBrush)window.FindResource("SurfaceBrush")).Color, ((SolidColorBrush)window.Background).Color);
+                Assert.All(Visuals<CheckBox>(window), toggle => Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(toggle))));
+                tabs.SelectedIndex = 2; window.UpdateLayout();
+                Assert.False(Assert.IsType<CheckBox>(window.FindName("CodexEnabled")).IsEnabled);
+                Assert.False(Assert.IsType<CheckBox>(window.FindName("ClaudeEnabled")).IsEnabled);
+                Assert.NotNull(Assert.IsType<System.Windows.Shapes.Path>(window.FindName("CodexMark")).Data);
+                Assert.NotNull(Assert.IsType<System.Windows.Shapes.Path>(window.FindName("ClaudeMark")).Data);
+                Assert.Equal(((SolidColorBrush)window.FindResource("SettingsSurfaceBrush")).Color, ((SolidColorBrush)window.Background).Color);
             }
             finally
             {
@@ -60,8 +77,9 @@ public sealed class SettingsWindowTests
             try
             {
                 window.Show();
-                Assert.IsType<ComboBox>(window.FindName("BarColors")).SelectedIndex = 1;
-                Assert.IsType<ComboBox>(window.FindName("YasbColors")).SelectedIndex = 1;
+                Assert.IsType<RadioButton>(window.FindName("BarUsage")).IsChecked = true;
+                Assert.IsType<RadioButton>(window.FindName("YasbBrand")).IsChecked = true;
+                Assert.IsType<Slider>(window.FindName("BackgroundOpacity")).Value = 70;
                 Assert.IsType<TextBox>(window.FindName("ThresholdInput")).Text = "20, 80, 100";
                 Assert.IsType<CheckBox>(window.FindName("Confetti")).IsChecked = true;
                 Assert.IsType<Button>(window.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -72,9 +90,28 @@ public sealed class SettingsWindowTests
                 timer.Start(); System.Windows.Threading.Dispatcher.PushFrame(frame); timer.Stop();
                 Assert.Equal("Changes saved.", Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text);
                 Assert.Equal(1, changed);
-                Assert.Equal(new AppearanceOptions("usage", "brand"), appearance.LoadAsync(default).AsTask().GetAwaiter().GetResult());
+                Assert.Equal(new AppearanceOptions("usage", "brand", 70), appearance.LoadAsync(default).AsTask().GetAwaiter().GetResult());
                 var saved = alerts.LoadAsync(default).AsTask().GetAwaiter().GetResult();
                 Assert.True(saved.Confetti); Assert.Equal(new[] { 20, 80, 100 }, saved.ThresholdValues.ToArray());
+            }
+            finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
+        });
+    }
+    [Fact]
+    public void Closing_without_save_discards_edits_in_all_sections_without_writing()
+    {
+        WpfTestApplicationHost.Run(_ =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), $"aibar-settings-cancel-{Guid.NewGuid():N}");
+            var window = new SettingsWindow(new AppearanceSettings(Path.Combine(root, "appearance.json")), new AlertSettings(Path.Combine(root, "alerts.json")));
+            try
+            {
+                window.Show();
+                Assert.IsType<RadioButton>(window.FindName("BarUsage")).IsChecked = true;
+                Assert.IsType<Slider>(window.FindName("BackgroundOpacity")).Value = 30;
+                Assert.IsType<TextBox>(window.FindName("ThresholdInput")).Text = "25, 80";
+                window.Close();
+                Assert.False(Directory.Exists(root));
             }
             finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
         });

@@ -1,129 +1,186 @@
 <Window x:Class="AIBar.Desktop.SettingsWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AIBar Settings" Width="590" Height="660" MinWidth="460" MinHeight="480"
-        WindowStartupLocation="CenterOwner" Background="{DynamicResource SurfaceBrush}"
-        Foreground="{DynamicResource TextBrush}" FontFamily="Segoe UI" FontSize="14">
-    <Window.Resources>
-        <Style TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
-        <Style TargetType="CheckBox"><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="Margin" Value="0,7"/></Style>
-        <Style TargetType="GroupBox"><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="Margin" Value="0,10"/><Setter Property="Padding" Value="16"/></Style>
-        <Style TargetType="ComboBox">
-            <Setter Property="Margin" Value="0,6,0,16"/><Setter Property="MinHeight" Value="32"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox">
-                <Grid>
-                    <ToggleButton Focusable="False" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
-                        <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
-                            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource SecondaryBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="10,6">
-                                <DockPanel><TextBlock DockPanel.Dock="Right" Text="⌄" Margin="12,0,0,0"/><ContentPresenter/></DockPanel>
-                            </Border>
-                        </ControlTemplate></ToggleButton.Template>
-                        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" HorizontalAlignment="Left"/>
-                    </ToggleButton>
-                    <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False">
-                        <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource SecondaryBorderBrush}" BorderThickness="1" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
-                            <ScrollViewer MaxHeight="240" CanContentScroll="True"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer>
-                        </Border>
-                    </Popup>
-                    <Border x:Name="FocusRing" BorderBrush="{DynamicResource FocusBrush}" BorderThickness="2" CornerRadius="4" IsHitTestVisible="False" Visibility="Collapsed"/>
-                </Grid>
-                <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="FocusRing" Property="Visibility" Value="Visible"/></Trigger></ControlTemplate.Triggers>
-            </ControlTemplate></Setter.Value></Setter>
-        </Style>
-        <Style TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem">
-                <Border x:Name="ItemBorder" Padding="10,8" Background="{TemplateBinding Background}" BorderThickness="2" BorderBrush="Transparent"><ContentPresenter/></Border>
-                <ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource FocusBrush}"/></Trigger></ControlTemplate.Triggers>
-            </ControlTemplate></Setter.Value></Setter>
-        </Style>
-        <Style TargetType="TextBox"><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="Padding" Value="7"/></Style>
-        <Style TargetType="Button">
-            <Setter Property="Padding" Value="18,7"/><Setter Property="Margin" Value="8,0,0,0"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
-                <Border x:Name="ButtonBorder" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource SecondaryBorderBrush}" BorderThickness="2" CornerRadius="4" Padding="{TemplateBinding Padding}"><ContentPresenter RecognizesAccessKey="True" HorizontalAlignment="Center"/></Border>
-                <ControlTemplate.Triggers>
-                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource FocusBrush}"/></Trigger>
-                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource FocusBrush}"/></Trigger>
-                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}"/></Trigger>
-                </ControlTemplate.Triggers>
-            </ControlTemplate></Setter.Value></Setter>
-        </Style>
-        <Style TargetType="TabItem">
-            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="Padding" Value="18,9"/>
-            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem">
-                <Border x:Name="TabBorder" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource SecondaryBorderBrush}" BorderThickness="0,0,0,2" Padding="{TemplateBinding Padding}"><ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/></Border>
-                <ControlTemplate.Triggers>
-                    <Trigger Property="IsSelected" Value="True"><Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/></Trigger>
-                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="TabBorder" Property="BorderThickness" Value="2"/><Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource FocusBrush}"/></Trigger>
-                </ControlTemplate.Triggers>
-            </ControlTemplate></Setter.Value></Setter>
-        </Style>
-    </Window.Resources>
-    <DockPanel Margin="24">
-        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,18">
-            <TextBlock Text="Settings" FontSize="26" FontWeight="SemiBold"/>
-            <TextBlock Text="Make AIBar yours. Appearance follows your Windows theme." Foreground="{DynamicResource MutedTextBrush}" Margin="0,5,0,0"/>
-        </StackPanel>
-        <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
-            <TextBlock x:Name="SaveStatus" AutomationProperties.LiveSetting="Polite" Margin="0,0,0,10"/>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="_Close" Click="OnClose" IsCancel="True"/>
-                <Button x:Name="SaveButton" Content="_Save changes" Click="OnSave" IsDefault="True" AutomationProperties.Name="Save changes"/>
-            </StackPanel>
-        </StackPanel>
-        <TabControl x:Name="Sections" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource SecondaryBorderBrush}" Foreground="{DynamicResource TextBrush}">
-            <TabItem Header="Colors">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Margin="16">
-                        <TextBlock Text="Colors" FontSize="20" FontWeight="SemiBold"/>
-                        <GroupBox Header="Panel">
-                            <StackPanel>
-                                <Label Content="Panel _bars" Target="{Binding ElementName=BarColors}" Foreground="{DynamicResource TextBrush}"/>
-                                <ComboBox x:Name="BarColors" SelectedIndex="0" AutomationProperties.Name="Panel bar colors">
-                                    <ComboBoxItem Content="Brand colors"/><ComboBoxItem Content="Usage level"/>
-                                </ComboBox>
-                                <TextBlock Text="Usage level: green below 75%, yellow from 75%, red from 90%." Foreground="{DynamicResource MutedTextBrush}"/>
-                            </StackPanel>
-                        </GroupBox>
-                        <GroupBox Header="YASB">
-                            <StackPanel>
-                                <Label Content="_YASB colors" Target="{Binding ElementName=YasbColors}" Foreground="{DynamicResource TextBrush}"/>
-                                <ComboBox x:Name="YasbColors" SelectedIndex="0" AutomationProperties.Name="YASB colors">
-                                    <ComboBoxItem Content="Usage level"/><ComboBoxItem Content="Brand colors"/>
-                                </ComboBox>
-                                <TextBlock Text="Brand colors: Codex green, Claude terracotta. YASB applies changes on its next refresh." Foreground="{DynamicResource MutedTextBrush}"/>
-                            </StackPanel>
-                        </GroupBox>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-            <TabItem Header="Alerts">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Margin="16">
-                        <TextBlock Text="Alerts" FontSize="20" FontWeight="SemiBold"/>
-                        <GroupBox Header="When to alert">
-                            <StackPanel>
-                                <CheckBox x:Name="Resets" Content="Window _resets" IsChecked="True"/>
-                                <CheckBox x:Name="Thresholds" Content="Crossed _thresholds" IsChecked="True"/>
-                                <Label Content="Thresholds (%) — _ascending integers, 1–100" Target="{Binding ElementName=ThresholdInput}" Foreground="{DynamicResource TextBrush}"/>
-                                <TextBox x:Name="ThresholdInput" Text="75, 90, 100" TextChanged="OnThresholdChanged" AutomationProperties.Name="Alert thresholds (%)" AutomationProperties.HelpText="Comma-separated ascending integers from 1 to 100. Default: 75, 90, 100."/>
-                                <TextBlock x:Name="ThresholdError" AutomationProperties.LiveSetting="Assertive" Margin="0,6"/>
-                                <CheckBox x:Name="RunOut" Content="May run out _before reset" IsChecked="True"/>
-                            </StackPanel>
-                        </GroupBox>
-                        <GroupBox Header="Effects">
-                            <StackPanel>
-                                <CheckBox x:Name="Notification" Content="_Windows notification" IsChecked="True"/>
-                                <CheckBox x:Name="EdgeGlow" Content="Edge _glow at limit (100%)" IsChecked="True"/>
-                                <CheckBox x:Name="Confetti" Content="_Confetti on window reset" IsChecked="False"/>
-                                <TextBlock Text="Glow and confetti never take focus or intercept clicks. High contrast disables both. Reduced motion disables confetti and makes glow static." Foreground="{DynamicResource MutedTextBrush}"/>
-                            </StackPanel>
-                        </GroupBox>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-        </TabControl>
-    </DockPanel>
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+ Title="AIBar Settings" Width="520" Height="600" MinWidth="460" MinHeight="480"
+ WindowStyle="None" WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+ Background="{DynamicResource SettingsSurfaceBrush}" Foreground="{DynamicResource SettingsTextBrush}"
+ FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="14" PreviewKeyDown="OnSettingsKeyDown">
+ <shell:WindowChrome.WindowChrome><shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="5" CornerRadius="8" GlassFrameThickness="0"/></shell:WindowChrome.WindowChrome>
+ <Window.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="SettingsProviderMarks.xaml"/></ResourceDictionary.MergedDictionaries>
+  <Style x:Key="SettingsFocus" TargetType="Control"><Setter Property="Template"><Setter.Value><ControlTemplate><Border BorderBrush="{DynamicResource SettingsFocusBrush}" BorderThickness="2" CornerRadius="6" Margin="-4"/></ControlTemplate></Setter.Value></Setter></Style>
+  <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap"/></Style>
+  <Style x:Key="SettingsMeta" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}"><Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="Normal"/><Setter Property="Foreground" Value="{DynamicResource SettingsSecondaryBrush}"/><Style.Triggers><DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True"><Setter Property="Foreground" Value="{DynamicResource SettingsHoverTextBrush}"/></DataTrigger></Style.Triggers></Style>
+  <Style x:Key="SettingsHeading" TargetType="TextBlock" BasedOn="{StaticResource SettingsMeta}"><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Margin" Value="0,0,0,8"/></Style>
+  <Style x:Key="SettingsCard" TargetType="Border"><Setter Property="Background" Value="{DynamicResource SettingsCardBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="6"/></Style>
+  <Style TargetType="Button">
+   <Setter Property="Foreground" Value="{DynamicResource SettingsTextBrush}"/><Setter Property="Background" Value="{DynamicResource SettingsCardBrush}"/>
+   <Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderBrush}"/><Setter Property="Padding" Value="12,4"/><Setter Property="Height" Value="32"/>
+   <Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True"/></Border>
+    <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource SettingsIndicatorBrush}"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger></ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style x:Key="SettingsCaptionClose" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Style.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource SettingsDangerBrush}"/><Setter Property="Foreground" Value="{DynamicResource SettingsOnAccentBrush}"/></Trigger></Style.Triggers></Style>
+  <Style x:Key="SettingsToggle" TargetType="CheckBox">
+   <EventSetter Event="Checked" Handler="OnToggleMotion"/><EventSetter Event="Unchecked" Handler="OnToggleMotion"/>
+   <Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/><Setter Property="VerticalAlignment" Value="Center"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><StackPanel Orientation="Horizontal">
+    <TextBlock x:Name="StateText" Text="Off" VerticalAlignment="Center" Margin="0,0,12,0"/>
+    <Border x:Name="Track" Width="40" Height="20" CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource SettingsSecondaryBrush}" Background="{DynamicResource SettingsCardBrush}">
+     <Ellipse x:Name="Knob" Width="12" Height="12" Fill="{DynamicResource SettingsSecondaryBrush}" HorizontalAlignment="Left" Margin="3,0"><Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform></Ellipse>
+    </Border></StackPanel>
+    <ControlTemplate.Triggers>
+     <Trigger Property="IsChecked" Value="True"><Setter TargetName="Track" Property="Background" Value="{DynamicResource SettingsAccentBrush}"/><Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource SettingsIndicatorBrush}"/><Setter TargetName="Knob" Property="Fill" Value="{DynamicResource SettingsOnAccentBrush}"/><Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/><Setter TargetName="StateText" Property="Text" Value="On"/></Trigger>
+     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Knob" Property="Width" Value="14"/><Setter TargetName="Knob" Property="Height" Value="14"/></Trigger>
+     <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+    </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style TargetType="CheckBox"><Setter Property="Foreground" Value="{DynamicResource SettingsTextBrush}"/><Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/></Style>
+  <Style x:Key="SettingsRadio" TargetType="RadioButton">
+   <Setter Property="Foreground" Value="{DynamicResource SettingsTextBrush}"/><Setter Property="Background" Value="{DynamicResource SettingsCardBrush}"/>
+   <Setter Property="Padding" Value="14,10"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border x:Name="Card" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="{TemplateBinding Padding}">
+    <DockPanel><Grid Width="18" Height="18" DockPanel.Dock="Left" VerticalAlignment="Top" Margin="0,1,8,0"><Ellipse Stroke="{DynamicResource SettingsSecondaryBrush}" StrokeThickness="1"/><Ellipse x:Name="Selected" Margin="4" Fill="{DynamicResource SettingsAccentBrush}" Visibility="Collapsed"/></Grid><ContentPresenter/></DockPanel>
+   </Border><ControlTemplate.Triggers>
+    <Trigger Property="IsChecked" Value="True"><Setter TargetName="Card" Property="BorderBrush" Value="{DynamicResource SettingsAccentBrush}"/><Setter TargetName="Card" Property="BorderThickness" Value="2"/><Setter TargetName="Card" Property="Padding" Value="13,9"/><Setter TargetName="Selected" Property="Visibility" Value="Visible"/><Setter Property="FontWeight" Value="SemiBold"/></Trigger>
+    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Card" Property="Background" Value="{DynamicResource SettingsHoverBrush}"/><Setter Property="Foreground" Value="{DynamicResource SettingsHoverTextBrush}"/></Trigger>
+   </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style TargetType="RadioButton" BasedOn="{StaticResource SettingsRadio}"/>
+  <Style x:Key="SettingsSourceRadio" TargetType="RadioButton" BasedOn="{StaticResource SettingsRadio}">
+   <Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="16,8"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}"><DockPanel>
+    <Grid DockPanel.Dock="Left" Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,12,0"><Ellipse Fill="{DynamicResource SettingsCardBrush}" Stroke="{DynamicResource SettingsSecondaryBrush}"/><Ellipse x:Name="SourceDot" Margin="4" Fill="{DynamicResource SettingsIndicatorBrush}" Visibility="Collapsed"/></Grid><ContentPresenter/>
+   </DockPanel></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter Property="FontWeight" Value="SemiBold"/><Setter TargetName="SourceDot" Property="Visibility" Value="Visible"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style TargetType="TabItem"><Setter Property="Foreground" Value="{DynamicResource SettingsSecondaryBrush}"/><Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem"><Grid Height="40" Margin="12,0"><ContentPresenter ContentSource="Header" VerticalAlignment="Center"/><Border x:Name="Underline" Width="16" Height="3" CornerRadius="1" Background="{DynamicResource SettingsIndicatorBrush}" VerticalAlignment="Bottom" Visibility="Collapsed"/></Grid>
+    <ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Foreground" Value="{DynamicResource SettingsTextBrush}"/><Setter Property="FontWeight" Value="SemiBold"/><Setter TargetName="Underline" Property="Visibility" Value="Visible"/></Trigger></ControlTemplate.Triggers>
+   </ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style TargetType="TextBox"><Setter Property="Foreground" Value="{DynamicResource SettingsTextBrush}"/><Setter Property="Background" Value="{DynamicResource SettingsCardBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource SettingsBorderBrush}"/><Setter Property="Padding" Value="8,4"/><Setter Property="Height" Value="32"/><Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/></Style>
+  <Style TargetType="Slider"><Setter Property="Foreground" Value="{DynamicResource SettingsAccentBrush}"/><Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Slider"><Grid Height="24">
+    <Track x:Name="PART_Track" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" IsDirectionReversed="{TemplateBinding IsDirectionReversed}">
+     <Track.DecreaseRepeatButton><RepeatButton Command="Slider.DecreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Height="6" CornerRadius="3" Background="{DynamicResource SettingsAccentBrush}"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
+     <Track.IncreaseRepeatButton><RepeatButton Command="Slider.IncreaseLarge" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Height="6" CornerRadius="3" Background="{DynamicResource SettingsTrackBrush}"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
+     <Track.Thumb><Thumb Width="18" Height="18"><Thumb.Template><ControlTemplate TargetType="Thumb"><Ellipse Fill="{DynamicResource SettingsSecondaryBrush}" Stroke="{DynamicResource SettingsCardBrush}" StrokeThickness="2"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+    </Track>
+   </Grid></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style TargetType="ProgressBar"><Setter Property="Focusable" Value="False"/><Setter Property="IsHitTestVisible" Value="False"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ProgressBar"><Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3"><Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left" CornerRadius="3"/></Border></ControlTemplate></Setter.Value></Setter></Style>
+ </ResourceDictionary></Window.Resources>
+ <Border BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="1" CornerRadius="8">
+  <DockPanel>
+   <Grid DockPanel.Dock="Top" Height="32" MouseLeftButtonDown="OnTitleDrag">
+    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="46"/><ColumnDefinition Width="46"/><ColumnDefinition Width="46"/></Grid.ColumnDefinitions>
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0"><TextBlock Text="∞" Foreground="{DynamicResource SettingsCodexBrush}" Margin="0,0,10,0"/><TextBlock Text="AIBar Settings" FontSize="12"/></StackPanel>
+    <Button Grid.Column="1" Content="−" AutomationProperties.Name="Minimize" Click="OnMinimize" shell:WindowChrome.IsHitTestVisibleInChrome="True" Background="Transparent" BorderBrush="Transparent"/>
+    <Button Grid.Column="2" Content="□" AutomationProperties.Name="Maximize or restore" Click="OnMaximize" shell:WindowChrome.IsHitTestVisibleInChrome="True" Background="Transparent" BorderBrush="Transparent"/>
+    <Button Grid.Column="3" Style="{StaticResource SettingsCaptionClose}" Content="×" AutomationProperties.Name="Close settings" Click="OnClose" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+   </Grid>
+   <Border DockPanel.Dock="Bottom" Height="56" Background="{DynamicResource SettingsFooterBrush}" BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="0,1,0,0" Padding="24,0">
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="96"/><ColumnDefinition Width="8"/><ColumnDefinition Width="96"/></Grid.ColumnDefinitions>
+     <TextBlock x:Name="SaveStatus" Style="{StaticResource SettingsMeta}" Text="Changes apply when you save" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" Margin="0,0,8,0"/>
+     <Button Grid.Column="1" Content="Cancel" Click="OnClose" IsCancel="True"/>
+     <Button x:Name="SaveButton" Grid.Column="3" Content="Save" Click="OnSave" IsDefault="True" FontWeight="SemiBold" Background="{DynamicResource SettingsAccentBrush}" Foreground="{DynamicResource SettingsOnAccentBrush}" AutomationProperties.Name="Save changes"/>
+    </Grid>
+   </Border>
+   <TabControl x:Name="Sections" BorderThickness="0" Background="Transparent" Padding="0" HorizontalContentAlignment="Stretch">
+    <TabControl.Template><ControlTemplate TargetType="TabControl"><DockPanel><Border DockPanel.Dock="Top" BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="0,0,0,1"><TabPanel IsItemsHost="True" Margin="16,0,0,0"/></Border><ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"/></DockPanel></ControlTemplate></TabControl.Template>
+    <TabItem Header="Appearance" AutomationProperties.Name="Appearance">
+     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="24,16">
+       <TextBlock Text="THEME" Style="{StaticResource SettingsHeading}"/>
+       <Border Style="{StaticResource SettingsCard}" Padding="16,6" Margin="0,0,0,8"><StackPanel><TextBlock Text="◐   Follows Windows"/><TextBlock x:Name="ThemeDescription" Style="{StaticResource SettingsMeta}" Margin="30,2,0,0" Text="Change it in Windows Settings › Personalization › Colors."/></StackPanel></Border>
+       <Border Style="{StaticResource SettingsCard}" Padding="16,6" Margin="0,0,0,16">
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="120"/><ColumnDefinition Width="50"/></Grid.ColumnDefinitions>
+         <StackPanel><TextBlock Text="Background opacity"/><TextBlock Text="Panel and notifications. Text and bars stay solid." Style="{StaticResource SettingsMeta}" Margin="0,2,10,0"/></StackPanel>
+         <Slider x:Name="BackgroundOpacity" Grid.Column="1" Minimum="30" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="100" SmallChange="5" LargeChange="10" VerticalAlignment="Center" AutomationProperties.Name="Background opacity" AutomationProperties.HelpText="30 to 100 percent in steps of 5. High contrast and disabled transparency use 100 percent."/>
+         <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=BackgroundOpacity, StringFormat={}{0:0} %}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+        </Grid>
+       </Border>
+       <TextBlock Text="PANEL BARS" Style="{StaticResource SettingsHeading}"/>
+       <Grid Margin="0,0,0,16" KeyboardNavigation.DirectionalNavigation="Contained"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+        <RadioButton x:Name="BarBrand" GroupName="PanelBars" IsChecked="True" AutomationProperties.Name="Panel bar colors: Brand colors" MinHeight="116">
+         <StackPanel><TextBlock Text="Brand colors"/><Grid Margin="-24,12,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+          <TextBlock Text="Codex" Style="{StaticResource SettingsMeta}"/><ProgressBar Grid.Column="1" Value="40" Height="6" Foreground="{DynamicResource SettingsCodexBrush}" Background="{DynamicResource SettingsTrackBrush}"/>
+          <TextBlock Grid.Row="1" Text="Claude" Style="{StaticResource SettingsMeta}" Margin="0,6,0,0"/><ProgressBar Grid.Row="1" Grid.Column="1" Value="82" Height="6" Margin="0,6,0,0" Foreground="{DynamicResource SettingsClaudeBrush}" Background="{DynamicResource SettingsTrackBrush}"/>
+         </Grid></StackPanel>
+        </RadioButton>
+        <RadioButton x:Name="BarUsage" Grid.Column="2" GroupName="PanelBars" AutomationProperties.Name="Panel bar colors: Usage level" MinHeight="116">
+         <StackPanel><TextBlock Text="Usage level"/><Grid Margin="-24,12,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+          <TextBlock Text="40%" Style="{StaticResource SettingsMeta}"/><ProgressBar Grid.Column="1" Value="40" Height="6" Foreground="{DynamicResource SettingsUsageOkBrush}" Background="{DynamicResource SettingsTrackBrush}"/>
+          <TextBlock Grid.Row="1" Text="80%" Style="{StaticResource SettingsMeta}" Margin="0,6,0,0"/><ProgressBar Grid.Row="1" Grid.Column="1" Value="80" Height="6" Margin="0,6,0,0" Foreground="{DynamicResource SettingsUsageWarnBrush}" Background="{DynamicResource SettingsTrackBrush}"/>
+          <TextBlock Grid.Row="2" Text="95%" Style="{StaticResource SettingsMeta}" Margin="0,6,0,0"/><ProgressBar Grid.Row="2" Grid.Column="1" Value="95" Height="6" Margin="0,6,0,0" Foreground="{DynamicResource SettingsUsageHighBrush}" Background="{DynamicResource SettingsTrackBrush}"/>
+         </Grid></StackPanel>
+        </RadioButton>
+       </Grid>
+       <TextBlock Text="YASB STATUS-BAR WIDGET" Style="{StaticResource SettingsHeading}"/>
+       <Grid KeyboardNavigation.DirectionalNavigation="Contained"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+        <RadioButton x:Name="YasbUsage" GroupName="Yasb" IsChecked="True" AutomationProperties.Name="YASB colors: Usage level" MinHeight="84"><StackPanel><TextBlock Text="Usage level"/><Border Background="{DynamicResource SettingsFooterBrush}" CornerRadius="4" Padding="6" Margin="-24,10,0,0"><StackPanel Orientation="Horizontal"><TextBlock Text="14% ▰" Foreground="{DynamicResource SettingsUsageOkBrush}" FontSize="11"/><TextBlock Text="   92% ▰" Foreground="{DynamicResource SettingsUsageHighBrush}" FontSize="11"/></StackPanel></Border></StackPanel></RadioButton>
+        <RadioButton x:Name="YasbBrand" Grid.Column="2" GroupName="Yasb" AutomationProperties.Name="YASB colors: Brand colors" MinHeight="84"><StackPanel><TextBlock Text="Brand colors"/><Border Background="{DynamicResource SettingsFooterBrush}" CornerRadius="4" Padding="6" Margin="-24,10,0,0"><StackPanel Orientation="Horizontal"><TextBlock Text="14% ▰" Foreground="{DynamicResource SettingsCodexBrush}" FontSize="11"/><TextBlock Text="   92% ▰" Foreground="{DynamicResource SettingsClaudeBrush}" FontSize="11"/></StackPanel></Border></StackPanel></RadioButton>
+       </Grid>
+      </StackPanel>
+     </ScrollViewer>
+    </TabItem>
+    <TabItem AutomationProperties.Name="Alerts">
+     <TabItem.Header><StackPanel Orientation="Horizontal"><TextBlock Text="Alerts"/><TextBlock x:Name="AlertsErrorDot" Text="●" FontSize="9" Foreground="{DynamicResource SettingsDangerBrush}" Margin="5,0,0,0" Visibility="Collapsed" AutomationProperties.Name="Alerts has an error"/></StackPanel></TabItem.Header>
+     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="24,16">
+       <TextBlock Text="NOTIFY ME WHEN" Style="{StaticResource SettingsHeading}"/>
+       <Border Style="{StaticResource SettingsCard}"><StackPanel>
+        <Grid MinHeight="36" Margin="16,6"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Window resets"/><TextBlock Text="A session or weekly window starts over" Style="{StaticResource SettingsMeta}"/></StackPanel><CheckBox x:Name="Resets" Grid.Column="1" Style="{StaticResource SettingsToggle}" IsChecked="True" AutomationProperties.Name="Window resets"/></Grid>
+        <Border BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="0,1,0,1" Padding="16,6"><StackPanel>
+         <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Thresholds"/><TextBlock Text="Usage crosses one of the values below" Style="{StaticResource SettingsMeta}"/></StackPanel><CheckBox x:Name="Thresholds" Grid.Column="1" Style="{StaticResource SettingsToggle}" IsChecked="True" AutomationProperties.Name="Crossed thresholds"/></Grid>
+         <Label Content="Thresholds (%)" Target="{Binding ElementName=ThresholdInput}" FontSize="12" Foreground="{DynamicResource SettingsSecondaryBrush}" Padding="0" Margin="0,6,0,4"/>
+         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="168"/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions>
+          <TextBox x:Name="ThresholdInput" Text="75, 90, 100" TextChanged="OnThresholdChanged" AutomationProperties.Name="Alert thresholds (%)" AutomationProperties.HelpText="Comma-separated ascending integers from 1 to 100. Default: 75, 90, 100."/>
+          <Grid x:Name="ThresholdTicks" Grid.Column="2" VerticalAlignment="Center"><Border Height="6" CornerRadius="3" Background="{DynamicResource SettingsTrackBrush}"/><Canvas x:Name="TickCanvas" Height="32" SizeChanged="OnTickSizeChanged" IsHitTestVisible="False"/></Grid>
+         </Grid>
+         <TextBlock x:Name="ThresholdError" Style="{StaticResource SettingsMeta}" Text="1–100, ascending" Margin="0,5,0,6" AutomationProperties.LiveSetting="Assertive"/>
+        </StackPanel></Border>
+        <Grid MinHeight="36" Margin="16,6"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Runs out before reset"/><TextBlock Text="At the current pace a window hits 100% early" Style="{StaticResource SettingsMeta}"/></StackPanel><CheckBox x:Name="RunOut" Grid.Column="1" Style="{StaticResource SettingsToggle}" IsChecked="True" AutomationProperties.Name="May run out before reset"/></Grid>
+       </StackPanel></Border>
+       <TextBlock Text="EFFECTS" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
+       <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+        <Border Style="{StaticResource SettingsCard}" Padding="8"><StackPanel>
+         <Button Click="OnPreviewNotification" Height="56" Padding="4" AutomationProperties.Name="Preview Windows notification"><Border Background="{DynamicResource SettingsFooterBrush}" Padding="4"><StackPanel><TextBlock Text="▶" FontSize="12"/><Border Background="{DynamicResource SettingsCardBrush}" Padding="5" CornerRadius="3"><TextBlock Text="AIBar · Window reset" FontSize="9"/></Border></StackPanel></Border></Button>
+         <CheckBox x:Name="Notification" IsChecked="True" Margin="0,8,0,0" AutomationProperties.Name="Windows notification"><TextBlock Text="Windows notification" FontSize="13" FontWeight="SemiBold"/></CheckBox>
+        </StackPanel></Border>
+        <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="8"><StackPanel>
+         <Button Click="OnPreviewGlow" Height="56" Padding="0" AutomationProperties.Name="Preview edge glow"><Border BorderBrush="{DynamicResource SettingsClaudeBrush}" BorderThickness="6" Width="112" Height="54"><TextBlock Text="▶" VerticalAlignment="Center" HorizontalAlignment="Center"/></Border></Button>
+         <CheckBox x:Name="EdgeGlow" IsChecked="True" Margin="0,8,0,0" AutomationProperties.Name="Edge glow at limit"><TextBlock Text="Edge glow at limit" FontSize="13" FontWeight="SemiBold"/></CheckBox>
+        </StackPanel></Border>
+        <Border Grid.Column="4" Style="{StaticResource SettingsCard}" Padding="8"><StackPanel>
+         <Button Click="OnPreviewConfetti" Height="56" Padding="4" AutomationProperties.Name="Preview confetti"><StackPanel><TextBlock Text="▪  ◆  •  ▪" Foreground="{DynamicResource SettingsCodexBrush}"/><TextBlock Text="▶  •  ▰  ◆" Foreground="{DynamicResource SettingsUsageWarnBrush}"/></StackPanel></Button>
+         <CheckBox x:Name="Confetti" IsChecked="False" Margin="0,8,0,0" AutomationProperties.Name="Confetti on reset"><TextBlock Text="Confetti on reset" FontSize="13" FontWeight="SemiBold"/></CheckBox>
+        </StackPanel></Border>
+       </Grid>
+      </StackPanel>
+     </ScrollViewer>
+    </TabItem>
+    <TabItem Header="Providers" AutomationProperties.Name="Providers">
+     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="24,16">
+       <TextBlock Text="SHOW IN AIBAR" Style="{StaticResource SettingsHeading}"/>
+       <Border Style="{StaticResource SettingsCard}"><StackPanel>
+        <Grid MinHeight="44" Margin="16,6"><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Border Background="{DynamicResource SettingsFooterBrush}" Width="32" Height="32" CornerRadius="6"><Path x:Name="CodexMark" Data="{StaticResource SettingsOpenAiMark}" Width="20" Height="20" Stretch="Uniform" Fill="{DynamicResource SettingsCodexBrush}"/></Border><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Codex"/><TextBlock Text="OpenAI · weekly limit" Style="{StaticResource SettingsMeta}"/></StackPanel><CheckBox x:Name="CodexEnabled" Grid.Column="2" Style="{StaticResource SettingsToggle}" AutomationProperties.Name="Show Codex in AIBar"/></Grid>
+        <Border BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="0,1,0,0"/>
+        <Grid MinHeight="44" Margin="16,6"><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Border Background="{DynamicResource SettingsFooterBrush}" Width="32" Height="32" CornerRadius="6"><Path x:Name="ClaudeMark" Data="{StaticResource SettingsClaudeMark}" Width="20" Height="20" Stretch="Uniform" Fill="{DynamicResource SettingsClaudeBrush}"/></Border><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Claude"/><TextBlock Text="Anthropic · session and weekly limits" Style="{StaticResource SettingsMeta}"/></StackPanel><CheckBox x:Name="ClaudeEnabled" Grid.Column="2" Style="{StaticResource SettingsToggle}" AutomationProperties.Name="Show Claude in AIBar"/></Grid>
+       </StackPanel></Border>
+       <TextBlock Text="CLAUDE SOURCE" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
+       <Border Style="{StaticResource SettingsCard}"><StackPanel x:Name="SourceChoices" KeyboardNavigation.DirectionalNavigation="Contained">
+        <RadioButton x:Name="SourceThisPc" Style="{StaticResource SettingsSourceRadio}" GroupName="ClaudeSource" AutomationProperties.Name="Claude source: This PC"><StackPanel><TextBlock Text="This PC"/><TextBlock Text="Use the Claude Code sign-in on this computer" Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
+        <RadioButton x:Name="SourceOtherMachine" Style="{StaticResource SettingsSourceRadio}" GroupName="ClaudeSource" AutomationProperties.Name="Claude source: Other machine"><StackPanel><TextBlock Text="Other machine"/><TextBlock Text="Use the usage another computer syncs here" Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
+        <RadioButton x:Name="SourceAutomatic" Style="{StaticResource SettingsSourceRadio}" BorderThickness="0" GroupName="ClaudeSource" IsChecked="True" AutomationProperties.Name="Claude source: Automatic"><StackPanel><TextBlock Text="Automatic"/><TextBlock Text="This PC when signed in here, otherwise the other machine" Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
+       </StackPanel></Border>
+       <TextBlock x:Name="SourceStatus" Style="{StaticResource SettingsMeta}" Margin="2,10,0,0" AutomationProperties.LiveSetting="Polite"/>
+      </StackPanel>
+     </ScrollViewer>
+    </TabItem>
+   </TabControl>
+  </DockPanel>
+ </Border>
 </Window>

@@ -1,6 +1,6 @@
 namespace AIBar.Application;
 
-public sealed record AppearanceOptions(string BarColors = "brand", string YasbColors = "usage");
+public sealed record AppearanceOptions(string BarColors = "brand", string YasbColors = "usage", int BackgroundOpacity = 100);
 
 /// <summary>Owns appearance.json. Clear joins the same gate as saves; callbacks never await UI dispatch.</summary>
 public sealed class AppearanceSettings(string path) : IAiBarClearWork
@@ -12,16 +12,17 @@ public sealed class AppearanceSettings(string path) : IAiBarClearWork
     {
         var stored = await QuotaAlertJson.ReadAsync<Stored>(path, cancellationToken).ConfigureAwait(false);
         return stored is { Schema: 1 } && Valid(stored.BarColors ?? "brand") && Valid(stored.YasbColors ?? "usage")
-            ? new(stored.BarColors ?? "brand", stored.YasbColors ?? "usage") : new();
+            ? new(stored.BarColors ?? "brand", stored.YasbColors ?? "usage", ValidOpacity(stored.BackgroundOpacity) ? stored.BackgroundOpacity : 100) : new();
     }
     public async ValueTask SaveAsync(AppearanceOptions options, CancellationToken cancellationToken)
     {
-        if (!Valid(options.BarColors) || !Valid(options.YasbColors)) throw new ArgumentException("Unknown appearance color mode.", nameof(options));
+        if (!Valid(options.BarColors) || !Valid(options.YasbColors) || !ValidOpacity(options.BackgroundOpacity))
+            throw new ArgumentException("Unknown color mode or opacity outside 30–100 in steps of 5.", nameof(options));
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             if (_paused) throw new InvalidOperationException("AIBar data is being cleared.");
-            await QuotaAlertJson.WriteAsync(path, new Stored(1, options.BarColors, options.YasbColors), cancellationToken).ConfigureAwait(false);
+            await QuotaAlertJson.WriteAsync(path, new Stored(1, options.BarColors, options.YasbColors, options.BackgroundOpacity), cancellationToken).ConfigureAwait(false);
         }
         finally { _gate.Release(); }
         Changed?.Invoke(options);
@@ -45,5 +46,6 @@ public sealed class AppearanceSettings(string path) : IAiBarClearWork
         Changed?.Invoke(options);
     }
     private static bool Valid(string mode) => mode is "brand" or "usage";
-    private sealed record Stored(int Schema, string? BarColors = null, string? YasbColors = null);
+    private static bool ValidOpacity(int value) => value is >= 30 and <= 100 && value % 5 == 0;
+    private sealed record Stored(int Schema, string? BarColors = null, string? YasbColors = null, int BackgroundOpacity = 100);
 }

@@ -234,6 +234,27 @@ public sealed class QuotaVisualDesignTests
                 ("CardBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("TextBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
                 ("MutedTextBrush", "{DynamicResource {x:Static SystemColors.GrayTextColorKey}}"),
+                ("SettingsBackgroundBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("NotificationBackgroundBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("SettingsSurfaceBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("SettingsCardBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("SettingsFooterBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("SettingsTextBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsSecondaryBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsBorderBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsAccentBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsIndicatorBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsOnAccentBrush", "{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"),
+                ("SettingsDangerBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsFocusBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsHoverBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsHoverTextBrush", "{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"),
+                ("SettingsTrackBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
+                ("SettingsCodexBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsClaudeBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsUsageOkBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsUsageWarnBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
+                ("SettingsUsageHighBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
                 ("PanelMenuHighlightBrush", "{DynamicResource {x:Static SystemColors.HighlightColorKey}}"),
                 ("PanelMenuHighlightTextBrush", "{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"),
                 ("PanelRowHoverBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
@@ -457,7 +478,8 @@ public sealed class QuotaVisualDesignTests
     private static readonly string[] SpecTokenKeys =
     [
         "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush",
-        "BackdropBrush", "SettingsBackgroundBrush", "NotificationBackgroundBrush", "FooterBrush", "TabSelectedBrush", "PressedBrush", "ControlBrush", "WindowBorderBrush", "CardBorderBrush", "ControlBorderBrush", "TertiaryTextBrush", "ClaudeUiBrush", "CodexUiBrush", "AccentIndicatorBrush", "LinkBrush", "WarningTextBrush", "WarningBackgroundBrush", "DangerTextBrush", "SuccessTextBrush", "CodexBrush", "CodexTintBrush", "ClaudeBrush", "ClaudeTintBrush", "UsageOkBrush", "UsageWarnBrush", "UsageHighBrush"
+        "BackdropBrush", "SettingsBackgroundBrush", "NotificationBackgroundBrush", "FooterBrush", "TabSelectedBrush", "PressedBrush", "ControlBrush", "WindowBorderBrush", "CardBorderBrush", "ControlBorderBrush", "TertiaryTextBrush", "ClaudeUiBrush", "CodexUiBrush", "AccentIndicatorBrush", "LinkBrush", "WarningTextBrush", "WarningBackgroundBrush", "DangerTextBrush", "SuccessTextBrush", "CodexBrush", "CodexTintBrush", "ClaudeBrush", "ClaudeTintBrush", "UsageOkBrush", "UsageWarnBrush", "UsageHighBrush",
+        "SettingsSurfaceBrush", "SettingsCardBrush", "SettingsFooterBrush", "SettingsTextBrush", "SettingsSecondaryBrush", "SettingsBorderBrush", "SettingsAccentBrush", "SettingsIndicatorBrush", "SettingsOnAccentBrush", "SettingsDangerBrush", "SettingsFocusBrush", "SettingsHoverBrush", "SettingsHoverTextBrush", "SettingsTrackBrush", "SettingsCodexBrush", "SettingsClaudeBrush", "SettingsUsageOkBrush", "SettingsUsageWarnBrush", "SettingsUsageHighBrush"
     ];
     private static readonly XNamespace PanelNamespace = "clr-namespace:AIBar.Desktop";
 
