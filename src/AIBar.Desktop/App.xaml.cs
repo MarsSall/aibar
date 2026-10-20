@@ -152,7 +152,10 @@ public partial class App : System.Windows.Application
         var tray = new WindowsTrayRuntime();
         if (composition.Appearance is { } appearance && composition.Alerts is { } settingsAlerts)
         {
-            _settingsWindowHost = new(appearance, settingsAlerts);
+            var providerSettings = composition.Settings is { } native && composition.ClaudeQuota is { } claude
+                ? SettingsProviderCommands.Create(native, claude) : null;
+            _settingsWindowHost = new(appearance, settingsAlerts, providerSettings,
+                () => tray.ShowAlert("AIBar · Window reset", "A session or weekly window starts over."));
             // The colour choice applies live; Changed can run during clear, so never wait on the UI thread.
             appearance.Changed += options => Dispatcher.BeginInvoke(new Action(() => window.BarColorMode = ToBarColorMode(options)));
             _ = ApplyInitialAppearanceAsync(appearance, window);
