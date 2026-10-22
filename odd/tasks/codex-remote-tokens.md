@@ -25,3 +25,4 @@ Branch: `feat/codex-remote-tokens`. Mirrors the Claude remote tokens path (`tool
 - L6 (slice): branch ~930 authored lines in 2 commits (Linux helper, AIBar); one PR reviewed commit by commit.
 - L7 (evidence): full suite on Mars 1411/1415; differential main b6b136a vs branch (2 runs each): identical — SettingsWindowTests.Save_persists fails on both (environment), RefreshInterval and DesktopLocalUsageComposition pass in isolation on both (suite-order flakes). No regression.
 - L8 (deploy): c9f0d29 installed on Mars (PID 20312); Linux: codex_remote_tokens.py in ~/.local/lib/aibar, unit updated (previous == main), service run success (codex current). PR #73 opened.
+- L9 (user check): screenshot shows Codex COST "$ 0.00 Today · 0 tokens" and "$ 2254.29 30 days · 4B tokens". Today 0 is correct: last openai-codex assistant entries are 2026-10-19 (18), none 10-20..10-22.
