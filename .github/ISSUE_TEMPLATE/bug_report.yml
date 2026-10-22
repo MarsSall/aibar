@@ -1,0 +1,48 @@
+name: Bug report
+description: Something in AIBar does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste tokens, `auth.json`, `.credentials.json` or full file paths. Security issues go to [SECURITY.md](https://github.com/MarsSall/aibar/blob/main/SECURITY.md), not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Enable Claude quota
+        2. Open the panel
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      options:
+        - Codex
+        - Claude
+        - Both
+        - Not provider-specific
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AIBar version or commit
+      placeholder: 0.1.0-beta.4
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2
