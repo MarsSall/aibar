@@ -159,6 +159,10 @@ public sealed class ClaudePanelTests
                 Assert.Contains("Weekly quota progress", names);
                 Assert.DoesNotContain("Claude weekly quota progress", names);
                 var details = Assert.IsType<Button>(panel.Window.FindName("CostButton"));
+                details.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.NotNull(panel.Window.DetailsWindow);
+                Assert.Equal(Visibility.Visible, ((StackPanel)panel.Window.FindName("SummaryView")).Visibility);
+                panel.Window.CloseDetails(restoreFocus: true);
                 details.Focus(); Assert.True(details.IsKeyboardFocused);
                 Assert.True(details.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
                 Assert.Equal("Usage Dashboard", AutomationProperties.GetName(Assert.IsAssignableFrom<DependencyObject>(Keyboard.FocusedElement)));

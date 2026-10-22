@@ -87,7 +87,8 @@ public sealed class PanelMockupRenderTests
                 if (scenario.StartsWith("details", StringComparison.Ordinal))
                 {
                     ((Button)window.FindName("CostButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    window.UpdateLayout();
+                    window.DetailsWindow!.UpdateLayout();
+                    Assert.Same(window.DetailsWindow, Window.GetWindow((FrameworkElement)window.FindName("DetailView")));
                 }
                 SaveRender(window, scenario);
             }
@@ -106,7 +107,9 @@ public sealed class PanelMockupRenderTests
         // Render the template surface, not just Window.Content: this includes the
         // rounded border, real background and AdornerDecorator subtree. DWM acrylic
         // cannot be captured offscreen, so renders use the opaque fallback surface.
-        var surface = (Border)window.Template.FindName("PanelSurface", window);
+        var surface = scenario.StartsWith("details", StringComparison.Ordinal)
+            ? (Border)window.DetailsWindow!.Content
+            : (Border)window.Template.FindName("PanelSurface", window);
         var bitmap = new RenderTargetBitmap((int)Math.Ceiling(surface.ActualWidth),
             (int)Math.Ceiling(surface.ActualHeight), 96, 96, PixelFormats.Pbgra32);
         var background = new DrawingVisual();

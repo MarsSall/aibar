@@ -74,7 +74,7 @@ public sealed class CodexBarPanelTests
                 Assert.Contains("unavailable", texts);
                 Assert.Contains("$ 254.24", texts); Assert.Contains("30 days · 918M tokens (partial)", texts);
                 var cost = Assert.IsType<Button>(window.FindName("CostButton"));
-                var back = Assert.IsType<Button>(window.FindName("BackButton"));
+                var back = Assert.IsType<Button>(window.FindName("CloseDetailsButton"));
                 var summary = Assert.IsType<StackPanel>(window.FindName("SummaryView"));
                 var detail = Assert.IsType<StackPanel>(window.FindName("DetailView"));
                 Assert.Equal(Visibility.Collapsed, detail.Visibility);
@@ -85,7 +85,8 @@ public sealed class CodexBarPanelTests
                     cost.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), 0, key)
                         { RoutedEvent = Keyboard.PreviewKeyDownEvent });
                     window.UpdateLayout();
-                    Assert.Equal(Visibility.Collapsed, summary.Visibility);
+                    Assert.Equal(Visibility.Visible, summary.Visibility);
+                    Assert.Same(window.DetailsWindow, Window.GetWindow(detail));
                     Assert.Equal(Visibility.Visible, detail.Visibility);
                     Assert.True(back.IsKeyboardFocused);
                     Assert.Contains(Visuals<TextBlock>(detail), text => text.IsVisible && text.Text == "Usage history");
@@ -97,8 +98,7 @@ public sealed class CodexBarPanelTests
                 Invoke(cost); window.UpdateLayout();
                 Assert.Equal(Visibility.Visible, detail.Visibility);
                 back.Focus();
-                back.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), 0, Key.Space)
-                    { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+                Invoke(back);
                 window.UpdateLayout(); Assert.Equal(Visibility.Collapsed, detail.Visibility);
                 var menu = Assert.IsType<StackPanel>(window.FindName("PanelActions"));
                 var buttons = menu.Children.OfType<Button>().ToArray();

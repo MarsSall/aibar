@@ -83,7 +83,7 @@ public sealed class PanelRenderRegressionTests
                 window.Show(); Pump(window); AssertOpaque(window);
                 ((Button)window.FindName("CostButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Pump(window); AssertOpaque(window);
-                ((Button)window.FindName("BackButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                ((Button)window.FindName("CloseDetailsButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 window.SelectProvider("Codex"); Pump(window); AssertOpaque(window);
                 window.Dismiss(); Assert.False(window.IsVisible);
                 window.Show(); Pump(window); AssertOpaque(window);
@@ -143,6 +143,12 @@ public sealed class PanelRenderRegressionTests
 
     private static void AssertOpaque(MainWindow window)
     {
+        if (window.DetailsWindow is { } side)
+        {
+            Pump(side);
+            Assert.Equal(1d, side.Opacity);
+            Assert.Same(side, Window.GetWindow((FrameworkElement)window.FindName("DetailView")));
+        }
         foreach (var body in new[] { (FrameworkElement)window.Content, (FrameworkElement)window.FindName("SummaryView"), (FrameworkElement)window.FindName("DetailView") })
         {
             Assert.Equal(1d, body.Opacity);

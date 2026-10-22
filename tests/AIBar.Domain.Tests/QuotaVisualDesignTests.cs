@@ -128,7 +128,8 @@ public sealed class QuotaVisualDesignTests
                 window = new MainWindow { DataContext = host }; window.Show();
                 ((System.Windows.Controls.Button)window.FindName("CostButton")).RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
                 window.UpdateLayout();
-                var allCards = FindVisualChildren<System.Windows.Controls.GroupBox>(window).ToArray();
+                var allCards = FindVisualChildren<System.Windows.Controls.GroupBox>(window)
+                    .Concat(FindVisualChildren<System.Windows.Controls.GroupBox>(Assert.IsType<PanelDetailsWindow>(window.DetailsWindow))).ToArray();
                 var claudeCards = allCards.Where(card => System.Windows.Automation.AutomationProperties.GetName(card).StartsWith("Claude ", StringComparison.Ordinal)).ToArray();
                 Assert.Equal(2, claudeCards.Length);
                 Assert.All(claudeCards, card => Assert.False(card.IsVisible));
@@ -161,19 +162,19 @@ public sealed class QuotaVisualDesignTests
                         Assert.Equal(expectedAutomationCards, automationCards);
                         ((System.Windows.Controls.Button)cardWindow.FindName("CostButton")).RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
                         cardWindow.UpdateLayout();
-                        var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(cardWindow).Where(item => item.Name != "AnalyticsDetailsExpander").ToArray(); Assert.Equal(3, usageExpanders.Length);
+                        var usageExpanders = FindVisualChildren<System.Windows.Controls.Expander>(Assert.IsType<PanelDetailsWindow>(cardWindow.DetailsWindow)).Where(item => item.Name != "AnalyticsDetailsExpander").ToArray(); Assert.Equal(3, usageExpanders.Length);
                         var openCode = usageExpanders.Single(item => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(item)!.GetName().StartsWith("OpenCode,", StringComparison.Ordinal));
                         var openCodePeer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(openCode)!;
                         Assert.Equal("OpenCode, 165 retained tokens, Input 11 · Cache 55 (read 22, write 33) · Output 44 · Reasoning 55, Retained history", openCodePeer.GetName());
                         Assert.True(openCode.Focusable); Assert.True(openCode.IsTabStop); Assert.DoesNotContain("model-", openCodePeer.GetName(), StringComparison.Ordinal);
                         var expandCollapse = Assert.IsAssignableFrom<System.Windows.Automation.Provider.IExpandCollapseProvider>(openCodePeer.GetPattern(System.Windows.Automation.Peers.PatternInterface.ExpandCollapse));
-                        expandCollapse.Expand(); cardWindow.UpdateLayout(); System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                        expandCollapse.Expand(); cardWindow.DetailsWindow!.UpdateLayout(); System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                         var visibleDetailText = FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible).ToArray();
                         Assert.Equal(new[] { "model-alpha", "model-zeta" }, visibleDetailText.Where(text => text.Text.StartsWith("model-", StringComparison.Ordinal)).Select(text => text.Text));
                         Assert.Contains(visibleDetailText, text => text.Text == "150 retained tokens"); Assert.Contains(visibleDetailText, text => text.Text == "15 retained tokens");
                         var detailNames = visibleDetailText.Select(text => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(text)?.GetName()).OfType<string>().ToArray();
                         Assert.Contains("2030-01-02, model-alpha, 150 retained tokens, Input 10 · Cache 50 (read 20, write 30) · Output 40 · Reasoning 50", detailNames);
-                        expandCollapse.Collapse(); cardWindow.UpdateLayout(); Assert.False(openCode.IsExpanded);
+                        expandCollapse.Collapse(); cardWindow.DetailsWindow!.UpdateLayout(); Assert.False(openCode.IsExpanded);
                         Assert.DoesNotContain(FindVisualChildren<System.Windows.Controls.TextBlock>(openCode).Where(text => text.IsVisible), text => text.Text.StartsWith("model-", StringComparison.Ordinal));
                     }
                     finally

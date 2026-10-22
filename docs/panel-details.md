@@ -30,7 +30,14 @@ Automatic polls refresh at the saved **Settings › Providers › Refresh every*
 
 Cost is now a bordered card with two amount/meta columns and a right chevron. Amounts use 16-DIP semibold type, metadata 12 DIPs. The panel-only converter separates the existing labels at their currency/token delimiter. Exact amounts, plus suffixes, token counts and partial/unpriced disclosures are preserved. Unavailable never becomes $0. Copy/export strings are not changed.
 
-Cost opens the existing in-panel detail view; Back restores summary and focus to Cost. The detail view retains the 24h / 7d / 30d segmented selector (one Tab stop, the selected segment), four accessible chart series, reset-cycle gaps, local Codex data, OpenCode/Pi ExpandCollapse disclosures, exact daily/model/token breakdowns and quota-access disclosures. No new source-specific cost split is fabricated from aggregate-only data.
+Cost opens an owned, borderless usage-details window beside the panel; the summary stays visible. It prefers the left side with a 6-DIP gap, moves right when necessary, and aligns its top with Cost within the monitor work area.
+
+- Hover Cost for 250 ms to open details without taking focus. Leaving both Cost and details closes an unpinned window after 400 ms.
+- Click, Enter, Space or Right on Cost pins and activates details, focusing Close usage details. Clicking Cost again closes it.
+- Esc, Left or the close button in details closes the window and returns focus to Cost.
+- An outside click leaving both windows dismisses the pair, except while the settings menu is open. Hiding, dismissing or closing the panel also closes details.
+
+The detail view retains the 24h / 7d / 30d segmented selector (one Tab stop, the selected segment), four accessible chart series, reset-cycle gaps, local Codex data, OpenCode/Pi ExpandCollapse disclosures, exact daily/model/token breakdowns and quota-access disclosures. No new source-specific cost split is fabricated from aggregate-only data.
 
 History reload/cancellation, observed pace fallback and clear/dispose publication guards are unchanged. Nothing in clear/dispose waits for the WPF dispatcher.
 
@@ -42,11 +49,11 @@ The menu groups remain Usage Dashboard / Status Page; Refresh / Copy summary; Se
 - Ctrl+C: existing copy-summary command and polite feedback.
 - Ctrl+,: existing SettingsRequested event.
 - Ctrl+Q: existing QuitRequested event and tray shutdown path.
-- Left/Right in summary: switch provider and focus its tab.
+- Left/Right in summary: switch provider and focus its tab, except Right on Cost opens details.
 - Up/Down in the menu: focus the next/previous enabled action, wrapping.
-- Enter/Space: native action activation; Cost and Back retain explicit keyboard handling.
-- Backspace in details: Back.
-- Esc: animated dismissal.
+- Enter/Space: native action activation; on Cost, open and focus usage details.
+- Esc/Left in details: close details and return focus to Cost.
+- Esc in the panel: animated dismissal of the panel and its details window.
 
 The detail range selector and disclosures keep their own arrow-key behavior. Focused scrolling content is brought into view asynchronously by WPF; tests must account for that rather than removing the behavior.
 

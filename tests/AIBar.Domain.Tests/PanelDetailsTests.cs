@@ -32,15 +32,18 @@ public sealed class PanelDetailsTests
                 Assert.False(detail.IsVisible);
                 var cost = Assert.IsType<Button>(window.FindName("CostButton"));
                 cost.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); window.UpdateLayout();
+                var side = Assert.IsType<PanelDetailsWindow>(window.DetailsWindow);
+                Assert.Same(side, Window.GetWindow(detail));
+                side.UpdateLayout();
                 Assert.True(detail.IsVisible);
-                var back = Assert.IsType<Button>(window.FindName("BackButton"));
+                var back = Assert.IsType<Button>(window.FindName("CloseDetailsButton"));
                 Assert.True(back.IsKeyboardFocused);
                 var provider = Visuals<Expander>(detail).Single(item => AutomationProperties.GetName(item) == "Provider row");
                 Assert.True(provider.Focusable && provider.IsTabStop); Assert.NotNull(provider.FocusVisualStyle);
                 Assert.Contains(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "1234567890 retained tokens");
                 Assert.DoesNotContain(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
                 var toggle = Assert.IsAssignableFrom<IExpandCollapseProvider>(new ExpanderAutomationPeer(provider).GetPattern(PatternInterface.ExpandCollapse));
-                toggle.Expand(); window.UpdateLayout();
+                toggle.Expand(); side.UpdateLayout();
                 var expected = Assert.IsType<SolidColorBrush>(window.FindResource("TextBrush")).Color;
                 if (theme != WindowsTheme.HighContrast)
                 {
@@ -51,7 +54,7 @@ public sealed class PanelDetailsTests
                 foreach (var label in new[] { "Provider scope", "1234567890 retained tokens", "Input 11", "2026-01-01", "sample-model", "100 tokens", "Input 10" })
                 {
                     var text = Assert.Single(Visuals<TextBlock>(provider).Where(text => text.Text == label));
-                    Assert.True(text.IsVisible); text.BringIntoView(); window.UpdateLayout(); AssertInViewports(text);
+                    Assert.True(text.IsVisible); text.BringIntoView(); side.UpdateLayout(); AssertInViewports(text);
                     if (label is "Provider scope" or "1234567890 retained tokens" or "2026-01-01" or "sample-model")
                         Assert.Equal(expected, Assert.IsType<SolidColorBrush>(text.Foreground).Color);
                 }
@@ -60,13 +63,13 @@ public sealed class PanelDetailsTests
                 var selector = Assert.IsType<ListBox>(Assert.Single(Visuals<QuotaHistoryChart>(detail)).FindName("HistoryRange"));
                 Assert.True(selector.IsKeyboardFocusWithin); Assert.Equal("Usage history range", AutomationProperties.GetName(selector));
                 Assert.True(((UIElement)Keyboard.FocusedElement).MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
-                Assert.True(provider.IsKeyboardFocused); window.UpdateLayout(); AssertInViewports(provider);
-                toggle.Collapse(); window.UpdateLayout();
+                Assert.True(provider.IsKeyboardFocused); side.UpdateLayout(); AssertInViewports(provider);
+                toggle.Collapse(); side.UpdateLayout();
                 Assert.DoesNotContain(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
                 foreach (var label in new[] { "Quota disclosure", "Private endpoint disclosure" })
                 {
                     var text = Assert.Single(Visuals<TextBlock>(detail).Where(text => text.Text == label));
-                    text.BringIntoView(); window.UpdateLayout(); AssertInViewports(text);
+                    text.BringIntoView(); side.UpdateLayout(); AssertInViewports(text);
                 }
                 back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); window.UpdateLayout();
                 Assert.False(detail.IsVisible); Assert.True(cost.IsKeyboardFocused);

@@ -266,7 +266,7 @@
                         </StackPanel>
                     </StackPanel>
                     <Border x:Name="WindowsRule" Style="{StaticResource PanelRule}" Margin="0,2,0,6" />
-                    <Button x:Name="CostButton" Click="OnCost" PreviewKeyDown="OnNavigationKeyDown" Style="{StaticResource PanelLinkStyle}" Foreground="{DynamicResource TextBrush}" Padding="0" Margin="-8,0,-8,10" automation:AutomationProperties.Name="Cost details">
+                    <Button x:Name="CostButton" Click="OnCost" PreviewKeyDown="OnNavigationKeyDown" MouseEnter="OnCostMouseEnter" MouseLeave="OnCostMouseLeave" Style="{StaticResource PanelLinkStyle}" Foreground="{DynamicResource TextBrush}" Padding="0" Margin="-8,0,-8,10" automation:AutomationProperties.Name="Cost details">
                         <Border x:Name="CostCard" Background="{DynamicResource PanelCardBrush}" BorderBrush="{DynamicResource PanelCardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12,8">
                             <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="24" /></Grid.ColumnDefinitions>
                                 <StackPanel>
@@ -290,7 +290,10 @@
                     </Button>
                 </StackPanel>
                 <StackPanel x:Name="DetailView" Visibility="Collapsed">
-                    <Button x:Name="BackButton" Content="‹ Back" Click="OnBack" PreviewKeyDown="OnNavigationKeyDown" Style="{StaticResource PanelLinkStyle}" FontSize="13" Margin="0,0,0,6" automation:AutomationProperties.Name="Back to quota" />
+                    <DockPanel Margin="0,0,0,6">
+                        <Button x:Name="CloseDetailsButton" DockPanel.Dock="Right" Content="×" Click="OnCloseDetails" Style="{StaticResource PanelLinkStyle}" FontSize="13" automation:AutomationProperties.Name="Close usage details" />
+                        <TextBlock Text="Usage details" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </DockPanel>
                     <local:QuotaHistoryChart History="{Binding PaceHistory, RelativeSource={RelativeSource AncestorType={x:Type local:MainWindow}}}" />
                     <Border Style="{StaticResource PanelRule}" Margin="0,8" />
                     <TextBlock Text="Local usage" FontSize="15" FontWeight="SemiBold" Margin="0,4,0,6" />
