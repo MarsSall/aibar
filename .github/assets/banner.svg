@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+  <title id="title">AIBar</title>
+  <desc id="desc">AIBar banner: your Codex and Claude quotas in the Windows tray.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1020"/>
+      <stop offset="1" stop-color="#141B33"/>
+    </linearGradient>
+    <linearGradient id="codex" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#10A37F"/>
+      <stop offset="1" stop-color="#3DDBB0"/>
+    </linearGradient>
+    <linearGradient id="claude" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#D97757"/>
+      <stop offset="1" stop-color="#F2A285"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="320" rx="24" fill="url(#bg)"/>
+  <g font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif">
+    <text x="80" y="150" fill="#FFFFFF" font-size="88" font-weight="700" letter-spacing="-2">AIBar</text>
+    <text x="84" y="200" fill="#A9B4D0" font-size="26">Your AI quotas, pace and cost in the Windows tray.</text>
+    <text x="84" y="244" fill="#6B7699" font-size="18" letter-spacing="3">CODEX · CLAUDE · LOCAL-FIRST</text>
+  </g>
+  <g transform="translate(720 78)" font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif">
+    <rect width="400" height="164" rx="16" fill="#1A2240" stroke="#2A355C"/>
+    <text x="24" y="40" fill="#A9B4D0" font-size="14" letter-spacing="2">CODEX · WEEKLY</text>
+    <text x="376" y="40" fill="#FFFFFF" font-size="20" font-weight="600" text-anchor="end">42%</text>
+    <rect x="24" y="52" width="352" height="8" rx="4" fill="#2A355C"/>
+    <rect x="24" y="52" width="148" height="8" rx="4" fill="url(#codex)"/>
+    <text x="24" y="104" fill="#A9B4D0" font-size="14" letter-spacing="2">CLAUDE · 5 HOURS</text>
+    <text x="376" y="104" fill="#FFFFFF" font-size="20" font-weight="600" text-anchor="end">67%</text>
+    <rect x="24" y="116" width="352" height="8" rx="4" fill="#2A355C"/>
+    <rect x="24" y="116" width="236" height="8" rx="4" fill="url(#claude)"/>
+    <text x="24" y="148" fill="#6B7699" font-size="13">resets in 1h 52m</text>
+  </g>
+</svg>
