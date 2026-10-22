@@ -13,6 +13,7 @@ using SystemColors = System.Windows.SystemColors;
 
 namespace AIBar.Domain.Tests;
 
+[Collection(WpfTestCollection.Name)]
 public sealed class SettingsStyleTests
 {
     [Theory]

@@ -8,6 +8,7 @@ using AIBar.Desktop;
 namespace AIBar.Domain.Tests;
 
 /// <summary>Settings sections scroll with the panel's slim bar and use uppercase section headings.</summary>
+[Collection(WpfTestCollection.Name)]
 public sealed class SettingsScrollStyleTests
 {
     [Theory]

@@ -13,6 +13,7 @@ using ColorConverter = System.Windows.Media.ColorConverter;
 namespace AIBar.Domain.Tests;
 
 /// <summary>CodexBar panel identity: brand meters, inline states, compact resets and acrylic fallback.</summary>
+[Collection(WpfTestCollection.Name)]
 public sealed class PanelIdentityTests
 {
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);

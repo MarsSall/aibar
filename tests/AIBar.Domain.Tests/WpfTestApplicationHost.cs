@@ -2,6 +2,10 @@ using System.Windows;
 using System.Windows.Threading;
 using AIBar.Desktop;
 namespace AIBar.Domain.Tests;
+/// <summary>All tests that use the shared WPF dispatcher run one class at a time, without blocking pool threads.</summary>
+[CollectionDefinition(Name)]
+public sealed class WpfTestCollection { public const string Name = "WPF"; }
+
 internal static class WpfTestApplicationHost
 {
     private static readonly Lazy<Host> Shared = new(() => new Host(), LazyThreadSafetyMode.ExecutionAndPublication);
@@ -10,7 +14,7 @@ internal static class WpfTestApplicationHost
     private sealed class Host
     {
         private readonly TaskCompletionSource<(App Application, Dispatcher Dispatcher)> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        // Parallel test classes share this dispatcher; a callback that pumps a nested frame would
+        // Safety net for a class outside WpfTestCollection: a callback that pumps a nested frame would
         // otherwise run another class's callback inside it (shared themes, windows and focus).
         private readonly SemaphoreSlim _exclusive = new(1, 1);
         public Host() { var thread = new Thread(Start) { IsBackground = true, Name = "AIBar WPF test application host" }; thread.SetApartmentState(ApartmentState.STA); thread.Start(); }

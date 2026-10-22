@@ -2,6 +2,7 @@ using System.Windows.Threading;
 
 namespace AIBar.Domain.Tests;
 
+[Collection(WpfTestCollection.Name)]
 public sealed class WpfTestApplicationHostTests
 {
     // xUnit runs test classes in parallel on one shared WPF dispatcher. A test that pumps a nested

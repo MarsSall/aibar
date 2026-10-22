@@ -7,6 +7,7 @@ using AIBar.Domain;
 
 namespace AIBar.Domain.Tests;
 
+[Collection(WpfTestCollection.Name)]
 public sealed class QuotaSummaryCopyTests
 {
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);

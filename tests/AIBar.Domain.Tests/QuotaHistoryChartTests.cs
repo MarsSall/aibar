@@ -5,6 +5,7 @@ using ListBox = System.Windows.Controls.ListBox;
 
 namespace AIBar.Domain.Tests;
 
+[Collection(WpfTestCollection.Name)]
 public sealed class QuotaHistoryChartTests
 {
     private static readonly DateTimeOffset Now = new(2030, 2, 1, 0, 0, 0, TimeSpan.Zero);

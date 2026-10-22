@@ -7,6 +7,7 @@ using AIBar.Desktop;
 
 namespace AIBar.Domain.Tests;
 
+[Collection(WpfTestCollection.Name)]
 public sealed class PanelSurfaceTests
 {
     // Frozen: xunit may build this static on another thread than the test's dispatcher.
