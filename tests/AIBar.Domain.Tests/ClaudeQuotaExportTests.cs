@@ -333,7 +333,9 @@ public sealed class ClaudeQuotaExportTests : IDisposable
         });
     }
     private ClaudeQuotaRuntime Runtime(IQuotaExportWriter writer, Provider provider, Store? store = null) =>
-        new(Settings, store ?? new(), _ => provider, new Clock(), exportWriter: writer);
+        new(Settings, store ?? new(), _ => provider, new Clock(), exportWriter: writer, remoteFileAvailable: NoRemoteFile);
+    // Never resolve Automatic against this machine's real %LOCALAPPDATA%\AIBar push.
+    private static bool NoRemoteFile() => false;
     private static QuotaSnapshot Snapshot(decimal value) => new(new(value, Now.AddHours(1)), new(value, Now.AddDays(1)), Now);
     private static QuotaExportDocument Document(decimal value) => new(1, Now, QuotaExportState.Current, null, Now, new(value, Now.AddHours(1)), new(value, Now.AddDays(1)));
     private sealed class Clock : IClock { public DateTimeOffset UtcNow => Now; }
