@@ -193,11 +193,15 @@ public partial class MainWindow : Window
         if (_closingDetails || DetailsWindow is null) return;
         Dispatcher.BeginInvoke(new Action(() =>
         {
-            if (!IsVisible || IsActive || DetailsWindow?.IsActive == true || IsSettingsMenuOpen) return;
+            if (!IsVisible || IsActive || DetailsWindow?.IsActive == true || IsSettingsMenuOpen || !ActivationLeftApp()) return;
             CloseDetails();
             Dismiss();
         }));
     }
+
+    /// <summary>Activation moving between the panel and its details window (or not granted yet) is not an outside click.</summary>
+    internal Func<bool> ActivationLeftApp { get; set; } = () =>
+        ForegroundActivation.ForegroundProcessId() is var pid && pid != 0 && pid != (uint)Environment.ProcessId;
 
     private void OnNavigationKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {

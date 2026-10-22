@@ -233,6 +233,7 @@ public sealed class PanelDetailsWindowTests
         WithPanel(panel =>
         {
             panel.OpenDetails(true);
+            panel.ActivationLeftApp = () => true; // The test's "outside" window lives in this process.
             panel.IsSettingsMenuOpen = settingsOpen;
             panel.ShowActivated = false; // Keep the outside-dismissal assertion independent of animation clocks.
             var outside = new Window { Width = 100, Height = 100 };
@@ -256,7 +257,28 @@ public sealed class PanelDetailsWindowTests
         });
     }
 
-    // S5: re-hosting retains explicit history and live DataContext bindings.
+    // S6: activation still inside AIBar (or not granted yet) never closes the pair.
+    [Fact]
+    public void Activation_without_another_app_in_front_keeps_the_pair_open()
+    {
+        WithPanel(panel =>
+        {
+            panel.OpenDetails(true);
+            panel.ActivationLeftApp = () => false;
+            var outside = new Window { Width = 100, Height = 100 };
+            try
+            {
+                outside.Show(); outside.Activate();
+                panel.CheckDetailsActivation();
+                Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.True(panel.IsVisible);
+                Assert.NotNull(panel.DetailsWindow);
+            }
+            finally { outside.Close(); }
+        });
+    }
+
+        // S5: re-hosting retains explicit history and live DataContext bindings.
     [Fact]
     public void Reopening_reuses_content_and_tracks_data_context()
     {

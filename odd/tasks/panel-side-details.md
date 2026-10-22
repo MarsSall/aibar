@@ -14,10 +14,10 @@ Branch: `feat/panel-side-details`. Verification runs on Windows CI (`.github/wor
 
 ## Tasks
 
-- T1 [S3] Remove the DWM system border on the popup window — inline — commit: pending
-- T2 [S4] Cost card uses a panel-matching surface — inline — commit: pending
-- T3 [S1, S2] Stronger glow + "Provider tint" setting — inline — commit: pending
-- T4 [S5, S6] DetailView moves into an owned side window with hover/click/keyboard — worker (context backstop) — commit: pending
+- T1 [S3] Remove the DWM system border on the popup window — inline — commit: 281d648
+- T2 [S4] Cost card uses a panel-matching surface — inline — commit: 281d648
+- T3 [S1, S2] Stronger glow + "Provider tint" setting — inline — commit: 281d648 + 145a7b3
+- T4 [S5, S6] DetailView moves into an owned side window with hover/click/keyboard — worker (context backstop) — commit: see `git log` (feat(panel): open Cost details in a side window)
 - T5 [S1-S6] Docs, Windows CI, rendered check on the user's PC — inline — commit: pending
 
 ## Log
@@ -27,3 +27,6 @@ Branch: `feat/panel-side-details`. Verification runs on Windows CI (`.github/wor
 - L3 (decision, superseded by L4): side panel is a WPF `Popup` (no activation), because the host hides the panel on `Deactivated` (`HostRuntime.cs:247`); a second window would close it.
 - L4 (decision): side panel is an owned borderless `Window` (Owner = MainWindow). The host already ignores panel deactivation while an owned window is visible (`IsOwnedDialogActive`, `HostRuntime.cs:556`), so the panel stays open; the pair handles outside clicks itself. A window gets the same acrylic/corners as the panel (a Popup cannot) and real keyboard focus.
 - L5 (evidence): T1-T3 commit pushed; CI run 39781285393 (workflow_dispatch, CI only triggers on main/PRs).
+- L6 (evidence): CI 39781285393 on 281d648 failed only on PanelSurfaceTests glow (cross-thread brush, test bug fixed in 145a7b3) and RefreshIntervalWindowTests(Light) (pre-existing flake; main run 39778832297 failed on a sibling Settings test).
+- L7 (slice): T1-T3 and T4 are separate commits; the branch is ~900 authored lines, mostly T4 test migration. One PR, reviewed commit by commit.
+- L8 (review fix): parent fixed worker output: hover-then-click pins instead of closing; Left stays with the chart range selector; details window background transparent (no double alpha). CI 39783679767.
