@@ -71,6 +71,20 @@ class HelperTests(unittest.TestCase):
         self.assertEqual(list(result), ['schemaVersion', 'generatedAt', 'state', 'fiveHour', 'weekly'])
         self.assertLessEqual(len(self.h.encode_contract(result)), 4096)
 
+    def test_known_plan_is_sent_last_and_unknown_or_missing_is_omitted(self):
+        body = {'five_hour': {'utilization': 32, 'resets_at': '2026-10-18T06:27:00Z'}, 'seven_day': None}
+        self.write_credentials(subscriptionType='Max')
+        result = self.collect(body)
+        self.assertEqual(list(result), ['schemaVersion', 'generatedAt', 'state', 'fiveHour', 'weekly', 'plan'])
+        self.assertEqual(result['plan'], 'max')
+        for value in ('lifetime', 42, '', 'max\n'):
+            self.write_credentials(subscriptionType=value)
+            self.assertNotIn('plan', self.collect(body))
+        self.write_credentials()
+        self.assertNotIn('plan', self.collect(body))
+        self.write_credentials(subscriptionType='pro', expiresAt=int(NOW.timestamp() * 1000))
+        self.assertNotIn('plan', self.collect(body))  # non-current documents stay minimal
+
     def test_expiry_margin_no_http(self):
         for delta in (-1, 0, 60):
             self.write_credentials(expiresAt=int((NOW.timestamp() + delta) * 1000))

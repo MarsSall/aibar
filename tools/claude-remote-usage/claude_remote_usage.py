@@ -17,6 +17,8 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 ENDPOINT = 'https://api.anthropic.com/api/oauth/usage'
 FILENAME = 'claude-remote-usage.json'
+# Subscription tiers AIBar can label; anything else is never sent.
+PLANS = frozenset(('max', 'pro', 'plus', 'free', 'team', 'business', 'enterprise', 'edu'))
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -37,10 +39,17 @@ def utc_stamp(value):
     return value.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
 
 
-def document(now, state, five_hour=None, weekly=None):
-    return dict(schemaVersion=1, generatedAt=utc_stamp(now), state=state,
-                fiveHour=five_hour if state == 'current' else None,
-                weekly=weekly if state == 'current' else None)
+def document(now, state, five_hour=None, weekly=None, plan=None):
+    value = dict(schemaVersion=1, generatedAt=utc_stamp(now), state=state,
+                 fiveHour=five_hour if state == 'current' else None,
+                 weekly=weekly if state == 'current' else None)
+    if state == 'current' and plan is not None:
+        value['plan'] = plan
+    return value
+
+
+def plan_of(value):
+    return value.lower() if isinstance(value, str) and value.lower() in PLANS else None
 
 
 def window(value):
@@ -72,6 +81,7 @@ def collect(root, *, now=None, opener=None):
         oauth = fields.get('claudeAiOauth')
         token = oauth.get('accessToken')
         expiry = oauth.get('expiresAt')
+        plan = plan_of(oauth.get('subscriptionType'))
         # Release the parsed credential document; no other credential fields are used.
         del fields, oauth
         if not isinstance(token, str) or not token.strip() or any(ord(c) < 32 or ord(c) > 126 for c in token):
@@ -106,7 +116,7 @@ def collect(root, *, now=None, opener=None):
             weekly = window(payload.get('seven_day'))
             if primary is None and weekly is None:
                 return unavailable
-            return document(now, 'current', primary, weekly)
+            return document(now, 'current', primary, weekly, plan)
     except HTTPError as error:
         error.close()
         return document(now, 'authentication-required') if error.code in (401, 403) else unavailable

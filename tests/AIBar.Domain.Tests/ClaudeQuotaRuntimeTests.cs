@@ -15,7 +15,7 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
     private ConsentSettings Settings => new(Path.Combine(_root, "settings.json"));
 
     [Fact]
-    public async Task Plan_metadata_is_local_only_and_disappears_on_source_switch_or_revoke()
+    public async Task Plan_metadata_follows_the_active_source_and_disappears_on_revoke()
     {
         var provider = new Provider { PlanLabel = "Max" };
         await using var runtime = new ClaudeQuotaRuntime(Settings, new MemoryStore(), _ => provider, new Clock(),
@@ -25,7 +25,7 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
         await runtime.GrantConsentAsync(default);
         Assert.Equal("Max", runtime.PlanLabel);
         await runtime.SetSourceAsync(ClaudeQuotaSource.OtherMachine, default);
-        Assert.Null(runtime.PlanLabel); // Even a remote provider cannot borrow the local credential's plan.
+        Assert.Equal("Pro", runtime.PlanLabel); // L15: the other machine's own plan, never the local credential's.
         await runtime.SetSourceAsync(ClaudeQuotaSource.ThisPc, default);
         Assert.Equal("Max", runtime.PlanLabel);
         await runtime.RevokeConsentAsync(default);

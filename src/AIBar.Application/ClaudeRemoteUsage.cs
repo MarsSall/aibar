@@ -9,8 +9,11 @@ namespace AIBar.Application;
 public enum ClaudeQuotaSource { ThisPc, OtherMachine, Automatic }
 
 /// <summary>Reads only the bounded, normalized usage file pushed by the other machine.</summary>
-public sealed class ClaudeRemoteUsageProvider : IQuotaProvider
+public sealed class ClaudeRemoteUsageProvider : IQuotaProvider, IQuotaPlanMetadata
 {
+    private string? _planLabel;
+    /// <summary>Plan from the optional trailing "plan" field of the last valid document; unknown plans stay unlabeled.</summary>
+    public string? PlanLabel => _policy.IsEnabled ? _planLabel : null;
     private readonly PrivateIntegrationPolicy _policy;
     private readonly string _path;
     private readonly ICredentialFileReader _files;
@@ -76,7 +79,12 @@ public sealed class ClaudeRemoteUsageProvider : IQuotaProvider
             var text = new UTF8Encoding(false, true).GetString(bytes, 0, count);
             using var json = JsonDocument.Parse(text);
             var root = json.RootElement;
-            RequireProperties(root, "schemaVersion", "generatedAt", "state", "fiveHour", "weekly");
+            // The helper may append "plan" (L15); every other extra property still fails closed.
+            var hasPlan = root.ValueKind == JsonValueKind.Object && root.EnumerateObject().Count() == 6;
+            if (hasPlan) RequireProperties(root, "schemaVersion", "generatedAt", "state", "fiveHour", "weekly", "plan");
+            else RequireProperties(root, "schemaVersion", "generatedAt", "state", "fiveHour", "weekly");
+            var plan = hasPlan ? root.GetProperty("plan") : default;
+            if (hasPlan && plan.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) throw new FormatException("Invalid plan.");
             if (root.GetProperty("schemaVersion").GetRawText() != "1") return Unavailable();
             var generated = Timestamp(root.GetProperty("generatedAt"));
             var state = root.GetProperty("state").GetString();
@@ -85,6 +93,7 @@ public sealed class ClaudeRemoteUsageProvider : IQuotaProvider
             if (state is not ("current" or "authentication-required" or "unavailable")) return Unavailable();
             if (state == "current" ? primary is null && weekly is null : primary is not null || weekly is not null)
                 return Unavailable();
+            _planLabel = hasPlan && plan.ValueKind == JsonValueKind.String ? QuotaPlanLabels.FromKnownValue(plan.GetString()) : null;
             var age = _utcNow() - generated;
             if (age < -TimeSpan.FromMinutes(2)) return Unavailable();
             if (age > TimeSpan.FromMinutes(15)) return Failure(QuotaErrorKind.Service, "quota_service");
