@@ -11,6 +11,9 @@ Branch: `feat/panel-side-details`. Verification runs on Windows CI (`.github/wor
 - S4 Cost card matches the panel: "fijate que el "COSTO", esta en engro, no se condice con el pane" (opaque `CardBrush` black card on a translucent surface).
 - S5 Side flyout: "me gusta como presenta los graficos codexbar, que se desplieguen al costa" / answer: "Todo el DetailView al costado" (chart, local usage and disclosures move to a side panel; the main panel no longer swaps views).
 - S6 Trigger: "Hover + click (Recomendado)" — opens after a short hover on the Cost row, on click, and on Enter/Space/→ from the keyboard; Esc/← closes it and returns focus to Cost.
+- S7 Charts: "los graficos no me gistan, preferiria de linea o columnas (configurable tambien)"; answers: data → "Ambos" (quota % of the selected provider, 5h and weekly, solid and readable; plus daily tokens/cost per day, CodexBar style); style switch → "Botón en el propio gráfico" (a Line | Columns selector next to 24h/7d/30d, remembered across restarts in appearance.json).
+- S8 Unified details color: "el pane de de cada uno tiene el color del proveedor, cuando desplegas el pane del grafico tiene otro color y settings tiene otro color, tenemos que unificar, dejaria con el color de settings cuando se despliega el pane con el grafico"; answer → "Borde + glow + fondo (Recomendado)": the details window uses the Settings window's surface, border and blue glow; the main panel keeps the provider tint.
+- S9 Remove sections: "/tmp/herdr-clipboard-images-1000/client-26-clipboard-1792676693844618882-0.png que no em interesa que este.."; answer → "Ambos": the details window drops "Local usage" (Local Codex data, OpenCode and Pi local usage) and "Quota access" (the consent dialogs keep the disclosure text).
 
 ## Tasks
 
@@ -18,7 +21,9 @@ Branch: `feat/panel-side-details`. Verification runs on Windows CI (`.github/wor
 - T2 [S4] Cost card uses a panel-matching surface — inline — commit: 281d648
 - T3 [S1, S2] Stronger glow + "Provider tint" setting — inline — commit: 281d648 + 145a7b3
 - T4 [S5, S6] DetailView moves into an owned side window with hover/click/keyboard — worker (context backstop) — commit: see `git log` (feat(panel): open Cost details in a side window)
-- T5 [S1-S6] Docs, Windows CI, rendered check on the user's PC — inline — commit: pending
+- T5 [S1-S6] Docs, Windows CI, rendered check on the user's PC — inline — commit: 4b9d4cf (deployed, user feedback L11)
+- T6 [S7, S8, S9] Chart redesign (quota + daily usage, Line/Columns toggle persisted), Settings-colored details window, remove Local usage and Quota access — worker — commit: pending
+- T7 [S7-S9] Windows CI, redeploy to the user's PC, user acceptance — inline — commit: pending
 
 ## Log
 
@@ -31,3 +36,5 @@ Branch: `feat/panel-side-details`. Verification runs on Windows CI (`.github/wor
 - L7 (slice): T1-T3 and T4 are separate commits; the branch is ~900 authored lines, mostly T4 test migration. One PR, reviewed commit by commit.
 - L8 (review fix): parent fixed worker output: hover-then-click pins instead of closing; Left stays with the chart range selector; details window background transparent (no double alpha). CI 39783679767.
 - L9 (evidence): CI 39784767277 green on all jobs (.NET Windows, YASB Pester, Python) after the activation fix. Pending: rendered/interactive check on the user's PC (hover, focus, acrylic, outside click).
+- L10 (deploy): built 4b9d4cf on Mars (SDK 8.0.408, self-contained win-x64); 7 AIBar files changed, installed into Downloads\AIBar with hash check; backup of previous 7 files at %TEMP%\aibar-pr71-backup (delete after acceptance); build clone removed; relaunched PID 1196 session 4.
+- L11 (user, after testing 4b9d4cf): "bueno varias cosas, los graficos no me gistan, preferiria de linea o columnas (configurable tambien), el pane de de cada uno tiene el color del proveedor, cuando desplegas el pane del grafico tiene otro color y settings tiene otro color, tenemos que unificar, dejaria con el color de settings cuando se despliega el pane con el grafico.  Luego tenemos /tmp/herdr-clipboard-images-1000/client-26-clipboard-1792676693844618882-0.png que no em interesa que este.." Answers: data "Ambos"; style "Botón en el propio gráfico"; color "Borde + glow + fondo (Recomendado)"; remove "Ambos".
