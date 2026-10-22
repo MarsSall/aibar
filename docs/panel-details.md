@@ -37,7 +37,7 @@ Cost opens an owned, borderless usage-details window beside the panel; the summa
 - Esc, Left or the close button in details closes the window and returns focus to Cost.
 - An outside click leaving both windows dismisses the pair, except while the settings menu is open. Hiding, dismissing or closing the panel also closes details.
 
-The details window uses the same opaque `SettingsSurfaceBrush`, theme border and dark blue glow as Settings, independent of provider tint and background opacity. The main panel keeps its provider decoration. Live Windows theme changes update both surfaces.
+The details window uses the same opaque `SettingsSurfaceBrush` as Settings, independent of background opacity, while its border and dark glow follow the panel's provider decoration (selected provider, high-usage red, sign-in amber, stale neutral, and Provider tint off). Live Windows theme changes update both surfaces.
 
 Two chart sections follow the selected provider tab live:
 

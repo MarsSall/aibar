@@ -88,14 +88,20 @@ internal sealed class PanelDetailsWindow : Window
         if (!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(new Action(ApplySurface));
     }
 
-    /// <summary>Settings surface and border, but the glow follows the selected provider like the panel's (S8, L15).</summary>
+    /// <summary>Settings surface; border and glow follow the selected provider like the panel's (S8, L15, L17).</summary>
     private void ApplySurface()
     {
         SettingsDecoration.Apply(DetailsSurface, _themeSource.Current);
-        var glow = new MultiBinding { Converter = new PanelWindowDecorationConverter(), ConverterParameter = "Glow" };
+        DetailsSurface.SetBinding(Border.BorderBrushProperty, ProviderDecoration(null));
+        DetailsSurface.SetBinding(Border.EffectProperty, ProviderDecoration("Glow"));
+    }
+
+    private MultiBinding ProviderDecoration(string? part)
+    {
+        var binding = new MultiBinding { Converter = new PanelWindowDecorationConverter(), ConverterParameter = part };
         foreach (var path in new[] { "Tag", "SelectedProvider", "CodexUsage", "ClaudeUsage", "DataContext.State.IsCurrent", "DataContext.Claude.State.IsCurrent", "DataContext.State.NeedsLogin", "DataContext.Claude.State.NeedsLogin", "ProviderTint" })
-            glow.Bindings.Add(new Binding(path) { Source = _panel });
-        DetailsSurface.SetBinding(Border.EffectProperty, glow);
+            binding.Bindings.Add(new Binding(path) { Source = _panel });
+        return binding;
     }
 
     internal void Place()

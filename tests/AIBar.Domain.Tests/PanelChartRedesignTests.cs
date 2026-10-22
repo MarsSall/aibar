@@ -179,7 +179,7 @@ public sealed class PanelChartRedesignTests
     [InlineData(WindowsTheme.Dark)]
     [InlineData(WindowsTheme.Light)]
     [InlineData(WindowsTheme.HighContrast)]
-    public void Details_chrome_matches_settings_surface_with_provider_glow(WindowsTheme theme)
+    public void Details_chrome_uses_settings_surface_with_provider_border_and_glow(WindowsTheme theme)
     {
         WpfTestApplicationHost.Run(_ =>
         {
@@ -196,7 +196,9 @@ public sealed class PanelChartRedesignTests
                 var expected = Assert.IsType<Border>(settings.FindName("SettingsSurface"));
                 Assert.Equal(((SolidColorBrush)expected.Background).Color, ((SolidColorBrush)details.DetailsSurface.Background).Color);
                 Assert.Equal(255, ((SolidColorBrush)details.DetailsSurface.Background).Color.A);
-                Assert.Equal(((SolidColorBrush)expected.BorderBrush).Color, ((SolidColorBrush)details.DetailsSurface.BorderBrush).Color);
+                // L17: the border follows the selected provider like the panel's, not the Settings border.
+                var panelBorder = ((SolidColorBrush)((Border)panel.Template.FindName("PanelSurface", panel)).BorderBrush).Color;
+                Assert.Equal(panelBorder, ((SolidColorBrush)details.DetailsSurface.BorderBrush).Color);
                 // L15: the glow is the panel's provider glow, not the Settings blue.
                 var panelGlow = Assert.IsType<DropShadowEffect>(((Border)panel.Template.FindName("PanelSurface", panel)).Effect);
                 var glow = Assert.IsType<DropShadowEffect>(details.DetailsSurface.Effect);
@@ -204,7 +206,7 @@ public sealed class PanelChartRedesignTests
                 Assert.False(details.IsTranslucent);
                 source.Set(WindowsTheme.Light);
                 System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-                Assert.Equal(System.Windows.Media.Color.FromRgb(214, 214, 214), ((SolidColorBrush)details.DetailsSurface.BorderBrush).Color);
+                Assert.Equal(panelBorder, ((SolidColorBrush)details.DetailsSurface.BorderBrush).Color);
             }
             finally { details?.Close(); settings.Close(); panel.Close(); }
         });
