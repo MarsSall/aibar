@@ -52,6 +52,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private CancellationTokenSource? _pollCancellation;
     private ITimer? _timer;
     private readonly IClaudeRemoteRefreshChannel _remoteRefresh;
+    private readonly TimeSpan _remoteAbsenceConfirmation;
     private IDisposable? _remoteUsageWatch;
     private readonly object _deadlineGate = new();
     private ITimer? _remoteDeadlineTimer;
@@ -68,8 +69,9 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         IQuotaExportWriter? exportWriter = null,
         Func<PrivateIntegrationPolicy, IQuotaProvider>? remoteProviderFactory = null,
         Func<bool>? remoteFileAvailable = null, IQuotaHistoryStore? historyStore = null,
-        IClaudeRemoteRefreshChannel? remoteRefresh = null)
+        IClaudeRemoteRefreshChannel? remoteRefresh = null, TimeSpan? remoteAbsenceConfirmation = null)
     {
+        _remoteAbsenceConfirmation = remoteAbsenceConfirmation ?? TimeSpan.Zero;
         // Like the export writer, only the desktop composition touches the real AIBar directory.
         _remoteRefresh = remoteRefresh ?? NoRemoteRefresh.Instance;
         _historyStore = historyStore;
@@ -396,6 +398,11 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private async ValueTask RefreshCoreAsync(RefreshTrigger trigger, bool requestRemote, CancellationToken cancellationToken)
     {
         QuotaRefreshCoordinator? coordinator;
+        // The other machine publishes with File.Replace, which leaves the file briefly absent.
+        // Automatic must not fall back to this PC (and its missing login) on that gap.
+        if (_remoteAbsenceConfirmation > TimeSpan.Zero && _source == ClaudeQuotaSource.Automatic &&
+            _resolvedSource == ClaudeQuotaSource.OtherMachine && !_remoteFileAvailable())
+            await Task.Delay(_remoteAbsenceConfirmation, _timeProvider, cancellationToken);
         await EnterGateAsync(cancellationToken);
         try
         {
@@ -527,7 +534,12 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     // would make the other machine push in a loop.
     private async void ForwardRemoteUsageChanged()
     {
-        try { if (_enabled) await RefreshCoreAsync(RefreshTrigger.Manual, requestRemote: false, CancellationToken.None); }
+        try
+        {
+            // Let the replace that raised the event finish before reading.
+            if (_remoteAbsenceConfirmation > TimeSpan.Zero) await Task.Delay(_remoteAbsenceConfirmation, _timeProvider);
+            if (_enabled) await RefreshCoreAsync(RefreshTrigger.Manual, requestRemote: false, CancellationToken.None);
+        }
         catch (Exception) { /* Never trace a provider/file-system exception or its private path. */ }
     }
 
