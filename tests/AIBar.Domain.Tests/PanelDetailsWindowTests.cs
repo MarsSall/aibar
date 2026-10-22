@@ -67,9 +67,11 @@ public sealed class PanelDetailsWindowTests
         });
     }
 
-    // S6: Left belongs to the chart range selector while it has focus.
-    [Fact]
-    public void Left_in_range_selector_moves_segment_without_closing()
+    // S6/S7: Left belongs to either chart selector while it has focus.
+    [Theory]
+    [InlineData("HistoryRange")]
+    [InlineData("StyleSelector")]
+    public void Left_in_chart_selector_moves_segment_without_closing(string selectorName)
     {
         WithPanel(panel =>
         {
@@ -77,16 +79,18 @@ public sealed class PanelDetailsWindowTests
             var side = panel.DetailsWindow!;
             side.UpdateLayout();
             var detail = (StackPanel)panel.FindName("DetailView");
-            var range = (ListBox)detail.Children.OfType<QuotaHistoryChart>().Single().FindName("HistoryRange");
-            var item = (ListBoxItem)range.ItemContainerGenerator.ContainerFromIndex(Math.Max(0, range.SelectedIndex));
+            var range = (ListBox)detail.Children.OfType<QuotaHistoryChart>().Single().FindName(selectorName);
+            range.SelectedIndex = 1;
+            var item = (ListBoxItem)range.ItemContainerGenerator.ContainerFromIndex(1);
             Assert.True(item.Focus());
             Send(item, side, Key.Left);
+            Assert.Equal(0, range.SelectedIndex);
             Assert.Same(side, panel.DetailsWindow);
             Assert.True(side.IsVisible);
         });
     }
 
-    // S5: the rounded border alone paints the surface, so its alpha matches the panel.
+    // S5/S8: the layered host is transparent; the Settings-colored rounded surface is opaque.
     [Fact]
     public void Details_window_background_is_transparent_behind_the_rounded_surface()
     {

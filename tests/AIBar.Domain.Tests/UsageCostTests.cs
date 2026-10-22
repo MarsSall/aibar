@@ -58,6 +58,34 @@ public sealed class UsageCostTests
     }
 
     [Fact]
+    public void Daily_breakdown_zero_fills_exact_30_day_window_without_changing_totals_or_labels()
+    {
+        var result = UsageCostPolicy.Calculate([Row(Today), Row(Today.AddDays(-29)), Row(Today.AddDays(-30)), Row(Today.AddDays(1))], Today);
+        Assert.Equal(30, result.Days.Count);
+        Assert.Equal(Today.AddDays(-29), result.Days[0].Day);
+        Assert.Equal(Today, result.Days[^1].Day);
+        Assert.All(result.Days.Skip(1).SkipLast(1), day => Assert.Equal(new UsageCostDay(day.Day, 0, 0, false), day));
+        Assert.Equal(result.Last30Days.Tokens, result.Days.Sum(day => day.Tokens));
+        Assert.Equal(result.Last30Days.Cost, result.Days.Sum(day => day.Cost));
+        Assert.Equal("Today: $1.25 · 1M tokens", result.TodayLabel);
+        Assert.Equal("Last 30 days: $2.50 · 2M tokens", result.Last30DaysLabel);
+        Assert.Empty(UsageCostSummary.Unavailable.Days);
+    }
+
+    [Fact]
+    public void Daily_breakdown_preserves_unpriced_subtotals_and_incomplete_flags()
+    {
+        var result = UsageCostPolicy.Calculate([Row(Today), Row(Today, "unknown"), Row(Today.AddDays(-1), "unknown")], Today);
+        Assert.Equal(new UsageCostDay(Today, 2_000_000, 1.25m, true, true), result.Days[^1]);
+        Assert.Equal(new UsageCostDay(Today.AddDays(-1), 1_000_000, null, true, true), result.Days[^2]);
+        var incomplete = UsageCostPolicy.Calculate([Row(Today)], Today, true);
+        Assert.All(incomplete.Days, day => Assert.True(day.Partial));
+        Assert.Equal(1.25m, incomplete.Days[^1].Cost);
+        Assert.Null(incomplete.Days[0].Cost);
+        Assert.Equal(incomplete.Today.Tokens, incomplete.Days[^1].Tokens);
+    }
+
+    [Fact]
     public async Task Codex_adapter_keeps_daily_rows_before_collapsing_model_totals()
     {
         var now = new DateTimeOffset(2026, 10, 19, 12, 0, 0, TimeSpan.Zero);

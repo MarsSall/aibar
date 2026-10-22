@@ -32,7 +32,7 @@ public sealed class AppearanceSettingsTests : IDisposable
         Assert.Equal(options, await settings.LoadAsync(default));
         Assert.Equal(options, Assert.Single(changes));
         using var json = JsonDocument.Parse(await File.ReadAllTextAsync(path));
-        Assert.Equal(new[] { "schema", "barColors", "yasbColors", "backgroundOpacity", "refreshMinutes", "providerTint" }, json.RootElement.EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.Equal(new[] { "schema", "barColors", "yasbColors", "backgroundOpacity", "refreshMinutes", "providerTint", "chartStyle" }, json.RootElement.EnumerateObject().Select(p => p.Name).ToArray());
         Assert.Equal(1, json.RootElement.GetProperty("schema").GetInt32());
         using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => settings.SaveAsync(new(), cancelled.Token).AsTask());
@@ -103,6 +103,29 @@ public sealed class AppearanceSettingsTests : IDisposable
         Assert.Equal(off, changed);
         using var json = JsonDocument.Parse(await File.ReadAllTextAsync(path));
         Assert.False(json.RootElement.GetProperty("providerTint").GetBoolean());
+    }
+    [Fact]
+    public async Task Chart_style_roundtrip_defaults_and_invalid_values_preserve_other_options()
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, "appearance.json");
+        var settings = new AppearanceSettings(path);
+        foreach (var suffix in new[] { "", ",\"chartStyle\":\"invalid\"", ",\"chartStyle\":null" })
+        {
+            await File.WriteAllTextAsync(path, "{\"schema\":1,\"barColors\":\"usage\"" + suffix + "}");
+            Assert.Equal(new AppearanceOptions("usage"), await settings.LoadAsync(default));
+        }
+        foreach (var style in new[] { "line", "columns" })
+        {
+            var options = new AppearanceOptions("usage", ChartStyle: style);
+            await settings.SaveAsync(options, default);
+            Assert.Equal(options, await settings.LoadAsync(default));
+            using var json = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+            Assert.Equal(style, json.RootElement.GetProperty("chartStyle").GetString());
+        }
+        foreach (var style in new[] { "", "Line", "bars", "invalid" })
+            await Assert.ThrowsAsync<ArgumentException>(() => settings.SaveAsync(new(ChartStyle: style), default).AsTask());
+        Assert.Equal("columns", (await settings.LoadAsync(default)).ChartStyle);
     }
     public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }
 }

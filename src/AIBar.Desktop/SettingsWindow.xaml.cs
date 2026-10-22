@@ -125,8 +125,9 @@ public partial class SettingsWindow : Window
             }
             await _saveAlerts(new(Resets.IsChecked == true, Thresholds.IsChecked == true, RunOut.IsChecked == true,
                 EdgeGlow.IsChecked == true, Notification.IsChecked == true, Confetti.IsChecked == true) { ThresholdValues = values });
+            var currentAppearance = await _appearance.LoadAsync(default);
             await _appearance.SaveAsync(new(BarUsage.IsChecked == true ? "usage" : "brand", YasbBrand.IsChecked == true ? "brand" : "usage", (int)BackgroundOpacity.Value,
-                RefreshChoices.Children.OfType<RadioButton>().Where(choice => choice.IsChecked == true).Select(RefreshMinutes).Single(), ProviderTint.IsChecked == true), default);
+                RefreshChoices.Children.OfType<RadioButton>().Where(choice => choice.IsChecked == true).Select(RefreshMinutes).Single(), ProviderTint.IsChecked == true, currentAppearance.ChartStyle), default);
             SaveStatus.Text = "Changes saved.";
             if (_providers is { } currentProviders) SourceStatus.Text = "ⓘ " + currentProviders.SourceDescription;
         }
@@ -189,11 +190,7 @@ public partial class SettingsWindow : Window
     private void UpdateWindowDecoration()
     {
         var dark = _themeSource.Current == WindowsTheme.Dark;
-        SettingsSurface.Effect = dark ? new System.Windows.Media.Effects.DropShadowEffect
-        {
-            Color = System.Windows.Media.Color.FromRgb(0x6E, 0x9B, 0xFF),
-            ShadowDepth = 0, BlurRadius = 29, Opacity = .27
-        } : null;
+        SettingsDecoration.Apply(SettingsSurface, _themeSource.Current);
         SettingsShadow.Effect = dark ? new System.Windows.Media.Effects.DropShadowEffect
         {
             Color = System.Windows.Media.Colors.Black,

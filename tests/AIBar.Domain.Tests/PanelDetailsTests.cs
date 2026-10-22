@@ -18,7 +18,7 @@ public sealed class PanelDetailsTests
     [InlineData(WindowsTheme.Dark, 360)]
     [InlineData(WindowsTheme.HighContrast, 300)]
     [InlineData(WindowsTheme.HighContrast, 360)]
-    public void Cost_detail_preserves_exact_local_usage_disclosure_focus_and_scroll(WindowsTheme theme, int width)
+    public void Cost_detail_removes_local_usage_and_disclosures_but_preserves_navigation_and_panel(WindowsTheme theme, int width)
     {
         WpfTestApplicationHost.Run(app =>
         {
@@ -38,12 +38,9 @@ public sealed class PanelDetailsTests
                 Assert.True(detail.IsVisible);
                 var back = Assert.IsType<Button>(window.FindName("CloseDetailsButton"));
                 Assert.True(back.IsKeyboardFocused);
-                var provider = Visuals<Expander>(detail).Single(item => AutomationProperties.GetName(item) == "Provider row");
-                Assert.True(provider.Focusable && provider.IsTabStop); Assert.NotNull(provider.FocusVisualStyle);
-                Assert.Contains(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "1234567890 retained tokens");
-                Assert.DoesNotContain(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
-                var toggle = Assert.IsAssignableFrom<IExpandCollapseProvider>(new ExpanderAutomationPeer(provider).GetPattern(PatternInterface.ExpandCollapse));
-                toggle.Expand(); side.UpdateLayout();
+                Assert.Empty(Visuals<GroupBox>(detail));
+                Assert.Empty(Visuals<Expander>(detail));
+                Assert.DoesNotContain(Visuals<TextBlock>(detail), text => new[] { "Local usage", "Local Codex data", "OpenCode and Pi local usage", "Quota access", "Quota disclosure", "Private endpoint disclosure" }.Contains(text.Text));
                 var expected = Assert.IsType<SolidColorBrush>(window.FindResource("TextBrush")).Color;
                 if (theme != WindowsTheme.HighContrast)
                 {
@@ -51,26 +48,13 @@ public sealed class PanelDetailsTests
                     var lights = new[] { Luminance(expected), Luminance(background) };
                     Assert.True((lights.Max() + .05) / (lights.Min() + .05) >= 4.5);
                 }
-                foreach (var label in new[] { "Provider scope", "1234567890 retained tokens", "Input 11", "2026-01-01", "sample-model", "100 tokens", "Input 10" })
-                {
-                    var text = Assert.Single(Visuals<TextBlock>(provider).Where(text => text.Text == label));
-                    Assert.True(text.IsVisible); text.BringIntoView(); side.UpdateLayout(); AssertInViewports(text);
-                    if (label is "Provider scope" or "1234567890 retained tokens" or "2026-01-01" or "sample-model")
-                        Assert.Equal(expected, Assert.IsType<SolidColorBrush>(text.Foreground).Color);
-                }
                 back.Focus(); Assert.True(back.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
                 // The segmented ListBox owns one Tab stop; focus lives on its selected segment.
                 var selector = Assert.IsType<ListBox>(Assert.Single(Visuals<QuotaHistoryChart>(detail)).FindName("HistoryRange"));
                 Assert.True(selector.IsKeyboardFocusWithin); Assert.Equal("Usage history range", AutomationProperties.GetName(selector));
                 Assert.True(((UIElement)Keyboard.FocusedElement).MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)));
-                Assert.True(provider.IsKeyboardFocused); side.UpdateLayout(); AssertInViewports(provider);
-                toggle.Collapse(); side.UpdateLayout();
-                Assert.DoesNotContain(Visuals<TextBlock>(provider), text => text.IsVisible && text.Text == "Input 11");
-                foreach (var label in new[] { "Quota disclosure", "Private endpoint disclosure" })
-                {
-                    var text = Assert.Single(Visuals<TextBlock>(detail).Where(text => text.Text == label));
-                    text.BringIntoView(); side.UpdateLayout(); AssertInViewports(text);
-                }
+                var styleSelector = Assert.IsType<ListBox>(Assert.Single(Visuals<QuotaHistoryChart>(detail)).FindName("StyleSelector"));
+                Assert.True(styleSelector.IsKeyboardFocusWithin);
                 back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); window.UpdateLayout();
                 Assert.False(detail.IsVisible); Assert.True(cost.IsKeyboardFocused);
                 var cards = Visuals<GroupBox>(window).Take(2).ToArray();

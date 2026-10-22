@@ -32,6 +32,7 @@ public sealed class PanelScrollTests
                 window.Show();
                 ((System.Windows.Controls.Button)window.FindName("CostButton")).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
                 var side = Assert.IsType<PanelDetailsWindow>(window.DetailsWindow);
+                side.DetailsScrollViewer.MaxHeight = 180; // Both chart sections must scroll in a short viewport; no local-usage rows are needed.
                 Settle(side);
                 var scroller = side.DetailsScrollViewer;
                 Assert.True(scroller.ScrollableHeight > 0);

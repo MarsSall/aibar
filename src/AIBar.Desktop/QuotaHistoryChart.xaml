@@ -1,6 +1,7 @@
 <UserControl x:Class="AIBar.Desktop.QuotaHistoryChart"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:local="clr-namespace:AIBar.Desktop"
  xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
  Focusable="False" Margin="0,8,0,16">
  <UserControl.Resources>
@@ -25,6 +26,7 @@
  </UserControl.Resources>
  <StackPanel>
   <TextBlock Text="Usage history" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" Margin="0,0,0,8" />
+  <WrapPanel>
   <ListBox x:Name="HistoryRange" SelectedIndex="0" HorizontalAlignment="Left" Margin="0,0,0,8"
    Focusable="False" IsTabStop="False" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Contained"
    PreviewKeyDown="OnRangeKeyDown" SelectionChanged="OnRangeChanged" ItemContainerStyle="{StaticResource RangeSegment}"
@@ -35,6 +37,16 @@
    <ListBoxItem Content="7d" automation:AutomationProperties.Name="Last 7 days" />
    <ListBoxItem Content="30d" automation:AutomationProperties.Name="Last 30 days" />
   </ListBox>
+  <ListBox x:Name="StyleSelector" SelectedIndex="0" HorizontalAlignment="Left" Margin="8,0,0,8"
+   Focusable="False" IsTabStop="False" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Contained"
+   PreviewKeyDown="OnRangeKeyDown" SelectionChanged="OnStyleChanged" ItemContainerStyle="{StaticResource RangeSegment}"
+   automation:AutomationProperties.Name="Chart style">
+   <ListBox.Template><ControlTemplate TargetType="ListBox"><Border Background="{DynamicResource ProgressTrackBrush}" CornerRadius="7" Padding="1"><ItemsPresenter /></Border></ControlTemplate></ListBox.Template>
+   <ListBox.ItemsPanel><ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate></ListBox.ItemsPanel>
+   <ListBoxItem Content="Line" automation:AutomationProperties.Name="Line" />
+   <ListBoxItem Content="Columns" automation:AutomationProperties.Name="Columns" />
+  </ListBox>
+  </WrapPanel>
   <Grid Height="124" Margin="0,4,0,0">
    <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition /></Grid.ColumnDefinitions>
    <TextBlock Text="100%" VerticalAlignment="Top" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" />
@@ -49,5 +61,6 @@
   <Grid Margin="38,0,2,8"><TextBlock x:Name="RangeStart" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" /><TextBlock Text="Now" HorizontalAlignment="Right" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" /></Grid>
   <TextBlock x:Name="HistoryMessage" Text="No usage history yet" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" automation:AutomationProperties.LiveSetting="Polite" />
   <WrapPanel x:Name="Legend" />
+  <local:DailyUsageChart x:Name="DailyChart" />
  </StackPanel>
 </UserControl>

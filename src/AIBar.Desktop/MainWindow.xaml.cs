@@ -17,6 +17,30 @@ public partial class MainWindow : Window
         nameof(BarColorMode), typeof(PanelBarColorMode), typeof(MainWindow), new PropertyMetadata(PanelBarColorMode.Brand));
     public PanelBarColorMode BarColorMode { get => (PanelBarColorMode)GetValue(BarColorModeProperty); set => SetValue(BarColorModeProperty, value); }
 
+    public AIBar.Application.AppearanceSettings? AppearanceSettings { get; set; }
+    public static readonly DependencyProperty ChartStyleProperty = DependencyProperty.Register(
+        nameof(ChartStyle), typeof(string), typeof(MainWindow), new PropertyMetadata("line"));
+    public string ChartStyle { get => (string)GetValue(ChartStyleProperty); set => SetValue(ChartStyleProperty, value); }
+    internal void ApplyAppearanceOptions(AIBar.Application.AppearanceOptions options)
+    {
+        ProviderTint = options.ProviderTint;
+        ChartStyle = options.ChartStyle;
+    }
+    private readonly SemaphoreSlim _chartStyleSaves = new(1, 1);
+    internal async Task SaveChartStyleAsync(string style)
+    {
+        if (!AIBar.Application.AppearanceSettings.ValidChartStyle(style)) throw new ArgumentException("Unknown chart style.", nameof(style));
+        ChartStyle = style;
+        if (AppearanceSettings is not { } settings) return;
+        await _chartStyleSaves.WaitAsync();
+        try
+        {
+            var current = await settings.LoadAsync(default);
+            await settings.SaveAsync(current with { ChartStyle = style }, default);
+        }
+        finally { _chartStyleSaves.Release(); }
+    }
+
     public static readonly DependencyProperty ProviderTintProperty = DependencyProperty.Register(
         nameof(ProviderTint), typeof(bool), typeof(MainWindow), new PropertyMetadata(true));
     /// <summary>False keeps border, glow, header divider and selected tab neutral.</summary>
@@ -57,6 +81,11 @@ public partial class MainWindow : Window
         SelectProvider(provider);
         (provider == "Claude" ? ClaudeTab : CodexTab).Focus();
         e.Handled = true;
+    }
+    private async void OnChartStyleSelected(string style)
+    {
+        try { await SaveChartStyleAsync(style); }
+        catch (Exception) { /* Keep the current session usable when appearance storage is unavailable. */ }
     }
     private void OnUsageDashboard(object sender, RoutedEventArgs e) => ProviderLinks.OpenUsage(
         SelectedProvider == "Claude" ? AIBar.Domain.StatusProvider.Claude : AIBar.Domain.StatusProvider.Codex, _launchLink);
@@ -146,6 +175,12 @@ public partial class MainWindow : Window
             if (DetailView.Parent is System.Windows.Controls.Panel parent) parent.Children.Remove(DetailView);
             var chart = DetailView.Children.OfType<QuotaHistoryChart>().Single();
             chart.SetBinding(QuotaHistoryChart.HistoryProperty, new System.Windows.Data.Binding(nameof(PaceHistory)) { Source = this });
+            chart.SetBinding(QuotaHistoryChart.SelectedProviderProperty, new System.Windows.Data.Binding(nameof(SelectedProvider)) { Source = this });
+            chart.SetBinding(QuotaHistoryChart.ChartStyleProperty, new System.Windows.Data.Binding(nameof(ChartStyle)) { Source = this });
+            chart.SetBinding(QuotaHistoryChart.CodexDailyProperty, new System.Windows.Data.Binding("DataContext.Analytics.UsageCost") { Source = this });
+            chart.SetBinding(QuotaHistoryChart.ClaudeDailyProperty, new System.Windows.Data.Binding("DataContext.ClaudeCost.State") { Source = this });
+            chart.StyleSelected -= OnChartStyleSelected;
+            chart.StyleSelected += OnChartStyleSelected;
             DetailView.Visibility = Visibility.Visible;
             DetailsWindow = new PanelDetailsWindow(this, DetailView) { ShowActivated = pinned };
             DetailsWindow.Closed += (_, _) => { DetailsWindow = null; DetailView.Visibility = Visibility.Collapsed; _detailsPinned = false; };

@@ -13,14 +13,17 @@ namespace AIBar.Desktop;
 internal sealed class PanelDetailsWindow : Window
 {
     private readonly MainWindow _panel;
-    private readonly System.ComponentModel.DependencyPropertyDescriptor _panelBackground = System.ComponentModel.DependencyPropertyDescriptor.FromProperty(BackgroundProperty, typeof(MainWindow))!;
+    private readonly IWindowsThemeSource _themeSource;
+    private readonly WindowsThemeController _theme;
+    internal Border DetailsSurface { get; };
     internal ScrollViewer DetailsScrollViewer { get; }
     internal bool IsTranslucent { get; set; }
     internal System.Windows.Media.Color? OpaqueCompositionColor { get; set; }
 
-    internal PanelDetailsWindow(MainWindow panel, FrameworkElement detail)
+    internal PanelDetailsWindow(MainWindow panel, FrameworkElement detail, IWindowsThemeSource? themeSource = null)
     {
         _panel = panel;
+        _themeSource = themeSource ?? new WindowsThemeSource();
         Owner = panel;
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
@@ -32,6 +35,7 @@ internal sealed class PanelDetailsWindow : Window
         SetBinding(TopmostProperty, new Binding(nameof(Topmost)) { Source = panel });
         SetBinding(DataContextProperty, new Binding(nameof(DataContext)) { Source = panel });
         // Only the rounded border paints the surface, as in the panel; a window background would double its alpha.
+        AllowsTransparency = true;
         Background = System.Windows.Media.Brushes.Transparent;
         SetBinding(ForegroundProperty, new Binding(nameof(Foreground)) { Source = panel });
         SetBinding(FontFamilyProperty, new Binding(nameof(FontFamily)) { Source = panel });
@@ -50,15 +54,11 @@ internal sealed class PanelDetailsWindow : Window
         {
             if (e.OriginalSource is FrameworkElement focused) focused.BringIntoView();
         };
-        var surface = new Border { CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Child = DetailsScrollViewer };
-        surface.SetBinding(Border.BackgroundProperty, new Binding(nameof(Background)) { Source = panel });
-        var border = new MultiBinding { Converter = new PanelWindowDecorationConverter() };
-        foreach (var path in new[] { "Tag", "SelectedProvider", "CodexUsage", "ClaudeUsage", "DataContext.State.IsCurrent", "DataContext.Claude.State.IsCurrent", "DataContext.State.NeedsLogin", "DataContext.Claude.State.NeedsLogin", "ProviderTint" })
-            border.Bindings.Add(new Binding(path) { Source = panel });
-        surface.SetBinding(Border.BorderBrushProperty, border);
-        Content = surface;
-        SourceInitialized += (_, _) => ApplySurface();
-        _panelBackground.AddValueChanged(panel, OnPanelSurfaceChanged);
+        DetailsSurface = new Border { CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Child = DetailsScrollViewer, Margin = new Thickness(16) };
+        Content = DetailsSurface;
+        _theme = new WindowsThemeController(Resources, _themeSource, Dispatcher);
+        _themeSource.Changed += OnThemeChanged;
+        ApplySurface();
         panel.LocationChanged += OnPanelPlacementChanged;
         panel.SizeChanged += OnPanelPlacementChanged;
         SizeChanged += (_, _) => Place();
@@ -74,7 +74,8 @@ internal sealed class PanelDetailsWindow : Window
         MouseLeave += (_, _) => panel.ScheduleDetailsClose();
         Closed += (_, _) =>
         {
-            _panelBackground.RemoveValueChanged(panel, OnPanelSurfaceChanged);
+            _themeSource.Changed -= OnThemeChanged;
+            _theme.Dispose();
             panel.LocationChanged -= OnPanelPlacementChanged;
             panel.SizeChanged -= OnPanelPlacementChanged;
             DetailsScrollViewer.Content = null;
@@ -82,20 +83,12 @@ internal sealed class PanelDetailsWindow : Window
     }
 
     private void OnPanelPlacementChanged(object? sender, EventArgs e) { if (IsVisible) Place(); }
-    private void OnPanelSurfaceChanged(object? sender, EventArgs e)
+    private void OnThemeChanged(object? sender, EventArgs e)
     {
-        if (IsVisible) ApplySurface();
+        if (!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(new Action(ApplySurface));
     }
 
-    private void ApplySurface()
-    {
-        var surface = _panel.Tag as System.Windows.Media.SolidColorBrush;
-        var highContrast = SystemParameters.HighContrast || surface is not null &&
-            DependencyPropertyHelper.GetValueSource(surface, System.Windows.Media.SolidColorBrush.ColorProperty).IsExpression;
-        var theme = highContrast ? WindowsTheme.HighContrast
-            : surface is not null && PanelPalette.IsDark(surface) ? WindowsTheme.Dark : WindowsTheme.Light;
-        PopupSurface.Apply(new WpfOpaquePopupSurface(this), theme, new WindowsDwmSurfaceHints());
-    }
+    private void ApplySurface() => SettingsDecoration.Apply(DetailsSurface, _themeSource.Current);
 
     internal void Place()
     {
