@@ -37,7 +37,7 @@ public sealed class CodexBarPanelTests
                         Primary = primary, Weekly = weekly, FreshnessLabel = "Current", IsRefreshAvailable = true,
                         State = new { IsCurrent = true, IsPrimaryAvailable = true, IsWeeklyAvailable = true, UpdatedLabel = "Updated just now" },
                         Claude = new { IsEnabled = true, State = new { Primary = primary, Weekly = weekly, IsCurrent = true, IsPrimaryAvailable = true, IsWeeklyAvailable = true, UpdatedLabel = "Updated 2m ago", SourceLabel = "Other machine" } },
-                        Analytics = new { UsageCost = new { TodayLabel = "Today: $0.04 · 15K tokens", Last30DaysLabel = "Last 30 days: $12.80+ · 9.4M tokens (some models unpriced)" } },
+                        CodexCost = new { TodayLabel = "Today: $0.04 · 15K tokens", Last30DaysLabel = "Last 30 days: $12.80+ · 9.4M tokens (some models unpriced)" },
                         ClaudeCost = new { State = new { TodayLabel = "Today: unavailable", Last30DaysLabel = "Last 30 days: $254.24 · 918M tokens (partial)" } }
                     }
                 };

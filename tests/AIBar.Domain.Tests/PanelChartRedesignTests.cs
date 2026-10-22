@@ -128,11 +128,18 @@ public sealed class PanelChartRedesignTests
         WpfTestApplicationHost.Run(_ =>
         {
             var codex = Usage(); var claude = Usage("unknown");
-            var panel = new MainWindow { ClaudeEnabled = true, DataContext = new { Analytics = new { UsageCost = codex }, ClaudeCost = new { State = claude } } };
+            var panel = new MainWindow { ClaudeEnabled = true, DataContext = new { CodexCost = codex, Analytics = new { UsageCost = UsageCostSummary.Unavailable }, ClaudeCost = new { State = claude } } };
             try
             {
                 panel.ApplyAppearanceOptions(new(ChartStyle: "columns"));
                 panel.Show();
+                panel.UpdateLayout();
+                var card = Assert.IsType<Border>(panel.FindName("CostCard"));
+                var costBindings = Visuals<TextBlock>(card).Select(text =>
+                    System.Windows.Data.BindingOperations.GetBinding(text, TextBlock.TextProperty)?.Path.Path).ToArray();
+                Assert.Equal(2, costBindings.Count(path => path == "CodexCost.TodayLabel"));
+                Assert.Equal(2, costBindings.Count(path => path == "CodexCost.Last30DaysLabel"));
+                Assert.DoesNotContain(costBindings, path => path?.StartsWith("Analytics.UsageCost", StringComparison.Ordinal) == true);
                 ((Button)panel.FindName("CostButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 panel.DetailsWindow!.UpdateLayout();
                 var chart = Assert.Single(Visuals<QuotaHistoryChart>(panel.DetailsWindow));

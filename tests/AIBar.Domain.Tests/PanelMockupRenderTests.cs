@@ -69,9 +69,9 @@ public sealed class PanelMockupRenderTests
                         {
                             SourceDetail = "Synthetic local data", TotalTokensLabel = "0 tokens",
                             ModelTotalsLabel = "", CoverageLabel = "", LastScanLabel = "",
-                            WarningLabel = "", IsLoading = false,
-                            UsageCost = new { TodayLabel = "Today: $0.04 · 15K tokens", Last30DaysLabel = "Last 30 days: $12.80 · 9.4M tokens" }
+                            WarningLabel = "", IsLoading = false
                         },
+                        CodexCost = new { TodayLabel = "Today: $0.04 · 15K tokens", Last30DaysLabel = "Last 30 days: $12.80 · 9.4M tokens" },
                         ClaudeCost = new { State = new { TodayLabel = "Today: $38.17 · 264M tokens", Last30DaysLabel = "Last 30 days: $254.24 · 918M tokens (partial)" } },
                         LocalUsage = new { Description = "Synthetic local usage", StatusLabel = "Current", Rows = Array.Empty<object>() }
                     }

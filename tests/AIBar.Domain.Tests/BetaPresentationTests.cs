@@ -107,6 +107,29 @@ public sealed class BetaPresentationTests
     }
 
     [Fact]
+    public async Task Combined_codex_cost_is_exposed_and_notified_without_changing_local_analytics()
+    {
+        var clock = new MutableClock(Now);
+        await using var coordinator = new QuotaRefreshCoordinator(new SnapshotStore(Snapshot(Now)), new NeverProvider(), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.FromDays(1));
+        await using var quota = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock));
+        await using var analytics = new LocalCodexAnalyticsView();
+        var result = new LocalUsageCoordinatorResult([], LocalUsageProjectionStatus.Completed, []);
+        var local = new LocalUsagePresentationHost(new(), _ => ValueTask.FromResult(result), (_, _) => ValueTask.FromResult(result), _ => ValueTask.FromResult(result));
+        var day = DateOnly.FromDateTime(Now.LocalDateTime);
+        var summary = UsageCostPolicy.Calculate([new(day, "gpt-5", 100, 0, 0, 0)], day);
+        await using var cost = new UsageCostView(() => true, _ => ValueTask.FromResult(summary));
+        var presentation = new BetaAnalyticsPresentation(quota, analytics, local, codexCost: cost);
+        var changes = new List<string?>();
+        presentation.PropertyChanged += (_, args) => changes.Add(args.PropertyName);
+        await cost.RefreshAsync(default);
+        Assert.Same(summary, presentation.CodexCost);
+        Assert.Contains(nameof(BetaAnalyticsPresentation.CodexCost), changes);
+        Assert.Same(UsageCostSummary.Unavailable, presentation.Analytics.UsageCost);
+        await cost.CancelAndWaitAsync(default);
+        Assert.Same(UsageCostSummary.Unavailable, presentation.CodexCost);
+    }
+
+    [Fact]
     public void Popup_display_remaps_countdowns_below_freshness_threshold_and_publishes_one_state_to_both_observers()
     {
         var clock = new MutableClock(Now);
