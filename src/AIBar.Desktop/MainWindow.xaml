@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AIBar.Desktop"
         xmlns:automation="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        Title="AIBar quota" Width="360" MinWidth="300" MinHeight="260" MaxHeight="640" SizeToContent="Height"
+        Title="AIBar quota" Width="360" MinWidth="300" MinHeight="260" MaxHeight="640" SizeToContent="Height" ResizeMode="NoResize"
         FontFamily="{DynamicResource AppFont}" FontSize="14"
         Tag="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextBrush}"
         UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display">
@@ -38,8 +38,8 @@
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource CardBrush}" /></Trigger>
                 <Trigger Property="IsChecked" Value="True">
-                    <Setter Property="Background"><Setter.Value><MultiBinding Converter="{StaticResource TabDecoration}" ConverterParameter="Fill"><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="State.IsCurrent" /><Binding Path="Claude.State.IsCurrent" /></MultiBinding></Setter.Value></Setter>
-                    <Setter Property="BorderBrush"><Setter.Value><MultiBinding Converter="{StaticResource TabDecoration}" ConverterParameter="Border"><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="State.IsCurrent" /><Binding Path="Claude.State.IsCurrent" /></MultiBinding></Setter.Value></Setter>
+                    <Setter Property="Background"><Setter.Value><MultiBinding Converter="{StaticResource TabDecoration}" ConverterParameter="Fill"><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="State.IsCurrent" /><Binding Path="Claude.State.IsCurrent" /><Binding Path="ProviderTint" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /></MultiBinding></Setter.Value></Setter>
+                    <Setter Property="BorderBrush"><Setter.Value><MultiBinding Converter="{StaticResource TabDecoration}" ConverterParameter="Border"><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="State.IsCurrent" /><Binding Path="Claude.State.IsCurrent" /><Binding Path="ProviderTint" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /></MultiBinding></Setter.Value></Setter>
                     <Setter Property="Foreground"><Setter.Value><MultiBinding Converter="{StaticResource TabDecoration}" ConverterParameter="Text"><Binding Path="Tag" RelativeSource="{RelativeSource Self}" /><Binding Path="Tag" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /></MultiBinding></Setter.Value></Setter><Setter Property="FontWeight" Value="SemiBold" />
                 </Trigger>
                 <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource FocusBrush}" /></Trigger>
@@ -73,7 +73,7 @@
         </Style>
         <Style x:Key="PanelHeaderRule" TargetType="Border" BasedOn="{StaticResource PanelRule}">
             <Setter Property="BorderBrush"><Setter.Value><MultiBinding Converter="{StaticResource WindowDecoration}" ConverterParameter="Divider">
-                <Binding Path="Tag" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="SelectedProvider" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="State.IsCurrent" /><Binding Path="Claude.State.IsCurrent" /><Binding Path="State.NeedsLogin" /><Binding Path="Claude.State.NeedsLogin" />
+                <Binding Path="Tag" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="SelectedProvider" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" /><Binding Path="State.IsCurrent" /><Binding Path="Claude.State.IsCurrent" /><Binding Path="State.NeedsLogin" /><Binding Path="Claude.State.NeedsLogin" /><Binding Path="ProviderTint" RelativeSource="{RelativeSource AncestorType=local:MainWindow}" />
             </MultiBinding></Setter.Value></Setter>
         </Style>
         <Style x:Key="PanelQuotaCardStyle" TargetType="Border" BasedOn="{StaticResource QuotaCardStyle}">
@@ -172,8 +172,8 @@
     </MultiBinding></Window.Background>
     <Window.Template><ControlTemplate TargetType="Window">
         <Border x:Name="PanelSurface" Background="{TemplateBinding Background}" CornerRadius="8" BorderThickness="1" Tag="{DynamicResource SurfaceBrush}">
-            <Border.BorderBrush><MultiBinding Converter="{StaticResource WindowDecoration}"><Binding Path="Tag" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="SelectedProvider" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.State.IsCurrent" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.Claude.State.IsCurrent" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.State.NeedsLogin" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.Claude.State.NeedsLogin" RelativeSource="{RelativeSource TemplatedParent}" /></MultiBinding></Border.BorderBrush>
-            <Border.Effect><MultiBinding Converter="{StaticResource WindowDecoration}" ConverterParameter="Glow"><Binding Path="Tag" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="SelectedProvider" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.State.IsCurrent" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.Claude.State.IsCurrent" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.State.NeedsLogin" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.Claude.State.NeedsLogin" RelativeSource="{RelativeSource TemplatedParent}" /></MultiBinding></Border.Effect>
+            <Border.BorderBrush><MultiBinding Converter="{StaticResource WindowDecoration}"><Binding Path="Tag" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="SelectedProvider" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.State.IsCurrent" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.Claude.State.IsCurrent" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.State.NeedsLogin" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.Claude.State.NeedsLogin" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="ProviderTint" RelativeSource="{RelativeSource TemplatedParent}" /></MultiBinding></Border.BorderBrush>
+            <Border.Effect><MultiBinding Converter="{StaticResource WindowDecoration}" ConverterParameter="Glow"><Binding Path="Tag" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="SelectedProvider" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="CodexUsage" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="ClaudeUsage" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.State.IsCurrent" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.Claude.State.IsCurrent" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.State.NeedsLogin" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="DataContext.Claude.State.NeedsLogin" RelativeSource="{RelativeSource TemplatedParent}" /><Binding Path="ProviderTint" RelativeSource="{RelativeSource TemplatedParent}" /></MultiBinding></Border.Effect>
             <AdornerDecorator><ContentPresenter /></AdornerDecorator>
         </Border>
     </ControlTemplate></Window.Template>
@@ -266,8 +266,8 @@
                         </StackPanel>
                     </StackPanel>
                     <Border x:Name="WindowsRule" Style="{StaticResource PanelRule}" Margin="0,2,0,6" />
-                    <Button x:Name="CostButton" Click="OnCost" PreviewKeyDown="OnNavigationKeyDown" Style="{StaticResource PanelLinkStyle}" Foreground="{DynamicResource TextBrush}" Padding="0" Margin="-8,0,-8,10" automation:AutomationProperties.Name="Cost details">
-                        <Border Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12,8">
+                    <Button x:Name="CostButton" Click="OnCost" PreviewKeyDown="OnNavigationKeyDown" MouseEnter="OnCostMouseEnter" MouseLeave="OnCostMouseLeave" Style="{StaticResource PanelLinkStyle}" Foreground="{DynamicResource TextBrush}" Padding="0" Margin="-8,0,-8,10" automation:AutomationProperties.Name="Cost details">
+                        <Border x:Name="CostCard" Background="{DynamicResource PanelCardBrush}" BorderBrush="{DynamicResource PanelCardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12,8">
                             <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="24" /></Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <local:PanelSectionLabel x:Name="CostTitle" Text="COST" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,0,6" />
@@ -290,45 +290,11 @@
                     </Button>
                 </StackPanel>
                 <StackPanel x:Name="DetailView" Visibility="Collapsed">
-                    <Button x:Name="BackButton" Content="‹ Back" Click="OnBack" PreviewKeyDown="OnNavigationKeyDown" Style="{StaticResource PanelLinkStyle}" FontSize="13" Margin="0,0,0,6" automation:AutomationProperties.Name="Back to quota" />
+                    <DockPanel Margin="0,0,0,6">
+                        <Button x:Name="CloseDetailsButton" DockPanel.Dock="Right" Content="×" Click="OnCloseDetails" Style="{StaticResource PanelLinkStyle}" FontSize="13" automation:AutomationProperties.Name="Close usage details" />
+                        <TextBlock Text="Usage details" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </DockPanel>
                     <local:QuotaHistoryChart History="{Binding PaceHistory, RelativeSource={RelativeSource AncestorType={x:Type local:MainWindow}}}" />
-                    <Border Style="{StaticResource PanelRule}" Margin="0,8" />
-                    <TextBlock Text="Local usage" FontSize="15" FontWeight="SemiBold" Margin="0,4,0,6" />
-                    <GroupBox Header="Local Codex data" automation:AutomationProperties.Name="Local Codex data" Style="{StaticResource SecondaryGroupBoxStyle}"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="8">
-                        <TextBlock Text="{Binding Analytics.SourceDetail}" Style="{StaticResource MutedTextStyle}" />
-                        <TextBlock Text="{Binding Analytics.TotalTokensLabel}" FontWeight="SemiBold" Margin="0,8,0,0" /><TextBlock Text="{Binding Analytics.ModelTotalsLabel}" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding Analytics.CoverageLabel}" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="{Binding Analytics.LastScanLabel}" Style="{StaticResource MutedTextStyle}" />
-                        <TextBlock Text="{Binding Analytics.WarningLabel}" Style="{StaticResource MutedTextStyle}" /><TextBlock Text="Loading local Codex data" Visibility="{Binding Analytics.IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource MutedTextStyle}" />
-                    </StackPanel></Border></GroupBox>
-                    <GroupBox Header="OpenCode and Pi local usage" automation:AutomationProperties.Name="OpenCode and Pi local usage" Style="{StaticResource SecondaryGroupBoxStyle}" Margin="0,8,0,0"><Border Style="{StaticResource SecondaryCardStyle}"><StackPanel Margin="8">
-                        <TextBlock Text="{Binding LocalUsage.Description}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
-                        <TextBlock Text="{Binding LocalUsage.StatusLabel}" FontWeight="SemiBold" Margin="0,8,0,0" />
-                        <ItemsControl ItemsSource="{Binding LocalUsage.Rows}" Focusable="False" Foreground="{DynamicResource TextBrush}" Margin="0,4,0,0"><ItemsControl.ItemTemplate><DataTemplate>
-                            <Expander IsExpanded="False" Focusable="True" IsTabStop="True" Style="{StaticResource PanelDetailsExpanderStyle}" HorizontalContentAlignment="Stretch" Margin="0,4,0,0" automation:AutomationProperties.Name="{Binding AutomationLabel}">
-                                <Expander.Header><StackPanel TextElement.Foreground="{DynamicResource TextBrush}">
-                                    <TextBlock Text="{Binding ScopeLabel}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding TotalLabel}" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource MutedTextStyle}" />
-                                </StackPanel></Expander.Header>
-                                <StackPanel>
-                                    <TextBlock Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,0,0,8" />
-                                    <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
-                                        <ItemsControl ItemsSource="{Binding Details}" Focusable="False" Foreground="{DynamicResource TextBrush}"><ItemsControl.ItemTemplate><DataTemplate>
-                                            <Grid Margin="8,4,0,4" TextElement.Foreground="{DynamicResource TextBrush}"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition /><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
-                                                <TextBlock Text="{Binding LocalDayLabel}" FontWeight="SemiBold" automation:AutomationProperties.Name="{Binding AutomationLabel}" />
-                                                <TextBlock Grid.Column="1" Text="{Binding ModelLabel}" TextWrapping="Wrap" Margin="8,0,0,0" />
-                                                <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TotalLabel}" />
-                                                <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding TokenBreakdownLabel}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
-                                            </Grid>
-                                        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-                                    </ScrollViewer>
-                                </StackPanel>
-                            </Expander>
-                        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-                    </StackPanel></Border></GroupBox>
-                    <TextBlock Text="Quota access" FontSize="13" Foreground="{DynamicResource MutedTextBrush}" Margin="0,16,0,8" />
-                    <TextBlock Text="{Binding State.Disclosure}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" />
-                    <TextBlock Text="{Binding PrivateEndpointDisclosure}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,4,0,12" />
                 </StackPanel>
             </Grid>
         </ScrollViewer>

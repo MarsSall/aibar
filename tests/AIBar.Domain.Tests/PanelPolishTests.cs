@@ -33,7 +33,7 @@ public sealed class PanelPolishTests
             {
                 window.Show(); window.UpdateLayout();
                 var cost = (Button)window.FindName("CostButton");
-                var back = (Button)window.FindName("BackButton");
+                var back = (Button)window.FindName("CloseDetailsButton");
                 foreach (var row in new[] { cost, back })
                 {
                     Assert.Equal(new Thickness(0), row.BorderThickness);

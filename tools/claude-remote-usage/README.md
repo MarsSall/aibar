@@ -36,12 +36,16 @@ The quota collector pushes this unchanged UTF-8, schema-v1 contract (at most 409
 {"schemaVersion":1,"generatedAt":"2026-10-18T02:00:00Z","state":"current","fiveHour":{"percentageUsed":32,"resetAt":"2026-10-18T06:27:00Z"},"weekly":null}
 ```
 
-The property order is fixed. Windows receive path:
+When the state is `current` and the local Claude credential names a known subscription tier
+(`max`, `pro`, `plus`, `free`, `team`, `business`, `enterprise`, `edu`), a final `"plan"`
+property carries it in lowercase (for example `,"plan":"max"`) so AIBar can label the plan;
+unknown or missing tiers are omitted. Older AIBar builds reject the extra property, so update
+AIBar on Windows before this helper. The property order is fixed. Windows receive path:
 `%LOCALAPPDATA%\AIBar\claude-remote-usage.json`. Windows must run under the same
 account/home as the configured SSH destination. Usage is 0–100; reset timestamps
 are normalized to UTC `Z` and required: a window without a reset time is sent as
 null. Non-current states have both windows null. Authentication tokens,
-account/plan/email, paths, error details and HTTP bodies are never output, logged,
+account/email, paths, error details and HTTP bodies are never output, logged,
 or pushed. This quota contract contains no token counts. Normal logs contain only state and UTC time.
 The token is necessarily handled in Python process memory, not erased securely.
 

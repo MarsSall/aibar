@@ -29,6 +29,8 @@ public sealed class PanelPaceTests
         Assert.Equal(PanelTone.Near, state.Primary.Pace.Tone);
         WithPanel(theme, true, true, window =>
         {
+            Assert.Null(window.DetailsWindow);
+            Assert.Equal(Visibility.Visible, ((System.Windows.Controls.StackPanel)window.FindName("SummaryView")).Visibility);
             Assert.Equal(Visibility.Collapsed, ((System.Windows.Controls.StackPanel)window.FindName("DetailView")).Visibility);
             var rows = Visuals<PanelPaceRow>(window).Where(row => row.IsVisible).ToArray();
             Assert.Equal(new[] { "Codex weekly" }, rows.Select(row => row.Data.Label));

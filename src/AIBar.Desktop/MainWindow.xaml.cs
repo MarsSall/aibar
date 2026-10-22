@@ -17,6 +17,35 @@ public partial class MainWindow : Window
         nameof(BarColorMode), typeof(PanelBarColorMode), typeof(MainWindow), new PropertyMetadata(PanelBarColorMode.Brand));
     public PanelBarColorMode BarColorMode { get => (PanelBarColorMode)GetValue(BarColorModeProperty); set => SetValue(BarColorModeProperty, value); }
 
+    public AIBar.Application.AppearanceSettings? AppearanceSettings { get; set; }
+    public static readonly DependencyProperty ChartStyleProperty = DependencyProperty.Register(
+        nameof(ChartStyle), typeof(string), typeof(MainWindow), new PropertyMetadata("line"));
+    public string ChartStyle { get => (string)GetValue(ChartStyleProperty); set => SetValue(ChartStyleProperty, value); }
+    internal void ApplyAppearanceOptions(AIBar.Application.AppearanceOptions options)
+    {
+        ProviderTint = options.ProviderTint;
+        ChartStyle = options.ChartStyle;
+    }
+    private readonly SemaphoreSlim _chartStyleSaves = new(1, 1);
+    internal async Task SaveChartStyleAsync(string style)
+    {
+        if (!AIBar.Application.AppearanceSettings.ValidChartStyle(style)) throw new ArgumentException("Unknown chart style.", nameof(style));
+        ChartStyle = style;
+        if (AppearanceSettings is not { } settings) return;
+        await _chartStyleSaves.WaitAsync();
+        try
+        {
+            var current = await settings.LoadAsync(default);
+            await settings.SaveAsync(current with { ChartStyle = style }, default);
+        }
+        finally { _chartStyleSaves.Release(); }
+    }
+
+    public static readonly DependencyProperty ProviderTintProperty = DependencyProperty.Register(
+        nameof(ProviderTint), typeof(bool), typeof(MainWindow), new PropertyMetadata(true));
+    /// <summary>False keeps border, glow, header divider and selected tab neutral.</summary>
+    public bool ProviderTint { get => (bool)GetValue(ProviderTintProperty); set => SetValue(ProviderTintProperty, value); }
+
     public static readonly DependencyProperty SelectedProviderProperty = DependencyProperty.Register(
         nameof(SelectedProvider), typeof(string), typeof(MainWindow), new PropertyMetadata("Codex"));
     public string SelectedProvider { get => (string)GetValue(SelectedProviderProperty); private set => SetValue(SelectedProviderProperty, value); }
@@ -53,6 +82,11 @@ public partial class MainWindow : Window
         (provider == "Claude" ? ClaudeTab : CodexTab).Focus();
         e.Handled = true;
     }
+    private async void OnChartStyleSelected(string style)
+    {
+        try { await SaveChartStyleAsync(style); }
+        catch (Exception) { /* Keep the current session usable when appearance storage is unavailable. */ }
+    }
     private void OnUsageDashboard(object sender, RoutedEventArgs e) => ProviderLinks.OpenUsage(
         SelectedProvider == "Claude" ? AIBar.Domain.StatusProvider.Claude : AIBar.Domain.StatusProvider.Codex, _launchLink);
     private void OnAbout(object sender, RoutedEventArgs e)
@@ -76,11 +110,18 @@ public partial class MainWindow : Window
         _launchLink = launchLink;
         InitializeComponent();
         PreviewKeyDown += OnPanelKeyDown;
+        _detailsHoverTimer.Tick += (_, _) => { _detailsHoverTimer.Stop(); if (IsVisible) OpenDetails(false); };
+        _detailsCloseTimer.Tick += (_, _) =>
+        {
+            _detailsCloseTimer.Stop();
+            if (!_detailsPinned && !CostButton.IsMouseOver && DetailsWindow?.IsMouseOver != true) CloseDetails();
+        };
+        Deactivated += (_, _) => CheckDetailsActivation();
         IsVisibleChanged += (_, _) =>
         {
             var generation = ++_showGeneration;
             _motion.Complete();
-            if (!IsVisible) return;
+            if (!IsVisible) { CloseDetails(); return; }
             // IsVisibleChanged can precede Loaded and the host's final placement.
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
             {
@@ -88,6 +129,7 @@ public partial class MainWindow : Window
                     AnimateBody((FrameworkElement)Content, 8, 167, vertical: true);
             }));
         };
+        Closing += (_, _) => CloseDetails();
         Closed += (_, _) => { ++_showGeneration; _motion.Complete(); };
         SetBinding(ClaudeEnabledProperty, new System.Windows.Data.Binding("Claude.IsEnabled") { FallbackValue = false });
         BindUsage(CodexUsageProperty, "Primary.PercentageUsed", "Weekly.PercentageUsed");
@@ -108,29 +150,98 @@ public partial class MainWindow : Window
     private void OnUseOtherMachine(object sender, RoutedEventArgs e) => UseOtherMachineRequested?.Invoke();
     internal bool IsSettingsMenuOpen { get; set; }
 
+    internal const int DetailsHoverDelayMilliseconds = 250;
+    internal const int DetailsCloseDelayMilliseconds = 400;
+    private readonly System.Windows.Threading.DispatcherTimer _detailsHoverTimer = new() { Interval = TimeSpan.FromMilliseconds(DetailsHoverDelayMilliseconds) };
+    private readonly System.Windows.Threading.DispatcherTimer _detailsCloseTimer = new() { Interval = TimeSpan.FromMilliseconds(DetailsCloseDelayMilliseconds) };
+    private bool _detailsPinned;
+    private bool _closingDetails;
+    internal PanelDetailsWindow? DetailsWindow { get; private set; }
+
     private void OnCost(object sender, RoutedEventArgs e)
     {
-        SummaryView.Visibility = Visibility.Collapsed;
-        DetailView.Visibility = Visibility.Visible;
-        SecondaryScrollViewer.ScrollToTop();
-        BackButton.Focus();
-        AnimateBody(DetailView, 24, 167);
+        // A hover-opened window is pinned by the click instead of being closed by it.
+        if (DetailsWindow is not null && _detailsPinned) CloseDetails(restoreFocus: true);
+        else OpenDetails(true);
     }
 
-    private void OnBack(object sender, RoutedEventArgs e)
+    internal void OpenDetails(bool pinned)
     {
-        DetailView.Visibility = Visibility.Collapsed;
-        SummaryView.Visibility = Visibility.Visible;
-        CostButton.Focus();
-        CostButton.BringIntoView();
-        AnimateBody(SummaryView, -24, 167);
+        _detailsHoverTimer.Stop();
+        CancelDetailsClose();
+        _detailsPinned |= pinned;
+        if (DetailsWindow is null)
+        {
+            if (DetailView.Parent is System.Windows.Controls.Panel parent) parent.Children.Remove(DetailView);
+            var chart = DetailView.Children.OfType<QuotaHistoryChart>().Single();
+            chart.SetBinding(QuotaHistoryChart.HistoryProperty, new System.Windows.Data.Binding(nameof(PaceHistory)) { Source = this });
+            chart.SetBinding(QuotaHistoryChart.SelectedProviderProperty, new System.Windows.Data.Binding(nameof(SelectedProvider)) { Source = this });
+            chart.SetBinding(QuotaHistoryChart.ChartStyleProperty, new System.Windows.Data.Binding(nameof(ChartStyle)) { Source = this });
+            chart.SetBinding(QuotaHistoryChart.CodexDailyProperty, new System.Windows.Data.Binding("DataContext.Analytics.UsageCost") { Source = this });
+            chart.SetBinding(QuotaHistoryChart.ClaudeDailyProperty, new System.Windows.Data.Binding("DataContext.ClaudeCost.State") { Source = this });
+            chart.StyleSelected -= OnChartStyleSelected;
+            chart.StyleSelected += OnChartStyleSelected;
+            DetailView.Visibility = Visibility.Visible;
+            DetailsWindow = new PanelDetailsWindow(this, DetailView) { ShowActivated = pinned };
+            DetailsWindow.Closed += (_, _) => { DetailsWindow = null; DetailView.Visibility = Visibility.Collapsed; _detailsPinned = false; };
+            DetailsWindow.Place();
+            DetailsWindow.Show();
+            DetailsWindow.UpdateLayout();
+            DetailsWindow.Place();
+        }
+        if (pinned)
+        {
+            DetailsWindow.Activate();
+            CloseDetailsButton.Focus();
+        }
     }
+
+    internal void CloseDetails(bool restoreFocus = false)
+    {
+        _detailsHoverTimer.Stop();
+        _detailsCloseTimer.Stop();
+        _detailsPinned = false;
+        _closingDetails = true;
+        try { DetailsWindow?.Close(); }
+        finally { _closingDetails = false; }
+        if (restoreFocus && IsVisible) { Activate(); CostButton.Focus(); CostButton.BringIntoView(); }
+    }
+
+    private void OnCloseDetails(object sender, RoutedEventArgs e) => CloseDetails(restoreFocus: true);
+    private void OnCostMouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        CancelDetailsClose();
+        if (DetailsWindow is null) _detailsHoverTimer.Start();
+    }
+    private void OnCostMouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        _detailsHoverTimer.Stop();
+        ScheduleDetailsClose();
+    }
+    internal void CancelDetailsClose() => _detailsCloseTimer.Stop();
+    internal void ScheduleDetailsClose()
+    {
+        if (!_detailsPinned && DetailsWindow is not null) _detailsCloseTimer.Start();
+    }
+    internal void CheckDetailsActivation()
+    {
+        if (_closingDetails || DetailsWindow is null) return;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (!IsVisible || IsActive || DetailsWindow?.IsActive == true || IsSettingsMenuOpen || !ActivationLeftApp()) return;
+            CloseDetails();
+            Dismiss();
+        }));
+    }
+
+    /// <summary>Activation moving between the panel and its details window (or not granted yet) is not an outside click.</summary>
+    internal Func<bool> ActivationLeftApp { get; set; } = () =>
+        ForegroundActivation.ForegroundProcessId() is var pid && pid != 0 && pid != (uint)Environment.ProcessId;
 
     private void OnNavigationKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key is not (Key.Enter or Key.Space)) return;
-        if (ReferenceEquals(sender, CostButton)) OnCost(sender, e);
-        else if (ReferenceEquals(sender, BackButton)) OnBack(sender, e);
+        if (e.Key is not (Key.Enter or Key.Space or Key.Right)) return;
+        OpenDetails(true);
         e.Handled = true;
     }
 
@@ -141,6 +252,7 @@ public partial class MainWindow : Window
     /// <summary>HostRuntime should use this instead of Window.Hide for outside-click dismissal.</summary>
     public void Dismiss()
     {
+        CloseDetails();
         if (!IsVisible) return;
         ++_showGeneration;
         _motion.Begin((FrameworkElement)Content,
@@ -165,16 +277,17 @@ public partial class MainWindow : Window
         if (Keyboard.Modifiers == ModifierKeys.Control && ExecuteShortcut(e.Key)) { e.Handled = true; return; }
         if (Keyboard.Modifiers != ModifierKeys.None) return;
         if (e.Key == Key.Escape) { Dismiss(); e.Handled = true; return; }
-        if (e.Key == Key.Back && DetailView.Visibility == Visibility.Visible) { OnBack(this, e); e.Handled = true; return; }
-        if (e.Key is Key.Left or Key.Right && SummaryView.Visibility == Visibility.Visible)
+        if (CostButton.IsKeyboardFocusWithin && e.Key is (Key.Right or Key.Enter or Key.Space))
+        {
+            OpenDetails(true); e.Handled = true; return;
+        }
+        if (e.Key is Key.Left or Key.Right)
         {
             SelectProvider(SelectedProvider == "Claude" ? "Codex" : "Claude");
             (SelectedProvider == "Claude" ? ClaudeTab : CodexTab).Focus();
             e.Handled = true; return;
         }
         if (e.Key is not (Key.Up or Key.Down)) return;
-        // Preserve arrow navigation in the chart range and other detail disclosures.
-        if (DetailView.Visibility == Visibility.Visible && !PanelActions.IsKeyboardFocusWithin) return;
         var buttons = PanelActions.Children.OfType<System.Windows.Controls.Button>().Where(button => button.IsVisible && button.IsEnabled).ToArray();
         if (buttons.Length == 0) return;
         var index = Array.FindIndex(buttons, button => button.IsKeyboardFocusWithin);

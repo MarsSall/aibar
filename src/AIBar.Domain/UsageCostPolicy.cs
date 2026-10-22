@@ -5,8 +5,10 @@ namespace AIBar.Domain;
 // Components are disjoint: cached input is not included in Input.
 public sealed record UsageCostDaily(DateOnly Day, string Model, long Input, long CachedInput, long CacheWrite, long Output);
 public sealed record UsageCostPeriod(long? Tokens, decimal? Cost, bool Partial, bool Unpriced = false);
+public sealed record UsageCostDay(DateOnly Day, long Tokens, decimal? Cost, bool Partial, bool Unpriced = false);
 public sealed record UsageCostSummary(UsageCostPeriod Today, UsageCostPeriod Last30Days)
 {
+    public IReadOnlyList<UsageCostDay> Days { get; init; } = [];
     public static UsageCostSummary Unavailable { get; } = new(new(null, null, false), new(null, null, false));
     public string TodayLabel => Label("Today", Today);
     public string Last30DaysLabel => Label("Last 30 days", Last30Days);
@@ -27,7 +29,13 @@ public static class UsageCostPolicy
     public static UsageCostSummary Calculate(IEnumerable<UsageCostDaily> days, DateOnly today, bool incomplete = false)
     {
         var rows = days.Where(d => d.Day >= today.AddDays(-29) && d.Day <= today).ToArray();
-        return new(Summarize(rows.Where(d => d.Day == today), incomplete), Summarize(rows, incomplete));
+        var breakdown = Enumerable.Range(0, 30).Select(offset =>
+        {
+            var day = today.AddDays(offset - 29);
+            var value = Summarize(rows.Where(row => row.Day == day), incomplete);
+            return new UsageCostDay(day, value.Tokens!.Value, value.Cost, value.Partial, value.Unpriced);
+        }).ToArray();
+        return new(Summarize(rows.Where(d => d.Day == today), incomplete), Summarize(rows, incomplete)) { Days = breakdown };
     }
 
     private static UsageCostPeriod Summarize(IEnumerable<UsageCostDaily> rows, bool incomplete)

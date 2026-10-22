@@ -21,12 +21,14 @@ Selected pivots have an accent underline and semibold text. Controls have named 
 | Choice | Default | Options |
 | --- | --- | --- |
 | Background opacity | 100% | 30–100%, step 5. Applies to panel and notification background brushes, not text, bars, tabs or buttons. |
+| Provider tint | On | Colors the panel border, glow, header divider and selected tab with the selected provider. Off keeps them neutral; the sign-in warning stays amber either way. |
+| Chart style | Line | Line or Columns, changed directly beside the range selector in Cost details; applies to both charts and saves immediately. Settings preserves this stored choice. |
 | Panel bars | Brand colors | Brand colors, or Usage level: green below 75%, yellow from 75%, red from 90%. |
 | YASB colors | Usage level | Existing usage ramp, or Brand colors. |
 
 Color radio cards show illustrative bars and YASB previews, not live quota. The usage-color boundaries are independent of alert thresholds. YASB picks up the saved preference on its next normal refresh; unavailable quota remains gray and the six output fields/export schema are unchanged.
 
-Opacity is persisted even when Windows high contrast or disabled transparency forces surfaces to 100%. Settings itself stays opaque. The panel and notification consumers must apply alpha only to their background brush and use an opaque fallback when transparency is unavailable.
+Opacity is persisted even when Windows high contrast or disabled transparency forces surfaces to 100%. Settings and the usage-details side window stay opaque. The panel and notification consumers must apply alpha only to their background brush and use an opaque fallback when transparency is unavailable.
 
 ## Alerts
 
@@ -65,10 +67,10 @@ The selected source is saved through `ClaudeQuotaRuntime.SetSourceAsync` before 
 `%LOCALAPPDATA%\AIBar\appearance.json` remains schema 1:
 
 ```json
-{"schema":1,"barColors":"brand","yasbColors":"usage","backgroundOpacity":100,"refreshMinutes":5}
+{"schema":1,"barColors":"brand","yasbColors":"usage","backgroundOpacity":100,"refreshMinutes":5,"providerTint":true,"chartStyle":"line"}
 ```
 
-Existing schema-1 files without `backgroundOpacity` load with **100**; missing `refreshMinutes` loads with **5**. Invalid numeric opacity falls back to 100, and invalid numeric refresh intervals fall back to 5, without discarding valid color choices. Saves reject out-of-range/non-step opacity, unknown color modes and refresh intervals outside 1/2/5/15/30. Successful writes atomically replace the destination via a same-directory temporary file and raise `AppearanceSettings.Changed` with all four values; failed/cancelled writes do not publish a change.
+Existing schema-1 files without `backgroundOpacity` load with **100**; missing `refreshMinutes` loads with **5**; missing `providerTint` loads as **on**; missing or invalid `chartStyle` loads as **line**. Invalid numeric opacity falls back to 100, and invalid numeric refresh intervals fall back to 5, without discarding valid color choices. Saves reject out-of-range/non-step opacity, unknown color modes, refresh intervals outside 1/2/5/15/30, and chart styles other than `line` or `columns`. Successful writes atomically replace the destination via a same-directory temporary file and raise `AppearanceSettings.Changed` with all six values; failed/cancelled writes do not publish a change.
 
 **Clear AIBar Data** drains appearance writes with alert work, removes the existing appearance/alert files, and publishes the actual post-clear appearance (defaults on success, surviving values after rollback). Clear/dispose paths never await the WPF dispatcher.
 

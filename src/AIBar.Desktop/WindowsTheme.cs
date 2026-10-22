@@ -206,9 +206,12 @@ public sealed class WpfOpaquePopupSurface(Window window) : IOpaquePopupSurface
     {
         if (window.AllowsTransparency) window.AllowsTransparency = false;
         window.Opacity = 1;
-        if (window is not MainWindow { IsTranslucent: true } panel) return;
+        var translucent = window is MainWindow { IsTranslucent: true } or PanelDetailsWindow { IsTranslucent: true };
+        if (!translucent) return;
         // Undo the acrylic composition so an opaque panel never shows the DWM frame.
-        panel.IsTranslucent = false;
+        var opaqueColor = window is MainWindow panel ? panel.OpaqueCompositionColor : ((PanelDetailsWindow)window).OpaqueCompositionColor;
+        if (window is MainWindow main) main.IsTranslucent = false;
+        if (window is PanelDetailsWindow details) details.IsTranslucent = false;
         try
         {
             var handle = new WindowInteropHelper(window).EnsureHandle();
@@ -216,7 +219,7 @@ public sealed class WpfOpaquePopupSurface(Window window) : IOpaquePopupSurface
             DwmSetWindowAttribute(handle, SystemBackdropType, ref none, sizeof(int));
             var margins = new Margins();
             DwmExtendFrameIntoClientArea(handle, ref margins);
-            if (HwndSource.FromHwnd(handle)?.CompositionTarget is { } target && panel.OpaqueCompositionColor is { } color)
+            if (HwndSource.FromHwnd(handle)?.CompositionTarget is { } target && opaqueColor is { } color)
                 target.BackgroundColor = color;
         }
         catch { }
@@ -225,20 +228,29 @@ public sealed class WpfOpaquePopupSurface(Window window) : IOpaquePopupSurface
     public void UseTranslucentBase()
     {
         if (window is MainWindow panel) panel.IsTranslucent = true;
+        if (window is PanelDetailsWindow details) details.IsTranslucent = true;
     }
 
     public void SetDarkMode() => Set(20, 1);
-    public void SetCorners() => Set(33, 2);
+    /// <summary>Rounded corners without the Windows 11 system border, which drew a second frame outside the panel's own.</summary>
+    public void SetCorners()
+    {
+        Set(33, 2);
+        var none = unchecked((int)0xFFFFFFFE); // DWMWA_COLOR_NONE; unsupported before Windows 11, so failure is ignored.
+        DwmSetWindowAttribute(new WindowInteropHelper(window).EnsureHandle(), 34, ref none, sizeof(int));
+    }
 
     /// <summary>Acrylic first; the frame and transparent composition change only after DWM accepts it.</summary>
     public void SetBackdrop()
     {
+        if (window is PanelDetailsWindow { Owner: MainWindow { IsTranslucent: false } }) throw new InvalidOperationException();
         Set(SystemBackdropType, BackdropTransientAcrylic);
         var handle = new WindowInteropHelper(window).EnsureHandle();
         var margins = new Margins { Left = -1, Right = -1, Top = -1, Bottom = -1 };
         if (DwmExtendFrameIntoClientArea(handle, ref margins) != 0) throw new InvalidOperationException();
         var target = HwndSource.FromHwnd(handle)?.CompositionTarget ?? throw new InvalidOperationException();
         if (window is MainWindow panel) panel.OpaqueCompositionColor ??= target.BackgroundColor;
+        if (window is PanelDetailsWindow details) details.OpaqueCompositionColor ??= target.BackgroundColor;
         target.BackgroundColor = System.Windows.Media.Colors.Transparent;
     }
 

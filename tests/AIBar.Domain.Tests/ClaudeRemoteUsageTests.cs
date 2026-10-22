@@ -466,6 +466,40 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
         else Assert.False(runtime.IsConsentEnabled);
     }
 
+    // L15: the Linux helper may append a known plan; older documents and unknown plans still work.
+    [Theory]
+    [InlineData(",\"plan\":\"max\"", "Max")]
+    [InlineData(",\"plan\":\"lifetime\"", null)]
+    [InlineData(",\"plan\":null", null)]
+    [InlineData("", null)]
+    public async Task Optional_trailing_plan_sets_the_label_without_changing_quota(string plan, string? label)
+    {
+        var provider = Remote(new Files(Valid[..^1] + plan + "}"));
+        var result = await provider.GetQuotaAsync(default);
+        Assert.Null(result.Failure);
+        Assert.Equal(32.5m, result.Snapshot!.Primary!.PercentageUsed);
+        Assert.Equal(label, Assert.IsAssignableFrom<IQuotaPlanMetadata>(provider).PlanLabel);
+    }
+
+    [Theory]
+    [InlineData(",\"plan\":\"max\",\"extra\":1")]
+    [InlineData(",\"extra\":\"max\"")]
+    [InlineData(",\"plan\":7")]
+    public async Task Any_other_extra_property_still_fails_closed(string tail)
+    {
+        var provider = Remote(new Files(Valid[..^1] + tail + "}"));
+        Assert.NotNull((await provider.GetQuotaAsync(default)).Failure);
+        Assert.Null(((IQuotaPlanMetadata)provider).PlanLabel);
+    }
+
+    [Fact]
+    public async Task Other_machine_source_exposes_the_remote_plan_label()
+    {
+        var time = new AdvancingTimeProvider();
+        await using var runtime = await RemoteRuntime(time, new AdvancingClock(time), new Files(Valid[..^1] + ",\"plan\":\"pro\"}"));
+        Assert.Equal("Pro", runtime.PlanLabel);
+    }
+
     private static string GeneratedAt(DateTimeOffset generated) =>
         Valid.Replace("2030-01-01T12:00:00Z", generated.ToString("yyyy-MM-ddTHH:mm:ss'Z'"));
 

@@ -66,7 +66,7 @@ public sealed class QuotaHistoryChartTests
     [InlineData(WindowsTheme.HighContrast, false, false)]
     [InlineData(WindowsTheme.Dark, true, false)]
     [InlineData(WindowsTheme.Dark, false, true)]
-    public void Narrow_chart_renders_all_series_with_dynamic_brushes_and_clear_removes_points(WindowsTheme theme, bool cycleChange, bool resetJitter)
+    public void Narrow_chart_renders_selected_provider_solid_series_with_dynamic_brushes_and_clear_removes_points(WindowsTheme theme, bool cycleChange, bool resetJitter)
     {
         WpfTestApplicationHost.Run(app =>
         {
@@ -83,10 +83,12 @@ public sealed class QuotaHistoryChartTests
                 window.Show(); window.UpdateLayout();
                 var plot = (System.Windows.Controls.Canvas)chart.FindName("Plot");
                 chart.Data = QuotaHistoryChartData.LoadAsync(store, QuotaHistoryChartRange.Day, Now, default).GetAwaiter().GetResult();
-                var expectedSegments = cycleChange ? 8 : 4;
+                var expectedSegments = cycleChange ? 4 : 2;
                 Assert.Equal(expectedSegments, plot.Children.OfType<System.Windows.Shapes.Polyline>().Count());
                 var lines = plot.Children.OfType<System.Windows.Shapes.Polyline>().ToArray();
-                Assert.Equal(4, lines.Select(line => string.Join(",", line.StrokeDashArray)).Distinct().Count());
+                Assert.All(lines, line => { Assert.True(line.StrokeDashArray is null || line.StrokeDashArray.Count == 0); Assert.Equal(2.5, line.StrokeThickness); });
+                Assert.Contains(lines, line => line.Opacity == 1);
+                Assert.Contains(lines, line => line.Opacity == .5);
                 Assert.All(lines, line =>
                 {
                     Assert.Equal(cycleChange ? 1 : 2, line.Points.Count);
@@ -96,9 +98,12 @@ public sealed class QuotaHistoryChartTests
                         Assert.Equal(plot.ActualWidth, line.Points[1].X, 3); Assert.Equal(0d, line.Points[1].Y, 3);
                     }
                     Assert.Equal(theme == WindowsTheme.HighContrast ? System.Windows.SystemColors.HighlightColor :
-                        PanelPalette.ProviderColor(Array.IndexOf(lines, line) < expectedSegments / 2 ? "Codex" : "Claude"),
+                        PanelPalette.ProviderColor("Codex"),
                         Assert.IsType<System.Windows.Media.SolidColorBrush>(line.Stroke).Color);
                 });
+                chart.SelectedProvider = "Claude";
+                Assert.All(plot.Children.OfType<System.Windows.Shapes.Polyline>(), line => Assert.StartsWith("Claude", AutomationProperties.GetName(line)));
+                Assert.Equal(expectedSegments, plot.Children.OfType<System.Windows.Shapes.Polyline>().Count());
                 ((ListBox)chart.FindName("HistoryRange")).SelectedIndex = 2;
                 Assert.Empty(plot.Children.Cast<object>());
                 chart.Data = QuotaHistoryChartData.LoadAsync(store, QuotaHistoryChartRange.Month, Now, default).GetAwaiter().GetResult();

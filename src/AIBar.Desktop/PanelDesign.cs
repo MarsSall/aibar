@@ -86,11 +86,12 @@ public sealed class PanelTabDecorationConverter : IMultiValueConverter
         var dark = surface is not null && PanelPalette.IsDark(surface);
         var usage = ProviderVisuals.Usage(values.ElementAtOrDefault(claude ? 3 : 2) ?? -1m) ?? -1;
         var current = values.ElementAtOrDefault(claude ? 5 : 4) is not false;
-        var color = !current ? Color.FromRgb(0x8E, 0x8E, 0x98) : usage >= 90 ? Color.FromRgb(0xFF, 0x6B, 0x5B)
+        var tint = values.ElementAtOrDefault(6) is not false;
+        var color = !current || !tint ? Color.FromRgb(0x8E, 0x8E, 0x98) : usage >= 90 ? Color.FromRgb(0xFF, 0x6B, 0x5B)
             : claude ? Color.FromRgb(0xE8, 0x95, 0x5F) : Color.FromRgb(0x2C, 0xC7, 0x9E);
         if (parameter as string == "Border") return new SolidColorBrush(dark ? Color.FromArgb(143, color.R, color.G, color.B)
-            : usage >= 90 ? Color.FromRgb(0xD1, 0x3B, 0x2A) : claude ? Color.FromRgb(0xC4, 0x70, 0x3F) : Color.FromRgb(0x10, 0xA3, 0x7F));
-        if (!dark) return new SolidColorBrush(claude ? Color.FromRgb(0xFB, 0xEF, 0xE7) : Color.FromRgb(0xDD, 0xF2, 0xEB));
+            : !tint ? Color.FromRgb(0x8E, 0x8E, 0x98) : usage >= 90 ? Color.FromRgb(0xD1, 0x3B, 0x2A) : claude ? Color.FromRgb(0xC4, 0x70, 0x3F) : Color.FromRgb(0x10, 0xA3, 0x7F));
+        if (!dark) return new SolidColorBrush(!tint ? Color.FromRgb(0xEC, 0xEC, 0xEE) : claude ? Color.FromRgb(0xFB, 0xEF, 0xE7) : Color.FromRgb(0xDD, 0xF2, 0xEB));
         return new LinearGradientBrush(Color.FromArgb(33, color.R, color.G, color.B), Color.FromArgb(8, color.R, color.G, color.B), 90);
     }
     public object[] ConvertBack(object value, Type[] types, object parameter, CultureInfo culture) => throw new NotSupportedException();
@@ -99,6 +100,8 @@ public sealed class PanelTabDecorationConverter : IMultiValueConverter
 /// <summary>Root decoration uses the selected provider; stale wins over usage, login over stale.</summary>
 public sealed class PanelWindowDecorationConverter : IMultiValueConverter
 {
+    // Stronger than the original 29 DIP / 0.27 halo, per user feedback.
+    internal const double GlowBlurRadius = 40, GlowOpacity = .42;
     public object Convert(object[] values, Type type, object parameter, CultureInfo culture)
     {
         var surface = values.ElementAtOrDefault(0) as SolidColorBrush;
@@ -107,23 +110,24 @@ public sealed class PanelWindowDecorationConverter : IMultiValueConverter
         var usage = ProviderVisuals.Usage(values.ElementAtOrDefault(claude ? 3 : 2) ?? -1m) ?? -1m;
         var current = values.ElementAtOrDefault(claude ? 5 : 4) is not false;
         var login = values.ElementAtOrDefault(claude ? 7 : 6) is true;
+        var tint = values.ElementAtOrDefault(8) is not false;
         var hc = SystemParameters.HighContrast || surface is not null && DependencyPropertyHelper.GetValueSource(surface, SolidColorBrush.ColorProperty).IsExpression;
-        var color = login ? Color.FromRgb(0xF5, 0xC2, 0x5A) : !current ? Colors.White : usage >= 90
+        var color = login ? Color.FromRgb(0xF5, 0xC2, 0x5A) : !current || !tint ? Colors.White : usage >= 90
             ? Color.FromRgb(0xFF, 0x6B, 0x5B) : claude ? Color.FromRgb(0xE8, 0x95, 0x5F) : Color.FromRgb(0x2C, 0xC7, 0x9E);
-        if (parameter as string == "Glow") return dark && !hc && (current || login)
-            ? new DropShadowEffect { Color = color, ShadowDepth = 0, BlurRadius = 29, Opacity = .27 }
+        if (parameter as string == "Glow") return dark && !hc && (tint && current || login)
+            ? new DropShadowEffect { Color = color, ShadowDepth = 0, BlurRadius = GlowBlurRadius, Opacity = GlowOpacity }
             : new DropShadowEffect { Opacity = 0 };
         if (hc) return System.Windows.SystemColors.WindowTextBrush;
         if (parameter as string == "Divider")
         {
-            if (!dark) return System.Windows.Application.Current.TryFindResource("SecondaryBorderBrush") ?? Brushes.Gray;
+            if (!dark || !tint && !login) return System.Windows.Application.Current.TryFindResource("SecondaryBorderBrush") ?? Brushes.Gray;
             var line = new LinearGradientBrush();
             line.GradientStops.Add(new(Colors.Transparent, 0));
             line.GradientStops.Add(new(Color.FromArgb(115, color.R, color.G, color.B), .5));
             line.GradientStops.Add(new(Colors.Transparent, 1));
             return line;
         }
-        return new SolidColorBrush(!dark ? Color.FromRgb(0xD6, 0xD6, 0xD6) : Color.FromArgb((byte)(current || login ? 107 : 31), color.R, color.G, color.B));
+        return new SolidColorBrush(!dark ? Color.FromRgb(0xD6, 0xD6, 0xD6) : Color.FromArgb((byte)(tint && current || login ? 107 : 31), color.R, color.G, color.B));
     }
     public object[] ConvertBack(object value, Type[] types, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }

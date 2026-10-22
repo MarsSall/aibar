@@ -117,7 +117,10 @@ public sealed class ClaudeDesignPanelTests
                 Send(window, Key.Left); Assert.Equal("Codex", window.SelectedProvider);
                 Send(window, Key.Right); Assert.Equal("Claude", window.SelectedProvider);
                 ((Button)window.FindName("CostButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                Send(window, Key.Back);
+                var side = Assert.IsType<PanelDetailsWindow>(window.DetailsWindow);
+                side.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(side), 0, Key.Left) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+                Assert.Null(window.DetailsWindow);
+                Assert.True(((Button)window.FindName("CostButton")).IsKeyboardFocused);
                 Assert.Equal(Visibility.Visible, ((StackPanel)window.FindName("SummaryView")).Visibility);
                 var menu = ((StackPanel)window.FindName("PanelActions")).Children.OfType<Button>().ToArray();
                 menu[0].Focus(); Send(menu[0], Key.Down); Assert.True(menu[1].IsKeyboardFocused);

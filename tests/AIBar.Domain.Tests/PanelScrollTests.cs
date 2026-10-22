@@ -31,8 +31,10 @@ public sealed class PanelScrollTests
                 window = CreateWindow();
                 window.Show();
                 ((System.Windows.Controls.Button)window.FindName("CostButton")).RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-                Settle(window);
-                var scroller = (ScrollViewer)window.FindName("SecondaryScrollViewer");
+                var side = Assert.IsType<PanelDetailsWindow>(window.DetailsWindow);
+                side.DetailsScrollViewer.MaxHeight = 180; // Both chart sections must scroll in a short viewport; no local-usage rows are needed.
+                Settle(side);
+                var scroller = side.DetailsScrollViewer;
                 Assert.True(scroller.ScrollableHeight > 0);
                 var bar = Assert.IsType<ScrollBar>(scroller.Template.FindName("PART_VerticalScrollBar", scroller));
                 Assert.Equal(Visibility.Visible, bar.Visibility);
@@ -42,12 +44,12 @@ public sealed class PanelScrollTests
                 var thumb = Assert.Single(Visuals<Thumb>(bar));
                 var chrome = Assert.Single(Visuals<System.Windows.Controls.Border>(thumb));
                 Assert.True(chrome.CornerRadius.TopLeft >= 2);
-                // Keyboard and wheel scrolling keep working with the slim bar. Opening Cost focuses Back,
+                // Keyboard and wheel scrolling keep working with the slim bar. Opening Cost focuses Close,
                 // and a late window activation can bring that focused button back into view; retry
                 // a bounded number of times so only a viewer that cannot scroll fails.
                 for (var attempt = 0; attempt < 10 && scroller.VerticalOffset <= 0; attempt++)
                 {
-                    scroller.ScrollToEnd(); Settle(window);
+                    scroller.ScrollToEnd(); Settle(side);
                 }
                 Assert.True(scroller.VerticalOffset > 0);
             }
