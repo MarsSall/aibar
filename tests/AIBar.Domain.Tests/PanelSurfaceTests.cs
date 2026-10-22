@@ -9,7 +9,9 @@ namespace AIBar.Domain.Tests;
 
 public sealed class PanelSurfaceTests
 {
-    private static readonly SolidColorBrush DarkSurface = new(Color.FromRgb(12, 12, 16));
+    // Frozen: xunit may build this static on another thread than the test's dispatcher.
+    private static readonly SolidColorBrush DarkSurface = Frozen(Color.FromRgb(12, 12, 16));
+    private static SolidColorBrush Frozen(Color color) { var brush = new SolidColorBrush(color); brush.Freeze(); return brush; }
 
     // Converter inputs: surface, provider, Codex usage, Claude usage, Codex/Claude current, Codex/Claude login, tint.
     private static object[] Window(bool tint, bool claudeLogin = false) =>
