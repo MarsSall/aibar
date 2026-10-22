@@ -98,7 +98,8 @@ public partial class App : System.Windows.Application
                 : WindowsAtomicQuotaExportWriter.ForClaudeOwnedSyntheticDataDirectory(dataDirectory)),
             seams.ClaudeRemoteProviderFactory ?? (claudePolicy => new ClaudeRemoteUsageProvider(claudePolicy,
                 Path.Combine(dataDirectory, "claude-remote-usage.json"))),
-            () => ClaudeRemoteUsageProvider.IsAvailableForAutomatic(Path.Combine(dataDirectory, "claude-remote-usage.json")), historyStore: historyStore);
+            () => ClaudeRemoteUsageProvider.IsAvailableForAutomatic(Path.Combine(dataDirectory, "claude-remote-usage.json")), historyStore: historyStore,
+            remoteRefresh: new ClaudeRemoteRefreshChannel(dataDirectory));
         var claudeCost = new UsageCostView(() => claudeRuntime.IsConsentEnabled,
             token => ClaudeRemoteTokens.ReadAsync(Path.Combine(dataDirectory, "claude-remote-tokens.json"), clock.UtcNow, token));
         claudeRuntime.ConsentChanged += () => { _ = claudeCost.RefreshAsync(default); };
