@@ -15,7 +15,7 @@ internal sealed class PanelDetailsWindow : Window
     private readonly MainWindow _panel;
     private readonly IWindowsThemeSource _themeSource;
     private readonly WindowsThemeController _theme;
-    internal Border DetailsSurface { get; };
+    internal Border DetailsSurface { get; }
     internal ScrollViewer DetailsScrollViewer { get; }
     internal bool IsTranslucent { get; set; }
     internal System.Windows.Media.Color? OpaqueCompositionColor { get; set; }
