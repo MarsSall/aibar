@@ -141,7 +141,10 @@ public sealed class ClaudeQuotaExportTests : IDisposable
         // is pending the cached value must still not unlock the export.
         await provider.Started.Task.WaitAsync(TimeSpan.FromSeconds(60));
         await runtime.ExportCompletion;
-        Assert.All(writer.Documents, value => Assert.Equal(QuotaExportState.Disabled, value.State));
+        // Persisted consent is not a privacy action: never "disabled", and no cached values yet.
+        Assert.NotEmpty(writer.Documents);
+        Assert.All(writer.Documents, AssertValueFreeNotDisabled);
+        Assert.Equal(QuotaExportState.Refreshing, writer.Documents.Last().State);
         provider.Release.TrySetResult();
         await runtime.RefreshAsync(RefreshTrigger.Manual, default);
         await runtime.ExportCompletion;
@@ -176,6 +179,34 @@ public sealed class ClaudeQuotaExportTests : IDisposable
             if (privacy is not null) await privacy;
             await runtime.DisposeAsync();
         }
+    }
+
+    [Fact]
+    public async Task Persisted_consent_startup_authentication_failure_with_cache_is_truthful_not_disabled()
+    {
+        await Settings.SaveClaudeAsync(true, default);
+        var writer = new Writer();
+        var provider = new Provider { Result = new(null, new(QuotaErrorKind.Authentication, "quota_authentication")) };
+        await using var runtime = Runtime(writer, provider, new Store { Snapshot = Snapshot(11) });
+        await runtime.InitializeAsync(default);
+        await provider.Started.Task.WaitAsync(TimeSpan.FromSeconds(60));
+        await WaitForAsync(() => runtime.State is { IsLoading: false, Failure: not null });
+        await runtime.ExportCompletion;
+        Assert.All(writer.Documents, AssertValueFreeNotDisabled);
+        var last = writer.Documents.Last();
+        Assert.Equal((QuotaExportState.Unavailable, QuotaExportWarning.AuthenticationFailed), (last.State, last.Warning!.Value));
+    }
+
+    private static void AssertValueFreeNotDisabled(QuotaExportDocument value)
+    {
+        Assert.NotEqual(QuotaExportState.Disabled, value.State);
+        Assert.Equal((null, null, null), (value.SourceRetrievedAt, value.FiveHour, value.Weekly));
+    }
+
+    private static async Task WaitForAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!condition()) { if (DateTime.UtcNow > deadline) throw new TimeoutException(); await Task.Delay(10); }
     }
 
     [Fact]

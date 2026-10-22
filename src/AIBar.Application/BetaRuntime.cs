@@ -48,7 +48,7 @@ public sealed class BetaRuntime : IAsyncDisposable
     {
         ThrowIfDisposed();
         var enabled = await _settings.LoadAsync(cancellationToken);
-        if (_publisher is not null) await (enabled ? _publisher.EnableAsync(cancellationToken) : _publisher.DisableAsync(cancellationToken));
+        if (_publisher is not null) await (enabled ? _publisher.RestoreAsync(cancellationToken) : _publisher.DisableAsync(cancellationToken));
         if (enabled) _policy.Enable(); else _policy.Disable();
         CredentialAvailability = _policy.IsEnabled ? CredentialAvailability.Missing : CredentialAvailability.Disabled;
         await _coordinator.InitializeAsync(cancellationToken);

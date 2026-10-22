@@ -281,7 +281,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             _resolvedSource = ResolveSource(_source);
             _initialized = true;
             Notify(Notification.Source);
-            if (await _settings.LoadClaudeAsync(cancellationToken)) await EnableCoreAsync(cancellationToken);
+            if (await _settings.LoadClaudeAsync(cancellationToken)) await EnableCoreAsync(cancellationToken, restore: true);
             else await StopExportAsync();
         }
         finally { ExitGate(); }
@@ -316,7 +316,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private ClaudeQuotaSource ResolveSource(ClaudeQuotaSource source) => source == ClaudeQuotaSource.Automatic
         ? (_remoteFileAvailable() ? ClaudeQuotaSource.OtherMachine : ClaudeQuotaSource.ThisPc) : source;
 
-    private async ValueTask EnableCoreAsync(CancellationToken cancellationToken, bool cacheCleared = false)
+    private async ValueTask EnableCoreAsync(CancellationToken cancellationToken, bool cacheCleared = false, bool restore = false)
     {
         var cachedSource = await _settings.LoadClaudeCacheSourceAsync(cancellationToken);
         // Before Automatic existed, an absent source meant This PC. An explicit legacy
@@ -348,7 +348,8 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             if (_exportWriter is not null)
             {
                 _publisher = new QuotaExportPublisher(_coordinator, _exportWriter, _clock);
-                await _publisher.EnableAsync(cancellationToken);
+                // Persisted consent is not a privacy action: publish value-free truthful states, never "disabled".
+                await (restore ? _publisher.RestoreAsync(cancellationToken) : _publisher.EnableAsync(cancellationToken));
             }
             _enabled = true;
             ScheduleRemoteDeadline();
