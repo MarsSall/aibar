@@ -51,6 +51,8 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private IQuotaProvider? _provider;
     private CancellationTokenSource? _pollCancellation;
     private ITimer? _timer;
+    private readonly IClaudeRemoteRefreshChannel _remoteRefresh;
+    private IDisposable? _remoteUsageWatch;
     private readonly object _deadlineGate = new();
     private ITimer? _remoteDeadlineTimer;
     private long _deadlineGeneration;
@@ -65,8 +67,11 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         IQuotaRefreshLifecycleEvents? lifecycle = null, TimeProvider? timeProvider = null,
         IQuotaExportWriter? exportWriter = null,
         Func<PrivateIntegrationPolicy, IQuotaProvider>? remoteProviderFactory = null,
-        Func<bool>? remoteFileAvailable = null, IQuotaHistoryStore? historyStore = null)
+        Func<bool>? remoteFileAvailable = null, IQuotaHistoryStore? historyStore = null,
+        IClaudeRemoteRefreshChannel? remoteRefresh = null)
     {
+        // Like the export writer, only the desktop composition touches the real AIBar directory.
+        _remoteRefresh = remoteRefresh ?? NoRemoteRefresh.Instance;
         _historyStore = historyStore;
         _remoteFileAvailable = remoteFileAvailable ?? (() => ClaudeRemoteUsageProvider.IsAvailableForAutomatic());
         _exportWriter = exportWriter;
@@ -281,10 +286,11 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             _resolvedSource = ResolveSource(_source);
             _initialized = true;
             Notify(Notification.Source);
-            if (await _settings.LoadClaudeAsync(cancellationToken)) await EnableCoreAsync(cancellationToken);
+            if (await _settings.LoadClaudeAsync(cancellationToken)) await EnableCoreAsync(cancellationToken, restore: true);
             else await StopExportAsync();
         }
         finally { ExitGate(); }
+        RequestRemoteRefresh();
         _ = RefreshInitiallyAsync();
     }
 
@@ -316,7 +322,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
     private ClaudeQuotaSource ResolveSource(ClaudeQuotaSource source) => source == ClaudeQuotaSource.Automatic
         ? (_remoteFileAvailable() ? ClaudeQuotaSource.OtherMachine : ClaudeQuotaSource.ThisPc) : source;
 
-    private async ValueTask EnableCoreAsync(CancellationToken cancellationToken, bool cacheCleared = false)
+    private async ValueTask EnableCoreAsync(CancellationToken cancellationToken, bool cacheCleared = false, bool restore = false)
     {
         var cachedSource = await _settings.LoadClaudeCacheSourceAsync(cancellationToken);
         // Before Automatic existed, an absent source meant This PC. An explicit legacy
@@ -348,12 +354,15 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             if (_exportWriter is not null)
             {
                 _publisher = new QuotaExportPublisher(_coordinator, _exportWriter, _clock);
-                await _publisher.EnableAsync(cancellationToken);
+                // Persisted consent is not a privacy action: publish value-free truthful states, never "disabled".
+                await (restore ? _publisher.RestoreAsync(cancellationToken) : _publisher.EnableAsync(cancellationToken));
             }
             _enabled = true;
             ScheduleRemoteDeadline();
             _timer = _timeProvider.CreateTimer(_ => Forward(RefreshTrigger.Poll), null,
                 pollInterval, pollInterval);
+            if (_resolvedSource == ClaudeQuotaSource.OtherMachine)
+                _remoteUsageWatch = _remoteRefresh.WatchUsage(ForwardRemoteUsageChanged);
             Notify(Notification.Consent);
         }
         catch
@@ -380,7 +389,11 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         finally { ExitGate(); }
     }
 
-    public async ValueTask RefreshAsync(RefreshTrigger trigger, CancellationToken cancellationToken)
+    public ValueTask RefreshAsync(RefreshTrigger trigger, CancellationToken cancellationToken) =>
+        // Only a person-driven refresh asks the other machine for a push; polls never do.
+        RefreshCoreAsync(trigger, trigger is RefreshTrigger.Manual or RefreshTrigger.PopoverOpened, cancellationToken);
+
+    private async ValueTask RefreshCoreAsync(RefreshTrigger trigger, bool requestRemote, CancellationToken cancellationToken)
     {
         QuotaRefreshCoordinator? coordinator;
         await EnterGateAsync(cancellationToken);
@@ -405,6 +418,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         }
         finally { ExitGate(); }
         if (coordinator is null) return;
+        if (requestRemote) RequestRemoteRefresh();
         // Resolution/handoff is serialized, never retrieval: revoke or another source
         // change must be able to cancel and drain even a cancellation-ignoring provider.
         try { await coordinator.ReevaluateAsync(trigger, cancellationToken); }
@@ -417,6 +431,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         Interlocked.Increment(ref _authorityEpoch);
         CancelRemoteDeadline();
         _pollCancellation?.Cancel();
+        StopRemoteUsageWatch();
         if (_timer is not null) await _timer.DisposeAsync();
         try
         {
@@ -508,6 +523,32 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         catch (Exception) { /* Never trace a provider/file-system exception or its private path. */ }
     }
 
+    // A push just arrived: read it now instead of at the next poll. Requesting again here
+    // would make the other machine push in a loop.
+    private async void ForwardRemoteUsageChanged()
+    {
+        try { if (_enabled) await RefreshCoreAsync(RefreshTrigger.Manual, requestRemote: false, CancellationToken.None); }
+        catch (Exception) { /* Never trace a provider/file-system exception or its private path. */ }
+    }
+
+    private void RequestRemoteRefresh()
+    {
+        if (!_enabled || _resolvedSource != ClaudeQuotaSource.OtherMachine) return;
+        _ = RequestRemoteRefreshAsync();
+    }
+
+    private async Task RequestRemoteRefreshAsync()
+    {
+        try { await _remoteRefresh.RequestAsync(_clock.UtcNow, CancellationToken.None); }
+        catch (Exception) { /* Best effort: the other machine's timer still pushes. */ }
+    }
+
+    private void StopRemoteUsageWatch()
+    {
+        var watch = Interlocked.Exchange(ref _remoteUsageWatch, null);
+        try { watch?.Dispose(); } catch (Exception) { }
+    }
+
     public async ValueTask DisposeAsync()
     {
         await EnterGateAsync();
@@ -523,6 +564,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
             _enabled = false; _policy.Disable(); _pollCancellation?.Cancel();
             Interlocked.Increment(ref _authorityEpoch);
             CancelRemoteDeadline();
+            StopRemoteUsageWatch();
             if (_timer is not null) await _timer.DisposeAsync();
             try { await StopExportAsync(); }
             finally

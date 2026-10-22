@@ -1,0 +1,14 @@
+[Unit]
+Description=Start AIBar's Claude usage push when Windows AIBar asks for fresh data
+
+[Service]
+Type=simple
+# Checks the Windows request file every 15 seconds over one SSH master connection and
+# starts aibar-claude-remote-usage.service, so the collector never runs concurrently.
+ExecStart=/usr/bin/python3 %h/.local/lib/aibar/claude_remote_request.py
+Restart=always
+RestartSec=30
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -157,6 +157,43 @@ public async Task Generation_is_an_exclusive_post_enable_unlock_not_freshness()
 }
 
 [Fact]
+public async Task Persisted_consent_restore_is_value_free_and_truthful_until_a_new_retrieval()
+{
+    await using var authority = Authority(); var writer = new MemoryWriter(); await using var publisher = new QuotaExportPublisher(authority, writer, new FixedClock(Now));
+    await publisher.RestoreAsync(default);
+    var cached = State(); var loading = cached with { IsLoading = true };
+    var authFailed = cached with { Freshness = FreshnessState.Stale, Failure = new(QuotaErrorKind.Authentication, "synthetic") };
+    publisher.Accept(new(loading, 1, 0)); await publisher.PublicationCompletion;
+    Assert.Equal(QuotaExportState.Refreshing, writer.Documents[^1].State);
+    publisher.Accept(new(authFailed, 2, 0)); await publisher.PublicationCompletion;
+    Assert.Equal((QuotaExportState.Unavailable, QuotaExportWarning.AuthenticationFailed), (writer.Documents[^1].State, writer.Documents[^1].Warning!.Value));
+    Assert.All(writer.Documents, value =>
+    {
+        Assert.NotEqual(QuotaExportState.Disabled, value.State);
+        Assert.Equal((null, null, null), (value.SourceRetrievedAt, value.FiveHour, value.Weekly));
+    });
+    publisher.Accept(new(cached, 3, 1)); await publisher.PublicationCompletion;
+    Assert.Equal((QuotaExportState.Current, 20m), (writer.Documents[^1].State, writer.Documents[^1].Weekly!.PercentageUsed));
+    await publisher.DisableAsync(default); await publisher.EnableAsync(default); var count = writer.Documents.Count;
+    publisher.Accept(new(loading, 4, 1)); publisher.Accept(new(authFailed, 5, 1)); await publisher.PublicationCompletion;
+    Assert.Equal(count, writer.Documents.Count);
+    Assert.Equal(QuotaExportState.Disabled, writer.Documents[^1].State);
+}
+
+[Fact]
+public async Task Persisted_consent_restore_keeps_a_late_cached_snapshot_redacted_after_a_snapshot_free_failure()
+{
+    await using var authority = Authority(); var writer = new MemoryWriter(); await using var publisher = new QuotaExportPublisher(authority, writer, new FixedClock(Now));
+    await publisher.RestoreAsync(default);
+    publisher.Accept(new(new(null, FreshnessState.Unavailable, true, null, null), 1, 0));
+    publisher.Accept(new(new(null, FreshnessState.Unavailable, false, new(QuotaErrorKind.Service, "synthetic"), null), 2, 0));
+    // A delayed cache load lands after the failure, still without a newer retrieval.
+    publisher.Accept(new(State() with { Freshness = FreshnessState.Stale }, 3, 0)); await publisher.PublicationCompletion;
+    Assert.All(writer.Documents, value => Assert.Equal((null, null, null), (value.SourceRetrievedAt, value.FiveHour, value.Weekly)));
+    Assert.Equal(QuotaExportState.Unavailable, writer.Documents[^1].State);
+}
+
+[Fact]
 public async Task Enabled_attempt_without_snapshot_replaces_disabled_export_with_sanitized_unavailable()
 {
     await using var authority = Authority(); var writer = new MemoryWriter(); await using var publisher = new QuotaExportPublisher(authority, writer, new FixedClock(Now));

@@ -77,7 +77,14 @@ public sealed class BetaConsentOrQuotaTests : IDisposable
         var writer = new ExportWriter(); var publisher = new QuotaExportPublisher(coordinator, writer, new FixedClock(Now));
         await using var runtime = new BetaRuntime(settings, new PrivateIntegrationPolicy(), coordinator, new FixedClock(Now), publisher: publisher);
         await runtime.InitializeAsync(default); await WaitUntilAsync(() => runtime.State.Failure is not null);
-        Assert.All(writer.Documents, document => Assert.Equal(QuotaExportState.Disabled, document.State));
+        await publisher.PublicationCompletion;
+        Assert.NotEmpty(writer.Documents);
+        Assert.All(writer.Documents, document =>
+        {
+            Assert.NotEqual(QuotaExportState.Disabled, document.State);
+            Assert.Equal((null, null, null), (document.SourceRetrievedAt, document.FiveHour, document.Weekly));
+        });
+        Assert.Equal((QuotaExportState.Unavailable, QuotaExportWarning.Unavailable), (writer.Documents[^1].State, writer.Documents[^1].Warning!.Value));
         provider.Next = new QuotaProviderResult(fresh, null); await runtime.RefreshAsync(RefreshTrigger.Manual, default); await publisher.PublicationCompletion; Assert.Equal(QuotaExportState.Current, writer.Documents[^1].State);
         await runtime.RevokeConsentAsync(default); Assert.Equal(QuotaExportState.Disabled, writer.Documents[^1].State);
         await runtime.GrantConsentAsync(default); await publisher.PublicationCompletion; Assert.Equal(QuotaExportState.Current, writer.Documents[^1].State);

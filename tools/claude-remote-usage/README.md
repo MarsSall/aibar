@@ -60,6 +60,20 @@ See [cost and tokens](../../docs/usage-cost.md) for fields, pricing and display 
 The service runs this collector as an independent pre-step; failure does not
 prevent the existing quota push. The quota CLI and its `--dry-run` are unchanged.
 
+## Fresh data when AIBar starts
+
+The five-minute timer is the only scheduled Anthropic query. When Windows AIBar starts,
+when its panel opens, and on a manual Refresh it writes
+`%LOCALAPPDATA%\AIBar\claude-refresh-request.json` (exactly
+`{"schemaVersion":1,"requestedAt":"<UTC Z timestamp>"}`, nothing else). The optional
+`claude_remote_request.py` watcher reads only that file every 15 seconds over one shared
+SSH master connection. A new request younger than ten minutes starts
+`aibar-claude-remote-usage.service`, so systemd serializes it with the timer and the
+collector never runs concurrently. Requests add at most one Anthropic query per minute;
+ordinary AIBar polls never write a request. Windows AIBar watches the pushed usage file
+and reflects it immediately. The watcher logs only `requested <timestamp>` or
+`failed <timestamp>`; unreachable Windows is silent and retried on the next check.
+
 ## Try once, then install (explicit opt-in)
 
 First ensure key-based SSH to your Windows alias is already trusted and working,
@@ -75,12 +89,13 @@ python3 claude_remote_tokens.py --dry-run
 install -d -m 700 ~/.config/aibar ~/.local/lib/aibar ~/.config/systemd/user
 install -m 600 claude-remote-usage.conf.example ~/.config/aibar/claude-remote-usage.conf
 # Edit host and remote_dir in that config before the first push.
-install -m 700 claude_remote_usage.py claude_remote_tokens.py ~/.local/lib/aibar/
-install -m 644 aibar-claude-remote-usage.service aibar-claude-remote-usage.timer ~/.config/systemd/user/
+install -m 700 claude_remote_usage.py claude_remote_tokens.py claude_remote_request.py ~/.local/lib/aibar/
+install -m 644 aibar-claude-remote-usage.service aibar-claude-remote-usage.timer aibar-claude-remote-request.service ~/.config/systemd/user/
 python3 ~/.local/lib/aibar/claude_remote_usage.py --once
 python3 ~/.local/lib/aibar/claude_remote_tokens.py --once
 systemctl --user daemon-reload
 systemctl --user enable --now aibar-claude-remote-usage.timer
+systemctl --user enable --now aibar-claude-remote-request.service
 ```
 
 `--once` is the default. `--dry-run` prints only the safe contract JSON and never
@@ -113,9 +128,9 @@ same destination. AIBar treats data older than 15 minutes as stale, not current.
   or raw SSH errors are exposed by the helper.
 - Inspect scheduling with `systemctl --user status aibar-claude-remote-usage.timer`
   and state-only logs with `journalctl --user -u aibar-claude-remote-usage.service`.
-- To uninstall, run `systemctl --user disable --now aibar-claude-remote-usage.timer`,
+- To uninstall, run `systemctl --user disable --now aibar-claude-remote-request.service aibar-claude-remote-usage.timer`,
   stop any active service with `systemctl --user stop aibar-claude-remote-usage.service`,
-  then remove the two installed unit files, both installed Python helpers, and
+  then remove the three installed unit files, the three installed Python helpers, and
   `~/.config/aibar/claude-remote-usage.conf`; run `systemctl --user daemon-reload`.
   Remove both remote JSON files and their `.tmp` files separately if desired; **Automatic**
   returns to the Windows login after the JSON is removed, on the next refresh.

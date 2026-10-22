@@ -13,6 +13,8 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"aibar-claude-remote-{Guid.NewGuid():N}");
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);
+    // Never resolve Automatic against this machine's real %LOCALAPPDATA%\AIBar push.
+    private static bool NoRemoteFile() => false;
     private const string Window = "{\"percentageUsed\":32.5,\"resetAt\":\"2030-01-01T17:00:00Z\"}";
     private const string Valid = "{\"schemaVersion\":1,\"generatedAt\":\"2030-01-01T12:00:00Z\",\"state\":\"current\",\"fiveHour\":" + Window + ",\"weekly\":null}";
     private string SettingsPath => Path.Combine(_root, "settings.json");
@@ -89,7 +91,7 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
         await Settings.SaveAsync(true, default);
         await Settings.SaveClaudeAsync(true, default);
         var local = new BlockingProvider(); var remote = new Provider(73); var store = new Store();
-        await using var runtime = new ClaudeQuotaRuntime(Settings, store, _ => local, new Clock(), remoteProviderFactory: _ => remote);
+        await using var runtime = new ClaudeQuotaRuntime(Settings, store, _ => local, new Clock(), remoteProviderFactory: _ => remote, remoteFileAvailable: NoRemoteFile);
         await runtime.InitializeAsync(default);
         await local.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
         Task switching;
@@ -114,7 +116,7 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
     {
         var factories = 0;
         await using var runtime = new ClaudeQuotaRuntime(Settings, new Store(), _ => { factories++; return new Provider(); }, new Clock(),
-            remoteProviderFactory: _ => { factories++; return new Provider(); });
+            remoteProviderFactory: _ => { factories++; return new Provider(); }, remoteFileAvailable: NoRemoteFile);
         await runtime.InitializeAsync(default);
         await runtime.SetSourceAsync(ClaudeQuotaSource.OtherMachine, default);
         Assert.Equal(0, factories);
@@ -127,7 +129,7 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
     public async Task Tray_source_controller_reflects_persisted_selection_and_routes_choice_without_prompt()
     {
         await Settings.SaveClaudeSourceAsync(ClaudeQuotaSource.OtherMachine, default);
-        await using var runtime = new ClaudeQuotaRuntime(Settings, new Store(), _ => new Provider(), new Clock());
+        await using var runtime = new ClaudeQuotaRuntime(Settings, new Store(), _ => new Provider(), new Clock(), remoteFileAvailable: NoRemoteFile);
         await runtime.InitializeAsync(default);
         var tray = new SourceTray(); var prompt = new Prompt();
         using var controller = new ClaudeQuotaTrayController(tray, runtime, prompt);

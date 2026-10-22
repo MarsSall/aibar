@@ -93,7 +93,7 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
     public async Task Declining_Claude_prompt_keeps_both_consents_off_and_does_not_construct_provider()
     {
         var factories = 0;
-        await using var runtime = new ClaudeQuotaRuntime(Settings, new MemoryStore(), _ => { factories++; return new Provider(); }, new Clock());
+        await using var runtime = new ClaudeQuotaRuntime(Settings, new MemoryStore(), _ => { factories++; return new Provider(); }, new Clock(), remoteFileAvailable: NoRemoteFile);
         await runtime.InitializeAsync(default);
         var tray = new ClaudeTray(); var prompt = new Prompt(false);
         using var controller = new ClaudeQuotaTrayController(tray, runtime, prompt);
@@ -202,7 +202,7 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
     public async Task Disabled_Claude_creates_no_provider_or_timer_and_ignores_every_lifecycle_trigger()
     {
         var factories = 0; var time = new PollTime(); var events = new Lifecycle(); var store = new MemoryStore();
-        await using var runtime = new ClaudeQuotaRuntime(Settings, store, _ => { factories++; return new Provider(); }, new Clock(), events, time);
+        await using var runtime = new ClaudeQuotaRuntime(Settings, store, _ => { factories++; return new Provider(); }, new Clock(), events, time, remoteFileAvailable: NoRemoteFile);
         await runtime.InitializeAsync(default);
         foreach (var trigger in Enum.GetValues<RefreshTrigger>()) await runtime.RefreshAsync(trigger, default);
         events.Sleep(); events.Resume(); events.ClockChangedNow(); time.Advance(TimeSpan.FromHours(1));
@@ -426,7 +426,9 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
     }
 
     private ClaudeQuotaRuntime Runtime(IQuotaSnapshotStore store, IQuotaProvider provider, Clock? clock = null,
-        Lifecycle? events = null, PollTime? time = null) => new(Settings, store, _ => provider, clock ?? new Clock(), events, time);
+        Lifecycle? events = null, PollTime? time = null) => new(Settings, store, _ => provider, clock ?? new Clock(), events, time, remoteFileAvailable: NoRemoteFile);
+    // Never resolve Automatic against this machine's real %LOCALAPPDATA%\AIBar push.
+    private static bool NoRemoteFile() => false;
     private static QuotaSnapshot Snapshot(decimal used = 42) => new(new(used, Now.AddHours(5)), new(20, Now.AddDays(7)), Now);
     private static async Task Until(Func<bool> condition)
     {

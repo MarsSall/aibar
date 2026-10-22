@@ -129,6 +129,7 @@ public sealed class QuotaExportPublisher : IAsyncDisposable, IAiBarClearWork
     private bool _enabled;
     private bool _unlocked;
     private bool _attemptObserved;
+    private bool _redacted;
     private bool _draining;
     private bool _disposed;
     public QuotaExportPublisher(QuotaRefreshCoordinator authority, IQuotaExportWriter writer, IClock clock)
@@ -143,18 +144,27 @@ internal void Accept(QuotaAuthorityUpdate update)
     {
 if (_disposed || _latest is { } latest && update.EventSequence <= latest.EventSequence) return;
 _latest = update;
-if (!_enabled) return;
+if (_enabled) Admit(update);
+    }
+}
+private void Admit(QuotaAuthorityUpdate update)
+{
 if (!_unlocked)
 {
 if (update.State.IsLoading) _attemptObserved = true;
-if (update.RetrievalGeneration > _baseline || _attemptObserved && !update.State.IsLoading && update.State.Snapshot is null) _unlocked = true;
+// Restore already publishes snapshot-free failures redacted; only a newer retrieval may unlock it,
+// or a late cache load after such a failure would disclose cached values.
+if (update.RetrievalGeneration > _baseline || !_redacted && _attemptObserved && !update.State.IsLoading && update.State.Snapshot is null) _unlocked = true;
 }
-if (!_unlocked) return;
-_pending = (update, _epoch, _epochCancellation.Token);
+if (!_unlocked && !_redacted) return;
+// Until a new retrieval, persisted consent discloses state and warnings but never cached values.
+_pending = (_unlocked ? update : update with { State = Redact(update.State) }, _epoch, _epochCancellation.Token);
 if (!_draining) { _draining = true; _drain = DrainAsync(); }
-    }
 }
+private static QuotaRefreshState Redact(QuotaRefreshState state) => state with { Snapshot = null };
 public ValueTask EnableAsync(CancellationToken cancellationToken) => ChangeDisclosureAsync(true, cancellationToken);
+/// <summary>Enables persisted consent at startup: not a privacy action, so it never publishes "disabled".</summary>
+public ValueTask RestoreAsync(CancellationToken cancellationToken) => ChangeDisclosureAsync(true, cancellationToken, restore: true);
 public ValueTask DisableAsync(CancellationToken cancellationToken) => ChangeDisclosureAsync(false, cancellationToken);
 public async ValueTask CancelAndWaitAsync(CancellationToken cancellationToken)
 {
@@ -166,7 +176,7 @@ lock (_gate)
 {
 ObjectDisposedException.ThrowIf(_disposed, this);
 prior = _epochCancellation; _epochCancellation = new(); ++_epoch;
-_enabled = _unlocked = _attemptObserved = false; _pending = null; drain = _drain;
+_enabled = _unlocked = _attemptObserved = _redacted = false; _pending = null; drain = _drain;
 }
 prior.Cancel();
 try { await drain; }
@@ -175,17 +185,19 @@ finally { prior.Dispose(); }
 finally { _privacyGate.Release(); }
 }
 public void ResumeAfterClear() { }
-private async ValueTask ChangeDisclosureAsync(bool enabled, CancellationToken cancellationToken)
+private async ValueTask ChangeDisclosureAsync(bool enabled, CancellationToken cancellationToken, bool restore = false)
 {
     await _privacyGate.WaitAsync(cancellationToken);
     CancellationTokenSource prior; CancellationTokenSource current; Task drain; long epoch;
     try
     {
+// Read before taking _gate: the authority owns its own lock.
+var restoreBaseline = restore ? _authority.RetrievalGeneration : 0;
 lock (_gate)
 {
 ObjectDisposedException.ThrowIf(_disposed, this);
 prior = _epochCancellation; current = _epochCancellation = new(); epoch = ++_epoch;
-_enabled = _unlocked = _attemptObserved = false; _pending = null; drain = _drain;
+_enabled = _unlocked = _attemptObserved = _redacted = false; _pending = null; drain = _drain;
 }
 prior.Cancel();
 try
@@ -193,8 +205,14 @@ try
 await drain;
 var now = _clock.UtcNow;
 using var linked = CancellationTokenSource.CreateLinkedTokenSource(current.Token, cancellationToken);
-await _writer.WriteAsync(QuotaExportWire.Disabled(now), now, linked.Token);
-if (enabled) lock (_gate) if (!_disposed && epoch == _epoch) { _baseline = _latest?.RetrievalGeneration ?? 0; _enabled = true; }
+var document = restore ? QuotaExportProjector.Project(new(Redact(_authority.State)), now) : QuotaExportWire.Disabled(now);
+await _writer.WriteAsync(document, now, linked.Token);
+if (enabled) lock (_gate) if (!_disposed && epoch == _epoch)
+{
+_baseline = restore ? restoreBaseline : _latest?.RetrievalGeneration ?? 0; _enabled = true; _redacted = restore;
+// Updates that arrived during the restore write must not wait for the next poll.
+if (restore && _latest is { } latest) Admit(latest);
+}
 }
 finally { prior.Dispose(); }
     }
@@ -230,7 +248,7 @@ lock (_gate)
 {
 if (_disposed) return;
 _disposed = true; prior = _epochCancellation; current = _epochCancellation = new(); ++_epoch;
-_enabled = _unlocked = _attemptObserved = false; _pending = null; drain = _drain;
+_enabled = _unlocked = _attemptObserved = _redacted = false; _pending = null; drain = _drain;
 }
 _authority.AuthorityUpdated -= Accept; prior.Cancel();
 try { await drain; var now = _clock.UtcNow; await _writer.WriteAsync(QuotaExportWire.Disabled(now), now, current.Token); }
