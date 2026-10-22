@@ -200,7 +200,10 @@ public sealed class CodexRemoteTokensTests : IDisposable
                 state = "current",
                 days = new[] { new { day = DateOnly.FromDateTime(now.LocalDateTime).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), model = "gpt-5", input, cachedInput = 0, cacheWrite = 0, output = 0 } }
             });
-            await File.WriteAllBytesAsync(path, bytes);
+            // Publish like the Linux helper (staging file + atomic replace): AIBar may be reading the
+            // current file in the background, and its FileShare.Delete read allows replace, not overwrite.
+            await File.WriteAllBytesAsync(path + ".tmp", bytes);
+            if (File.Exists(path)) File.Replace(path + ".tmp", path, null); else File.Move(path + ".tmp", path);
         }
         await Publish(100);
         var composition = App.CreateComposition(new(data, Path.Combine(_root, "codex"), UserProfile: Path.Combine(_root, "home")));
