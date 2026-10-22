@@ -23,3 +23,4 @@ Branch: `feat/codex-remote-tokens`. Mirrors the Claude remote tokens path (`tool
 - L4 (decision): oversized lines (22, none assistant) mark partial only when they are assistant messages; files untouched 31 days are skipped; only lines containing "openai-codex" are parsed.
 - L5 (decision): ClearAiBarDataService allowlist extended with codex-remote-tokens.json (worker request, approved by parent to match Claude clear semantics). Combined Codex cost follows the existing Codex consent gate, like local analytics (BetaRuntime owns analytics).
 - L6 (slice): branch ~930 authored lines in 2 commits (Linux helper, AIBar); one PR reviewed commit by commit.
+- L7 (evidence): full suite on Mars 1411/1415; differential main b6b136a vs branch (2 runs each): identical — SettingsWindowTests.Save_persists fails on both (environment), RefreshInterval and DesktopLocalUsageComposition pass in isolation on both (suite-order flakes). No regression.
