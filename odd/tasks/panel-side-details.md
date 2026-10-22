@@ -30,3 +30,4 @@ Branch: `feat/panel-side-details`. Verification runs on Windows CI (`.github/wor
 - L6 (evidence): CI 39781285393 on 281d648 failed only on PanelSurfaceTests glow (cross-thread brush, test bug fixed in 145a7b3) and RefreshIntervalWindowTests(Light) (pre-existing flake; main run 39778832297 failed on a sibling Settings test).
 - L7 (slice): T1-T3 and T4 are separate commits; the branch is ~900 authored lines, mostly T4 test migration. One PR, reviewed commit by commit.
 - L8 (review fix): parent fixed worker output: hover-then-click pins instead of closing; Left stays with the chart range selector; details window background transparent (no double alpha). CI 39783679767.
+- L9 (evidence): CI 39784767277 green on all jobs (.NET Windows, YASB Pester, Python) after the activation fix. Pending: rendered/interactive check on the user's PC (hover, focus, acrylic, outside click).
