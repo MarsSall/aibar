@@ -9,6 +9,7 @@ using TextBlock = System.Windows.Controls.TextBlock;
 using StackPanel = System.Windows.Controls.StackPanel;
 using Point = System.Windows.Point;
 using Rectangle = System.Windows.Shapes.Rectangle;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
 
 namespace AIBar.Desktop;
 
@@ -26,7 +27,12 @@ public sealed class DailyUsageChart : System.Windows.Controls.UserControl
     public string UnitLabel => _unit.Text;
     public string EmptyMessage => _message.Text;
     public IReadOnlyList<UsageCostDay> VisibleDays => Summary?.Days.TakeLast(Range == QuotaHistoryChartRange.Month ? 30 : 7).ToArray() ?? [];
-    private readonly Canvas _plot = new() { Height = 124, ClipToBounds = true };
+    private readonly Canvas _plot = new() { ClipToBounds = true };
+    // Axis labels mirror the quota chart: maximum, half and zero on the left; first day and today below.
+    private readonly TextBlock _top = Axis(VerticalAlignment.Top), _middle = Axis(VerticalAlignment.Center), _zero = Axis(VerticalAlignment.Bottom);
+    private readonly TextBlock _start = Axis(VerticalAlignment.Top), _end = Axis(VerticalAlignment.Top);
+    public string AxisMaximumLabel => _top.Text;
+    public string AxisStartLabel => _start.Text;
     private readonly TextBlock _unit = new() { FontSize = 11, Margin = new Thickness(0, 4, 0, 4) };
     private readonly TextBlock _message = new() { FontSize = 12 };
     public DailyUsageChart()
@@ -35,24 +41,55 @@ public sealed class DailyUsageChart : System.Windows.Controls.UserControl
         foreach (var text in new[] { title, _unit, _message }) text.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
         AutomationProperties.SetName(_plot, "Daily usage");
         AutomationProperties.SetLiveSetting(_message, AutomationLiveSetting.Polite);
+        var frame = new System.Windows.Controls.Grid { Height = 124, Margin = new Thickness(0, 4, 0, 0) };
+        frame.ColumnDefinitions.Add(new() { Width = new GridLength(38) }); frame.ColumnDefinitions.Add(new());
+        frame.Children.Add(_top); frame.Children.Add(_middle); frame.Children.Add(_zero);
+        var area = new System.Windows.Controls.Grid { Margin = new Thickness(0, 6, 2, 6) };
+        System.Windows.Controls.Grid.SetColumn(area, 1);
+        var bounds = new System.Windows.Controls.Border { BorderThickness = new Thickness(0, 1, 0, 1) };
+        var half = new System.Windows.Controls.Border { Height = 1, VerticalAlignment = VerticalAlignment.Center };
+        bounds.SetResourceReference(System.Windows.Controls.Border.BorderBrushProperty, "SecondaryBorderBrush");
+        half.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty, "SecondaryBorderBrush");
+        area.Children.Add(bounds); area.Children.Add(half); area.Children.Add(_plot);
+        frame.Children.Add(area);
+        _end.Text = "Today"; _end.HorizontalAlignment = HorizontalAlignment.Right;
+        var dates = new System.Windows.Controls.Grid { Margin = new Thickness(38, 0, 2, 8) };
+        dates.Children.Add(_start); dates.Children.Add(_end);
         var body = new StackPanel();
-        body.Children.Add(title); body.Children.Add(_unit); body.Children.Add(_plot); body.Children.Add(_message);
+        body.Children.Add(title); body.Children.Add(_unit); body.Children.Add(frame); body.Children.Add(dates); body.Children.Add(_message);
         Content = body;
         _plot.SizeChanged += (_, _) => Draw();
         Draw();
     }
+    private static TextBlock Axis(VerticalAlignment alignment)
+    {
+        var text = new TextBlock { FontSize = 11, VerticalAlignment = alignment };
+        text.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+        return text;
+    }
+    private static string Compact(double value, bool dollars) => dollars
+        ? "$" + value.ToString(value < 10 ? "0.##" : "0", CultureInfo.InvariantCulture)
+        : value >= 1e9 ? (value / 1e9).ToString("0.#", CultureInfo.InvariantCulture) + "B"
+        : value >= 1e6 ? (value / 1e6).ToString("0.#", CultureInfo.InvariantCulture) + "M"
+        : value >= 1e3 ? (value / 1e3).ToString("0.#", CultureInfo.InvariantCulture) + "K"
+        : value.ToString("0", CultureInfo.InvariantCulture);
     private static void Changed(DependencyObject sender, DependencyPropertyChangedEventArgs e) => ((DailyUsageChart)sender).Draw();
     private void Draw()
     {
         _plot.Children.Clear();
         var days = VisibleDays;
-        _message.Text = days.Count == 0 ? "No daily usage yet" : "";
+        // Zero-filled days alone are no usage: a flat line on the floor reads as a broken chart.
+        var empty = days.Count == 0 || days.All(day => day.Tokens == 0);
+        _message.Text = empty ? "No daily usage yet" : "";
         var priced = days.All(day => day.Cost.HasValue && !day.Partial && !day.Unpriced);
         _unit.Text = priced ? "$ per day" : "tokens per day";
         AutomationProperties.SetName(_unit, _unit.Text);
-        if (days.Count == 0) return;
+        _start.Text = days.Count == 0 ? "" : days[0].Day.ToString("MMM d", CultureInfo.InvariantCulture);
+        if (empty) { _top.Text = _middle.Text = _zero.Text = ""; return; }
         double Value(UsageCostDay day) => priced ? (double)day.Cost!.Value : day.Tokens;
-        var maximum = Math.Max(1, days.Max(Value));
+        var maximum = days.Max(Value);
+        if (maximum <= 0) maximum = 1;
+        _top.Text = Compact(maximum, priced); _middle.Text = Compact(maximum / 2, priced); _zero.Text = priced ? "$0" : "0";
         var width = _plot.ActualWidth / days.Count;
         Polyline? line = null;
         if (ChartStyle == "line")
@@ -65,9 +102,9 @@ public sealed class DailyUsageChart : System.Windows.Controls.UserControl
         for (var index = 0; index < days.Count; index++)
         {
             var day = days[index];
-            var height = Value(day) / maximum * _plot.Height;
+            var height = Value(day) / maximum * _plot.ActualHeight;
             var x = (index + .5) * width;
-            var y = _plot.Height - height;
+            var y = _plot.ActualHeight - height;
             Shape point;
             if (line is null)
                 point = new Rectangle { Width = Math.Max(0, width - 3), Height = height };

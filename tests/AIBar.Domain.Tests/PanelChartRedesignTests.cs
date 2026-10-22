@@ -96,6 +96,32 @@ public sealed class PanelChartRedesignTests
         });
     }
 
+    [Fact] // S7 (L14): days that are all zero show the empty message, not a flat line; real data gets labelled axes.
+    public void Daily_usage_hides_all_zero_days_and_labels_its_axes()
+    {
+        WpfTestApplicationHost.Run(_ =>
+        {
+            var daily = new DailyUsageChart();
+            var window = new Window { Content = daily, Width = 360, SizeToContent = SizeToContent.Height, ShowInTaskbar = false };
+            try
+            {
+                window.Show(); window.UpdateLayout();
+                daily.Summary = UsageCostPolicy.Calculate([], Today);
+                Assert.Equal(7, daily.VisibleDays.Count);
+                Assert.Equal("No daily usage yet", daily.EmptyMessage);
+                Assert.Empty(Visuals<Polyline>(daily)); Assert.Empty(Visuals<Rectangle>(daily));
+                Assert.Equal("", daily.AxisMaximumLabel);
+                daily.Summary = Usage(); window.UpdateLayout();
+                Assert.Equal("", daily.EmptyMessage);
+                Assert.Equal("$1.25", daily.AxisMaximumLabel);
+                Assert.Equal(daily.VisibleDays[0].Day.ToString("MMM d", System.Globalization.CultureInfo.InvariantCulture), daily.AxisStartLabel);
+                Assert.Contains(Visuals<TextBlock>(daily), text => text.Text == "Today");
+                Assert.Single(Visuals<Polyline>(daily));
+            }
+            finally { window.Close(); }
+        });
+    }
+
     [Fact] // S7: actual MainWindow bindings survive rehosting and follow the provider tab live.
     public void Rehosted_charts_follow_selected_provider_and_appearance_options()
     {
