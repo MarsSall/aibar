@@ -61,6 +61,19 @@ Malformed or unreadable log records mark the aggregate partial, not complete zer
 Its destination is **`claude-remote-tokens.json`**, not the quota file above.
 It has an independent schema-1 contract, 1 MiB cap, and two-hour freshness limit.
 See [cost and tokens](../../docs/usage-cost.md) for fields, pricing and display rules.
+
+### Codex tokens from Gentle Shell/Pi
+
+`codex_remote_tokens.py` does the same for Codex subscription usage that runs through
+Gentle Shell or Pi on this machine instead of Codex CLI on Windows. It reads
+`*.jsonl` under `~/.gentle-shell/agent/sessions` and `~/.pi/agent/sessions`
+(override with `AIBAR_CODEX_SESSION_DIRS`, entries separated by `:`), keeps only
+assistant messages whose provider is `openai-codex`, and sums their
+input/cacheRead/cacheWrite/output counters per local day and model, deduplicated by
+entry ID (forked sessions repeat entries). Files untouched for 31 days are skipped and
+only lines that mention `openai-codex` are parsed. Oversized lines mark the aggregate
+partial only when they are assistant messages. It pushes the same schema-1 contract to
+**`codex-remote-tokens.json`**; AIBar adds it to local Codex CLI usage.
 The service runs this collector as an independent pre-step; failure does not
 prevent the existing quota push. The quota CLI and its `--dry-run` are unchanged.
 
@@ -90,13 +103,15 @@ Run these commands from this helper directory on Linux **only when ready**:
 ```sh
 python3 claude_remote_usage.py --dry-run
 python3 claude_remote_tokens.py --dry-run
+python3 codex_remote_tokens.py --dry-run
 install -d -m 700 ~/.config/aibar ~/.local/lib/aibar ~/.config/systemd/user
 install -m 600 claude-remote-usage.conf.example ~/.config/aibar/claude-remote-usage.conf
 # Edit host and remote_dir in that config before the first push.
-install -m 700 claude_remote_usage.py claude_remote_tokens.py claude_remote_request.py ~/.local/lib/aibar/
+install -m 700 claude_remote_usage.py claude_remote_tokens.py codex_remote_tokens.py claude_remote_request.py ~/.local/lib/aibar/
 install -m 644 aibar-claude-remote-usage.service aibar-claude-remote-usage.timer aibar-claude-remote-request.service ~/.config/systemd/user/
 python3 ~/.local/lib/aibar/claude_remote_usage.py --once
 python3 ~/.local/lib/aibar/claude_remote_tokens.py --once
+python3 ~/.local/lib/aibar/codex_remote_tokens.py --once
 systemctl --user daemon-reload
 systemctl --user enable --now aibar-claude-remote-usage.timer
 systemctl --user enable --now aibar-claude-remote-request.service
