@@ -66,6 +66,40 @@ public sealed class ClaudeRemoteRefreshTests : IDisposable
     }
 
     [Fact]
+    public async Task A_push_replacing_the_remote_file_never_switches_Automatic_to_this_pc()
+    {
+        // Observed 2026-10-22: File.Replace leaves the target briefly absent, and the change
+        // watcher refreshes exactly then; Automatic flipped to This PC and showed "authentication failed".
+        var replacing = 0; var local = new Provider(); var remote = new Provider();
+        // While "replacing", exactly the next existence check sees the file missing.
+        await using var runtime = await StartAutomaticAsync(local, remote, () => Interlocked.Exchange(ref replacing, 0) == 0);
+        await Until(() => remote.Calls >= 1 && !runtime.State.IsLoading);
+        Assert.Equal(ClaudeQuotaSource.OtherMachine, runtime.ResolvedSource);
+
+        Volatile.Write(ref replacing, 1);
+        await runtime.RefreshAsync(RefreshTrigger.Manual, default);
+
+        Assert.Equal(0, Volatile.Read(ref replacing));
+        Assert.Equal(ClaudeQuotaSource.OtherMachine, runtime.ResolvedSource);
+        Assert.Equal(0, local.Calls);
+        Assert.Equal(ClaudeQuotaSource.OtherMachine, await Settings.LoadClaudeCacheSourceAsync(default));
+    }
+
+    [Fact]
+    public async Task A_removed_remote_file_still_switches_Automatic_to_this_pc_after_confirmation()
+    {
+        var present = true; var local = new Provider(); var remote = new Provider();
+        await using var runtime = await StartAutomaticAsync(local, remote, () => Volatile.Read(ref present));
+        await Until(() => remote.Calls >= 1 && !runtime.State.IsLoading);
+        Volatile.Write(ref present, false);
+
+        await runtime.RefreshAsync(RefreshTrigger.Manual, default);
+
+        Assert.Equal(ClaudeQuotaSource.ThisPc, runtime.ResolvedSource);
+        await Until(() => local.Calls >= 1);
+    }
+
+    [Fact]
     public async Task Request_file_is_exact_and_leaves_no_staging_file()
     {
         var channel = new ClaudeRemoteRefreshChannel(_root);
@@ -100,6 +134,16 @@ public sealed class ClaudeRemoteRefreshTests : IDisposable
         await Settings.SaveClaudeSourceAsync(source, default);
         var runtime = new ClaudeQuotaRuntime(Settings, new Store(), _ => provider, new Clock(time), timeProvider: time,
             remoteProviderFactory: _ => provider, remoteFileAvailable: () => false, remoteRefresh: channel);
+        await runtime.InitializeAsync(default);
+        return runtime;
+    }
+
+    private async Task<ClaudeQuotaRuntime> StartAutomaticAsync(Provider local, Provider remote, Func<bool> available)
+    {
+        await Settings.SaveClaudeAsync(true, default);
+        var runtime = new ClaudeQuotaRuntime(Settings, new Store(), _ => local, new Clock(new ManualTime()), timeProvider: TimeProvider.System,
+            remoteProviderFactory: _ => remote, remoteFileAvailable: available, remoteRefresh: new Channel(),
+            remoteAbsenceConfirmation: TimeSpan.FromMilliseconds(50));
         await runtime.InitializeAsync(default);
         return runtime;
     }

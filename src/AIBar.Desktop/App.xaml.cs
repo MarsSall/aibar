@@ -99,7 +99,7 @@ public partial class App : System.Windows.Application
             seams.ClaudeRemoteProviderFactory ?? (claudePolicy => new ClaudeRemoteUsageProvider(claudePolicy,
                 Path.Combine(dataDirectory, "claude-remote-usage.json"))),
             () => ClaudeRemoteUsageProvider.IsAvailableForAutomatic(Path.Combine(dataDirectory, "claude-remote-usage.json")), historyStore: historyStore,
-            remoteRefresh: new ClaudeRemoteRefreshChannel(dataDirectory));
+            remoteRefresh: new ClaudeRemoteRefreshChannel(dataDirectory), remoteAbsenceConfirmation: TimeSpan.FromSeconds(2));
         var claudeCost = new UsageCostView(() => claudeRuntime.IsConsentEnabled,
             token => ClaudeRemoteTokens.ReadAsync(Path.Combine(dataDirectory, "claude-remote-tokens.json"), clock.UtcNow, token));
         claudeRuntime.ConsentChanged += () => { _ = claudeCost.RefreshAsync(default); };
