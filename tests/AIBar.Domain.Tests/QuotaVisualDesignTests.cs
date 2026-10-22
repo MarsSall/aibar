@@ -232,6 +232,8 @@ public sealed class QuotaVisualDesignTests
             {
                 ("SurfaceBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
                 ("CardBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("PanelCardBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
+                ("PanelCardBorderBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
                 ("TextBrush", "{DynamicResource {x:Static SystemColors.WindowTextColorKey}}"),
                 ("MutedTextBrush", "{DynamicResource {x:Static SystemColors.GrayTextColorKey}}"),
                 ("NotificationSurfaceBrush", "{DynamicResource {x:Static SystemColors.WindowColorKey}}"),
@@ -497,7 +499,7 @@ public sealed class QuotaVisualDesignTests
     // S10 adds every shared color token; legacy keys remain for other windows.
     private static readonly string[] SpecTokenKeys =
     [
-        "AccentBrush", "CardBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush",
+        "AccentBrush", "CardBrush", "PanelCardBrush", "PanelCardBorderBrush", "FocusBrush", "MutedTextBrush", "PanelMenuHighlightBrush", "PanelMenuHighlightTextBrush", "PanelRowHoverBrush", "ProgressTrackBrush", "SecondaryBorderBrush", "SurfaceBrush", "TextBrush",
         "BackdropBrush", "SettingsBackgroundBrush", "NotificationBackgroundBrush", "FooterBrush", "TabSelectedBrush", "PressedBrush", "ControlBrush", "WindowBorderBrush", "CardBorderBrush", "ControlBorderBrush", "TertiaryTextBrush", "ClaudeUiBrush", "CodexUiBrush", "AccentIndicatorBrush", "LinkBrush", "WarningTextBrush", "WarningBackgroundBrush", "DangerTextBrush", "SuccessTextBrush", "CodexBrush", "CodexTintBrush", "ClaudeBrush", "ClaudeTintBrush", "UsageOkBrush", "UsageWarnBrush", "UsageHighBrush",
         "SettingsWindowBorderBrush", "SettingsControlBrush", "SettingsControlBorderBrush", "SettingsSurfaceBrush", "SettingsCardBrush", "SettingsFooterBrush", "SettingsTextBrush", "SettingsSecondaryBrush", "SettingsBorderBrush", "SettingsAccentBrush", "SettingsIndicatorBrush", "SettingsOnAccentBrush", "SettingsDangerBrush", "SettingsFocusBrush", "SettingsHoverBrush", "SettingsHoverTextBrush", "SettingsTrackBrush", "SettingsCodexBrush", "SettingsClaudeBrush", "SettingsUsageOkBrush", "SettingsUsageWarnBrush", "SettingsUsageHighBrush",
         "NotificationSurfaceBrush", "NotificationTextBrush", "NotificationSecondaryTextBrush", "NotificationBorderBrush", "NotificationThresholdBrush", "NotificationResetBrush", "NotificationPaceBrush", "NotificationTimerBrush", "NotificationCodexBrush", "NotificationClaudeBrush", "NotificationCodexTileBrush", "NotificationClaudeTileBrush", "NotificationFocusBrush", "NotificationHoverBrush", "NotificationHoverTextBrush", "NotificationBadgeTextBrush"

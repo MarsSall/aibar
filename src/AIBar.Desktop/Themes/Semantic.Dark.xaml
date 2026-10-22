@@ -1,6 +1,9 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <!-- S10 shared color tokens. Legacy keys are retained for existing consumers. -->
     <SolidColorBrush x:Key="SurfaceBrush" Color="#0C0C10" />
+    <!-- Panel cards are a light veil over the panel surface, so acrylic and opacity show through. -->
+    <SolidColorBrush x:Key="PanelCardBrush" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="PanelCardBorderBrush" Color="#1FFFFFFF" />
     <SolidColorBrush x:Key="CardBrush" Color="#111116" />
     <SolidColorBrush x:Key="TextBrush" Color="#F4F4F6" />
     <SolidColorBrush x:Key="MutedTextBrush" Color="#A9A9B2" />

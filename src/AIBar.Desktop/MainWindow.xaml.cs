@@ -17,6 +17,11 @@ public partial class MainWindow : Window
         nameof(BarColorMode), typeof(PanelBarColorMode), typeof(MainWindow), new PropertyMetadata(PanelBarColorMode.Brand));
     public PanelBarColorMode BarColorMode { get => (PanelBarColorMode)GetValue(BarColorModeProperty); set => SetValue(BarColorModeProperty, value); }
 
+    public static readonly DependencyProperty ProviderTintProperty = DependencyProperty.Register(
+        nameof(ProviderTint), typeof(bool), typeof(MainWindow), new PropertyMetadata(true));
+    /// <summary>False keeps border, glow, header divider and selected tab neutral.</summary>
+    public bool ProviderTint { get => (bool)GetValue(ProviderTintProperty); set => SetValue(ProviderTintProperty, value); }
+
     public static readonly DependencyProperty SelectedProviderProperty = DependencyProperty.Register(
         nameof(SelectedProvider), typeof(string), typeof(MainWindow), new PropertyMetadata("Codex"));
     public string SelectedProvider { get => (string)GetValue(SelectedProviderProperty); private set => SetValue(SelectedProviderProperty, value); }

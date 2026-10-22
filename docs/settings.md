@@ -21,6 +21,7 @@ Selected pivots have an accent underline and semibold text. Controls have named 
 | Choice | Default | Options |
 | --- | --- | --- |
 | Background opacity | 100% | 30–100%, step 5. Applies to panel and notification background brushes, not text, bars, tabs or buttons. |
+| Provider tint | On | Colors the panel border, glow, header divider and selected tab with the selected provider. Off keeps them neutral; the sign-in warning stays amber either way. |
 | Panel bars | Brand colors | Brand colors, or Usage level: green below 75%, yellow from 75%, red from 90%. |
 | YASB colors | Usage level | Existing usage ramp, or Brand colors. |
 
@@ -65,10 +66,10 @@ The selected source is saved through `ClaudeQuotaRuntime.SetSourceAsync` before 
 `%LOCALAPPDATA%\AIBar\appearance.json` remains schema 1:
 
 ```json
-{"schema":1,"barColors":"brand","yasbColors":"usage","backgroundOpacity":100,"refreshMinutes":5}
+{"schema":1,"barColors":"brand","yasbColors":"usage","backgroundOpacity":100,"refreshMinutes":5,"providerTint":true}
 ```
 
-Existing schema-1 files without `backgroundOpacity` load with **100**; missing `refreshMinutes` loads with **5**. Invalid numeric opacity falls back to 100, and invalid numeric refresh intervals fall back to 5, without discarding valid color choices. Saves reject out-of-range/non-step opacity, unknown color modes and refresh intervals outside 1/2/5/15/30. Successful writes atomically replace the destination via a same-directory temporary file and raise `AppearanceSettings.Changed` with all four values; failed/cancelled writes do not publish a change.
+Existing schema-1 files without `backgroundOpacity` load with **100**; missing `refreshMinutes` loads with **5**; missing `providerTint` loads as **on**. Invalid numeric opacity falls back to 100, and invalid numeric refresh intervals fall back to 5, without discarding valid color choices. Saves reject out-of-range/non-step opacity, unknown color modes and refresh intervals outside 1/2/5/15/30. Successful writes atomically replace the destination via a same-directory temporary file and raise `AppearanceSettings.Changed` with all five values; failed/cancelled writes do not publish a change.
 
 **Clear AIBar Data** drains appearance writes with alert work, removes the existing appearance/alert files, and publishes the actual post-clear appearance (defaults on success, surviving values after rollback). Clear/dispose paths never await the WPF dispatcher.
 

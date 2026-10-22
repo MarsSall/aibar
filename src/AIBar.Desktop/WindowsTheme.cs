@@ -228,7 +228,13 @@ public sealed class WpfOpaquePopupSurface(Window window) : IOpaquePopupSurface
     }
 
     public void SetDarkMode() => Set(20, 1);
-    public void SetCorners() => Set(33, 2);
+    /// <summary>Rounded corners without the Windows 11 system border, which drew a second frame outside the panel's own.</summary>
+    public void SetCorners()
+    {
+        Set(33, 2);
+        var none = unchecked((int)0xFFFFFFFE); // DWMWA_COLOR_NONE; unsupported before Windows 11, so failure is ignored.
+        DwmSetWindowAttribute(new WindowInteropHelper(window).EnsureHandle(), 34, ref none, sizeof(int));
+    }
 
     /// <summary>Acrylic first; the frame and transparent composition change only after DWM accepts it.</summary>
     public void SetBackdrop()

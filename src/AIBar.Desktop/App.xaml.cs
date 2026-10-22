@@ -208,6 +208,7 @@ public partial class App : System.Windows.Application
     private async Task ApplyAppearance(AppearanceOptions options, MainWindow window, StartupComposition composition)
     {
         window.BarColorMode = ToBarColorMode(options);
+        window.ProviderTint = options.ProviderTint;
         window.BackgroundOpacity = ToBackgroundOpacity(options);
         if (_alertController is { } controller) controller.BackgroundOpacity = window.BackgroundOpacity;
         try { await ApplyRefreshIntervalAsync(options, composition.CodexQuota, composition.ClaudeQuota); }

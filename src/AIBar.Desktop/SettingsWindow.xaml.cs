@@ -75,6 +75,7 @@ public partial class SettingsWindow : Window
         BarUsage.IsChecked = appearance.BarColors == "usage"; BarBrand.IsChecked = !BarUsage.IsChecked;
         YasbBrand.IsChecked = appearance.YasbColors == "brand"; YasbUsage.IsChecked = !YasbBrand.IsChecked;
         BackgroundOpacity.Value = appearance.BackgroundOpacity;
+        ProviderTint.IsChecked = appearance.ProviderTint;
         foreach (var choice in RefreshChoices.Children.OfType<RadioButton>())
             choice.IsChecked = RefreshMinutes(choice) == appearance.RefreshMinutes;
         if (_providers is { } providers)
@@ -125,7 +126,7 @@ public partial class SettingsWindow : Window
             await _saveAlerts(new(Resets.IsChecked == true, Thresholds.IsChecked == true, RunOut.IsChecked == true,
                 EdgeGlow.IsChecked == true, Notification.IsChecked == true, Confetti.IsChecked == true) { ThresholdValues = values });
             await _appearance.SaveAsync(new(BarUsage.IsChecked == true ? "usage" : "brand", YasbBrand.IsChecked == true ? "brand" : "usage", (int)BackgroundOpacity.Value,
-                RefreshChoices.Children.OfType<RadioButton>().Where(choice => choice.IsChecked == true).Select(RefreshMinutes).Single()), default);
+                RefreshChoices.Children.OfType<RadioButton>().Where(choice => choice.IsChecked == true).Select(RefreshMinutes).Single(), ProviderTint.IsChecked == true), default);
             SaveStatus.Text = "Changes saved.";
             if (_providers is { } currentProviders) SourceStatus.Text = "ⓘ " + currentProviders.SourceDescription;
         }

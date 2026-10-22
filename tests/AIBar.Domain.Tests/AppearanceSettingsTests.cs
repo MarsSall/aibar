@@ -32,7 +32,7 @@ public sealed class AppearanceSettingsTests : IDisposable
         Assert.Equal(options, await settings.LoadAsync(default));
         Assert.Equal(options, Assert.Single(changes));
         using var json = JsonDocument.Parse(await File.ReadAllTextAsync(path));
-        Assert.Equal(new[] { "schema", "barColors", "yasbColors", "backgroundOpacity", "refreshMinutes" }, json.RootElement.EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.Equal(new[] { "schema", "barColors", "yasbColors", "backgroundOpacity", "refreshMinutes", "providerTint" }, json.RootElement.EnumerateObject().Select(p => p.Name).ToArray());
         Assert.Equal(1, json.RootElement.GetProperty("schema").GetInt32());
         using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => settings.SaveAsync(new(), cancelled.Token).AsTask());
@@ -86,6 +86,23 @@ public sealed class AppearanceSettingsTests : IDisposable
         var path = Path.Combine(_root, "appearance.json");
         await File.WriteAllTextAsync(path, $"{{\"schema\":1,\"barColors\":\"usage\",\"yasbColors\":\"brand\",\"backgroundOpacity\":{opacity}}}");
         Assert.Equal(new AppearanceOptions("usage", "brand", 100), await new AppearanceSettings(path).LoadAsync(default));
+    }
+    [Fact]
+    public async Task Provider_tint_roundtrips_and_legacy_file_keeps_it_on()
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, "appearance.json");
+        await File.WriteAllTextAsync(path, "{\"schema\":1,\"barColors\":\"usage\",\"yasbColors\":\"brand\"}");
+        var settings = new AppearanceSettings(path);
+        Assert.True((await settings.LoadAsync(default)).ProviderTint);
+        AppearanceOptions? changed = null;
+        settings.Changed += value => changed = value;
+        var off = new AppearanceOptions("usage", "brand", ProviderTint: false);
+        await settings.SaveAsync(off, default);
+        Assert.Equal(off, await settings.LoadAsync(default));
+        Assert.Equal(off, changed);
+        using var json = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+        Assert.False(json.RootElement.GetProperty("providerTint").GetBoolean());
     }
     public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }
 }

@@ -86,6 +86,7 @@ public sealed class SettingsWindowTests
                 Assert.IsType<Slider>(window.FindName("BackgroundOpacity")).Value = 70;
                 Assert.IsType<TextBox>(window.FindName("ThresholdInput")).Text = "20, 80, 100";
                 Assert.IsType<CheckBox>(window.FindName("Confetti")).IsChecked = true;
+                Assert.IsType<CheckBox>(window.FindName("ProviderTint")).IsChecked = false;
                 Assert.IsType<Button>(window.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 var frame = new System.Windows.Threading.DispatcherFrame();
                 var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
@@ -94,7 +95,7 @@ public sealed class SettingsWindowTests
                 timer.Start(); System.Windows.Threading.Dispatcher.PushFrame(frame); timer.Stop();
                 Assert.Equal("Changes saved.", Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text);
                 Assert.Equal(1, changed);
-                Assert.Equal(new AppearanceOptions("usage", "brand", 70), appearance.LoadAsync(default).AsTask().GetAwaiter().GetResult());
+                Assert.Equal(new AppearanceOptions("usage", "brand", 70, ProviderTint: false), appearance.LoadAsync(default).AsTask().GetAwaiter().GetResult());
                 var saved = alerts.LoadAsync(default).AsTask().GetAwaiter().GetResult();
                 Assert.True(saved.Confetti); Assert.Equal(new[] { 20, 80, 100 }, saved.ThresholdValues.ToArray());
             }

@@ -141,6 +141,11 @@
          <TextBlock Grid.Column="2" Text="{Binding Value, ElementName=BackgroundOpacity, StringFormat={}{0:0} %}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
         </Grid>
        </Border>
+       <Border Style="{StaticResource SettingsCard}" Padding="16,10" Margin="0,-8,0,16">
+        <CheckBox x:Name="ProviderTint" IsChecked="True" AutomationProperties.Name="Provider tint" AutomationProperties.HelpText="Colors the panel border, glow, header divider and selected tab with the selected provider.">
+         <StackPanel><TextBlock Text="Provider tint"/><TextBlock Text="Border, glow and selected tab follow the provider color." Style="{StaticResource SettingsMeta}" Margin="0,2,0,0"/></StackPanel>
+        </CheckBox>
+       </Border>
        <TextBlock Text="PANEL BARS" Style="{StaticResource SettingsHeading}"/>
        <Grid Margin="0,0,0,16" KeyboardNavigation.DirectionalNavigation="Contained"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
         <RadioButton x:Name="BarBrand" GroupName="PanelBars" IsChecked="True" AutomationProperties.Name="Panel bar colors: Brand colors" MinHeight="116">
