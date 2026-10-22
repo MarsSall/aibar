@@ -179,7 +179,7 @@ public sealed class PanelChartRedesignTests
     [InlineData(WindowsTheme.Dark)]
     [InlineData(WindowsTheme.Light)]
     [InlineData(WindowsTheme.HighContrast)]
-    public void Details_chrome_matches_settings_without_provider_tint_or_opacity(WindowsTheme theme)
+    public void Details_chrome_matches_settings_surface_with_provider_glow(WindowsTheme theme)
     {
         WpfTestApplicationHost.Run(_ =>
         {
@@ -197,18 +197,13 @@ public sealed class PanelChartRedesignTests
                 Assert.Equal(((SolidColorBrush)expected.Background).Color, ((SolidColorBrush)details.DetailsSurface.Background).Color);
                 Assert.Equal(255, ((SolidColorBrush)details.DetailsSurface.Background).Color.A);
                 Assert.Equal(((SolidColorBrush)expected.BorderBrush).Color, ((SolidColorBrush)details.DetailsSurface.BorderBrush).Color);
-                if (theme == WindowsTheme.Dark)
-                {
-                    var glow = Assert.IsType<DropShadowEffect>(details.DetailsSurface.Effect);
-                    var expectedGlow = Assert.IsType<DropShadowEffect>(expected.Effect);
-                    Assert.Equal(expectedGlow.Color, glow.Color); Assert.Equal(29, glow.BlurRadius);
-                    Assert.Equal(.27, glow.Opacity); Assert.Equal(0, glow.ShadowDepth);
-                }
-                else Assert.Null(details.DetailsSurface.Effect);
+                // L15: the glow is the panel's provider glow, not the Settings blue.
+                var panelGlow = Assert.IsType<DropShadowEffect>(((Border)panel.Template.FindName("PanelSurface", panel)).Effect);
+                var glow = Assert.IsType<DropShadowEffect>(details.DetailsSurface.Effect);
+                Assert.Equal(panelGlow.Color, glow.Color); Assert.Equal(panelGlow.Opacity, glow.Opacity); Assert.Equal(panelGlow.BlurRadius, glow.BlurRadius);
                 Assert.False(details.IsTranslucent);
                 source.Set(WindowsTheme.Light);
                 System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-                Assert.Null(details.DetailsSurface.Effect);
                 Assert.Equal(System.Windows.Media.Color.FromRgb(214, 214, 214), ((SolidColorBrush)details.DetailsSurface.BorderBrush).Color);
             }
             finally { details?.Close(); settings.Close(); panel.Close(); }
