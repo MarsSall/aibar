@@ -11,6 +11,7 @@ using ScrollViewer = System.Windows.Controls.ScrollViewer;
 namespace AIBar.Domain.Tests;
 
 /// <summary>The details scroll bar follows the panel: slim, rounded, no arrow buttons.</summary>
+[Collection(WpfTestCollection.Name)]
 public sealed class PanelScrollTests
 {
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);

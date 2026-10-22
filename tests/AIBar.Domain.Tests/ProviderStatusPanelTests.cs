@@ -10,6 +10,7 @@ using AIBar.Domain;
 
 namespace AIBar.Domain.Tests;
 
+[Collection(WpfTestCollection.Name)]
 public sealed class ProviderStatusPanelTests
 {
     [Fact]

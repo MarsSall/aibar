@@ -7,6 +7,7 @@ using AIBar.Desktop;
 namespace AIBar.Domain.Tests;
 
 /// <summary>S10 replaces S9 appearance, not quota/command/accessibility contracts.</summary>
+[Collection(WpfTestCollection.Name)]
 public sealed class ClaudeDesignPanelTests
 {
     [Fact]

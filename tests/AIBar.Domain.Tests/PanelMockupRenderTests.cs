@@ -14,6 +14,7 @@ namespace AIBar.Domain.Tests;
 /// each case still constructs and lays out the real panel to catch XAML failures.
 /// All data and commands are synthetic; no runtime, credential or usage files are opened.
 /// </summary>
+[Collection(WpfTestCollection.Name)]
 public sealed class PanelMockupRenderTests
 {
     private static readonly DateTimeOffset Now = new(2030, 1, 1, 12, 0, 0, TimeSpan.Zero);

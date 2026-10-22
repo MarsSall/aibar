@@ -7,6 +7,7 @@ using AIBar.Desktop;
 
 namespace AIBar.Domain.Tests;
 
+[Collection(WpfTestCollection.Name)]
 public sealed class PanelDetailsWindowTests
 {
     // S5/S6: click pins an owned side window without replacing the summary.

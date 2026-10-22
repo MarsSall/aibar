@@ -6,6 +6,7 @@ using AIBar.Desktop;
 
 namespace AIBar.Domain.Tests;
 
+[Collection(WpfTestCollection.Name)]
 public sealed class PanelMotionRegressionTests
 {
     [Fact]

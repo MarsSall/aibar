@@ -8,6 +8,7 @@ using AIBar.Desktop;
 namespace AIBar.Domain.Tests;
 
 /// <summary>Writes native Settings renders for visual review when AIBAR_PANEL_RENDER_DIRECTORY is set.</summary>
+[Collection(WpfTestCollection.Name)]
 public sealed class SettingsRenderTests
 {
     [Theory]

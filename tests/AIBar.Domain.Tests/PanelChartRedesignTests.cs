@@ -11,6 +11,7 @@ using AIBar.Domain;
 
 namespace AIBar.Domain.Tests;
 
+[Collection(WpfTestCollection.Name)]
 public sealed class PanelChartRedesignTests
 {
     private static readonly DateOnly Today = new(2030, 2, 1);
