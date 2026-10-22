@@ -67,6 +67,27 @@ public sealed class ClearAiBarDataTests(ITestOutputHelper output) : IDisposable
     }
 
     [Fact]
+    public async Task Clear_removes_codex_tokens_resets_the_view_and_preserves_unowned_source_data()
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, "codex-remote-tokens.json");
+        var now = DateTimeOffset.UtcNow;
+        var day = DateOnly.FromDateTime(now.UtcDateTime);
+        var payload = $"{{\"schemaVersion\":1,\"generatedAt\":\"{now.UtcDateTime:yyyy-MM-dd'T'HH:mm:ss'Z'}\",\"localDay\":\"{day:yyyy-MM-dd}\",\"state\":\"current\",\"days\":[]}}";
+        await File.WriteAllTextAsync(path, payload);
+        await File.WriteAllTextAsync(Path.Combine(_root, "unrelated.txt"), "preserve");
+        await using var view = new UsageCostView(() => true, async token => (await RemoteTokens.ReadRowsAsync(path, now, token)).Summary);
+        await view.RefreshAsync(default);
+        Assert.Equal(0L, view.State.Today.Tokens);
+        await new ClearAiBarDataService(_root, [view], _ => ValueTask.CompletedTask).ClearAsync(default);
+        Assert.False(File.Exists(path));
+        Assert.Same(UsageCostSummary.Unavailable, view.State);
+        await view.RefreshAsync(default);
+        Assert.Same(UsageCostSummary.Unavailable, view.State);
+        Assert.Equal("preserve", await File.ReadAllTextAsync(Path.Combine(_root, "unrelated.txt")));
+    }
+
+    [Fact]
     public async Task Clear_is_idempotent_and_recreates_after_each_successful_retry()
     {
         var recreations = 0;

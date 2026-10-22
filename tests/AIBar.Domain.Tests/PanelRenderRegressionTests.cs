@@ -136,7 +136,7 @@ public sealed class PanelRenderRegressionTests
                 state.Primary, state.Weekly, State = state, state.FreshnessLabel,
                 Claude = new { IsEnabled = true, State = state },
                 ClaudeCost = new { State = new { TodayLabel = "Today: $38.17 · 264M tokens", Last30DaysLabel = "Last 30 days: $254.24 · 918M tokens (partial)" } },
-                Analytics = new { UsageCost = new { TodayLabel = "Today: $0.04 · 15K tokens", Last30DaysLabel = "Last 30 days: $12.80 · 9.4M tokens" } }
+                CodexCost = new { TodayLabel = "Today: $0.04 · 15K tokens", Last30DaysLabel = "Last 30 days: $12.80 · 9.4M tokens" }
             }
         };
     }

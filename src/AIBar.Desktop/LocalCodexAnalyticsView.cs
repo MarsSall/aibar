@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using AIBar.Application;
+using AIBar.Domain;
 
 namespace AIBar.Desktop;
 
@@ -97,15 +98,19 @@ public sealed class BetaAnalyticsPresentation : INotifyPropertyChanged
     private readonly QuotaPresentationHost _quota;
     private readonly LocalCodexAnalyticsView _analytics;
     private readonly LocalUsagePresentationHost _localUsage;
+    private readonly UsageCostView? _codexCost;
 
-    public BetaAnalyticsPresentation(QuotaPresentationHost quota, LocalCodexAnalyticsView analytics, LocalUsagePresentationHost localUsage, ClaudeQuotaPresentationHost? claude = null, UsageCostView? claudeCost = null)
+    public BetaAnalyticsPresentation(QuotaPresentationHost quota, LocalCodexAnalyticsView analytics, LocalUsagePresentationHost localUsage, ClaudeQuotaPresentationHost? claude = null, UsageCostView? claudeCost = null, UsageCostView? codexCost = null)
     {
         _quota = quota; _analytics = analytics; _localUsage = localUsage; Claude = claude; ClaudeCost = claudeCost;
+        _codexCost = codexCost;
+        if (_codexCost is not null) _codexCost.PropertyChanged += OnCodexCostChanged;
         _quota.PropertyChanged += OnQuotaChanged;
         _analytics.PropertyChanged += OnAnalyticsChanged;
         _localUsage.PropertyChanged += OnLocalUsageChanged;
     }
 
+    public UsageCostSummary CodexCost => _codexCost?.State ?? Analytics.UsageCost;
     public UsageCostView? ClaudeCost { get; }
     public ClaudeQuotaPresentationHost? Claude { get; }
     public QuotaWindowPresentation Primary => _quota.Primary;
@@ -121,6 +126,11 @@ public sealed class BetaAnalyticsPresentation : INotifyPropertyChanged
     public QuotaPresentationHost QuotaPresentation => _quota;
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnQuotaChanged(object? sender, PropertyChangedEventArgs args) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
-    private void OnAnalyticsChanged(object? sender, PropertyChangedEventArgs args) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Analytics)));
+    private void OnAnalyticsChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Analytics)));
+        if (_codexCost is null) OnCodexCostChanged(sender, args);
+    }
+    private void OnCodexCostChanged(object? sender, PropertyChangedEventArgs args) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CodexCost)));
     private void OnLocalUsageChanged(object? sender, PropertyChangedEventArgs args) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LocalUsage)));
 }

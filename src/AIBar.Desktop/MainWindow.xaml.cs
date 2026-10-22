@@ -177,7 +177,7 @@ public partial class MainWindow : Window
             chart.SetBinding(QuotaHistoryChart.HistoryProperty, new System.Windows.Data.Binding(nameof(PaceHistory)) { Source = this });
             chart.SetBinding(QuotaHistoryChart.SelectedProviderProperty, new System.Windows.Data.Binding(nameof(SelectedProvider)) { Source = this });
             chart.SetBinding(QuotaHistoryChart.ChartStyleProperty, new System.Windows.Data.Binding(nameof(ChartStyle)) { Source = this });
-            chart.SetBinding(QuotaHistoryChart.CodexDailyProperty, new System.Windows.Data.Binding("DataContext.Analytics.UsageCost") { Source = this });
+            chart.SetBinding(QuotaHistoryChart.CodexDailyProperty, new System.Windows.Data.Binding("DataContext.CodexCost") { Source = this });
             chart.SetBinding(QuotaHistoryChart.ClaudeDailyProperty, new System.Windows.Data.Binding("DataContext.ClaudeCost.State") { Source = this });
             chart.StyleSelected -= OnChartStyleSelected;
             chart.StyleSelected += OnChartStyleSelected;
