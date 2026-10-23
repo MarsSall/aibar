@@ -3,7 +3,13 @@
   <a href="./README.es.md"><img src="https://img.shields.io/badge/Espa%C3%B1ol-1F2937?style=for-the-badge&labelColor=0B1020" alt="Español" /></a>
 </p>
 
-<img src="./.github/assets/banner.svg" alt="AIBar banner" width="100%" />
+<div align="center">
+
+<img src="./src/AIBar.Desktop/Assets/aibar.svg" alt="AIBar icon: a brain filled with liquid gold" width="128" />
+
+# AIBar
+
+</div>
 
 <div align="center">
 
@@ -15,13 +21,7 @@
 
 </div>
 
-<div align="center">
-
-<img src="./src/AIBar.Desktop/Assets/aibar.svg" alt="AIBar icon: a brain filled with liquid gold" width="128" />
-
-# AIBar
-
-</div>
+<img src="./.github/assets/banner.svg" alt="AIBar banner" width="100%" />
 
 Your AI quotas at a glance: Codex and Claude subscription usage, pace, resets and estimated cost, in the Windows tray.
 
