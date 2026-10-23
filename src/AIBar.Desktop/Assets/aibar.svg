@@ -4,7 +4,7 @@
     <stop offset="0" stop-color="#1D2A6B"/><stop offset=".6" stop-color="#0E1638"/><stop offset="1" stop-color="#060914"/>
   </radialGradient>
   <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#FFE9A3"/><stop offset=".35" stop-color="#F7C548"/><stop offset="1" stop-color="#C7861B"/>
+    <stop offset="0" stop-color="#F2CC6B"/><stop offset=".4" stop-color="#D4A12A"/><stop offset="1" stop-color="#94640F"/>
   </linearGradient>
   <radialGradient id="empty" cx="50%" cy="40%" r="70%">
     <stop offset="0" stop-color="#16204A"/><stop offset="1" stop-color="#0A1028"/>
@@ -25,9 +25,9 @@
 <circle cx="239" cy="148" r="52" fill="url(#empty)"/><circle cx="273" cy="148" r="52" fill="url(#empty)"/><circle cx="183" cy="167" r="52" fill="url(#empty)"/><circle cx="329" cy="167" r="52" fill="url(#empty)"/><circle cx="143" cy="208" r="52" fill="url(#empty)"/><circle cx="369" cy="208" r="52" fill="url(#empty)"/><circle cx="129" cy="262" r="52" fill="url(#empty)"/><circle cx="383" cy="262" r="52" fill="url(#empty)"/><circle cx="143" cy="316" r="52" fill="url(#empty)"/><circle cx="369" cy="316" r="52" fill="url(#empty)"/><circle cx="183" cy="357" r="52" fill="url(#empty)"/><circle cx="329" cy="357" r="52" fill="url(#empty)"/><circle cx="239" cy="376" r="52" fill="url(#empty)"/><circle cx="273" cy="376" r="52" fill="url(#empty)"/><circle cx="192" cy="262" r="103" fill="url(#empty)"/><circle cx="320" cy="262" r="103" fill="url(#empty)"/><circle cx="241" cy="207" r="91" fill="url(#empty)"/><circle cx="271" cy="207" r="91" fill="url(#empty)"/><circle cx="241" cy="317" r="91" fill="url(#empty)"/><circle cx="271" cy="317" r="91" fill="url(#empty)"/>
 <g clip-path="url(#brain)" filter="url(#goldglow)">
   <path d="M40,244 C110,230 170,258 256,244 S402,230 472,244 L472,480 L40,480 Z" fill="url(#gold)"/>
-  <path d="M40,244 C110,230 170,258 256,244 S402,230 472,244" fill="none" stroke="#FFF4CC" stroke-width="6" stroke-linecap="round"/>
+  <path d="M40,244 C110,230 170,258 256,244 S402,230 472,244" fill="none" stroke="#FBE3A0" stroke-width="6" stroke-linecap="round"/>
 </g>
-  <g fill="none" stroke="#7A4A08" stroke-width="10" stroke-linecap="round" opacity=".55" clip-path="url(#brain)">
+  <g fill="none" stroke="#5E3C06" stroke-width="10" stroke-linecap="round" opacity=".55" clip-path="url(#brain)">
     <path d="M104,296 c22,-14 40,14 62,0 s30,-12 50,2"/><path d="M408,296 c-22,-14 -40,14 -62,0 s-30,-12 -50,2"/>
     <path d="M128,350 c20,-12 36,12 56,0"/><path d="M384,350 c-20,-12 -36,12 -56,0"/>
   </g>

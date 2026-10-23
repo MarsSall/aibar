@@ -18,7 +18,27 @@ public sealed class AppIconTests
         Assert.Equal(new byte[] { 0, 0, 1, 0 }, bytes[..4]);
         var count = BitConverter.ToUInt16(bytes, 4);
         var sizes = Enumerable.Range(0, count).Select(index => bytes[6 + 16 * index] == 0 ? 256 : bytes[6 + 16 * index]);
-        Assert.Equal(new[] { 16, 20, 24, 32, 48, 64, 256 }, sizes);
+        Assert.Equal(new[] { 16, 20, 24, 32, 40, 48, 64, 256 }, sizes);
+    }
+
+    [Theory]
+    [InlineData(16)]
+    [InlineData(20)]
+    [InlineData(24)]
+    [InlineData(32)]
+    [InlineData(40)]
+    [InlineData(48)]
+    public void Tray_and_taskbar_frames_are_an_untiled_glyph_that_fills_the_frame(int size)
+    {
+        using var icon = new Icon(IconPath, size, size);
+        using var bitmap = icon.ToBitmap();
+        Assert.Equal(size, bitmap.Width);
+        // No background tile: a rounded tile covers ~96% of the frame, the brain glyph leaves its corners clear.
+        var opaque = Enumerable.Range(0, size * size).Count(index => bitmap.GetPixel(index % size, index / size).A >= 64);
+        Assert.True(opaque < size * size * 0.9, $"{size} px frame is {opaque * 100 / (size * size)}% opaque: background tile");
+        // The brain reaches the frame edges instead of floating inside padding.
+        Assert.True(bitmap.GetPixel(0, size / 2).A > 0 || bitmap.GetPixel(1, size / 2).A > 0);
+        Assert.True(bitmap.GetPixel(size / 2, size - 1).A > 0 || bitmap.GetPixel(size / 2, size - 2).A > 0);
     }
 
     [Fact]
