@@ -1,7 +1,7 @@
 """Generate the AIBar liquid-gold brain icon sources.
 
 Usage: python3 -I tools/icon/aibar_icon.py <outdir>
-Writes aibar.svg (detailed, 24px and up) and aibar-small.svg (simplified tray glyph, 16px)."""
+Writes aibar.svg (detailed, 24px and up) and aibar-small.svg (simplified untiled glyph, 16-48px)."""
 import math
 import pathlib
 import sys
@@ -37,7 +37,7 @@ def icon(spec, *, stroke, gap, level, glow, sulci, wave, tile=True):
     sulci_svg = ""
     if sulci:
         sulci_svg = """
-  <g fill="none" stroke="#7A4A08" stroke-width="10" stroke-linecap="round" opacity=".55" clip-path="url(#brain)">
+  <g fill="none" stroke="#5E3C06" stroke-width="10" stroke-linecap="round" opacity=".55" clip-path="url(#brain)">
     <path d="M104,296 c22,-14 40,14 62,0 s30,-12 50,2"/><path d="M408,296 c-22,-14 -40,14 -62,0 s-30,-12 -50,2"/>
     <path d="M128,350 c20,-12 36,12 56,0"/><path d="M384,350 c-20,-12 -36,12 -56,0"/>
   </g>
@@ -53,7 +53,7 @@ def icon(spec, *, stroke, gap, level, glow, sulci, wave, tile=True):
     <stop offset="0" stop-color="#1D2A6B"/><stop offset=".6" stop-color="#0E1638"/><stop offset="1" stop-color="#060914"/>
   </radialGradient>
   <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="#FFE9A3"/><stop offset=".35" stop-color="#F7C548"/><stop offset="1" stop-color="#C7861B"/>
+    <stop offset="0" stop-color="#F2CC6B"/><stop offset=".4" stop-color="#D4A12A"/><stop offset="1" stop-color="#94640F"/>
   </linearGradient>
   <radialGradient id="empty" cx="50%" cy="40%" r="70%">
     <stop offset="0" stop-color="#16204A"/><stop offset="1" stop-color="#0A1028"/>
@@ -73,7 +73,7 @@ def icon(spec, *, stroke, gap, level, glow, sulci, wave, tile=True):
 {circles(pts, 'fill="url(#empty)"')}
 <g clip-path="url(#brain)" filter="url(#goldglow)">
   <path d="{surface} L472,480 L40,480 Z" fill="url(#gold)"/>
-  <path d="{surface}" fill="none" stroke="#FFF4CC" stroke-width="{max(6, stroke // 2)}" stroke-linecap="round"/>
+  <path d="{surface}" fill="none" stroke="#FBE3A0" stroke-width="{max(6, stroke // 2)}" stroke-linecap="round"/>
 </g>{sulci_svg}
 <rect x="{256 - gap}" y="0" width="{2 * gap}" height="512" fill="#0A0F24" clip-path="url(#brain)"/>
 </svg>"""
@@ -81,4 +81,4 @@ def icon(spec, *, stroke, gap, level, glow, sulci, wave, tile=True):
 # level is the gold surface height in the 512 viewBox: lower values mean a fuller brain.
 out = pathlib.Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)
 (out / "aibar.svg").write_text(icon(LOBES, stroke=9, gap=7, level=244, glow=4, sulci=True, wave=14))
-(out / "aibar-small.svg").write_text(icon(SMALL_LOBES, stroke=26, gap=16, level=236, glow=0.01, sulci=False, wave=0, tile=False))
+(out / "aibar-small.svg").write_text(icon(SMALL_LOBES, stroke=26, gap=16, level=210, glow=0.01, sulci=False, wave=0, tile=False))
