@@ -17,7 +17,7 @@ def hemisphere(cx, cy, rx, ry, r, n, a0=95, a1=265):
 
 # Left hemisphere lobes (cx, cy, r); lobes() mirrors them around x=256.
 LOBES = hemisphere(256, 262, 172, 166, 52, 7)
-SMALL_LOBES = hemisphere(256, 256, 236, 222, 78, 5)
+SMALL_LOBES = hemisphere(256, 256, 212, 200, 70, 5)
 
 def lobes(spec, gap):
     pts = []
@@ -28,6 +28,9 @@ def lobes(spec, gap):
 
 def circles(pts, attrs):
     return "".join(f'<circle cx="{x}" cy="{y}" r="{r}" {attrs}/>' for x, y, r in pts)
+
+# Dark green outline: separates the brain shape from both the navy tile and dark taskbars.
+OUTLINE = "#1E7A3C"
 
 TILE = '''<rect width="512" height="512" rx="112" fill="url(#bg)"/>
 <rect x="3" y="3" width="506" height="506" rx="110" fill="none" stroke="#2C3A78" stroke-width="5"/>'''
@@ -69,7 +72,7 @@ def icon(spec, *, stroke, gap, level, glow, sulci, wave, tile=True):
   </filter>
 </defs>
 {TILE if tile else ""}
-<g filter="url(#glow)">{circles(pts, f'fill="#6E9BFF" stroke="#6E9BFF" stroke-width="{stroke * 2}"')}</g>
+<g filter="url(#glow)">{circles(pts, f'fill="{OUTLINE}" stroke="{OUTLINE}" stroke-width="{stroke * 2}"')}</g>
 {circles(pts, 'fill="url(#empty)"')}
 <g clip-path="url(#brain)" filter="url(#goldglow)">
   <path d="{surface} L472,480 L40,480 Z" fill="url(#gold)"/>
@@ -80,5 +83,5 @@ def icon(spec, *, stroke, gap, level, glow, sulci, wave, tile=True):
 
 # level is the gold surface height in the 512 viewBox: lower values mean a fuller brain.
 out = pathlib.Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)
-(out / "aibar.svg").write_text(icon(LOBES, stroke=9, gap=7, level=244, glow=4, sulci=True, wave=14))
-(out / "aibar-small.svg").write_text(icon(SMALL_LOBES, stroke=26, gap=16, level=210, glow=0.01, sulci=False, wave=0, tile=False))
+(out / "aibar.svg").write_text(icon(LOBES, stroke=18, gap=7, level=244, glow=4, sulci=True, wave=14))
+(out / "aibar-small.svg").write_text(icon(SMALL_LOBES, stroke=44, gap=16, level=210, glow=0.01, sulci=False, wave=0, tile=False))
