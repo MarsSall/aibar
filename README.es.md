@@ -3,7 +3,13 @@
   <img src="https://img.shields.io/badge/Espa%C3%B1ol-3B82F6?style=for-the-badge&labelColor=0B1020" alt="Español" />
 </p>
 
-<img src="./.github/assets/banner.svg" alt="Banner de AIBar" width="100%" />
+<div align="center">
+
+<img src="./src/AIBar.Desktop/Assets/aibar.svg" alt="Icono de AIBar: un cerebro lleno de oro líquido" width="128" />
+
+# AIBar
+
+</div>
 
 <div align="center">
 
@@ -15,13 +21,7 @@
 
 </div>
 
-<div align="center">
-
-<img src="./src/AIBar.Desktop/Assets/aibar.svg" alt="Icono de AIBar: un cerebro lleno de oro líquido" width="128" />
-
-# AIBar
-
-</div>
+<img src="./.github/assets/banner.svg" alt="Banner de AIBar" width="100%" />
 
 Tus cuotas de IA de un vistazo: uso, ritmo, reinicios y costo estimado de tus suscripciones de Codex y Claude, en la bandeja de Windows.
 
