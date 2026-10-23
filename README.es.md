@@ -15,7 +15,13 @@
 
 </div>
 
+<div align="center">
+
+<img src="./src/AIBar.Desktop/Assets/aibar.svg" alt="Icono de AIBar: un cerebro lleno de oro líquido" width="128" />
+
 # AIBar
+
+</div>
 
 Tus cuotas de IA de un vistazo: uso, ritmo, reinicios y costo estimado de tus suscripciones de Codex y Claude, en la bandeja de Windows.
 
