@@ -1,10 +1,25 @@
-strict_tdd: false
+strict_tdd: true
 context: |
-  AIBar is a newly initialized, otherwise empty Git repository.
-  It is intended to become a Windows application.
-  No technology stack, package manager, source files, project conventions,
-  or test runner are currently present.
-  Technology choices are intentionally deferred until a later planning phase.
+  AIBar is an established Windows desktop application built with the pinned .NET SDK 8.0.408.
+  AIBar.sln contains nine SDK-style projects organized under src/, tests/, and tools/.
+  The product follows a layered structure: AIBar.Domain (net8.0), AIBar.Application
+  (net8.0, referencing Domain and Microsoft.Data.Sqlite), and AIBar.Desktop
+  (net8.0-windows, WPF WinExe with Windows Forms interop, x64, referencing Application).
+  Packaging supervisor executables and libraries live under tools/ and target
+  net8.0-windows/win-x64; test-only packaging harness and authority support projects
+  live under tests/ and explicitly refuse pack/publish operations.
+  Projects consistently enable implicit usings and, for production projects, nullable
+  reference types. Project references preserve the Domain -> Application -> Desktop
+  dependency direction. Windows-specific projects use x64 where required.
+  The primary automated test project is tests/AIBar.Domain.Tests, targeting
+  net8.0-windows with xUnit, Microsoft.NET.Test.Sdk, and coverlet.collector. It exercises
+  domain, application, desktop, packaging, and repository-level behavior. YASB PowerShell
+  integration behavior has a separate Pester 5.7.1 suite at
+  yasb/tests/read-aibar-quota.Tests.ps1. GitHub Actions runs restore, Debug build, the
+  full .NET solution test suite, and the pinned Pester suite on windows-2022.
+  Use Windows with the pinned SDK for build and test parity. Prefer focused xUnit tests
+  during RED/GREEN cycles, then run the solution test command for verification. Treat
+  dotnet format --verify-no-changes and the Debug solution build as quality gates.
 rules:
   proposal:
     require_problem_statement: true
@@ -15,29 +30,36 @@ rules:
   tasks:
     protect_review_workload: true
   apply:
-    test_command: ""
+    test_command: "dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --configuration Debug --nologo"
   verify:
-    test_command: ""
+    test_command: "dotnet test AIBar.sln --configuration Debug --nologo"
 testing:
-  detected: "2026-07-12"
+  detected: "2026-08-21"
   runner:
-    command: ""
-    framework: ""
+    command: "dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --configuration Debug --nologo"
+    framework: "xUnit 2.5.3 via Microsoft.NET.Test.Sdk 17.8.0; Pester 5.7.1 for YASB PowerShell integration tests"
   layers:
-    unit: ""
-    integration: ""
-    e2e: ""
+    unit: "xUnit tests in tests/AIBar.Domain.Tests"
+    integration: "xUnit repository, desktop, and packaging integration coverage in tests/AIBar.Domain.Tests"
+    e2e: "Pester tests in yasb/tests/read-aibar-quota.Tests.ps1, executed with pinned Pester 5.7.1 in CI"
   commands:
-    unit: []
-    integration: []
-    e2e: []
+    unit:
+      - "dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --configuration Debug --nologo"
+    integration:
+      - "dotnet test AIBar.sln --configuration Debug --nologo"
+    e2e:
+      - "powershell.exe -NoLogo -NoProfile -Command \"Invoke-Pester -Path 'yasb/tests/read-aibar-quota.Tests.ps1'\""
   coverage:
-    command: ""
-    commands: []
+    command: "dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --configuration Debug --collect:\"XPlat Code Coverage\" --nologo"
+    commands:
+      - "dotnet test tests/AIBar.Domain.Tests/AIBar.Domain.Tests.csproj --configuration Debug --collect:\"XPlat Code Coverage\" --nologo"
 quality:
-  lint: ""
-  lint_commands: []
-  typecheck: ""
-  typecheck_commands: []
-  format: ""
-  format_commands: []
+  lint: "dotnet format AIBar.sln --verify-no-changes --no-restore"
+  lint_commands:
+    - "dotnet format AIBar.sln --verify-no-changes --no-restore"
+  typecheck: "dotnet build AIBar.sln --no-restore --configuration Debug --nologo"
+  typecheck_commands:
+    - "dotnet build AIBar.sln --no-restore --configuration Debug --nologo"
+  format: "dotnet format AIBar.sln --no-restore"
+  format_commands:
+    - "dotnet format AIBar.sln --no-restore"
