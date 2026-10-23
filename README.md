@@ -15,7 +15,13 @@
 
 </div>
 
+<div align="center">
+
+<img src="./src/AIBar.Desktop/Assets/aibar.svg" alt="AIBar icon: a brain filled with liquid gold" width="128" />
+
 # AIBar
+
+</div>
 
 Your AI quotas at a glance: Codex and Claude subscription usage, pace, resets and estimated cost, in the Windows tray.
 
