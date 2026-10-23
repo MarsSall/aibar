@@ -356,7 +356,7 @@ public sealed class TrayHostRuntime : IAsyncDisposable
 
 public sealed partial class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRootTray, IClaudeQuotaTray, IClaudeQuotaSourceTray, IQuotaAlertTray
 {
-    private readonly Forms.NotifyIcon _icon = new() { Icon = SystemIcons.Application, Text = "AIBar", Visible = false };
+    private readonly Forms.NotifyIcon _icon = new() { Icon = LoadTrayIcon(), Text = "AIBar", Visible = false };
     private readonly Forms.ContextMenuStrip _menu = new();
     private readonly Forms.ToolStripMenuItem _refresh = new("Refresh");
     private readonly Forms.ToolStripMenuItem _startup = new("Start with Windows");
@@ -389,6 +389,12 @@ public sealed partial class WindowsTrayRuntime : ITrayRuntime, IOpenCodeDataRoot
         _disableClaude.Click += (_, _) => ClaudeQuotaDisableRequested?.Invoke();
         _refresh.Click += (_, _) => RefreshRequested?.Invoke(); _startup.Click += (_, _) => StartupToggleRequested?.Invoke(); _clear.Click += (_, _) => ClearAiBarDataRequested?.Invoke(); _enablePrivate.Click += (_, _) => PrivateIntegrationEnableRequested?.Invoke(); _disablePrivate.Click += (_, _) => PrivateIntegrationDisableRequested?.Invoke(); _openCodeUsage.Click += (_, _) => OpenCodeLocalUsageToggleRequested?.Invoke(); _piUsage.Click += (_, _) => PiLocalUsageToggleRequested?.Invoke(); _chooseOpenCodeFolder.Click += (_, _) => OpenCodeDataFolderChooseRequested?.Invoke(); _resetOpenCodeFolder.Click += (_, _) => OpenCodeDataFolderResetRequested?.Invoke(); exit.Click += (_, _) => ExitRequested?.Invoke(); _menu.Items.Add(exit); _icon.ContextMenuStrip = _menu;
         _icon.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) Toggled?.Invoke(); };
+    }
+    // The .ico carries 16/20/24 px tray frames; ask for the DPI-scaled small size so Windows never downsamples the tile.
+    private static Icon LoadTrayIcon()
+    {
+        using var stream = typeof(WindowsTrayRuntime).Assembly.GetManifestResourceStream("AIBar.Desktop.Assets.AIBar.ico");
+        return stream is null ? SystemIcons.Application : new Icon(stream, Forms.SystemInformation.SmallIconSize);
     }
     public event Action? Toggled;
     public event Action? ExitRequested;
