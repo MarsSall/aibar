@@ -79,10 +79,16 @@ public sealed class SettingsWindowTests
             var alerts = new AlertSettings(Path.Combine(root, "alerts.json"));
             appearance.SaveAsync(new(ChartStyle: "columns"), default).AsTask().GetAwaiter().GetResult();
             var changed = 0; appearance.Changed += _ => Interlocked.Increment(ref changed);
-            var window = new SettingsWindow(appearance, alerts);
+            var dock = new DockSettings(Path.Combine(root, DockSettings.FileName));
+            var initialDock = new DockOptions(true, "left", .25, "screen-2");
+            dock.SaveAsync(initialDock, default).AsTask().GetAwaiter().GetResult();
+            var window = new SettingsWindow(appearance, alerts, dock: dock);
             try
             {
                 window.Show();
+                Pump(window.LoadAsync());
+                Assert.True(Assert.IsType<CheckBox>(window.FindName("FloatingWidget")).IsChecked == true);
+                Assert.IsType<CheckBox>(window.FindName("FloatingWidget")).IsChecked = false;
                 Assert.IsType<RadioButton>(window.FindName("BarUsage")).IsChecked = true;
                 Assert.IsType<RadioButton>(window.FindName("YasbBrand")).IsChecked = true;
                 Assert.IsType<Slider>(window.FindName("BackgroundOpacity")).Value = 70;
@@ -97,6 +103,7 @@ public sealed class SettingsWindowTests
                 timer.Start(); System.Windows.Threading.Dispatcher.PushFrame(frame); timer.Stop();
                 Assert.Equal("Changes saved.", Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text);
                 Assert.Equal(1, changed);
+                Assert.Equal(initialDock with { Enabled = false }, dock.LoadAsync(default).AsTask().GetAwaiter().GetResult());
                 Assert.Equal(new AppearanceOptions("usage", "brand", 70, ProviderTint: false, ChartStyle: "columns"), appearance.LoadAsync(default).AsTask().GetAwaiter().GetResult());
                 var saved = alerts.LoadAsync(default).AsTask().GetAwaiter().GetResult();
                 Assert.True(saved.Confetti); Assert.Equal(new[] { 20, 80, 100 }, saved.ThresholdValues.ToArray());
@@ -123,6 +130,66 @@ public sealed class SettingsWindowTests
             finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
         });
     }
+    [Theory]
+    [InlineData(true, true, false, "IosevkaTerm Nerd Font is installed.")]
+    [InlineData(false, false, false, "Bundled font not found.")]
+    [InlineData(false, true, true, "Install the bundled font for YASB quota glyphs.")]
+    public void Font_status_and_install_button_use_the_replaceable_facade(bool installed, bool available, bool enabled, string status)
+    {
+        WpfTestApplicationHost.Run(_ =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), $"aibar-settings-font-{Guid.NewGuid():N}");
+            var calls = 0;
+            var font = new SettingsGlyphFont(() => installed, () => available, () => { calls++; installed = true; return null; });
+            var window = new SettingsWindow(new AppearanceSettings(Path.Combine(root, "appearance.json")), new AlertSettings(Path.Combine(root, "alerts.json")), font: font);
+            try
+            {
+                var button = Assert.IsType<Button>(window.FindName("InstallYasbFont"));
+                var line = Assert.IsType<TextBlock>(window.FindName("FontStatus"));
+                Assert.Equal(enabled, button.IsEnabled);
+                Assert.Equal(status, line.Text);
+                button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal(enabled ? 1 : 0, calls);
+                if (enabled)
+                {
+                    Assert.Equal("Installed. Restart YASB to use it.", line.Text);
+                    Assert.False(button.IsEnabled);
+                }
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    [Fact]
+    public void Font_install_failure_is_shown_without_disabling_retry()
+    {
+        WpfTestApplicationHost.Run(_ =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), $"aibar-settings-font-failure-{Guid.NewGuid():N}");
+            var window = new SettingsWindow(new AppearanceSettings(Path.Combine(root, "appearance.json")), new AlertSettings(Path.Combine(root, "alerts.json")),
+                font: new(() => false, () => true, () => "Windows refused the installation (IOException)."));
+            try
+            {
+                var button = Assert.IsType<Button>(window.FindName("InstallYasbFont"));
+                button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal("Windows refused the installation (IOException).", Assert.IsType<TextBlock>(window.FindName("FontStatus")).Text);
+                Assert.True(button.IsEnabled);
+            }
+            finally { window.Close(); }
+        });
+    }
+
+    private static void Pump(Task task)
+    {
+        var frame = new System.Windows.Threading.DispatcherFrame();
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        timer.Tick += (_, _) => frame.Continue = !task.IsCompleted && DateTime.UtcNow < deadline;
+        timer.Start(); System.Windows.Threading.Dispatcher.PushFrame(frame); timer.Stop();
+        Assert.True(task.IsCompleted, "Settings load did not complete.");
+        task.GetAwaiter().GetResult();
+    }
+
     private sealed class ThemeSource(WindowsTheme theme) : IWindowsThemeSource
     {
         public event EventHandler? Changed { add { } remove { } }

@@ -87,6 +87,8 @@ AIBar arranca en la bandeja. Activá Codex y Claude desde el menú de la bandeja
 - **Estado de los proveedores.** Indicadores de incidentes tomados de las páginas de estado oficiales y acceso con un clic a la página de uso de cada proveedor. Ver [estado de proveedores](./docs/provider-status.md).
 - **Copiar resumen.** Copia la cuota que se está mostrando al portapapeles como texto plano. Ver [resumen de cuotas](./docs/quota-summary.md).
 - **Configuración.** Sigue los temas claro, oscuro y de alto contraste de Windows: opacidad, tinte por proveedor, colores de las barras, umbrales de alerta e intervalo de actualización. Se puede usar entera con teclado. Ver [configuración](./docs/settings.md).
+- **Widget flotante.** ¿No tenés YASB? Activá una tira siempre visible con anillos de cuota desde Configuración, o aceptá la oferta al iniciar, que aparece una sola vez. Arrastrala a cualquier borde de la pantalla.
+- **Fuente para YASB.** Si detecta YASB sin la fuente, AIBar te ofrece instalar IosevkaTerm Nerd Font, incluida en el ZIP. También podés instalarla desde Configuración, solo para tu usuario, sin permisos de administrador ni descargas.
 - **Widget para YASB.** CustomWidget opcional para [YASB](https://github.com/amnweb/yasb) que muestra una instantánea sanitizada de la cuota en tu barra. Ver [`yasb/README.txt`](./yasb/README.txt).
 - **Uso remoto.** Helpers opcionales para Linux que mandan por SSH la cuota de Claude y los totales de tokens de Codex desde otra máquina. Ver [`tools/claude-remote-usage`](./tools/claude-remote-usage/README.md).
 

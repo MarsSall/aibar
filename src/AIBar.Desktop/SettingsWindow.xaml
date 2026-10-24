@@ -146,6 +146,11 @@
          <StackPanel><TextBlock Text="Provider tint"/><TextBlock Text="Border, glow and selected tab follow the provider color." Style="{StaticResource SettingsMeta}" Margin="0,2,0,0"/></StackPanel>
         </CheckBox>
        </Border>
+       <Border Style="{StaticResource SettingsCard}" Padding="16,10" Margin="0,-8,0,16">
+        <CheckBox x:Name="FloatingWidget" AutomationProperties.Name="Floating widget" AutomationProperties.HelpText="Show an always-on-top strip with quota rings. Drag it to any screen edge.">
+         <StackPanel><TextBlock Text="Floating widget"/><TextBlock Text="Show an always-on-top strip with quota rings. Drag it to any screen edge." Style="{StaticResource SettingsMeta}" Margin="0,2,0,0"/></StackPanel>
+        </CheckBox>
+       </Border>
        <TextBlock Text="PANEL BARS" Style="{StaticResource SettingsHeading}"/>
        <Grid Margin="0,0,0,16" KeyboardNavigation.DirectionalNavigation="Contained"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
         <RadioButton x:Name="BarBrand" GroupName="PanelBars" IsChecked="True" AutomationProperties.Name="Panel bar colors: Brand colors" MinHeight="116">
@@ -163,6 +168,10 @@
         </RadioButton>
        </Grid>
        <TextBlock Text="YASB STATUS-BAR WIDGET" Style="{StaticResource SettingsHeading}"/>
+       <Border Style="{StaticResource SettingsCard}" Padding="16,10" Margin="0,0,0,8"><StackPanel>
+        <Button x:Name="InstallYasbFont" Content="Install YASB font" AutomationProperties.Name="Install YASB font" Click="OnInstallYasbFont" HorizontalAlignment="Left"/>
+        <TextBlock x:Name="FontStatus" Style="{StaticResource SettingsMeta}" Margin="0,4,0,0" AutomationProperties.LiveSetting="Polite"/>
+       </StackPanel></Border>
        <Grid KeyboardNavigation.DirectionalNavigation="Contained"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
         <RadioButton x:Name="YasbUsage" GroupName="Yasb" IsChecked="True" AutomationProperties.Name="YASB colors: Usage level" MinHeight="84"><StackPanel><TextBlock Text="Usage level"/><Border Background="{DynamicResource SettingsFooterBrush}" CornerRadius="4" Padding="6" Margin="-24,10,0,0"><StackPanel Orientation="Horizontal"><TextBlock Text="14% ▰" Foreground="{DynamicResource SettingsUsageOkBrush}" FontSize="11"/><TextBlock Text="   92% ▰" Foreground="{DynamicResource SettingsUsageHighBrush}" FontSize="11"/></StackPanel></Border></StackPanel></RadioButton>
         <RadioButton x:Name="YasbBrand" Grid.Column="2" GroupName="Yasb" AutomationProperties.Name="YASB colors: Brand colors" MinHeight="84"><StackPanel><TextBlock Text="Brand colors"/><Border Background="{DynamicResource SettingsFooterBrush}" CornerRadius="4" Padding="6" Margin="-24,10,0,0"><StackPanel Orientation="Horizontal"><TextBlock Text="14% ▰" Foreground="{DynamicResource SettingsCodexBrush}" FontSize="11"/><TextBlock Text="   92% ▰" Foreground="{DynamicResource SettingsClaudeBrush}" FontSize="11"/></StackPanel></Border></StackPanel></RadioButton>

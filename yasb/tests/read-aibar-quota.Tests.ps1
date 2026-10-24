@@ -305,6 +305,9 @@ aibar_quota:
         $css | Should -Match 'warning-authentication-failed'
         $expectedCss = @'
 /* Copy and customize; state/warning text remains visible in the widget. */
+/* After installing the bundled font, set the bar font or enable this label rule:
+.aibar-quota .label { font-family: "IosevkaTerm Nerd Font"; }
+*/
 .aibar-quota { padding: 0 8px; border-radius: 6px; }
 .aibar-quota.state-current { background: #244f36; }
 .aibar-quota.state-refreshing { background: #29496b; }
