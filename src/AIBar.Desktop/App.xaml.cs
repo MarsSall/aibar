@@ -15,6 +15,9 @@ public partial class App : System.Windows.Application
     private IThemeController? _theme;
     private QuotaAlertTrayController? _alertController;
     private SettingsWindowHost? _settingsWindowHost;
+    private DockWindow? _dock;
+    private DockSettings? _dockSettings;
+    private Action<DockOptions>? _dockChanged;
 
     public App() : this(false) { }
     internal App(bool suppressHostStartup) => _suppressHostStartup = suppressHostStartup;
@@ -33,10 +36,10 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        _ = StartPrimary(() => CreateComposition(), StartTray, ReportFault, Shutdown, showRequested ? RequestShowAfterStartup : null);
+        _ = StartPrimary(() => CreateComposition(), StartTray, ReportFault, Shutdown, showRequested ? RequestShowAfterStartup : null, RunStartupOffersAsync);
     }
 
-    internal static async Task StartPrimary(Func<StartupComposition> compose, Action<StartupComposition> startTray, Action<Exception> report, Action shutdown, Action? showWhenReady = null)
+    internal static async Task StartPrimary(Func<StartupComposition> compose, Action<StartupComposition> startTray, Action<Exception> report, Action shutdown, Action? showWhenReady = null, Func<StartupComposition, Task>? afterInitialize = null)
     {
         StartupComposition composition;
         try { composition = compose(); }
@@ -49,7 +52,7 @@ public partial class App : System.Windows.Application
             shutdown();
             return;
         }
-        try { await composition.Initialize(); showWhenReady?.Invoke(); }
+        try { await composition.Initialize(); showWhenReady?.Invoke(); if (afterInitialize is not null) await afterInitialize(composition); }
         catch (Exception exception) { report(exception); composition.ReportUnavailable(); }
     }
     private void RequestShowAfterStartup() => _runtime?.RequestShow();
@@ -112,6 +115,8 @@ public partial class App : System.Windows.Application
         analytics.StateChanged += state => { _ = codexCost.RefreshAsync(default); };
         coordinator.StateChanged += state => { _ = codexCost.RefreshAsync(default); };
         var appearance = new AppearanceSettings(Path.Combine(dataDirectory, "appearance.json"));
+        var dock = new DockSettings(Path.Combine(dataDirectory, DockSettings.FileName));
+        var onboarding = new OnboardingSettings(Path.Combine(dataDirectory, OnboardingSettings.FileName));
         var alerts = new QuotaAlertObserver(dataDirectory, clock);
         coordinator.AuthorityUpdated += update => alerts.Observe("Codex", update,
             () => policy.IsEnabled && coordinator.State.Freshness == FreshnessState.Current && coordinator.State.Failure is null);
@@ -123,7 +128,7 @@ public partial class App : System.Windows.Application
         var localUsagePresentation = new LocalUsagePresentationHost(localUsage, new LocalUsagePresentationMapper());
         var providerStatus = new ProviderStatusPresentation(presentation, claudePresentation, () => policy.IsEnabled);
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
-        var clear = new ClearAiBarDataService(dataDirectory, [paceHistory, codexCost, claudeCost, claudeRuntime, publisher, coordinator, historyRecorder, historyStore, alerts, appearance, localUsage, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics, publisher));
+        var clear = new ClearAiBarDataService(dataDirectory, [paceHistory, codexCost, claudeCost, claudeRuntime, publisher, coordinator, historyRecorder, historyStore, alerts, appearance, dock, onboarding, localUsage, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics, publisher));
         return new(new BetaAnalyticsPresentation(presentation, analytics, localUsagePresentation, claudePresentation, claudeCost, codexCost), presentation.RefreshCommand, new NativeSettingsCommands(startup, clear, policy,
                 async token => { await betaRuntime.RevokeConsentAsync(token); await codexCost.RefreshAsync(token); },
                 async token => { await betaRuntime.GrantConsentAsync(token); await codexCost.RefreshAsync(token); },
@@ -139,7 +144,7 @@ public partial class App : System.Windows.Application
                 await claudeCost.RefreshAsync(token);
                 await codexCost.RefreshAsync(token);
             }, localUsagePresentation.RefreshAsync)
-            { CodexQuota = betaRuntime, ClaudeQuota = claudeRuntime, QuotaHistory = historyStore, ProviderStatus = providerStatus, Alerts = alerts, Appearance = appearance, PaceHistory = paceHistory };
+            { CodexQuota = betaRuntime, ClaudeQuota = claudeRuntime, QuotaHistory = historyStore, ProviderStatus = providerStatus, Alerts = alerts, Appearance = appearance, PaceHistory = paceHistory, Dock = dock, Onboarding = onboarding, UserProfile = userProfile };
     }
     internal static async Task InitializeCompositionAsync(BetaRuntime runtime, QuotaPresentationHost presentation, LocalUsagePresentationHost localUsage, CancellationToken cancellationToken)
     {
@@ -173,7 +178,7 @@ public partial class App : System.Windows.Application
             var providerSettings = composition.Settings is { } native && composition.ClaudeQuota is { } claude
                 ? SettingsProviderCommands.Create(native, claude) : null;
             _settingsWindowHost = new(appearance, settingsAlerts, providerSettings,
-                () => tray.ShowAlert("AIBar · Window reset", "A session or weekly window starts over."));
+                () => tray.ShowAlert("AIBar · Window reset", "A session or weekly window starts over."), composition.Dock, SettingsGlyphFont.Create());
             // The colour choice applies live; Changed can run during clear, so never wait on the UI thread.
             window.AppearanceSettings = appearance;
             appearance.Changed += options => Dispatcher.BeginInvoke(new Action(() => { _ = ApplyAppearance(options, window, composition); }));
@@ -194,9 +199,42 @@ public partial class App : System.Windows.Application
         if (composition.Alerts is { } alerts)
             _alertController = new(tray, alerts, Dispatcher, () => _runtime.RequestShow(),
                 cards: new NotificationStack(() => _runtime.RequestShow(), () => window.Width <= 300)) { BackgroundOpacity = window.BackgroundOpacity };
+        if (composition.Dock is { } dockSettings)
+        {
+            var dock = new DockWindow(composition.Presentation, new DockOptions(), () => _runtime.RequestShow(), dockSettings.SaveAsync);
+            _dock = dock; _dockSettings = dockSettings;
+            _dockChanged = options =>
+            {
+                if (!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (ReferenceEquals(_dock, dock)) dock.Apply(options);
+                }));
+            };
+            dockSettings.Changed += _dockChanged;
+            _ = LoadDockAsync(dockSettings, dock);
+        }
         _runtime.Start();
         composition.ProviderStatus?.Start();
     }
+    private async Task LoadDockAsync(DockSettings settings, DockWindow dock)
+    {
+        try
+        {
+            var options = await settings.LoadAsync(default);
+            if (ReferenceEquals(_dock, dock)) dock.Apply(options);
+        }
+        catch (Exception error) { ReportFault(error); }
+    }
+
+    private async Task RunStartupOffersAsync(StartupComposition composition)
+    {
+        if (composition.Dock is not { } dock || composition.Onboarding is not { } onboarding) return;
+        var font = SettingsGlyphFont.Create();
+        await new StartupOffers(() => YasbPresence.IsDetected(composition.UserProfile!), font.IsInstalled, font.IsBundledFontAvailable,
+            async token => (await dock.LoadAsync(token)).Enabled, onboarding, new WindowsStartupOfferPrompt(), font.Install,
+            async token => await dock.SaveAsync((await dock.LoadAsync(token)) with { Enabled = true }, token), ReportFault).RunAsync(default);
+    }
+
     private static void ReportFault(Exception exception) => Trace.TraceError("AIBar unavailable: {0}", exception.GetType().Name);
     internal sealed record StartupComposition(object Presentation, IManualRefreshCommand? RefreshCommand, NativeSettingsCommands? Settings, IAsyncDisposable Resource, Func<Task> Initialize, Action ReportUnavailable, Func<RefreshTrigger, CancellationToken, ValueTask>? Reevaluate = null, Func<CancellationToken, ValueTask<LocalUsageCoordinatorResult>>? RefreshLocalUsage = null)
     {
@@ -210,6 +248,9 @@ public partial class App : System.Windows.Application
         internal ProviderStatusPresentation? ProviderStatus { get; init; }
         internal QuotaAlertObserver? Alerts { get; init; }
         internal AppearanceSettings? Appearance { get; init; }
+        internal DockSettings? Dock { get; init; }
+        internal OnboardingSettings? Onboarding { get; init; }
+        internal string? UserProfile { get; init; }
         internal static StartupComposition Unavailable => new(new UnavailableQuotaPresentation(), null, null, new EmptyAsyncResource(), () => Task.CompletedTask, () => { });
     }
 
@@ -276,6 +317,8 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_dockSettings is { } dockSettings && _dockChanged is { } changed) dockSettings.Changed -= changed;
+        var dock = _dock; _dock = null; dock?.Close();
         _settingsWindowHost?.Dispose();
         _alertController?.Dispose();
         _theme?.Dispose();

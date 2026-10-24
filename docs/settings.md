@@ -2,7 +2,7 @@
 
 Open **Settings…** from the panel or tray. One Settings window is reused. It follows Windows light, dark and high-contrast themes, with a custom 32-DIP title bar and **Appearance / Alerts / Providers** pivots. The default size is 520 × 600 DIPs (minimum 460 × 480); content scrolls without moving the footer.
 
-Changes apply when you select **Save**. **Cancel**, Escape and closing the window discard edits that have not been saved. Save leaves the window open and announces success or failure. Preview buttons do not save preferences.
+Changes apply when you select **Save**. **Cancel**, Escape and closing the window discard edits that have not been saved. Save leaves the window open and announces success or failure. Preview buttons do not save preferences. **Install YASB font** is an immediate action, independent of Save or Cancel.
 
 ## Keyboard and accessibility
 
@@ -21,6 +21,7 @@ Selected pivots have an accent underline and semibold text. Controls have named 
 | Choice | Default | Options |
 | --- | --- | --- |
 | Background opacity | 100% | 30–100%, step 5. Applies to panel and notification background brushes, not text, bars, tabs or buttons. |
+| Floating widget | Off | Always-on-top quota rings, useful without YASB. Drag to any screen edge; click to open the panel. Save preserves the current edge, offset and monitor. |
 | Provider tint | On | Colors the panel border, glow, header divider and selected tab with the selected provider. Off keeps them neutral; the sign-in warning stays amber either way. |
 | Chart style | Line | Line or Columns, changed directly beside the range selector in Cost details; applies to both charts and saves immediately. Settings preserves this stored choice. |
 | Panel bars | Brand colors | Brand colors, or Usage level: green below 75%, yellow from 75%, red from 90%. |
@@ -29,6 +30,10 @@ Selected pivots have an accent underline and semibold text. Controls have named 
 Color radio cards show illustrative bars and YASB previews, not live quota. The usage-color boundaries are independent of alert thresholds. YASB picks up the saved preference on its next normal refresh; unavailable quota remains gray and the six output fields/export schema are unchanged.
 
 Opacity is persisted even when Windows high contrast or disabled transparency forces surfaces to 100%. Settings and the usage-details side window stay opaque. The panel and notification consumers must apply alpha only to their background brush and use an opaque fallback when transparency is unavailable.
+
+**Install YASB font** installs the bundled IosevkaTerm Nerd Font for your Windows user only, without administrator rights or a download. Its status shows whether it is installed; the button is disabled when installed or when the bundled font is unavailable. After installation, restart YASB.
+
+At startup, YASB users with a missing font receive an install offer (**Not now** retries next launch; **Don't ask again** suppresses it). Without YASB, AIBar offers the floating widget once. The offers are mutually exclusive; Settings remains available afterwards.
 
 ## Alerts
 
@@ -74,11 +79,13 @@ Existing schema-1 files without `backgroundOpacity` load with **100**; missing `
 
 **Clear AIBar Data** drains appearance writes with alert work, removes the existing appearance/alert files, and publishes the actual post-clear appearance (defaults on success, surviving values after rollback). Clear/dispose paths never await the WPF dispatcher.
 
+`dock.json` stores the floating widget's enabled state and placement separately from appearance; `onboarding.json` remembers answered startup offers. Both are included in **Clear AIBar Data**; clearing resets the widget and offer choices, but does not uninstall the font.
+
 Saving multiple sections is **not a cross-file transaction**. A later persistence failure can leave an earlier section saved. The status reports that not all changes were saved and allows retry; this also applies to provider runtime commands.
 
 ## Integration contract
 
-`SettingsWindowHost(AppearanceSettings, QuotaAlertObserver, SettingsProviderCommands?, Action? previewNotification)` is the UI-thread entry point. The optional parameters preserve existing call sites. Alert saves still run on the observer's serialized queue.
+`SettingsWindowHost(AppearanceSettings, QuotaAlertObserver, SettingsProviderCommands?, Action? previewNotification, DockSettings? dock, SettingsGlyphFont? font)` is the UI-thread entry point. The optional parameters preserve existing call sites. Alert saves still run on the observer's serialized queue.
 
 `App.xaml.cs` constructs `SettingsProviderCommands` from the existing `NativeSettingsCommands` and `ClaudeQuotaRuntime`, and passes the tray's notification entry point for preview. Codex uses `EnablePrivateIntegrationAsync` / `DisablePrivateIntegrationAsync`; Claude uses `GrantConsentAsync` / `RevokeConsentAsync` and `SetSourceAsync`. No `HostRuntime.cs` behavior is replaced.
 
@@ -88,7 +95,7 @@ Only `Settings*` tokens were added to `Semantic.Light.xaml`, `Semantic.Dark.xaml
 
 ## Windows verification
 
-No local .NET/PowerShell verification is available in the Linux worktree. The parent runs tests-only RED followed by implementation GREEN in Windows CI.
+No local .NET/PowerShell verification is available in the Linux worktree. For the floating-widget/font wiring, strict TDD is disabled by explicit parent choice; nothing was compiled or executed locally. Windows CI must compile and run the new tests.
 
 Focused coverage: `RefreshIntervalSettingsTests`, `RefreshIntervalWindowTests`, `RefreshIntervalRuntimeTests`, `AppearanceSettingsTests`, `SettingsWindowTests`, `SettingsProviderTests`, `SettingsAlertOptionsTests`; existing delivery/clear/privacy tests must remain green. Test deadlines remain at least 60 seconds for asynchronous WPF saves.
 
