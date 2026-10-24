@@ -13,9 +13,9 @@ Branch: `feat/floating-widget-and-font`. Verification runs on Windows CI (`.gith
 
 ## Tasks
 
-- T1 [S3, S4] Dock strip component: `DockSettings` (dock.json: enabled, edge, offset, monitor), `DockWindow` with concentric rings per provider, hover card, click opens panel, drag-to-edge snap, placement math + tests — worker (background, parallel with T2) — commit: pending
-- T2 [S1] Bundled glyph font: Publish-Deterministic downloads pinned IosevkaTermNerdFont-Regular.ttf + LICENSE.md (v3.5.1, SHA-256 pinned) into `fonts/`; `GlyphFontInstaller` (detect, per-user install, WM_FONTCHANGE) + tests; YASB docs — worker (background, parallel with T1) — commit: pending. Risk: item 5 (writes the user's font registry/files).
-- T3 [S2, S5] Wiring: `YasbPresence`, `OnboardingSettings` (onboarding.json, in clear-data list), startup offers (font when YASB + missing font; dock when no YASB), Settings toggle + install button, App composition — inline after T1/T2 — commit: pending
+- T1 [S3, S4] Dock strip component: `DockSettings` (dock.json: enabled, edge, offset, monitor), `DockWindow` with concentric rings per provider, hover card, click opens panel, drag-to-edge snap, placement math + tests — worker (background, parallel with T2) — commit: f2b15c5, 5b1d327
+- T2 [S1] Bundled glyph font: Publish-Deterministic downloads pinned IosevkaTermNerdFont-Regular.ttf + LICENSE.md (v3.5.1, SHA-256 pinned) into `fonts/`; `GlyphFontInstaller` (detect, per-user install, WM_FONTCHANGE) + tests; YASB docs — worker (background, parallel with T1) — commit: f1c99a9 (packaging), 7a660a6 (installer). Risk: item 5 (writes the user's font registry/files).
+- T3 [S2, S5] Wiring: `YasbPresence`, `OnboardingSettings` (onboarding.json, in clear-data list), startup offers (font when YASB + missing font; dock when no YASB), Settings toggle + install button, App composition — standalone pieces inline, wiring by worker (context backstop) — commit: cbe7ccc
 - T4 [S1-S5] Docs, Windows CI, deploy to the user's PC, acceptance — inline — commit: pending
 
 ## Log
@@ -25,3 +25,4 @@ Branch: `feat/floating-widget-and-font`. Verification runs on Windows CI (`.gith
 - L3 (user): "Lo de la font lo resolvemos con el ofrecimiento desde la app, y con widget me refería a algo flotante, exacto, como ofrece quorb"
 - L5 (decision): font is not committed (14.4 MB); the publish script downloads `https://raw.githubusercontent.com/ryanoasis/nerd-fonts/v3.5.1/patched-fonts/IosevkaTerm/IosevkaTermNerdFont-Regular.ttf` (sha256 5c12e7d30e97ff997c10e9b0acb2ed7f8495134e0f33b1176136f9e6d36d8e00, 14442592 bytes) and `LICENSE.md` (sha256 7484961b97b41985d54c21700e53f7142a7007d72401acbd32c0b9c6a5a0b558, OFL-1.1). YASB detected = `%USERPROFILE%\.config\yasb` exists or a `yasb` process runs. Dock position lives in its own dock.json so drags do not re-run appearance changes. Offers are mutually exclusive by YASB presence.
 - L4 (user, answers): font "IosevkaTerm Nerd Font en el ZIP"; offer "Al iniciar, una vez, si hay YASB sin font"; rings "Dos concéntricos: 5h afuera, semanal adentro"; activation "Toggle en Settings + oferta si no hay YASB".
+- L6 (slice): branch is ~1.9k authored lines in 5 work-unit commits (dock placement, dock window, font packaging, font installer, onboarding wiring); one PR reviewed commit by commit, like PR #71. Nothing compiled locally (no dotnet on Linux); CI run 40110279069 on cbe7ccc.
