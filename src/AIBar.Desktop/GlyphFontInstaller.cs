@@ -92,6 +92,7 @@ internal sealed class GlyphFontInstaller
             if (IsInstalled()) return new(GlyphFontInstallStatus.AlreadyInstalled);
 
             var destination = Path.Combine(_environment.UserFontsDirectory, FileName);
+            var copied = false;
             if (!Matches(destination))
             {
                 _environment.CreateDirectory(_environment.UserFontsDirectory);
@@ -101,10 +102,21 @@ internal sealed class GlyphFontInstaller
                 if (!Matches(temporary)) return new(GlyphFontInstallStatus.SourceMismatch);
                 _environment.MoveFile(temporary, destination);
                 temporary = null;
+                copied = true;
             }
-            _environment.WriteUserFontRegistration(RegistryValueName, destination);
-            _environment.AddFontResource(destination);
-            _environment.BroadcastFontChange();
+            // Register only a font Windows accepted; a failure leaves nothing that IsInstalled would count, so the user can retry.
+            try
+            {
+                _environment.AddFontResource(destination);
+                _environment.WriteUserFontRegistration(RegistryValueName, destination);
+            }
+            catch (Exception) when (copied)
+            {
+                try { _environment.DeleteFile(destination); } catch (Exception) { /* A loaded font stays locked until sign-out; it is unregistered either way. */ }
+                throw;
+            }
+            // Telling running applications is best effort: the font is already installed and registered.
+            try { _environment.BroadcastFontChange(); } catch (Exception) { }
             return new(GlyphFontInstallStatus.Installed);
         }
         catch (Exception exception) { return new(GlyphFontInstallStatus.Failed, exception.GetType().Name); }

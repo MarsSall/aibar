@@ -35,12 +35,13 @@ internal sealed class GlyphFontWindowsEnvironment : IGlyphFontEnvironment
     }
     public void BroadcastFontChange()
     {
-        // Bounded broadcast: a hung application must not indefinitely block Settings/startup.
-        if (SendMessageTimeoutW(new IntPtr(0xffff), 0x001D, UIntPtr.Zero, IntPtr.Zero, 0x0002, 1000, out _) == IntPtr.Zero)
+        // SendNotifyMessage returns at once, so hung windows cannot stall the UI thread.
+        if (!SendNotifyMessageW(new IntPtr(0xffff), 0x001D, UIntPtr.Zero, IntPtr.Zero))
             throw new Win32Exception(Marshal.GetLastWin32Error());
     }
     [DllImport("gdi32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
     private static extern int AddFontResourceW(string fileName);
     [DllImport("user32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
-    private static extern IntPtr SendMessageTimeoutW(IntPtr window, uint message, UIntPtr wParam, IntPtr lParam, uint flags, uint timeout, out UIntPtr result);
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SendNotifyMessageW(IntPtr window, uint message, UIntPtr wParam, IntPtr lParam);
 }

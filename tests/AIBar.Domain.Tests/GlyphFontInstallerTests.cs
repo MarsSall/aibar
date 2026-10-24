@@ -63,7 +63,7 @@ public sealed class GlyphFontInstallerTests
         Assert.True(registration.CurrentUser);
         Assert.Equal(GlyphFontInstaller.RegistryValueName, registration.Entry.Name);
         Assert.Equal(destination, registration.Entry.FilePath);
-        Assert.Equal(new[] { "mkdir", "copy", "move", "registry", "add", "broadcast" }, environment.Writes);
+        Assert.Equal(new[] { "mkdir", "copy", "move", "add", "registry", "broadcast" }, environment.Writes);
         Assert.Equal(destination, environment.AddedFont);
         Assert.DoesNotContain(environment.Files.Keys, path => path.EndsWith(".tmp", StringComparison.Ordinal));
         Assert.True(installer.IsInstalled());
@@ -114,6 +114,35 @@ public sealed class GlyphFontInstallerTests
     }
 
     [Fact]
+    public void Rejected_font_resource_leaves_nothing_registered_and_can_be_retried()
+    {
+        var environment = new FakeEnvironment { FailAdd = true };
+        environment.Files["source.ttf"] = Font;
+        var installer = new GlyphFontInstaller(environment, Hash);
+        var result = installer.Install("source.ttf");
+        Assert.Equal(GlyphFontInstallStatus.Failed, result.Status);
+        Assert.Equal(nameof(InvalidOperationException), result.ExceptionType);
+        Assert.Empty(environment.Registrations);
+        Assert.Equal(new[] { "source.ttf" }, environment.Files.Keys.ToArray());
+        Assert.False(installer.IsInstalled());
+
+        environment.FailAdd = false;
+        Assert.Equal(GlyphFontInstallStatus.Installed, installer.Install("source.ttf").Status);
+        Assert.True(installer.IsInstalled());
+    }
+
+    [Fact]
+    public void Failed_change_broadcast_still_reports_an_installed_and_registered_font()
+    {
+        var environment = new FakeEnvironment { FailBroadcast = true };
+        environment.Files["source.ttf"] = Font;
+        var installer = new GlyphFontInstaller(environment, Hash);
+        Assert.Equal(GlyphFontInstallStatus.Installed, installer.Install("source.ttf").Status);
+        Assert.Single(environment.Registrations);
+        Assert.True(installer.IsInstalled());
+    }
+
+    [Fact]
     public void Bundle_validation_uses_the_pinned_hash_and_expected_path()
     {
         var environment = new FakeEnvironment();
@@ -135,6 +164,8 @@ public sealed class GlyphFontInstallerTests
         public List<(bool CurrentUser, GlyphFontRegistration Entry)> Registrations { get; } = new();
         public List<string> Writes { get; } = new();
         public bool FailCopy { get; init; }
+        public bool FailAdd { get; set; }
+        public bool FailBroadcast { get; init; }
         public string? AddedFont { get; private set; }
         public IEnumerable<GlyphFontRegistration> ReadFontRegistrations(bool currentUser) => Registrations.Where(item => item.CurrentUser == currentUser).Select(item => item.Entry).ToArray();
         public bool FileExists(string path) => Files.ContainsKey(path);
@@ -149,7 +180,16 @@ public sealed class GlyphFontInstallerTests
         public void MoveFile(string source, string destination) { Writes.Add("move"); Files[destination] = Files[source]; Files.Remove(source); }
         public void DeleteFile(string path) { Writes.Add("delete"); Files.Remove(path); }
         public void WriteUserFontRegistration(string name, string path) { Writes.Add("registry"); Registrations.Add((true, new(name, path))); }
-        public void AddFontResource(string path) { Writes.Add("add"); AddedFont = path; }
-        public void BroadcastFontChange() => Writes.Add("broadcast");
+        public void AddFontResource(string path)
+        {
+            Writes.Add("add");
+            if (FailAdd) throw new InvalidOperationException("Windows rejected the font");
+            AddedFont = path;
+        }
+        public void BroadcastFontChange()
+        {
+            Writes.Add("broadcast");
+            if (FailBroadcast) throw new InvalidOperationException("broadcast failed");
+        }
     }
 }
