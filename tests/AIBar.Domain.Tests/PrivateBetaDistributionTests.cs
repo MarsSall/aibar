@@ -79,6 +79,16 @@ public sealed class PrivateBetaDistributionTests
             using var stream = entry.Open(); using var bytes = new MemoryStream(); stream.CopyTo(bytes);
             Assert.Equal(File.ReadAllBytes(Path.Combine(RepositoryRoot(), relative.Replace('/', Path.DirectorySeparatorChar))), bytes.ToArray());
         }
+        foreach (var relative in new[] { "fonts/IosevkaTermNerdFont-Regular.ttf", "fonts/IosevkaTerm-LICENSE.md" })
+        {
+            var entry = Assert.Single(archive.Entries, candidate => candidate.FullName == relative);
+            using var stream = entry.Open();
+            using var bytes = new MemoryStream(); stream.CopyTo(bytes);
+            Assert.Equal(File.ReadAllBytes(Path.Combine(fixture.GlyphDirectory, Path.GetFileName(relative))), bytes.ToArray());
+            var item = Assert.Single(manifest.RootElement.GetProperty("inventory").EnumerateArray(), candidate => candidate.GetProperty("path").GetString() == relative);
+            Assert.Equal(entry.Length, item.GetProperty("length").GetInt64());
+            Assert.Equal(Convert.ToHexString(SHA256.HashData(bytes.ToArray())).ToLowerInvariant(), item.GetProperty("sha256").GetString());
+        }
         var instructions = File.ReadAllText(Path.Combine(output, "private-beta-instructions.txt"));
         Assert.Contains($"AIBar private beta {version}", instructions, StringComparison.Ordinal);
         Assert.Contains($"Baseline ancestor: {baseline}.", instructions, StringComparison.Ordinal);
@@ -157,11 +167,12 @@ public sealed class PrivateBetaDistributionTests
         using var archive = ZipFile.OpenRead(zip);
         foreach (var item in manifest.RootElement.GetProperty("inventory").EnumerateArray())
         {
-            var entry = Assert.Single(archive.Entries, entry => entry.FullName == item.GetProperty("path").GetString());
+            var entry = Assert.Single(archive.Entries, candidate => candidate.FullName == item.GetProperty("path").GetString());
             using var stream = entry.Open();
             Assert.Equal(item.GetProperty("length").GetInt64(), entry.Length);
             Assert.Equal(item.GetProperty("sha256").GetString(), Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant());
         }
+        Assert.Equal(2, archive.Entries.Count(entry => entry.FullName.StartsWith("fonts/", StringComparison.Ordinal)));
         // Six YASB files plus the two provider marks under yasb/icons.
         Assert.Equal(8, archive.Entries.Count(entry => entry.FullName.StartsWith("yasb/", StringComparison.Ordinal)));
         var repeat = fixture.Output("prepared-repeat");
@@ -206,6 +217,50 @@ public sealed class PrivateBetaDistributionTests
         Assert.Empty(fixture.Git("status", "--porcelain").Output);
     }
 
+    [Fact]
+    public void Production_font_pins_match_the_installer_and_reviewed_upstream_version()
+    {
+        var script = File.ReadAllText(Path.Combine(RepositoryRoot(), "scripts", "Publish-Deterministic.ps1"));
+        Assert.Contains(AIBar.Desktop.GlyphFontInstaller.Sha256, script, StringComparison.Ordinal);
+        Assert.Contains("$fontLength = 14442592L", script, StringComparison.Ordinal);
+        Assert.Contains("https://raw.githubusercontent.com/ryanoasis/nerd-fonts/v3.5.1/patched-fonts/IosevkaTerm/IosevkaTermNerdFont-Regular.ttf", script, StringComparison.Ordinal);
+        Assert.Contains("https://raw.githubusercontent.com/ryanoasis/nerd-fonts/v3.5.1/patched-fonts/IosevkaTerm/LICENSE.md", script, StringComparison.Ordinal);
+        Assert.Contains("7484961b97b41985d54c21700e53f7142a7007d72401acbd32c0b9c6a5a0b558", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Production_font_pins_reject_synthetic_bytes_without_using_the_network()
+    {
+        using var fixture = new SyntheticRepository();
+        var output = fixture.Output("font-mismatch");
+        var result = fixture.Run(output, publisher: fixture.Publisher("invalid"), expectedSource: fixture.Source, prepareOnly: true, glyphTestPins: false);
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("BETA_GLYPH_SOURCE_MISMATCH", result.Output);
+        Assert.False(Directory.Exists(output));
+    }
+
+    [Fact]
+    public void Font_length_and_license_hash_are_verified_even_with_synthetic_test_pins()
+    {
+        using var fixture = new SyntheticRepository();
+        File.AppendAllText(Path.Combine(fixture.GlyphDirectory, "IosevkaTermNerdFont-Regular.ttf"), "changed");
+        var font = fixture.Run(fixture.Output("font-length"), publisher: fixture.Publisher("invalid"), expectedSource: fixture.Source, prepareOnly: true);
+        Assert.NotEqual(0, font.ExitCode);
+        Assert.Contains("BETA_GLYPH_SOURCE_MISMATCH: IosevkaTermNerdFont-Regular.ttf", font.Output);
+        File.WriteAllBytes(Path.Combine(fixture.GlyphDirectory, "IosevkaTermNerdFont-Regular.ttf"), new byte[SyntheticRepository.FontBytes.Length]);
+        var hash = fixture.Run(fixture.Output("font-hash"), publisher: fixture.Publisher("invalid"), expectedSource: fixture.Source, prepareOnly: true);
+        Assert.NotEqual(0, hash.ExitCode);
+        Assert.Contains("BETA_GLYPH_SOURCE_MISMATCH: IosevkaTermNerdFont-Regular.ttf", hash.Output);
+        File.WriteAllBytes(Path.Combine(fixture.GlyphDirectory, "IosevkaTermNerdFont-Regular.ttf"), SyntheticRepository.FontBytes);
+        File.AppendAllText(Path.Combine(fixture.GlyphDirectory, "IosevkaTerm-LICENSE.md"), "changed");
+        var license = fixture.Run(fixture.Output("license-hash"), publisher: fixture.Publisher("invalid"), expectedSource: fixture.Source, prepareOnly: true);
+        Assert.NotEqual(0, license.ExitCode);
+        Assert.Contains("BETA_GLYPH_SOURCE_MISMATCH: IosevkaTerm-LICENSE.md", license.Output);
+        Assert.False(Directory.Exists(fixture.Output("font-length")));
+        Assert.False(Directory.Exists(fixture.Output("font-hash")));
+        Assert.False(Directory.Exists(fixture.Output("license-hash")));
+    }
+
     private sealed class SyntheticRepository : IDisposable
     {
         private readonly TemporaryRoot _temporary = new("private-beta");
@@ -213,9 +268,16 @@ public sealed class PrivateBetaDistributionTests
         public string Baseline { get; }
         public string Parent { get; }
         public string Source { get; }
+        public string GlyphDirectory => Path.Combine(_temporary.Path, "glyph-inputs");
+        public static readonly byte[] FontBytes = System.Text.Encoding.UTF8.GetBytes("synthetic glyph font");
+        private static readonly byte[] LicenseBytes = System.Text.Encoding.UTF8.GetBytes("synthetic font license");
 
         public SyntheticRepository()
         {
+            // One owned fixture root, removed by Dispose; no network or real font binary.
+            Directory.CreateDirectory(GlyphDirectory);
+            File.WriteAllBytes(Path.Combine(GlyphDirectory, "IosevkaTermNerdFont-Regular.ttf"), FontBytes);
+            File.WriteAllBytes(Path.Combine(GlyphDirectory, "IosevkaTerm-LICENSE.md"), LicenseBytes);
             Root = Path.Combine(_temporary.Path, "repository");
             Directory.CreateDirectory(Path.Combine(Root, "scripts"));
             Directory.CreateDirectory(Path.Combine(Root, "src", "AIBar.Desktop"));
@@ -249,12 +311,17 @@ public sealed class PrivateBetaDistributionTests
             return path;
         }
 
-        public (int ExitCode, string Output) Run(string output, string? publisher = null, string? parent = null, int timeout = 5, int smokeStartupMilliseconds = 1000, string? script = null, string? expectedSource = null, bool prepareOnly = false, bool testMode = true, bool privateBeta = true, string mode = "")
+        public (int ExitCode, string Output) Run(string output, string? publisher = null, string? parent = null, int timeout = 5, int smokeStartupMilliseconds = 1000, string? script = null, string? expectedSource = null, bool prepareOnly = false, bool testMode = true, bool privateBeta = true, string mode = "", bool glyphTestPins = true)
         {
             var start = new ProcessStartInfo("pwsh") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
             start.Environment.Remove("AIBAR_PRIVATE_BETA_TEST_MODE");
             if (testMode) start.Environment["AIBAR_PRIVATE_BETA_TEST_MODE"] = "1";
             foreach (var argument in new[] { "-NoProfile", "-File", script ?? Path.Combine(Root, "scripts", "Publish-Deterministic.ps1"), "-OutputDirectory", output, "-BetaBaselineCommit", Baseline, "-BetaParentCommit", parent ?? Parent, "-PublishCommand", publisher ?? Publisher("stay"), "-ProcessTimeoutSeconds", timeout.ToString(), "-SmokeStartupMilliseconds", smokeStartupMilliseconds.ToString() }) start.ArgumentList.Add(argument);
+            start.ArgumentList.Add("-GlyphFontDirectory"); start.ArgumentList.Add(GlyphDirectory);
+            if (glyphTestPins)
+            {
+                foreach (var argument in new[] { "-TestGlyphFontSha256", Convert.ToHexString(SHA256.HashData(FontBytes)).ToLowerInvariant(), "-TestGlyphFontLength", FontBytes.Length.ToString(), "-TestGlyphLicenseSha256", Convert.ToHexString(SHA256.HashData(LicenseBytes)).ToLowerInvariant() }) start.ArgumentList.Add(argument);
+            }
             if (expectedSource is not null)
             {
                 start.ArgumentList.Add("-ExpectedSourceCommit"); start.ArgumentList.Add(expectedSource);
