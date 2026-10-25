@@ -19,6 +19,7 @@ public sealed class CodexDataSourceTests
             var settings = new ConsentSettings(Path.Combine(root, "settings.json"));
             await settings.SaveAsync(true, default);
             await settings.SaveDataSourceAsync(DataSource.OtherMachine, default);
+            await settings.SaveClaudeSourceAsync(ClaudeQuotaSource.ThisPc, default);
             var policy = new PrivateIntegrationPolicy();
             var files = new Files();
             var credentials = new ConsentCredentialSource(policy, new CodexCredentialReader(files), "synthetic");
@@ -38,9 +39,9 @@ public sealed class CodexDataSourceTests
             await using var claude = new ClaudeQuotaRuntime(settings, new Store(), _ => provider, clock,
                 remoteProviderFactory: _ => provider, remoteFileAvailable: () => false);
             await claude.InitializeAsync(default);
-            await SettingsProviderCommands.ApplySourceAsync(local, runtime, claude);
+            await runtime.SetSourceAsync(local, default);
             Assert.Equal(local, runtime.Source);
-            Assert.Equal(local.ToClaude(), claude.Source);
+            Assert.Equal(ClaudeQuotaSource.ThisPc, claude.Source);
             Assert.Equal(local, await settings.LoadDataSourceAsync(default));
             Assert.False(claude.IsConsentEnabled); // Changing source never grants consent.
             Assert.True(provider.Calls > 0); Assert.True(files.Reads > 0);
@@ -202,6 +203,7 @@ public sealed class CodexDataSourceTests
         {
             var settings = new ConsentSettings(Path.Combine(root, "settings.json"));
             await settings.SaveDataSourceAsync(DataSource.OtherMachine, default);
+            await settings.SaveClaudeSourceAsync(ClaudeQuotaSource.ThisPc, default);
             await settings.SaveAsync(enabledAtStartup, default);
             var clock = new FixedClock(); var analytics = new Analytics();
             var coordinator = new QuotaRefreshCoordinator(new Store(), new CurrentProvider(clock), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);

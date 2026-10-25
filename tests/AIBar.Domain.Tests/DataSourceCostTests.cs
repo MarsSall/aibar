@@ -9,10 +9,13 @@ namespace AIBar.Domain.Tests;
 public sealed class DataSourceCostTests
 {
     [Theory]
-    [InlineData(DataSource.Automatic, 3_000_000L, 2_000_000L)]
-    [InlineData(DataSource.ThisPc, 1_000_000L, null)]
-    [InlineData(DataSource.OtherMachine, 2_000_000L, 2_000_000L)]
-    public async Task Public_cost_views_follow_source_and_refresh_on_switch_without_a_quota_poll(DataSource source, long codexTokens, long? claudeTokens)
+    [InlineData(DataSource.Automatic, ClaudeQuotaSource.Automatic, 3_000_000L, 2_000_000L)]
+    [InlineData(DataSource.ThisPc, ClaudeQuotaSource.ThisPc, 1_000_000L, null)]
+    [InlineData(DataSource.OtherMachine, ClaudeQuotaSource.OtherMachine, 2_000_000L, 2_000_000L)]
+    [InlineData(DataSource.ThisPc, ClaudeQuotaSource.OtherMachine, 1_000_000L, 2_000_000L)]
+    [InlineData(DataSource.Automatic, ClaudeQuotaSource.OtherMachine, 3_000_000L, 2_000_000L)]
+    [InlineData(DataSource.OtherMachine, ClaudeQuotaSource.ThisPc, 2_000_000L, null)]
+    public async Task Public_cost_views_follow_each_provider_source_without_a_quota_poll(DataSource source, ClaudeQuotaSource claudeSource, long codexTokens, long? claudeTokens)
     {
         var root = Path.Combine(Path.GetTempPath(), $"aibar-source-cost-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
@@ -34,12 +37,16 @@ public sealed class DataSourceCostTests
             await WaitForAsync(() => view.CodexCost.Today.Tokens == 3_000_000);
             AssertTotals(view.CodexCost, "gpt-5", 3_000_000);
             AssertTotals(view.ClaudeCost!.State, "claude-sonnet-4", 2_000_000);
-            await SettingsProviderCommands.ApplySourceAsync(source, composition.CodexQuota!, composition.ClaudeQuota);
-            // No Reevaluate/Refresh call: changing the source itself must refresh both views.
+            await composition.CodexQuota!.SetSourceAsync(source, default);
+            Assert.Equal(ClaudeQuotaSource.Automatic, composition.ClaudeQuota.Source);
+            await composition.ClaudeQuota.SetSourceAsync(claudeSource, default);
+            Assert.Equal(source, composition.CodexQuota.Source);
+            // No Reevaluate/Refresh call: each source change must refresh its own cost view.
             await WaitForAsync(() => view.CodexCost.Today.Tokens == codexTokens && view.ClaudeCost.State.Today.Tokens == claudeTokens);
             AssertTotals(view.CodexCost, "gpt-5", codexTokens);
             AssertTotals(view.ClaudeCost.State, "claude-sonnet-4", claudeTokens);
-            await SettingsProviderCommands.ApplySourceAsync(DataSource.Automatic, composition.CodexQuota!, composition.ClaudeQuota);
+            await composition.CodexQuota.SetSourceAsync(DataSource.Automatic, default);
+            await composition.ClaudeQuota.SetSourceAsync(ClaudeQuotaSource.Automatic, default);
             await WaitForAsync(() => view.CodexCost.Today.Tokens == 3_000_000 && view.ClaudeCost.State.Today.Tokens == 2_000_000);
         }
         finally
