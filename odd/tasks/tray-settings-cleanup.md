@@ -14,7 +14,7 @@ Branch: `feat/tray-settings-cleanup`, stacked on `feat/floating-widget-and-font`
 ## Tasks
 
 - T1 [S1, S2] Tray menu trimmed to Refresh/Settings…/Start with Windows/Exit; OpenCode/Pi local usage no longer composed or scanned; tests + docs — worker — commit: 0adfe44
-- T2 [S3, S4] General tab (Start with Windows, Clear AIBar Data with confirmation, Data source for all providers with claudeSource migration and Codex other-machine state); Providers loses Claude source; tests + docs — worker after T1 — commit: 8c24cb4
+- T2 [S3, S4] General tab (Start with Windows, Clear AIBar Data with confirmation, Data source for all providers with claudeSource migration and Codex other-machine state); Providers loses Claude source; tests + docs — worker after T1 — commit: 8c24cb4, fixes b3f4e75 (tests) + c24750f
 - T3 [S1-S5] Windows CI, deploy to the user's PC, acceptance, Codex remote quota issue — inline — commit: pending
 
 ## Log
@@ -30,3 +30,5 @@ Branch: `feat/tray-settings-cleanup`, stacked on `feat/floating-widget-and-font`
 - L9 (decision): data source applies to cost too — Automatic combines local + remote rows (today's behavior), This PC local rows only, Other machine remote rows only; same rule for Claude cost (remote token rows only outside This PC). Fix RED-first: tests-only commit → CI RED, then implementation → GREEN.
 - L10 (evidence): tests-only RED commit b3f4e75 (CodexDataSourceTests, DataSourceSettingsTests, DataSourceCostTests, SettingsStyleTests fix); implementation held as .atl/tray-settings-cleanup/s4-impl.patch (gitignored, applies cleanly); RED CI 40194333022. Session reloaded mid-run; state verified intact.
 - L11 (evidence): RED CI 40194333022 on b3f4e75: 1520/1529, the 9 failures are exactly the new tests (settings save orders ×2, analytics in remote mode ×2, export ×2, queued alert, cost This PC and Other machine); Automatic cost case and the SettingsStyle fix pass. Implementation patch applied unchanged.
+- L12 (evidence): GREEN CI 40194789538 on c24750f: .NET 1529/1529, Pester 29/29, Python. Verifier's three required S4 findings and both optional ones fixed with RED→GREEN.
+- L13 (S5): Codex remote quota helper tracked as issue #85.
