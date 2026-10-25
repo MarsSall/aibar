@@ -80,8 +80,10 @@ public static class RemoteTokens
     }
 
     /// <summary>Keep the exact local-only summary when there is no usable remote aggregate.</summary>
-    public static UsageCostSummary Combine(LocalAnalyticsState local, RemoteTokenRows remote, DateOnly today)
+    public static UsageCostSummary Combine(LocalAnalyticsState local, RemoteTokenRows remote, DateOnly today, DataSource source = DataSource.Automatic)
     {
+        if (source == DataSource.ThisPc) return local.UsageCost;
+        if (source == DataSource.OtherMachine) return remote.Summary;
         if (!remote.Available) return local.UsageCost;
         try
         {

@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
@@ -53,6 +54,9 @@ public sealed class SettingsStyleTests
                     Assert.Null(Assert.IsType<Border>(window.FindName("SettingsShadow")).Effect);
                 }
 
+                // General opens first; the opacity slider lives on Appearance.
+                var sections = Assert.IsType<TabControl>(window.FindName("Sections"));
+                sections.SelectedItem = sections.Items.Cast<TabItem>().Single(tab => AutomationProperties.GetName(tab) == "Appearance"); window.UpdateLayout();
                 var slider = Assert.IsType<Slider>(window.FindName("BackgroundOpacity"));
                 Assert.NotNull(slider.FocusVisualStyle);
                 var track = Assert.IsType<Track>(slider.Template.FindName("PART_Track", slider));
@@ -64,7 +68,7 @@ public sealed class SettingsStyleTests
                 AssertColor(Token(window, "SettingsAccentBrush"), fill.Background);
 
                 var tabs = Assert.IsType<TabControl>(window.FindName("Sections"));
-                tabs.SelectedIndex = 1; window.UpdateLayout();
+                tabs.SelectedItem = tabs.Items.Cast<TabItem>().Single(tab => AutomationProperties.GetName(tab) == "Alerts"); window.UpdateLayout();
                 foreach (var name in new[] { "Notification", "EdgeGlow", "Confetti" })
                 {
                     var box = Assert.IsType<CheckBox>(window.FindName(name));

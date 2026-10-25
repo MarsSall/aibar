@@ -67,7 +67,8 @@ public partial class SettingsWindow : Window
         // The layered host stays transparent: applying the opaque popup policy here
         // would remove AllowsTransparency and clip the exterior Settings glow.
         UpdateWindowDecoration();
-        CodexEnabled.IsEnabled = ClaudeEnabled.IsEnabled = SourceChoices.IsEnabled = providers is not null;
+        CodexEnabled.IsEnabled = ClaudeEnabled.IsEnabled = CodexSource.IsEnabled = ClaudeSource.IsEnabled = providers is not null;
+        StartWithWindows.IsEnabled = ClearData.IsEnabled = providers?.General is not null;
         FloatingWidget.IsEnabled = dock is not null;
         UpdateFontStatus();
         UpdateThemeDescription();
@@ -75,6 +76,7 @@ public partial class SettingsWindow : Window
     }
     public async Task LoadAsync()
     {
+        if (_providers?.General is { } general) StartWithWindows.IsChecked = await general.LoadStartupAsync();
         var appearance = await _appearance.LoadAsync(default);
         var alerts = await _alerts.LoadAsync(default);
         BarUsage.IsChecked = appearance.BarColors == "usage"; BarBrand.IsChecked = !BarUsage.IsChecked;
@@ -88,15 +90,39 @@ public partial class SettingsWindow : Window
         if (_providers is { } providers)
         {
             CodexEnabled.IsChecked = providers.CodexEnabled; ClaudeEnabled.IsChecked = providers.ClaudeEnabled;
-            SourceThisPc.IsChecked = providers.Source == ClaudeQuotaSource.ThisPc;
-            SourceOtherMachine.IsChecked = providers.Source == ClaudeQuotaSource.OtherMachine;
-            SourceAutomatic.IsChecked = providers.Source == ClaudeQuotaSource.Automatic;
+            CodexSource.SelectedIndex = providers.CodexSource switch { DataSource.ThisPc => 1, DataSource.OtherMachine => 2, _ => 0 };
+            ClaudeSource.SelectedIndex = providers.Source switch { ClaudeQuotaSource.ThisPc => 1, ClaudeQuotaSource.OtherMachine => 2, _ => 0 };
             SourceStatus.Text = "ⓘ " + providers.SourceDescription;
         }
         else SourceStatus.Text = "Provider settings are unavailable.";
         Resets.IsChecked = alerts.Resets; Thresholds.IsChecked = alerts.Thresholds; RunOut.IsChecked = alerts.RunOut;
         Notification.IsChecked = alerts.Notification; EdgeGlow.IsChecked = alerts.EdgeGlow; Confetti.IsChecked = alerts.Confetti;
         ThresholdInput.Text = string.Join(", ", alerts.ThresholdValues);
+    }
+    private async void OnToggleStartup(object sender, RoutedEventArgs e)
+    {
+        if (_saving || _providers?.General is not { } general) return;
+        _saving = true; StartWithWindows.IsEnabled = ClearData.IsEnabled = false; ValidateThresholds();
+        try { StartWithWindows.IsChecked = await general.ToggleStartupAsync(); GeneralStatus.Text = "Startup setting updated."; }
+        catch (Exception)
+        {
+            try { StartWithWindows.IsChecked = await general.LoadStartupAsync(); } catch (Exception) { StartWithWindows.IsChecked = false; }
+            GeneralStatus.Text = "Could not update startup. Please try again.";
+        }
+        finally { _saving = false; StartWithWindows.IsEnabled = ClearData.IsEnabled = true; ValidateThresholds(false); }
+    }
+    private async void OnClearData(object sender, RoutedEventArgs e)
+    {
+        if (_saving || _providers?.General is not { } general) return;
+        _saving = true; StartWithWindows.IsEnabled = ClearData.IsEnabled = false; ValidateThresholds();
+        try
+        {
+            if (!await general.ClearAsync()) { GeneralStatus.Text = "Clear cancelled."; return; }
+            await LoadAsync();
+            GeneralStatus.Text = "AIBar data cleared. Codex quota access is off.";
+        }
+        catch (Exception) { GeneralStatus.Text = "Could not clear all AIBar data. Please try again."; }
+        finally { _saving = false; StartWithWindows.IsEnabled = ClearData.IsEnabled = true; ValidateThresholds(false); }
     }
     private void OnThresholdChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) => ValidateThresholds();
     private void ValidateThresholds(bool updateStatus = true)
@@ -117,6 +143,8 @@ public partial class SettingsWindow : Window
         }
         System.Windows.Automation.AutomationProperties.SetHelpText(ThresholdInput, error ?? "Ascending integers from 1 to 100, separated by commas.");
         SaveButton.IsEnabled = valid && !_saving;
+        if (StartWithWindows is not null && ClearData is not null)
+            StartWithWindows.IsEnabled = ClearData.IsEnabled = !_saving && _providers?.General is not null;
         DrawThresholdTicks();
     }
     private async void OnSave(object sender, RoutedEventArgs e)
@@ -126,7 +154,8 @@ public partial class SettingsWindow : Window
         try
         {
             if (_providers is { } providers && !await providers.SaveAsync(CodexEnabled.IsChecked == true, ClaudeEnabled.IsChecked == true,
-                SourceThisPc.IsChecked == true ? ClaudeQuotaSource.ThisPc : SourceOtherMachine.IsChecked == true ? ClaudeQuotaSource.OtherMachine : ClaudeQuotaSource.Automatic))
+                CodexSource.SelectedIndex switch { 1 => DataSource.ThisPc, 2 => DataSource.OtherMachine, _ => DataSource.Automatic },
+                ClaudeSource.SelectedIndex switch { 1 => ClaudeQuotaSource.ThisPc, 2 => ClaudeQuotaSource.OtherMachine, _ => ClaudeQuotaSource.Automatic }))
             {
                 SaveStatus.Text = "Consent declined. Changes were not saved."; return;
             }
@@ -182,6 +211,8 @@ public partial class SettingsWindow : Window
     }
     private void OnSettingsKeyDown(object sender, KeyEventArgs e)
     {
+        // Let the open dropdown accept or dismiss its selection before window-level shortcuts.
+        if ((CodexSource.IsDropDownOpen || ClaudeSource.IsDropDownOpen) && e.Key is Key.Enter or Key.Escape) return;
         if (e.Key == Key.Tab && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
             var direction = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1;

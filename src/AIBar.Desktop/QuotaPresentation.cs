@@ -134,6 +134,7 @@ public sealed class QuotaPresentationMapper(IClock clock, QuotaHistoryProvider p
         QuotaErrorKind.Network => "Network unavailable",
         QuotaErrorKind.Service => "Service unavailable",
         QuotaErrorKind.Redirect => "Redirect rejected",
+        QuotaErrorKind.Unavailable when failure.SafeCode == "quota_other_machine_pending" => "No data from the other machine yet",
         QuotaErrorKind.Unavailable when failure.SafeCode == "quota_refresh_failed" => "Refresh failed",
         QuotaErrorKind.Unavailable => "Quota unavailable",
         _ => null
@@ -203,6 +204,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     private readonly ManualRefreshCommand _refreshCommand;
     private readonly ClaudeQuotaPresentationHost? _claude;
     private readonly IQuotaPlanMetadata? _planSource;
+    private readonly BetaRuntime? _runtime;
     public QuotaSummaryCopyCommand CopySummaryCommand { get; }
     private readonly IQuotaRefreshLifecycleEvents? _lifecycleEvents;
     private BetaPresentationState _state;
@@ -212,8 +214,10 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     private long _historyRevision;
     public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, bool refreshAvailable = true, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null)
         : this(coordinator, mapper, () => refreshAvailable, report, lifecycleEvents) { }
-    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, Func<bool> refreshAvailable, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null, ClaudeQuotaPresentationHost? claude = null, PanelPaceHistory? history = null, IQuotaPlanMetadata? planSource = null)
+    public QuotaPresentationHost(QuotaRefreshCoordinator coordinator, QuotaPresentationMapper mapper, Func<bool> refreshAvailable, Action<Exception>? report = null, IQuotaRefreshLifecycleEvents? lifecycleEvents = null, ClaudeQuotaPresentationHost? claude = null, PanelPaceHistory? history = null, IQuotaPlanMetadata? planSource = null, BetaRuntime? runtime = null)
     {
+        _runtime = runtime;
+        if (_runtime is not null) _runtime.SourceChanged += OnSourceChanged;
         ArgumentNullException.ThrowIfNull(refreshAvailable);
         _planSource = planSource;
         _coordinator = coordinator; _mapper = mapper; _dispatcher = Dispatcher.CurrentDispatcher; _refreshAvailable = refreshAvailable; _state = Map(coordinator.State); _report = report; _lifecycleEvents = lifecycleEvents;
@@ -267,6 +271,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         if (!_dispatcher.CheckAccess()) { _dispatcher.BeginInvoke(RecalculateFromClock); return; }
         Update(_coordinator.State);
     }
+    private void OnSourceChanged() => OnStateChanged(_coordinator.State);
     private void OnClockChanged() => RecalculateFromClock();
     private void OnStateChanged(QuotaRefreshState state)
     {
@@ -279,7 +284,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         if (_disposed) return;
         var revision = ++_historyRevision;
         _state = Map(state);
-        if (_history is not null && _state.IsCurrent && _refreshAvailable()) _ = ApplyHistoryAsync(state, revision);
+        if (_history is not null && _state.IsCurrent && _refreshAvailable() && _runtime?.IsRemoteOnly != true) _ = ApplyHistoryAsync(state, revision);
         CopySummaryCommand.RefreshState();
         if (state.Failure != _reportedFailure)
         {
@@ -294,7 +299,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         {
             var historyRevision = _history!.Revision;
             var samples = await _history.ReadPaceAsync(QuotaHistoryProvider.Codex);
-            if (_disposed || revision != _historyRevision || !_refreshAvailable() || !_history.CanPublish(historyRevision)) return;
+            if (_disposed || revision != _historyRevision || !_refreshAvailable() || _runtime?.IsRemoteOnly == true || !_history.CanPublish(historyRevision)) return;
             _state = _mapper.Map(state, samples) with { PlanLabel = _refreshAvailable() ? _planSource?.PlanLabel : null };
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         }
@@ -302,7 +307,8 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     }
     private BetaPresentationState Map(QuotaRefreshState state)
     {
-        var mapped = _mapper.Map(state) with { PlanLabel = _refreshAvailable() ? _planSource?.PlanLabel : null };
+        if (_runtime?.IsRemoteOnly == true) state = _runtime.State;
+        var mapped = _mapper.Map(state) with { PlanLabel = _refreshAvailable() && _runtime?.IsRemoteOnly != true ? _planSource?.PlanLabel : null };
         return _refreshAvailable() ? mapped : mapped with
         {
             FreshnessLabel = "Private quota integration disabled",
@@ -328,6 +334,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
             _disposed = true;
             CopySummaryCommand.RefreshState();
             _coordinator.StateChanged -= OnStateChanged;
+            if (_runtime is not null) _runtime.SourceChanged -= OnSourceChanged;
             if (_history is not null)
             {
                 _history.Invalidated -= OnHistoryInvalidated;

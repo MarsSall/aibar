@@ -97,17 +97,18 @@ public sealed class BetaAnalyticsPresentation : INotifyPropertyChanged
 {
     private readonly QuotaPresentationHost _quota;
     private readonly LocalCodexAnalyticsView _analytics;
-    private readonly LocalUsagePresentationHost _localUsage;
+    private readonly LocalUsagePresentationHost? _localUsage;
+    private readonly LocalUsagePresentationState _unusedLocalUsage = new LocalUsagePresentationMapper().NotLoaded();
     private readonly UsageCostView? _codexCost;
 
-    public BetaAnalyticsPresentation(QuotaPresentationHost quota, LocalCodexAnalyticsView analytics, LocalUsagePresentationHost localUsage, ClaudeQuotaPresentationHost? claude = null, UsageCostView? claudeCost = null, UsageCostView? codexCost = null)
+    public BetaAnalyticsPresentation(QuotaPresentationHost quota, LocalCodexAnalyticsView analytics, LocalUsagePresentationHost? localUsage = null, ClaudeQuotaPresentationHost? claude = null, UsageCostView? claudeCost = null, UsageCostView? codexCost = null)
     {
         _quota = quota; _analytics = analytics; _localUsage = localUsage; Claude = claude; ClaudeCost = claudeCost;
         _codexCost = codexCost;
         if (_codexCost is not null) _codexCost.PropertyChanged += OnCodexCostChanged;
         _quota.PropertyChanged += OnQuotaChanged;
         _analytics.PropertyChanged += OnAnalyticsChanged;
-        _localUsage.PropertyChanged += OnLocalUsageChanged;
+        if (_localUsage is not null) _localUsage.PropertyChanged += OnLocalUsageChanged;
     }
 
     public UsageCostSummary CodexCost => _codexCost?.State ?? Analytics.UsageCost;
@@ -122,7 +123,7 @@ public sealed class BetaAnalyticsPresentation : INotifyPropertyChanged
     public QuotaSummaryCopyCommand CopySummaryCommand => _quota.CopySummaryCommand;
     public BetaPresentationState State => _quota.State;
     public LocalAnalyticsState Analytics => _analytics.State;
-    public LocalUsagePresentationState LocalUsage => _localUsage.State;
+    public LocalUsagePresentationState LocalUsage => _localUsage?.State ?? _unusedLocalUsage;
     public QuotaPresentationHost QuotaPresentation => _quota;
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnQuotaChanged(object? sender, PropertyChangedEventArgs args) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));

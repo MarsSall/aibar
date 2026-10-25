@@ -66,7 +66,7 @@ dotnet build AIBar.sln
 dotnet run --project src/AIBar.Desktop
 ```
 
-AIBar arranca en la bandeja. Activá Codex y Claude desde el menú de la bandeja: cada proveedor pide su propio consentimiento y queda apagado hasta que lo aceptes.
+AIBar arranca en la bandeja. Activá Codex y Claude desde **Settings… → Providers**: cada proveedor pide su propio consentimiento y queda apagado hasta que lo aceptes. La bandeja solo contiene **Refresh** (cuando está disponible), **Settings…**, **Start with Windows** y **Exit AIBar**.
 
 ## Comandos
 
@@ -86,7 +86,7 @@ AIBar arranca en la bandeja. Activá Codex y Claude desde el menú de la bandeja
 - **Alertas.** Avisos de reinicio, de umbral (por defecto 75/90/100%) y de "se agota antes del reinicio", con efectos opcionales de confeti y brillo en el borde. Ver [alertas](./docs/alerts.md).
 - **Estado de los proveedores.** Indicadores de incidentes tomados de las páginas de estado oficiales y acceso con un clic a la página de uso de cada proveedor. Ver [estado de proveedores](./docs/provider-status.md).
 - **Copiar resumen.** Copia la cuota que se está mostrando al portapapeles como texto plano. Ver [resumen de cuotas](./docs/quota-summary.md).
-- **Configuración.** Sigue los temas claro, oscuro y de alto contraste de Windows: opacidad, tinte por proveedor, colores de las barras, umbrales de alerta e intervalo de actualización. Se puede usar entera con teclado. Ver [configuración](./docs/settings.md).
+- **Configuración.** General reúne Start with Windows y Clear AIBar Data con confirmación. Providers tiene un desplegable Source compacto por proveedor: Automatic / This PC / Other machine. Las elecciones son independientes y también filtran los datos de costo de cada proveedor. Automatic prioriza la cuota remota de ese proveedor cuando existe; Codex con Other machine queda sin cuota hasta que exista un helper remoto y no lee su sesión local. Use other machine en el panel cambia solo Claude. Sigue los temas claro, oscuro y de alto contraste de Windows: opacidad, tinte por proveedor, colores de las barras, umbrales de alerta e intervalo de actualización. Se puede usar entera con teclado. Ver [configuración](./docs/settings.md).
 - **Widget flotante.** ¿No tenés YASB? Activá una tira siempre visible con anillos de cuota desde Configuración, o aceptá la oferta al iniciar, que aparece una sola vez. Arrastrala a cualquier borde de la pantalla.
 - **Fuente para YASB.** Si detecta YASB sin la fuente, AIBar te ofrece instalar IosevkaTerm Nerd Font, incluida en el ZIP. También podés instalarla desde Configuración, solo para tu usuario, sin permisos de administrador ni descargas.
 - **Widget para YASB.** CustomWidget opcional para [YASB](https://github.com/amnweb/yasb) que muestra una instantánea sanitizada de la cuota en tu barra. Ver [`yasb/README.txt`](./yasb/README.txt).
@@ -121,7 +121,7 @@ Las notas de desarrollo y de diseño de tests están en [`docs/dev/`](./docs/dev
 - Las credenciales se leen solo de los archivos de login de las CLI oficiales. AIBar nunca renueva tokens, nunca modifica un login y no guarda credenciales propias.
 - Los datos quedan en `%LOCALAPPDATA%\AIBar`: caché de cuotas, historial, analíticas y la instantánea para YASB. AIBar no tiene backend ni telemetría.
 - Las consultas van directo desde tu PC a OpenAI, Anthropic y sus páginas de estado públicas.
-- **Clear AIBar Data**, en la bandeja, borra las cachés, el historial y las exportaciones locales.
+- AIBar ya no escanea el uso local de OpenCode ni Pi. Los archivos existentes se conservan hasta **Clear AIBar Data**, cuya operación interna sigue borrando las cachés, el historial y las exportaciones locales. Usá **Settings → General → Clear AIBar Data**; no toca tus sesiones de los proveedores.
 
 ## Roadmap
 

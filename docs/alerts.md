@@ -4,7 +4,7 @@ AIBar alerts on **Codex and Claude** subscription quota, independently for the 5
 
 ## Choose alerts
 
-Open **Settings… → Alerts** to choose events, thresholds, and effects. The existing tray **Alerts** toggles still work; **Configure alerts…** opens the same window. The original four choices default to on, Windows notifications default to on, and confetti defaults to off. See [Settings](settings.md) for keyboard controls and color preferences.
+Open **Settings… → Alerts** to choose events, thresholds, and effects. Alert configuration lives only in Settings; the tray no longer has an Alerts submenu. The original four choices default to on, Windows notifications default to on, and confetti defaults to off. See [Settings](settings.md) for keyboard controls and color preferences.
 
 | Choice | Behavior |
 | --- | --- |
@@ -40,7 +40,7 @@ Under `%LOCALAPPDATA%\AIBar`:
 
 Writes use a same-directory temporary file and atomic replacement. The serialized observer performs disk work off the UI thread, persists keys **before** delivery, and never delivers if state persistence fails. Consequently a crash after persistence but before delivery may lose a notification rather than duplicate it. Turning an event off still records its key; turning it on later does not replay old alerts. Missing, malformed, or unknown-schema settings use the defaults; a lost/corrupt state file starts new deduplication history.
 
-**Clear AIBar Data** pauses and drains alert work, removes these files and `appearance.json`, drops in-memory keys/samples, restores the default menu checks, and resumes the observer. It leaves provider consent handling to the existing clear lifecycle. No remote payloads, Codex export v1 fields, or copied quota summaries change.
+**Clear AIBar Data** pauses and drains alert work, removes these files and `appearance.json`, drops in-memory keys/samples, restores the default alert settings, and resumes the observer. It leaves provider consent handling to the existing clear lifecycle. No remote payloads, Codex export v1 fields, or copied quota summaries change.
 
 ## Validation on Windows
 

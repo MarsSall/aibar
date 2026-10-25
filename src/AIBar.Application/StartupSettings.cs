@@ -147,6 +147,7 @@ public sealed class NativeSettingsCommands(IStartupRegistration startup, IAiBarD
     public bool LocalAnalyticsEnabled => true;
     public bool LocalUsageAvailable => loadLocalUsage is not null && saveLocalUsage is not null && applyLocalUsage is not null;
     public LocalUsagePolicy LocalUsagePolicy => Volatile.Read(ref _localUsagePolicy);
+    public ValueTask<bool> LoadStartupAsync(CancellationToken cancellationToken) => startup.IsEnabledAsync(cancellationToken);
     public async ValueTask<bool> ToggleStartupAsync(CancellationToken cancellationToken)
     {
         var enabled = await startup.IsEnabledAsync(cancellationToken);

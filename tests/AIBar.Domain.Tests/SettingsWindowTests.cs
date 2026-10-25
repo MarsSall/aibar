@@ -28,10 +28,27 @@ public sealed class SettingsWindowTests
                 window.Show(); window.UpdateLayout();
                 Assert.Equal("AIBar Settings", window.Title);
                 var tabs = Assert.IsType<TabControl>(window.FindName("Sections"));
-                Assert.Equal(3, tabs.Items.Count);
-                Assert.Equal("Appearance", AutomationProperties.GetName((TabItem)tabs.Items[0]));
-                Assert.Equal("Alerts", AutomationProperties.GetName((TabItem)tabs.Items[1]));
-                Assert.Equal("Providers", AutomationProperties.GetName((TabItem)tabs.Items[2]));
+                Assert.Equal(4, tabs.Items.Count);
+                Assert.Equal("General", AutomationProperties.GetName((TabItem)tabs.Items[0]));
+                Assert.Equal("Appearance", AutomationProperties.GetName((TabItem)tabs.Items[1]));
+                Assert.Equal("Alerts", AutomationProperties.GetName((TabItem)tabs.Items[2]));
+                Assert.Equal("Providers", AutomationProperties.GetName((TabItem)tabs.Items[3]));
+                Assert.Null(window.FindName("SourceChoices"));
+                Assert.DoesNotContain(Visuals<TextBlock>((TabItem)tabs.Items[0]), text => text.Text == "Data source");
+                tabs.SelectedIndex = 3; window.UpdateLayout();
+                foreach (var provider in new[] { "Codex", "Claude" })
+                {
+                    var source = Assert.IsType<ComboBox>(window.FindName(provider + "Source"));
+                    Assert.Equal(provider + " source", AutomationProperties.GetName(source));
+                    Assert.Equal(new[] { "Automatic", "This PC", "Other machine" }, source.Items.Cast<ComboBoxItem>().Select(item => (string)item.Content));
+                    var suffix = provider == "Codex" ? " Codex has no remote quota yet." : "";
+                    Assert.Equal(new[] {
+                        "Uses data sent from another machine when it exists, otherwise this PC's login." + suffix,
+                        "Only this PC's login." + suffix,
+                        "Only data sent from another machine." + suffix
+                    }, source.Items.Cast<ComboBoxItem>().Select(item => (string)item.ToolTip));
+                    Assert.False(source.IsEnabled);
+                }
                 // The 520 × 600 Settings surface is unchanged; the transparent host reserves
                 // 40 DIPs on each side so the exterior glow is not clipped.
                 Assert.Equal(600, window.Width);
@@ -41,7 +58,7 @@ public sealed class SettingsWindowTests
                 Assert.Equal(30, opacity.Minimum); Assert.Equal(100, opacity.Maximum);
                 Assert.Equal(5, opacity.TickFrequency); Assert.True(opacity.IsSnapToTickEnabled);
                 Assert.All(Visuals<RadioButton>(window), choice => Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(choice))));
-                tabs.SelectedIndex = 1; window.UpdateLayout();
+                tabs.SelectedIndex = 2; window.UpdateLayout();
                 var input = Assert.IsType<TextBox>(window.FindName("ThresholdInput"));
                 Assert.Equal("Alert thresholds (%)", AutomationProperties.GetName(input));
                 input.Text = "90, 75, 100"; window.UpdateLayout();
@@ -53,7 +70,7 @@ public sealed class SettingsWindowTests
                 Assert.True(Assert.IsType<Button>(window.FindName("SaveButton")).IsEnabled);
                 Assert.True(input.Focusable);
                 Assert.All(Visuals<CheckBox>(window), toggle => Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(toggle))));
-                tabs.SelectedIndex = 2; window.UpdateLayout();
+                tabs.SelectedIndex = 3; window.UpdateLayout();
                 Assert.False(Assert.IsType<CheckBox>(window.FindName("CodexEnabled")).IsEnabled);
                 Assert.False(Assert.IsType<CheckBox>(window.FindName("ClaudeEnabled")).IsEnabled);
                 Assert.NotNull(Assert.IsType<System.Windows.Shapes.Path>(window.FindName("CodexMark")).Data);
@@ -177,6 +194,119 @@ public sealed class SettingsWindowTests
             }
             finally { window.Close(); }
         });
+    }
+
+    [Fact]
+    public void General_controls_load_toggle_and_confirm_clear()
+    {
+        WpfTestApplicationHost.Run(_ =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), $"aibar-general-{Guid.NewGuid():N}");
+            var approve = false; var clears = 0; var toggles = 0; var source = ClaudeQuotaSource.OtherMachine;
+            var applied = new List<ClaudeQuotaSource>();
+            var commands = new SettingsProviderCommands(() => false, () => false, () => source, () => true, () => true,
+                _ => Task.CompletedTask, _ => Task.CompletedTask,
+                selected => { applied.Add(selected); source = selected; return Task.CompletedTask; },
+                general: new(() => Task.FromResult(true), () => { toggles++; return Task.FromResult(false); },
+                    () => approve, () => { clears++; return Task.CompletedTask; }));
+            var window = new SettingsWindow(new AppearanceSettings(Path.Combine(root, "appearance.json")), new AlertSettings(Path.Combine(root, "alerts.json")), providers: commands);
+            try
+            {
+                window.Show(); Pump(window.LoadAsync());
+                Assert.True(Assert.IsType<CheckBox>(window.FindName("StartWithWindows")).IsChecked);
+                Assert.True(Assert.IsType<ComboBox>(window.FindName("ClaudeSource")).SelectedIndex == 2);
+                Assert.IsType<CheckBox>(window.FindName("StartWithWindows")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.False(Assert.IsType<CheckBox>(window.FindName("StartWithWindows")).IsChecked); Assert.Equal(1, toggles);
+                Assert.IsType<Button>(window.FindName("ClearData")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.Equal(0, clears);
+                approve = true;
+                Assert.IsType<Button>(window.FindName("ClearData")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                // LoadAsync after clear is asynchronous. Pump it before issuing Save.
+                var frame = new System.Windows.Threading.DispatcherFrame();
+                var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+                var deadline = DateTime.UtcNow.AddSeconds(60);
+                timer.Tick += (_, _) => frame.Continue = !Assert.IsType<Button>(window.FindName("ClearData")).IsEnabled && DateTime.UtcNow < deadline;
+                timer.Start(); System.Windows.Threading.Dispatcher.PushFrame(frame); timer.Stop();
+                Assert.Equal(1, clears);
+                Assert.IsType<ComboBox>(window.FindName("ClaudeSource")).SelectedIndex = 1;
+                Assert.IsType<Button>(window.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                frame = new System.Windows.Threading.DispatcherFrame();
+                timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+                deadline = DateTime.UtcNow.AddSeconds(60);
+                timer.Tick += (_, _) => frame.Continue = Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text == "Saving…" && DateTime.UtcNow < deadline;
+                timer.Start(); System.Windows.Threading.Dispatcher.PushFrame(frame); timer.Stop();
+                Assert.Equal(new[] { ClaudeQuotaSource.ThisPc }, applied);
+                Assert.Equal("Changes saved.", Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text);
+            }
+            finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
+        });
+    }
+
+    [Theory]
+    [InlineData(0, 2, DataSource.Automatic, ClaudeQuotaSource.OtherMachine)]
+    [InlineData(1, 2, DataSource.ThisPc, ClaudeQuotaSource.OtherMachine)]
+    [InlineData(2, 1, DataSource.OtherMachine, ClaudeQuotaSource.ThisPc)]
+    public void Provider_dropdowns_load_and_save_independent_sources(int codexIndex, int claudeIndex, DataSource codexSource, ClaudeQuotaSource claudeSource)
+    {
+        WpfTestApplicationHost.Run(_ =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), $"aibar-provider-sources-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(root);
+            // Start with deliberately different values. No consent is granted by source changes.
+            File.WriteAllText(Path.Combine(root, "settings.json"), """{"schema":1,"codexSource":"this-pc","claudeSource":"automatic"}""");
+            var composition = App.CreateComposition(new(root, Path.Combine(root, "codex"), UserProfile: Path.Combine(root, "home")));
+            SettingsWindow? window = null;
+            try
+            {
+                Pump(composition.Initialize());
+                var commands = SettingsProviderCommands.Create(composition.Settings!, composition.ClaudeQuota!, composition.CodexQuota!);
+                window = new SettingsWindow(new AppearanceSettings(Path.Combine(root, "appearance.json")), new AlertSettings(Path.Combine(root, "alerts.json")), providers: commands);
+                window.Show(); Pump(window.LoadAsync());
+                var codex = Assert.IsType<ComboBox>(window.FindName("CodexSource"));
+                var claude = Assert.IsType<ComboBox>(window.FindName("ClaudeSource"));
+                Assert.Equal(1, codex.SelectedIndex);
+                Assert.Equal(0, claude.SelectedIndex);
+                codex.SelectedIndex = codexIndex;
+                claude.SelectedIndex = claudeIndex;
+                Assert.Equal(DataSource.ThisPc, composition.CodexQuota!.Source);
+                Assert.Equal(ClaudeQuotaSource.Automatic, composition.ClaudeQuota!.Source);
+                Assert.IsType<Button>(window.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                var frame = new System.Windows.Threading.DispatcherFrame();
+                var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+                var deadline = DateTime.UtcNow.AddSeconds(60);
+                timer.Tick += (_, _) => frame.Continue = Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text == "Saving…" && DateTime.UtcNow < deadline;
+                timer.Start(); System.Windows.Threading.Dispatcher.PushFrame(frame); timer.Stop();
+                Assert.Equal("Changes saved.", Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text);
+                Assert.Equal(codexSource, composition.CodexQuota.Source);
+                Assert.Equal(claudeSource, composition.ClaudeQuota.Source);
+                var settings = new ConsentSettings(Path.Combine(root, "settings.json"));
+                Assert.Equal(codexSource, settings.LoadDataSourceAsync(default).AsTask().GetAwaiter().GetResult());
+                Assert.Equal(claudeSource, settings.LoadClaudeSourceAsync(default).AsTask().GetAwaiter().GetResult());
+                Assert.False(composition.CodexQuota.IsConsentEnabled);
+                Assert.False(composition.ClaudeQuota.IsConsentEnabled);
+            }
+            finally
+            {
+                window?.Close();
+                Pump(composition.Resource.DisposeAsync().AsTask());
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+        });
+    }
+
+    [Fact]
+    public async Task General_commands_reflect_startup_readback_and_confirm_before_clear()
+    {
+        var toggles = 0; var clears = 0; var confirmations = 0; var approve = false;
+        var general = new SettingsGeneralCommands(() => Task.FromResult(true),
+            () => { toggles++; return Task.FromResult(false); },
+            () => { confirmations++; return approve; },
+            () => { clears++; return Task.CompletedTask; });
+        Assert.True(await general.LoadStartupAsync());
+        Assert.False(await general.ToggleStartupAsync()); Assert.Equal(1, toggles);
+        Assert.False(await general.ClearAsync()); Assert.Equal(0, clears);
+        approve = true;
+        Assert.True(await general.ClearAsync()); Assert.Equal(1, clears); Assert.Equal(2, confirmations);
     }
 
     private static void Pump(Task task)

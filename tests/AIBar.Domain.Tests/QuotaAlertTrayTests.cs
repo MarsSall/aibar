@@ -9,7 +9,7 @@ public sealed class QuotaAlertTrayTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"aibar-alert-tray-{Guid.NewGuid():N}");
     [Fact]
-    public void Toggles_persist_checkmarks_balloon_click_shows_panel_and_limit_glows_once()
+    public void Settings_changes_persist_balloon_click_shows_panel_and_limit_glows_once()
     {
         var now = DateTimeOffset.UtcNow;
         var owner = new QuotaAlertObserver(_root, new FixedClock(now));
@@ -17,8 +17,7 @@ public sealed class QuotaAlertTrayTests : IDisposable
         {
             var tray = new Tray(); var opened = 0; var glows = 0;
             using var controller = new QuotaAlertTrayController(tray, owner, Dispatcher.CurrentDispatcher, () => opened++, _ => glows++);
-            PumpUntil(() => tray.Options is not null);
-            tray.Toggle("resets"); PumpUntil(() => tray.Options?.Resets == false);
+            owner.ChangeSettingsAsync(options => options with { Resets = false }).GetAwaiter().GetResult();
             Assert.False(owner.Settings.LoadAsync(default).AsTask().GetAwaiter().GetResult().Resets);
             tray.Click(); Assert.Equal(1, opened);
             var update = new QuotaAuthorityUpdate(new(new(new(100, now.AddHours(2)), null, now), FreshnessState.Current, false, null, null), 1, 1);
@@ -91,13 +90,9 @@ public sealed class QuotaAlertTrayTests : IDisposable
     }
     private sealed class Tray : IQuotaAlertTray
     {
-        public event Action<string>? AlertToggleRequested;
         public event Action? AlertClicked;
-        public AlertOptions? Options;
         public readonly List<(string Title, string Body)> Messages = [];
-        public void SetAlertOptions(AlertOptions options) => Options = options;
         public void ShowAlert(string title, string body) => Messages.Add((title, body));
-        public void Toggle(string key) => AlertToggleRequested?.Invoke(key);
         public void Click() => AlertClicked?.Invoke();
     }
     public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }

@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
@@ -28,7 +29,7 @@ public sealed class SettingsScrollStyleTests
                     new AlertSettings(Path.Combine(root, "alerts.json")), themeSource: new ThemeSource(theme))
                 { Left = -10000, Top = -10000, ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual };
                 window.Show();
-                ((TabControl)window.FindName("Sections")).SelectedIndex = 2;
+                var tabs = (TabControl)window.FindName("Sections"); tabs.SelectedItem = tabs.Items.Cast<TabItem>().Single(tab => AutomationProperties.GetName(tab) == "Providers");
                 window.UpdateLayout();
                 var headings = Visuals<TextBlock>(window).Where(text => text.IsVisible && text.Style == window.FindResource("SettingsHeading")).Select(text => text.Text).ToArray();
                 Assert.Contains("REFRESH EVERY", headings);

@@ -4,7 +4,7 @@ Claude quota is a separate, optional integration for Claude Pro/Max subscription
 
 ## Enable or disable
 
-In the AIBar tray menu, choose **Enable Claude quota** and accept the Claude-specific disclosure. Cancelling leaves it off. Choose **Disable Claude quota** at any time to cancel Claude requests, stop polling and clear its cached quota. Codex keeps running independently.
+Open **Settings… → Providers**, turn on **Show Claude in AIBar**, and select **Save** to accept the Claude-specific disclosure. Cancelling leaves it off. Turn the switch off and save at any time to cancel Claude requests, stop polling and clear its cached quota. Codex keeps running independently.
 
 With **Automatic** (the default), AIBar detects a usage file from another machine; if none exists, it reads the existing **Claude Code login on this PC**, read-only: `.credentials.json` under `CLAUDE_CONFIG_DIR`, or the current Windows user's `.claude` directory by default. It queries Anthropic's unofficial subscription-usage endpoint, `https://api.anthropic.com/api/oauth/usage`. This private endpoint is unsupported and may change.
 
@@ -14,7 +14,7 @@ AIBar never refreshes tokens or changes the login. If the local session expires 
 
 To use a Linux Claude Code login, follow
 [the optional remote usage helper instructions](../tools/claude-remote-usage/README.md).
-No tray change is needed after installing the helper: **Claude source: Automatic**
+No source change is needed after installing the helper: **Settings → Providers → Claude → Source: Automatic**
 detects `%LOCALAPPDATA%\AIBar\claude-remote-usage.json` on initialization and each
 refresh, including polls (the saved refresh interval when resolved to This PC,
 default five minutes; every minute when resolved to Other machine). Claude consent is still required once.
@@ -27,7 +27,7 @@ marked stale after 15 minutes. An existing stale or invalid file stays remote;
 AIBar never silently falls back to the local login. Reparse-point files are not
 eligible for automatic detection.
 
-The tray offers **Automatic / This PC / Other machine**. Choose **This PC** to
+**Settings → Providers** has a separate **Source** dropdown beside each provider's visibility checkbox, with **Automatic / This PC / Other machine**. Claude keeps its existing `claudeSource` choice; only a missing choice migrates from the former general `dataSource`. Codex saves its independent `codexSource` (migrating from `dataSource` if absent, otherwise defaulting to Automatic). Migration is in memory: consent/cache saves do not add absent source fields. AIBar never creates or updates the general choice; it preserves an existing `dataSource` fallback until both provider fields exist and a source is explicitly saved, then removes it. Source selection never grants provider consent or changes the other provider. The panel's **Use other machine** changes only Claude. The tray no longer contains source or consent controls. Choose **This PC** for Claude to
 force the Windows login even while a remote file exists, or **Other machine** to
 force the remote source even when its file is missing. Existing explicit choices
 are preserved. Return to **Automatic** to detect the source again. When the file
@@ -45,7 +45,7 @@ Claude has its own loading, unavailable and stale-cache status. If its login is 
 ## Cost and tokens
 
 While Claude is enabled, **Pace & details** shows **Today** and **Last 30 days**
-rows from Linux log aggregates, independently of the selected quota source.
+rows from Linux log aggregates when Claude's Source is **Automatic** or **Other machine**. **This PC** excludes remote token rows and shows cost as unavailable because there is no local Claude token reader. Changing Claude's Source refreshes its cost view immediately, independently of Codex's Source.
 No prompt, source path, message ID or authentication token is sent. Estimates use
 the checked-in official list-price catalog; unpriced models are visibly partial,
 never silently charged at zero. Missing, invalid or more-than-two-hour-old token

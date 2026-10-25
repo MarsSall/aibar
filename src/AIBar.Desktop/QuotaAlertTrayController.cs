@@ -8,46 +8,13 @@ namespace AIBar.Desktop;
 
 public interface IQuotaAlertTray
 {
-    event Action<string>? AlertToggleRequested;
     event Action? AlertClicked;
-    void SetAlertOptions(AlertOptions options);
     void ShowAlert(string title, string body);
 }
 
 public sealed partial class WindowsTrayRuntime
 {
-    private readonly Forms.ToolStripMenuItem _alerts = new("Alerts");
-    private readonly Dictionary<string, Forms.ToolStripMenuItem> _alertItems = [];
-    public event Action<string>? AlertToggleRequested;
     public event Action? AlertClicked;
-    public event Action? SettingsRequested;
-    private void InitializeAlerts()
-    {
-        foreach (var (key, text) in new[] { ("resets", "Window resets"), ("thresholds", "Threshold alerts"),
-                     ("runOut", "May run out before reset"), ("edgeGlow", "Edge glow at 100%") })
-        {
-            // The persisted decision drives the checkmark; failed saves never lie about the choice.
-            var item = new Forms.ToolStripMenuItem(text) { Checked = true, CheckOnClick = false };
-            item.Click += (_, _) => AlertToggleRequested?.Invoke(key);
-            _alertItems.Add(key, item); _alerts.DropDownItems.Add(item);
-        }
-        var settings = new Forms.ToolStripMenuItem("Settings…");
-        settings.Click += (_, _) => SettingsRequested?.Invoke();
-        _menu.Items.Add(settings);
-        var configure = new Forms.ToolStripMenuItem("Configure alerts…");
-        configure.Click += (_, _) => SettingsRequested?.Invoke();
-        _alerts.DropDownItems.Add(configure);
-        _menu.Items.Add(_alerts);
-        _icon.BalloonTipClicked += (_, _) => AlertClicked?.Invoke();
-    }
-    public void SetAlertOptions(AlertOptions options)
-    {
-        _alertItems["resets"].Checked = options.Resets;
-        _alertItems["thresholds"].Checked = options.Thresholds;
-        _alertItems["thresholds"].Text = string.Join(" / ", options.ThresholdValues) + "% thresholds";
-        _alertItems["runOut"].Checked = options.RunOut;
-        _alertItems["edgeGlow"].Checked = options.EdgeGlow;
-    }
     public void ShowAlert(string title, string body) => _icon.ShowBalloonTip(5000, title, body, Forms.ToolTipIcon.Warning);
 }
 
@@ -75,28 +42,14 @@ public sealed class QuotaAlertTrayController : IDisposable
         _cards = cards ?? (tray is WindowsTrayRuntime ? new NotificationStack(showPanel) : null);
         _glow = glow ?? (enabled => { EdgeGlowWindow.ShowOnAllMonitors(enabled); });
         _confetti = confetti;
-        tray.AlertToggleRequested += Toggle; tray.AlertClicked += Clicked;
-        observer.AlertReady += Deliver; observer.SettingsChanged += SettingsChanged;
-        _ = LoadAsync();
-    }
-    private async Task LoadAsync()
-    {
-        try { SettingsChanged(await _observer.Settings.LoadAsync(default)); } catch (Exception) { }
+        tray.AlertClicked += Clicked;
+        observer.AlertReady += Deliver;
     }
     private void Post(Action action)
     {
         if (_dispatcher.HasShutdownStarted) return;
         _dispatcher.BeginInvoke(new Action(() => { if (!_disposed) action(); }));
     }
-    private void SettingsChanged(AlertOptions options) => Post(() => _tray.SetAlertOptions(options));
-    private void Toggle(string key) => _ = _observer.ChangeSettingsAsync(options => key switch
-    {
-        "resets" => options with { Resets = !options.Resets },
-        "thresholds" => options with { Thresholds = !options.Thresholds },
-        "runOut" => options with { RunOut = !options.RunOut },
-        "edgeGlow" => options with { EdgeGlow = !options.EdgeGlow },
-        _ => options
-    });
     private void Clicked() { if (!_disposed) _showPanel(); }
     private void Deliver(QuotaAlert alert) => Post(async () =>
     {
@@ -147,7 +100,7 @@ public sealed class QuotaAlertTrayController : IDisposable
     {
         _disposed = true;
         _cards?.Dispose();
-        _tray.AlertToggleRequested -= Toggle; _tray.AlertClicked -= Clicked;
-        _observer.AlertReady -= Deliver; _observer.SettingsChanged -= SettingsChanged;
+        _tray.AlertClicked -= Clicked;
+        _observer.AlertReady -= Deliver;
     }
 }
