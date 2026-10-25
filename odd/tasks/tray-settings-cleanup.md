@@ -15,7 +15,7 @@ Branch: `feat/tray-settings-cleanup`, stacked on `feat/floating-widget-and-font`
 
 - T1 [S1, S2] Tray menu trimmed to Refresh/Settings…/Start with Windows/Exit; OpenCode/Pi local usage no longer composed or scanned; tests + docs — worker — commit: 0adfe44
 - T2 [S3, S4] General tab (Start with Windows, Clear AIBar Data with confirmation, Data source for all providers with claudeSource migration and Codex other-machine state); Providers loses Claude source; tests + docs — worker after T1 — commit: 8c24cb4, fixes b3f4e75 (tests) + c24750f
-- T3 [S1-S5] Windows CI, deploy to the user's PC, acceptance, Codex remote quota issue — inline — commit: pending
+- T3 [S1-S5] Windows CI, deploy to the user's PC, acceptance, Codex remote quota issue — inline — commit: 5685724 (deploy log); issue #85
 
 - T4 [S4 revised] Per-provider Source dropdowns in Providers; remove General Data source; per-provider persistence/migration; tests + docs — worker — commit: e7b77bd (tests), 0ec9ac7, aceed9f
 
@@ -43,3 +43,4 @@ Branch: `feat/tray-settings-cleanup`, stacked on `feat/floating-widget-and-font`
 - L20 (fix): worker mvnvmkk9-3-um16 — ConsentSettings preserves absent source fields (written only by that provider's source save), migration is load-only with the legacy dataSource kept as fallback until both provider fields exist, and all ConsentSettings awaits use ConfigureAwait(false) (static deadlock: Provider_dropdowns test blocks the WPF dispatcher on source loads whose continuations captured it). Parent aligned the new test General_source_migrates_to_both_providers with the established shape-stability contract (consent save keeps dataSource, adds no provider fields).
 - L21 (evidence): GREEN CI 40199085585 on aceed9f: .NET 1537/1537 in 4m42s (no hang), Pester 29/29, Python.
 - L22 (deploy): built HEAD on Mars; installed AIBar.Application.dll + AIBar.Desktop.dll (previous in %TEMP%\aibar-pr84-build\backup-before-per-provider); settings had claudeSource=automatic, dataSource=automatic (Codex migrates to Automatic). Relaunched PID 30572; 20 s later running, no crash events, YASB exports current (Codex weekly 1, Claude weekly 48). Pending: user acceptance of the dropdowns.
+- L23 (close): user accepted the per-provider dropdowns ("bien"). Windows build dir %TEMP%\aibar-pr84-build (builds + backups) removed; rollback = rebuild from git. Local implementation patch removed. PR #84 and #86 await the user's merge (merge #84 first, then retarget #86 to main); Codex remote quota in #85.
