@@ -44,7 +44,7 @@ public sealed class DockRing : UserControl
         }
         grid.Children.Add(_outer); grid.Children.Add(_inner); grid.Children.Add(_mark); grid.Children.Add(_placeholder);
         Content = grid;
-        var tooltip = new ToolTip { Content = _details, Focusable = false, StaysOpen = false };
+        var tooltip = new ToolTip { Content = _details, Focusable = false };
         tooltip.SetResourceReference(Control.BackgroundProperty, "SettingsSurfaceBrush");
         tooltip.SetResourceReference(Control.ForegroundProperty, "SettingsTextBrush");
         ToolTip = tooltip;

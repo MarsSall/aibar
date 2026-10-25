@@ -10,6 +10,17 @@ namespace AIBar.Domain.Tests;
 public sealed class DockRingTests
 {
     [Fact]
+    public void Hover_card_is_a_tooltip_wpf_can_open_without_crashing()
+    {
+        // WPF's tooltip service throws NotSupportedException (and AIBar exits) when it opens a ToolTip with StaysOpen = false.
+        WpfTestApplicationHost.Run(_ =>
+        {
+            var tooltip = Assert.IsType<System.Windows.Controls.ToolTip>(new DockRing().ToolTip);
+            Assert.True(tooltip.StaysOpen);
+        });
+    }
+
+    [Fact]
     public void Zero_missing_partial_and_full_circle_geometry_are_observable()
     {
         WpfTestApplicationHost.Run(_ =>
