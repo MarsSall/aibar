@@ -272,7 +272,7 @@ public sealed class HostRuntimeTests
 
             Assert.Equal("Private quota integration disabled", presentation.FreshnessLabel);
             Assert.True(presentation.State.IsPrivateIntegrationDisabled);
-            Assert.False(tray.EnablePrivateVisible); Assert.False(tray.DisablePrivateVisible);
+            Assert.DoesNotContain(typeof(ITrayRuntime).GetMembers(), member => member.Name.Contains("Private", StringComparison.Ordinal));
         }
         finally
         {
@@ -295,7 +295,8 @@ public sealed class HostRuntimeTests
         tray.EnablePrivate();
 
         Assert.Equal(0, prompt.Calls); Assert.Equal(0, grants); Assert.Equal(0, reevaluations);
-        Assert.False(policy.IsEnabled); Assert.False(tray.EnablePrivateVisible); Assert.False(tray.DisablePrivateVisible);
+        Assert.False(policy.IsEnabled);
+        Assert.DoesNotContain(typeof(ITrayRuntime).GetMembers(), member => member.Name.Contains("Private", StringComparison.Ordinal));
         instance.Dispose();
     }
 
@@ -367,8 +368,6 @@ public sealed class HostRuntimeTests
         public bool PrivateIntegrationEnabled { get; private set; }
         public List<bool> PrivateIntegrationWrites { get; } = [];
         public void SetPrivateIntegrationEnabled(bool enabled) { PrivateIntegrationEnabled = enabled; PrivateIntegrationWrites.Add(enabled); }
-        public bool EnablePrivateVisible => SettingsAvailable && !PrivateIntegrationEnabled;
-        public bool DisablePrivateVisible => SettingsAvailable && PrivateIntegrationEnabled;
         public bool StartupEnabled { get; private set; }
         public void SetStartupEnabled(bool enabled) => StartupEnabled = enabled;
         public bool LocalUsageAvailable { get; private set; }

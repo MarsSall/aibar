@@ -128,9 +128,11 @@ public sealed class ClaudeQuotaRuntimeTests : IDisposable
     }
 
     [Fact]
-    public void Windows_tray_exposes_Claude_as_an_optional_capability_not_a_new_Codex_requirement()
+    public void Windows_tray_has_no_Claude_configuration_items()
     {
-        Assert.True(typeof(IClaudeQuotaTray).IsAssignableFrom(typeof(WindowsTrayRuntime)));
+        // Claude consent and source live in Settings; the tray only offers actions.
+        Assert.False(typeof(IClaudeQuotaTray).IsAssignableFrom(typeof(WindowsTrayRuntime)));
+        Assert.False(typeof(IClaudeQuotaSourceTray).IsAssignableFrom(typeof(WindowsTrayRuntime)));
         Assert.DoesNotContain(typeof(ITrayRuntime).GetMembers(), member => member.Name.Contains("Claude", StringComparison.Ordinal));
     }
 
