@@ -41,12 +41,43 @@ public sealed class BetaRuntime : IAsyncDisposable
     public string Disclosure => _policy.Disclosure;
     public bool IsConsentEnabled => _policy.IsEnabled;
     public CredentialAvailability CredentialAvailability { get; private set; } = CredentialAvailability.Disabled;
-    public QuotaRefreshState State => _coordinator.State;
+    private volatile DataSource _source = DataSource.Automatic;
+    public DataSource Source => _source;
+    public bool IsRemoteOnly => Source == DataSource.OtherMachine;
+    public event Action? SourceChanged;
+    public QuotaRefreshState State => IsRemoteOnly
+        ? new(null, FreshnessState.Unavailable, false, new(QuotaErrorKind.Unavailable, "quota_other_machine_pending"), null)
+        : _coordinator.State;
+
+    public async ValueTask SetSourceAsync(DataSource source, CancellationToken cancellationToken)
+    {
+        _ = source.ToClaude(); // Validate before writing or cancelling anything.
+        ThrowIfDisposed();
+        await _consentGate.WaitAsync(cancellationToken);
+        try
+        {
+            await _settings.SaveDataSourceAsync(source, cancellationToken);
+            if (_source == source) return;
+            _source = source;
+            // Drain any local request before completing the handoff; direct coordinator
+            // callers (manual refresh and lifecycle) must also remain paused remotely.
+            await _coordinator.CancelAndWaitAsync(CancellationToken.None);
+            SourceChanged?.Invoke();
+            if (!IsRemoteOnly && _policy.IsEnabled)
+            {
+                _coordinator.ResumeAfterClear();
+                await RefreshAsync(RefreshTrigger.Manual, CancellationToken.None);
+            }
+        }
+        finally { _consentGate.Release(); }
+    }
     public TimeSpan? CachedAge => State.Snapshot is { } snapshot ? _clock.UtcNow - snapshot.RetrievedAt : null;
 
     public async ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
+        _source = await _settings.LoadDataSourceAsync(cancellationToken);
+        if (IsRemoteOnly) await _coordinator.CancelAndWaitAsync(cancellationToken);
         var enabled = await _settings.LoadAsync(cancellationToken);
         if (_publisher is not null) await (enabled ? _publisher.RestoreAsync(cancellationToken) : _publisher.DisableAsync(cancellationToken));
         if (enabled) _policy.Enable(); else _policy.Disable();
@@ -77,7 +108,8 @@ public sealed class BetaRuntime : IAsyncDisposable
         if (_publisher is not null) await _publisher.EnableAsync(cancellationToken);
         await _settings.SaveAsync(true, cancellationToken);
         _policy.Enable();
-        _coordinator.ResumeAfterClear();
+        if (IsRemoteOnly) await _coordinator.CancelAndWaitAsync(cancellationToken);
+        else _coordinator.ResumeAfterClear();
         _polling ??= PollAsync(_lifetime.Token);
         if (_analytics is not null) await _analytics.StartAsync(_lifetime.Token);
         await RefreshAsync(RefreshTrigger.Manual, cancellationToken);
@@ -102,7 +134,7 @@ public sealed class BetaRuntime : IAsyncDisposable
     public async ValueTask RefreshAsync(RefreshTrigger trigger, CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        if (!_policy.IsEnabled) return;
+        if (!_policy.IsEnabled || IsRemoteOnly) return;
         await _coordinator.ReevaluateAsync(trigger, cancellationToken);
         CredentialAvailability = _credentials?.LastAvailability ?? State.Failure?.SafeCode switch
         {

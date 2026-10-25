@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -12,13 +13,15 @@ namespace AIBar.Domain.Tests;
 public sealed class SettingsRenderTests
 {
     [Theory]
-    [InlineData(WindowsTheme.Dark, 0, "appearance")]
-    [InlineData(WindowsTheme.Dark, 1, "alerts")]
-    [InlineData(WindowsTheme.Dark, 2, "providers")]
-    [InlineData(WindowsTheme.Light, 0, "appearance")]
-    [InlineData(WindowsTheme.Light, 1, "alerts")]
-    [InlineData(WindowsTheme.Light, 2, "providers")]
-    public void Render_settings_section(WindowsTheme theme, int section, string name)
+    [InlineData(WindowsTheme.Dark, "General")]
+    [InlineData(WindowsTheme.Dark, "Appearance")]
+    [InlineData(WindowsTheme.Dark, "Alerts")]
+    [InlineData(WindowsTheme.Dark, "Providers")]
+    [InlineData(WindowsTheme.Light, "General")]
+    [InlineData(WindowsTheme.Light, "Appearance")]
+    [InlineData(WindowsTheme.Light, "Alerts")]
+    [InlineData(WindowsTheme.Light, "Providers")]
+    public void Render_settings_section(WindowsTheme theme, string name)
     {
         WpfTestApplicationHost.Run(app =>
         {
@@ -32,7 +35,7 @@ public sealed class SettingsRenderTests
                     new AlertSettings(Path.Combine(root, "alerts.json")), themeSource: new ThemeSource(theme))
                 { Left = -10000, Top = -10000, ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual };
                 window.Show();
-                ((TabControl)window.FindName("Sections")).SelectedIndex = section;
+                var tabs = (TabControl)window.FindName("Sections"); tabs.SelectedItem = tabs.Items.Cast<TabItem>().Single(tab => AutomationProperties.GetName(tab) == name);
                 window.UpdateLayout();
                 Assert.True(window.ActualWidth > 0 && window.ActualHeight > 0);
                 var directory = Environment.GetEnvironmentVariable("AIBAR_PANEL_RENDER_DIRECTORY");
@@ -47,7 +50,7 @@ public sealed class SettingsRenderTests
                 Directory.CreateDirectory(directory);
                 var png = new PngBitmapEncoder();
                 png.Frames.Add(BitmapFrame.Create(bitmap));
-                using var stream = File.Create(Path.Combine(directory, $"settings-{name}-{theme.ToString().ToLowerInvariant()}.png"));
+                using var stream = File.Create(Path.Combine(directory, $"settings-{name.ToLowerInvariant()}-{theme.ToString().ToLowerInvariant()}.png"));
                 png.Save(stream);
             }
             finally

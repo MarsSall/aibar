@@ -68,6 +68,7 @@ public partial class SettingsWindow : Window
         // would remove AllowsTransparency and clip the exterior Settings glow.
         UpdateWindowDecoration();
         CodexEnabled.IsEnabled = ClaudeEnabled.IsEnabled = SourceChoices.IsEnabled = providers is not null;
+        StartWithWindows.IsEnabled = ClearData.IsEnabled = providers?.General is not null;
         FloatingWidget.IsEnabled = dock is not null;
         UpdateFontStatus();
         UpdateThemeDescription();
@@ -75,6 +76,7 @@ public partial class SettingsWindow : Window
     }
     public async Task LoadAsync()
     {
+        if (_providers?.General is { } general) StartWithWindows.IsChecked = await general.LoadStartupAsync();
         var appearance = await _appearance.LoadAsync(default);
         var alerts = await _alerts.LoadAsync(default);
         BarUsage.IsChecked = appearance.BarColors == "usage"; BarBrand.IsChecked = !BarUsage.IsChecked;
@@ -98,6 +100,31 @@ public partial class SettingsWindow : Window
         Notification.IsChecked = alerts.Notification; EdgeGlow.IsChecked = alerts.EdgeGlow; Confetti.IsChecked = alerts.Confetti;
         ThresholdInput.Text = string.Join(", ", alerts.ThresholdValues);
     }
+    private async void OnToggleStartup(object sender, RoutedEventArgs e)
+    {
+        if (_saving || _providers?.General is not { } general) return;
+        _saving = true; StartWithWindows.IsEnabled = ClearData.IsEnabled = false; ValidateThresholds();
+        try { StartWithWindows.IsChecked = await general.ToggleStartupAsync(); GeneralStatus.Text = "Startup setting updated."; }
+        catch (Exception)
+        {
+            try { StartWithWindows.IsChecked = await general.LoadStartupAsync(); } catch (Exception) { StartWithWindows.IsChecked = false; }
+            GeneralStatus.Text = "Could not update startup. Please try again.";
+        }
+        finally { _saving = false; StartWithWindows.IsEnabled = ClearData.IsEnabled = true; ValidateThresholds(false); }
+    }
+    private async void OnClearData(object sender, RoutedEventArgs e)
+    {
+        if (_saving || _providers?.General is not { } general) return;
+        _saving = true; StartWithWindows.IsEnabled = ClearData.IsEnabled = false; ValidateThresholds();
+        try
+        {
+            if (!await general.ClearAsync()) { GeneralStatus.Text = "Clear cancelled."; return; }
+            await LoadAsync();
+            GeneralStatus.Text = "AIBar data cleared. Codex quota access is off.";
+        }
+        catch (Exception) { GeneralStatus.Text = "Could not clear all AIBar data. Please try again."; }
+        finally { _saving = false; StartWithWindows.IsEnabled = ClearData.IsEnabled = true; ValidateThresholds(false); }
+    }
     private void OnThresholdChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) => ValidateThresholds();
     private void ValidateThresholds(bool updateStatus = true)
     {
@@ -117,6 +144,8 @@ public partial class SettingsWindow : Window
         }
         System.Windows.Automation.AutomationProperties.SetHelpText(ThresholdInput, error ?? "Ascending integers from 1 to 100, separated by commas.");
         SaveButton.IsEnabled = valid && !_saving;
+        if (StartWithWindows is not null && ClearData is not null)
+            StartWithWindows.IsEnabled = ClearData.IsEnabled = !_saving && _providers?.General is not null;
         DrawThresholdTicks();
     }
     private async void OnSave(object sender, RoutedEventArgs e)

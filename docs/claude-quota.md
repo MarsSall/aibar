@@ -14,7 +14,7 @@ AIBar never refreshes tokens or changes the login. If the local session expires 
 
 To use a Linux Claude Code login, follow
 [the optional remote usage helper instructions](../tools/claude-remote-usage/README.md).
-No source change is needed after installing the helper: **Settings → Providers → Claude source: Automatic**
+No source change is needed after installing the helper: **Settings → General → Data source: Automatic**
 detects `%LOCALAPPDATA%\AIBar\claude-remote-usage.json` on initialization and each
 refresh, including polls (the saved refresh interval when resolved to This PC,
 default five minutes; every minute when resolved to Other machine). Claude consent is still required once.
@@ -27,7 +27,7 @@ marked stale after 15 minutes. An existing stale or invalid file stays remote;
 AIBar never silently falls back to the local login. Reparse-point files are not
 eligible for automatic detection.
 
-**Settings → Providers → Claude source** offers **Automatic / This PC / Other machine**. The tray no longer contains source or consent controls. Choose **This PC** to
+**Settings → General → Data source** offers **Automatic / This PC / Other machine** for every provider. Existing `claudeSource` choices migrate when `dataSource` is absent. Codex has no remote quota reader yet: Other machine hides its local quota, never reads its local credential or calls its quota endpoint, and shows **No data from the other machine yet**. Source selection does not grant provider consent. The tray no longer contains source or consent controls. Choose **This PC** to
 force the Windows login even while a remote file exists, or **Other machine** to
 force the remote source even when its file is missing. Existing explicit choices
 are preserved. Return to **Automatic** to detect the source again. When the file

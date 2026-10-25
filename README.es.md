@@ -86,7 +86,7 @@ AIBar arranca en la bandeja. Activá Codex y Claude desde **Settings… → Prov
 - **Alertas.** Avisos de reinicio, de umbral (por defecto 75/90/100%) y de "se agota antes del reinicio", con efectos opcionales de confeti y brillo en el borde. Ver [alertas](./docs/alerts.md).
 - **Estado de los proveedores.** Indicadores de incidentes tomados de las páginas de estado oficiales y acceso con un clic a la página de uso de cada proveedor. Ver [estado de proveedores](./docs/provider-status.md).
 - **Copiar resumen.** Copia la cuota que se está mostrando al portapapeles como texto plano. Ver [resumen de cuotas](./docs/quota-summary.md).
-- **Configuración.** Sigue los temas claro, oscuro y de alto contraste de Windows: opacidad, tinte por proveedor, colores de las barras, umbrales de alerta e intervalo de actualización. Se puede usar entera con teclado. Ver [configuración](./docs/settings.md).
+- **Configuración.** General reúne Start with Windows, Clear AIBar Data con confirmación y Data source para todos los proveedores. Automatic prioriza los datos remotos cuando existen; Other machine deja Codex sin cuota hasta que exista un helper remoto. Sigue los temas claro, oscuro y de alto contraste de Windows: opacidad, tinte por proveedor, colores de las barras, umbrales de alerta e intervalo de actualización. Se puede usar entera con teclado. Ver [configuración](./docs/settings.md).
 - **Widget flotante.** ¿No tenés YASB? Activá una tira siempre visible con anillos de cuota desde Configuración, o aceptá la oferta al iniciar, que aparece una sola vez. Arrastrala a cualquier borde de la pantalla.
 - **Fuente para YASB.** Si detecta YASB sin la fuente, AIBar te ofrece instalar IosevkaTerm Nerd Font, incluida en el ZIP. También podés instalarla desde Configuración, solo para tu usuario, sin permisos de administrador ni descargas.
 - **Widget para YASB.** CustomWidget opcional para [YASB](https://github.com/amnweb/yasb) que muestra una instantánea sanitizada de la cuota en tu barra. Ver [`yasb/README.txt`](./yasb/README.txt).
@@ -121,7 +121,7 @@ Las notas de desarrollo y de diseño de tests están en [`docs/dev/`](./docs/dev
 - Las credenciales se leen solo de los archivos de login de las CLI oficiales. AIBar nunca renueva tokens, nunca modifica un login y no guarda credenciales propias.
 - Los datos quedan en `%LOCALAPPDATA%\AIBar`: caché de cuotas, historial, analíticas y la instantánea para YASB. AIBar no tiene backend ni telemetría.
 - Las consultas van directo desde tu PC a OpenAI, Anthropic y sus páginas de estado públicas.
-- AIBar ya no escanea el uso local de OpenCode ni Pi. Los archivos existentes se conservan hasta **Clear AIBar Data**, cuya operación interna sigue borrando las cachés, el historial y las exportaciones locales. El botón en Configuración llegará en la próxima actualización de ajustes; ya no es una acción de la bandeja.
+- AIBar ya no escanea el uso local de OpenCode ni Pi. Los archivos existentes se conservan hasta **Clear AIBar Data**, cuya operación interna sigue borrando las cachés, el historial y las exportaciones locales. Usá **Settings → General → Clear AIBar Data**; no toca tus sesiones de los proveedores.
 
 ## Roadmap
 

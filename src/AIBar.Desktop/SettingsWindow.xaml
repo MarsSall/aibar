@@ -129,6 +129,28 @@
    </Border>
    <TabControl x:Name="Sections" BorderThickness="0" Background="Transparent" Padding="0" HorizontalContentAlignment="Stretch">
     <TabControl.Template><ControlTemplate TargetType="TabControl"><DockPanel><Border DockPanel.Dock="Top" BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="0,0,0,1"><TabPanel IsItemsHost="True" Margin="16,0,0,0"/></Border><ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"/></DockPanel></ControlTemplate></TabControl.Template>
+    <TabItem Header="General" AutomationProperties.Name="General">
+     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="24,16">
+       <TextBlock Text="STARTUP" Style="{StaticResource SettingsHeading}"/>
+       <Border Style="{StaticResource SettingsCard}" Padding="16,10">
+        <CheckBox x:Name="StartWithWindows" Content="Start with Windows" AutomationProperties.Name="Start with Windows" Click="OnToggleStartup"/>
+       </Border>
+       <TextBlock Text="DATA SOURCE" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
+       <Border Style="{StaticResource SettingsCard}"><StackPanel x:Name="SourceChoices" KeyboardNavigation.DirectionalNavigation="Contained">
+        <RadioButton x:Name="SourceAutomatic" Style="{StaticResource SettingsSourceRadio}" GroupName="DataSource" IsChecked="True" AutomationProperties.Name="Data source: Automatic"><StackPanel><TextBlock Text="Automatic"/><TextBlock x:Name="AutomaticDescription" Text="Uses data sent from another machine when it exists, otherwise this PC's logins." Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
+        <RadioButton x:Name="SourceThisPc" Style="{StaticResource SettingsSourceRadio}" GroupName="DataSource" AutomationProperties.Name="Data source: This PC"><StackPanel><TextBlock Text="This PC"/><TextBlock Text="Only this PC's Codex and Claude logins." Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
+        <RadioButton x:Name="SourceOtherMachine" Style="{StaticResource SettingsSourceRadio}" BorderThickness="0" GroupName="DataSource" AutomationProperties.Name="Data source: Other machine"><StackPanel><TextBlock Text="Other machine"/><TextBlock Text="Only data sent from another machine. Codex has no remote quota yet." Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
+       </StackPanel></Border>
+       <TextBlock x:Name="SourceStatus" Style="{StaticResource SettingsMeta}" Margin="2,10,0,0" AutomationProperties.LiveSetting="Polite"/>
+       <TextBlock Text="LOCAL DATA" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
+       <Border Style="{StaticResource SettingsCard}" Padding="16,10"><StackPanel>
+        <Button x:Name="ClearData" Content="Clear AIBar Data" AutomationProperties.Name="Clear AIBar Data" Click="OnClearData" HorizontalAlignment="Left"/>
+        <TextBlock x:Name="GeneralStatus" Style="{StaticResource SettingsMeta}" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
+       </StackPanel></Border>
+      </StackPanel>
+     </ScrollViewer>
+    </TabItem>
     <TabItem Header="Appearance" AutomationProperties.Name="Appearance">
      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Margin="24,16">
@@ -233,13 +255,6 @@
         <RadioButton x:Name="Refresh30" Style="{StaticResource SettingsRefreshRadio}" GroupName="RefreshInterval" Content="30 min" Tag="30" IsTabStop="False" Checked="OnRefreshSelected" AutomationProperties.Name="Refresh every 30 min"/>
        </UniformGrid>
        <TextBlock x:Name="RefreshRateLimitNote" Text="May hit provider rate limits." Style="{StaticResource SettingsMeta}" Margin="2,8,0,0" Visibility="Collapsed" AutomationProperties.LiveSetting="Polite"/>
-       <TextBlock Text="CLAUDE SOURCE" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
-       <Border Style="{StaticResource SettingsCard}"><StackPanel x:Name="SourceChoices" KeyboardNavigation.DirectionalNavigation="Contained">
-        <RadioButton x:Name="SourceThisPc" Style="{StaticResource SettingsSourceRadio}" GroupName="ClaudeSource" AutomationProperties.Name="Claude source: This PC"><StackPanel><TextBlock Text="This PC"/><TextBlock Text="Use the Claude Code sign-in on this computer" Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
-        <RadioButton x:Name="SourceOtherMachine" Style="{StaticResource SettingsSourceRadio}" GroupName="ClaudeSource" AutomationProperties.Name="Claude source: Other machine"><StackPanel><TextBlock Text="Other machine"/><TextBlock Text="Use the usage another computer syncs here" Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
-        <RadioButton x:Name="SourceAutomatic" Style="{StaticResource SettingsSourceRadio}" BorderThickness="0" GroupName="ClaudeSource" IsChecked="True" AutomationProperties.Name="Claude source: Automatic"><StackPanel><TextBlock Text="Automatic"/><TextBlock Text="This PC when signed in here, otherwise the other machine" Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
-       </StackPanel></Border>
-       <TextBlock x:Name="SourceStatus" Style="{StaticResource SettingsMeta}" Margin="2,10,0,0" AutomationProperties.LiveSetting="Polite"/>
       </StackPanel>
      </ScrollViewer>
     </TabItem>

@@ -118,7 +118,7 @@ public partial class App : System.Windows.Application
             () => claudeRuntime.IsConsentEnabled && claudeRuntime.State.Freshness == FreshnessState.Current && claudeRuntime.State.Failure is null);
         var lifecycleAdapter = new QuotaRefreshLifecycleAdapter(lifecycleEvents, coordinator);
         var claudePresentation = new ClaudeQuotaPresentationHost(claudeRuntime, new ClaudeQuotaPresentationMapper(clock), paceHistory);
-        var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents, claudePresentation, paceHistory, codexProvider);
+        var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents, claudePresentation, paceHistory, codexProvider, betaRuntime);
         var providerStatus = new ProviderStatusPresentation(presentation, claudePresentation, () => policy.IsEnabled);
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
         var clear = new ClearAiBarDataService(dataDirectory, [paceHistory, codexCost, claudeCost, claudeRuntime, publisher, coordinator, historyRecorder, historyStore, alerts, appearance, dock, onboarding, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics, publisher));
@@ -156,8 +156,8 @@ public partial class App : System.Windows.Application
         var tray = new WindowsTrayRuntime();
         if (composition.Appearance is { } appearance && composition.Alerts is { } settingsAlerts)
         {
-            var providerSettings = composition.Settings is { } native && composition.ClaudeQuota is { } claude
-                ? SettingsProviderCommands.Create(native, claude) : null;
+            var providerSettings = composition.Settings is { } native && composition.ClaudeQuota is { } claude && composition.CodexQuota is { } codex
+                ? SettingsProviderCommands.Create(native, claude, codex) : null;
             _settingsWindowHost = new(appearance, settingsAlerts, providerSettings,
                 () => tray.ShowAlert("AIBar · Window reset", "A session or weekly window starts over."), composition.Dock, SettingsGlyphFont.Create());
             // The colour choice applies live; Changed can run during clear, so never wait on the UI thread.
@@ -171,8 +171,8 @@ public partial class App : System.Windows.Application
         window.QuitRequested += tray.RequestExit;
         window.UseOtherMachineRequested += async () =>
         {
-            if (composition.ClaudeQuota is not { } claude) return;
-            try { await claude.SetSourceAsync(ClaudeQuotaSource.OtherMachine, default); }
+            if (composition.ClaudeQuota is not { } claude || composition.CodexQuota is not { } codex) return;
+            try { await SettingsProviderCommands.ApplySourceAsync(DataSource.OtherMachine, codex, claude); }
             catch (Exception error) { ReportFault(error); }
         };
         _runtime = new TrayHostRuntime(_instance!, tray, new WpfPopoverRuntime(window, _theme, () => WindowsPopoverPlacementContextProvider.Get(window), null, () => themeSource.Current), _taskbar,

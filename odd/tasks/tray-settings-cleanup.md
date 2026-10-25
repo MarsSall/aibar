@@ -13,7 +13,7 @@ Branch: `feat/tray-settings-cleanup`, stacked on `feat/floating-widget-and-font`
 
 ## Tasks
 
-- T1 [S1, S2] Tray menu trimmed to Refresh/Settings…/Start with Windows/Exit; OpenCode/Pi local usage no longer composed or scanned; tests + docs — worker — commit: pending
+- T1 [S1, S2] Tray menu trimmed to Refresh/Settings…/Start with Windows/Exit; OpenCode/Pi local usage no longer composed or scanned; tests + docs — worker — commit: 0adfe44
 - T2 [S3, S4] General tab (Start with Windows, Clear AIBar Data with confirmation, Data source for all providers with claudeSource migration and Codex other-machine state); Providers loses Claude source; tests + docs — worker after T1 — commit: pending
 - T3 [S1-S5] Windows CI, deploy to the user's PC, acceptance, Codex remote quota issue — inline — commit: pending
 
@@ -23,3 +23,5 @@ Branch: `feat/tray-settings-cleanup`, stacked on `feat/floating-widget-and-font`
 - L2 (evidence): explore map — tray built in HostRuntime.cs:357–390 + QuotaAlertTrayController.cs:24–41; Private Quota = Codex consent (= Settings "Show Codex in AIBar"); Claude quota = Settings "Show Claude in AIBar"; Claude source and Alerts already in Settings; Start with Windows and Clear AIBar Data have no Settings equivalent; LocalUsage presentation is bound nowhere since PR #71; no record found of an earlier "source for all providers" decision; Settings' Automatic text contradicts runtime precedence (SettingsWindow.xaml:240 vs ClaudeQuotaRuntime.cs:324–325).
 - L3 (user, answers): tray "Refresh, Settings…, Start with Windows, Exit"; OpenCode/Pi "Sacarlas y dejar de escanear (Recom.)"; source "no convendria una opcion generalo?" then "General ahora + helper de Codex en el próximo PR (Recom.)"; General "Nueva pestaña General (Recom.)".
 - L4 (decision): S2 stops composition/scanning only; the local-usage module and its tests stay for a later removal to keep this PR reviewable. T1 then T2 run sequentially (both edit App.xaml.cs and HostRuntime.cs).
+- L5 (evidence): T1 worker removed 490 / added 215 lines; committed 0adfe44; CI 40191868797 dispatched. Between T1 and T2 Clear AIBar Data has no UI entry (T2 adds it). T2 worker mvnscdkd-b-boaq launched.
+- L6 (evidence): CI 40191868797 on 0adfe44 failed 3/1504, all stale tray-model tests (fake tray derived Private visibility; WindowsTrayRuntime expected to implement IClaudeQuotaTray). Fixed tests in 6eaa8ff; CI 40192277403 green (.NET 1504/1504, Pester 29/29, Python).

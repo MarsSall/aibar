@@ -1,20 +1,36 @@
 # Settings
 
-Open **Settings…** from the panel or tray. One Settings window is reused. It follows Windows light, dark and high-contrast themes, with a custom 32-DIP title bar and **Appearance / Alerts / Providers** pivots. The default size is 520 × 600 DIPs (minimum 460 × 480); content scrolls without moving the footer.
+Open **Settings…** from the panel or tray. One Settings window is reused. It follows Windows light, dark and high-contrast themes, with a custom 32-DIP title bar and **General / Appearance / Alerts / Providers** pivots. The default size is 520 × 600 DIPs (minimum 460 × 480); content scrolls without moving the footer.
 
-The tray now contains only **Refresh** (when its command can execute), **Settings…**, **Start with Windows** (checkable), and **Exit AIBar**, in that order. Provider consent/source choices and alerts are configured here, not in tray submenus. OpenCode/Pi scans are no longer composed or started, even with an old opt-in; retained files remain covered by Clear AIBar Data. The General tab and its Clear AIBar Data button are a follow-up, not part of this tray cleanup.
+The tray now contains only **Refresh** (when its command can execute), **Settings…**, **Start with Windows** (checkable), and **Exit AIBar**, in that order. Provider consent/source choices and alerts are configured here, not in tray submenus. OpenCode/Pi scans are no longer composed or started, even with an old opt-in; retained files remain covered by Clear AIBar Data. Start with Windows and Clear AIBar Data are also available in General.
 
-Changes apply when you select **Save**. **Cancel**, Escape and closing the window discard edits that have not been saved. Save leaves the window open and announces success or failure. Preview buttons do not save preferences. **Install YASB font** is an immediate action, independent of Save or Cancel.
+Changes apply when you select **Save**. **Cancel**, Escape and closing the window discard edits that have not been saved. Save leaves the window open and announces success or failure. Preview buttons do not save preferences. **Start with Windows**, **Clear AIBar Data** and **Install YASB font** are immediate actions, independent of Save or Cancel.
 
 ## Keyboard and accessibility
 
 - **Ctrl+Tab** cycles pivots; **Ctrl+Shift+Tab** cycles backwards.
 - **Tab / Shift+Tab** move through controls; **Space** toggles checkboxes and switches.
-- **Arrow keys** move through radio groups (panel colors, YASB colors, refresh interval and Claude source). **Home / End** select the first / last refresh interval; the refresh group has one Tab stop.
+- **Arrow keys** move through radio groups (panel colors, YASB colors, refresh interval and data source). **Home / End** select the first / last refresh interval; the refresh group has one Tab stop.
 - **Enter** saves, unless validation fails; **Escape** cancels.
 - The opacity slider supports arrows in 5-point steps and Page Up/Down in 10-point steps.
 
 Selected pivots have an accent underline and semibold text. Controls have named automation peers and keyboard focus rings. Errors are announced inline and are never represented by color alone. High contrast uses system colors; toggle animation is omitted when Windows client-area animations are off or high contrast is active.
+
+## General
+
+**Start with Windows** loads the current Windows registration. Clicking it toggles the native registration and displays the actual readback result, not an assumed success.
+
+**Clear AIBar Data** asks: “Clear AIBar Data? This removes AIBar's local data and turns off Codex quota access. Your provider logins are not touched.” Choose **Clear** or **Cancel** (the safe default). Cancel does nothing; Clear drains the existing runtime work and removes AIBar-owned data. The result appears inline and Settings reloads its controls.
+
+**Data source** applies to both Codex and Claude on Save:
+
+| Choice | Meaning |
+| --- | --- |
+| Automatic (default) | Uses data sent from another machine when it exists, otherwise this PC's logins. Claude prefers its remote file when present; Codex remains local because it has no remote quota reader yet. |
+| This PC | Only this PC's Codex and Claude logins. |
+| Other machine | Only data sent from another machine. Codex has no remote quota yet: it shows **No data from the other machine yet**, hides cached local quota and does not read the local Codex credential or call its quota endpoint. |
+
+Switching back to This PC or Automatic resumes Codex refresh only if consent is enabled. Source selection never grants consent. The panel's **Use other machine** action selects this same general setting for both providers. A Codex remote helper is a separate follow-up, not included here.
 
 ## Appearance
 
@@ -61,15 +77,11 @@ Enabling a disabled provider shows the existing provider-specific consent disclo
 
 Opening the panel still refreshes data older than one minute, with a one-minute attempt throttle; manual **Refresh** is unchanged. The interval does not change freshness thresholds, consent, or YASB.
 
-Claude source radio cards select:
-
-- **This PC** — existing Claude Code sign-in on this computer.
-- **Other machine** — the existing synced usage file.
-- **Automatic** — the existing runtime's automatic source-selection policy (including its existing remote-file precedence and freshness behavior).
-
-The selected source is saved through `ClaudeQuotaRuntime.SetSourceAsync` before granting consent. It does not change the remote quota payload or its reader contract. Without a provider-command binding, provider controls are explicitly unavailable rather than silently changing only the view.
+Source selection has moved to **General → Data source**. Providers retains only the Codex/Claude switches and refresh interval. The shared source is applied before granting consent; the Claude remote payload and reader contract are unchanged. Without runtime command bindings, the corresponding controls are explicitly unavailable.
 
 ## Persistence and clearing
+
+`%LOCALAPPDATA%\AIBar\settings.json` stores `dataSource` as `automatic`, `this-pc` or `other-machine`. If absent, the existing `claudeSource` choice is used; absent or invalid choices default to Automatic. A present invalid `dataSource` does not fall back to the legacy choice. Saving writes the general field atomically while preserving independent consent and Claude cache provenance.
 
 `%LOCALAPPDATA%\AIBar\appearance.json` remains schema 1:
 
@@ -89,7 +101,7 @@ Saving multiple sections is **not a cross-file transaction**. A later persistenc
 
 `SettingsWindowHost(AppearanceSettings, QuotaAlertObserver, SettingsProviderCommands?, Action? previewNotification, DockSettings? dock, SettingsGlyphFont? font)` is the UI-thread entry point. The optional parameters preserve existing call sites. Alert saves still run on the observer's serialized queue.
 
-`App.xaml.cs` constructs `SettingsProviderCommands` from the existing `NativeSettingsCommands` and `ClaudeQuotaRuntime`, and passes the tray's notification entry point for preview. Codex uses `EnablePrivateIntegrationAsync` / `DisablePrivateIntegrationAsync`; Claude uses `GrantConsentAsync` / `RevokeConsentAsync` and `SetSourceAsync`. The tray's former provider/alert entry points are removed; the underlying runtime operations remain available to Settings.
+`App.xaml.cs` constructs `SettingsProviderCommands` from the existing `NativeSettingsCommands`, `BetaRuntime` and `ClaudeQuotaRuntime`, and passes the tray's notification entry point for preview. Codex uses `EnablePrivateIntegrationAsync` / `DisablePrivateIntegrationAsync`; Claude uses `GrantConsentAsync` / `RevokeConsentAsync` and `SetSourceAsync`. The tray's former provider/alert entry points are removed; the underlying runtime operations remain available to Settings.
 
 The appearance instance remains shared with startup composition and the clear lifecycle. Existing panel bar-color mapping stays intact. The parallel panel/notification units must load `BackgroundOpacity` initially and subscribe to `Changed` for updates, posting to their dispatcher **without awaiting it**. Do not apply `Window.Opacity`: content must stay opaque.
 
@@ -97,7 +109,7 @@ Only `Settings*` tokens were added to `Semantic.Light.xaml`, `Semantic.Dark.xaml
 
 ## Windows verification
 
-No local .NET/PowerShell verification is available in the Linux worktree. For the floating-widget/font wiring, strict TDD is disabled by explicit parent choice; nothing was compiled or executed locally. Windows CI must compile and run the new tests.
+No local .NET/PowerShell verification is available in the Linux worktree. For this General/data-source change, strict TDD is disabled by explicit parent choice; tests were written first but nothing was compiled or executed locally. Windows CI must compile and run the new tests.
 
 Focused coverage: `RefreshIntervalSettingsTests`, `RefreshIntervalWindowTests`, `RefreshIntervalRuntimeTests`, `AppearanceSettingsTests`, `SettingsWindowTests`, `SettingsProviderTests`, `SettingsAlertOptionsTests`; existing delivery/clear/privacy tests must remain green. Test deadlines remain at least 60 seconds for asynchronous WPF saves.
 

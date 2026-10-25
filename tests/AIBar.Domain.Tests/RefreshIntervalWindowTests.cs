@@ -30,7 +30,7 @@ public sealed class RefreshIntervalWindowTests
                 window = new SettingsWindow(appearance, new AlertSettings(Path.Combine(root, "alerts.json")), themeSource: new ThemeSource(theme));
                 window.Show();
                 var load = window.LoadAsync(); PumpUntil(() => load.IsCompleted); load.GetAwaiter().GetResult();
-                Assert.IsType<TabControl>(window.FindName("Sections")).SelectedIndex = 2;
+                var tabs = Assert.IsType<TabControl>(window.FindName("Sections")); tabs.SelectedItem = tabs.Items.Cast<TabItem>().Single(tab => AutomationProperties.GetName(tab) == "Providers");
                 window.UpdateLayout();
                 var choices = new[] { 1, 2, 5, 15, 30 }.Select(value => Assert.IsType<RadioButton>(window.FindName($"Refresh{value}"))).ToArray();
                 var note = Assert.IsType<TextBlock>(window.FindName("RefreshRateLimitNote"));
