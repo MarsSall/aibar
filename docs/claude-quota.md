@@ -34,6 +34,14 @@ are preserved. Return to **Automatic** to detect the source again. When the file
 appears or is removed in Automatic, AIBar cancels and drains the previous source's
 work, clears its cached quota, and refreshes the newly resolved source.
 
+## Codex from the same other machine
+
+The helper also supplies `%LOCALAPPDATA%\AIBar\codex-remote-usage.json` for Codex. Enable Codex separately in **Settings → Providers**. Its Automatic mode prefers this file; This PC forces the local login; Other machine forces the file, even when missing. While resolved remote, AIBar never invokes the local Codex credential reader or quota endpoint. Renewal guidance names **the other machine**.
+
+Both usage files use the same strict contract: UTF-8 JSON at most 4096 bytes, ordered `schemaVersion`, `generatedAt`, `state`, `fiveHour`, `weekly`, and optional trailing `plan`. Version is 1; timestamps must be UTC `Z`; each non-null window requires `percentageUsed` (0–100) and `resetAt`. Current state requires at least one window; authentication-required/unavailable require both null. Extra or duplicate properties and reparse-point paths are rejected. No tokens, account data, paths or raw errors belong in these files.
+
+Codex reads remote quota every minute and marks it stale at 15 minutes, without waiting for another poll. The panel, dock, tray tooltip, YASB export and alerts consume the same quota authority. A source change drains retrieval/export work, clears the old cache and invalidates queued alerts from that source. Codex remote snapshots are memory-only, so restarting cannot reuse them as local quota. Automatic still keeps local Codex analytics running; explicit Other machine stops them. Cost/token source rules are unchanged.
+
 ## Opened panel
 
 While Claude is enabled, a **CLAUDE** section appears below **CODEX**, with a pill naming where its quota is read (**This PC** or **Other machine**). Each provider shows weekly quota first, then the 5-hour window: percentage used, a status-colored bar and a compact reset. Missing windows are omitted. Meter colors, flags and translucency are described in [the panel appearance](panel-details.md#panel-appearance).

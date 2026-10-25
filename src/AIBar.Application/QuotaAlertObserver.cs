@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using AIBar.Domain;
 
 namespace AIBar.Application;
@@ -9,7 +10,10 @@ public sealed class QuotaAlertObserver : IAiBarClearWork, IAsyncDisposable
     private readonly string _statePath;
     private readonly IClock _clock;
     private readonly Dictionary<string, long> _generations = [];
-    private readonly Dictionary<string, Func<bool>> _consent = [];
+    // Key by object identity, not alert key/provider: an old queued alert must never
+    // inherit the current source's predicate. Weak keys bound retention to delivery.
+    private readonly ConditionalWeakTable<QuotaAlert, Eligibility> _eligibility = new();
+    private sealed record Eligibility(Func<bool> IsAllowed);
     private Task _tail = Task.CompletedTask;
     private StoredState? _state;
     private bool _paused, _disposed;
@@ -25,7 +29,7 @@ public sealed class QuotaAlertObserver : IAiBarClearWork, IAsyncDisposable
     public bool CanDeliver(QuotaAlert alert)
     {
         lock (_gate) return !_paused && !_disposed && alert.Sample.ResetAt > _clock.UtcNow &&
-            _consent.TryGetValue(alert.Sample.Provider, out var consent) && consent();
+            _eligibility.TryGetValue(alert, out var eligibility) && eligibility.IsAllowed();
     }
     public void Observe(string provider, QuotaAuthorityUpdate update, Func<bool> consent)
     {
@@ -33,7 +37,6 @@ public sealed class QuotaAlertObserver : IAiBarClearWork, IAsyncDisposable
         {
             if (_paused || _disposed || update.RetrievalGeneration <= _generations.GetValueOrDefault(provider)) return;
             _generations[provider] = update.RetrievalGeneration;
-            _consent[provider] = consent;
             var previous = _tail;
             _tail = Task.Run(async () =>
             {
@@ -99,6 +102,7 @@ public sealed class QuotaAlertObserver : IAiBarClearWork, IAsyncDisposable
         _state = next;
         foreach (var alert in events)
         {
+            lock (_gate) _eligibility.Add(alert, new(consent));
             if (!CanDeliver(alert)) return;
             if (alert.Kind switch
             {
@@ -112,9 +116,9 @@ public sealed class QuotaAlertObserver : IAiBarClearWork, IAsyncDisposable
     public async ValueTask CancelAndWaitAsync(CancellationToken cancellationToken)
     {
         Task pending;
-        lock (_gate) { _paused = true; pending = _tail; }
+        lock (_gate) { _paused = true; _eligibility.Clear(); pending = _tail; }
         await pending.WaitAsync(cancellationToken);
-        lock (_gate) { _state = null; _generations.Clear(); }
+        lock (_gate) { _state = null; _generations.Clear(); _eligibility.Clear(); }
     }
     public void ResumeAfterClear()
     {

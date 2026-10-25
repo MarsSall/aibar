@@ -86,17 +86,17 @@ AIBar starts in the tray. Open **Settings… → Providers** to enable Codex and
 - **Alerts.** Reset, threshold (default 75/90/100%) and "runs out before reset" notifications, with optional confetti and edge-glow effects. See [alerts](./docs/alerts.md).
 - **Provider status.** Incident badges from the official status pages and one-click links to each provider's usage page. See [provider status](./docs/provider-status.md).
 - **Copy summary.** Puts the displayed quota on the clipboard as plain text. See [quota summary](./docs/quota-summary.md).
-- **Settings.** General has Start with Windows and confirmed Clear AIBar Data. Providers has a compact Source dropdown per provider: Automatic / This PC / Other machine. Choices are independent and also filter each provider's cost data. Automatic prefers that provider's remote quota when available; Codex Other machine shows no quota until a remote helper exists, without reading its local login. The panel's Use other machine action changes only Claude. Also follows Windows light, dark and high-contrast themes; opacity, provider tint, bar colors, alert thresholds and refresh interval. Fully keyboard accessible. See [settings](./docs/settings.md).
+- **Settings.** General has Start with Windows and confirmed Clear AIBar Data. Providers has a compact Source dropdown per provider: Automatic / This PC / Other machine. Choices are independent and also filter each provider's cost data. Automatic prefers that provider's remote quota file when available. Codex Other machine shows the helper's quota in the panel, dock, tray and YASB, without reading its local login; stale or missing data names the other machine. The panel's Use other machine action changes only Claude. Also follows Windows light, dark and high-contrast themes; opacity, provider tint, bar colors, alert thresholds and refresh interval. Fully keyboard accessible. See [settings](./docs/settings.md).
 - **Floating widget.** No YASB? Enable an always-on-top quota-ring strip in Settings, or accept the one-time startup offer. Drag it to any screen edge.
 - **YASB font.** AIBar offers to install the bundled IosevkaTerm Nerd Font when YASB is detected and the font is missing. You can also install it from Settings (per user, no admin or download).
 - **YASB widget.** Optional [YASB](https://github.com/amnweb/yasb) CustomWidget that shows a sanitized quota snapshot in your status bar. See [`yasb/README.txt`](./yasb/README.txt).
-- **Remote usage.** Optional Linux helpers send Claude quota and Codex token aggregates from another machine over SSH. See [`tools/claude-remote-usage`](./tools/claude-remote-usage/README.md).
+- **Remote usage.** Optional Linux helpers send Codex and Claude quota plus token aggregates from another machine over SSH. Remote quota is read every minute and becomes stale after 15 minutes; each provider still requires consent. See [`tools/claude-remote-usage`](./tools/claude-remote-usage/README.md).
 
 ### Supported providers
 
 | Provider | Data | Connection |
 | --- | --- | --- |
-| ChatGPT Codex | 5-hour and weekly limits, local token usage | Existing Codex CLI login (`auth.json`), read-only |
+| ChatGPT Codex | 5-hour and weekly limits, local/remote token usage | Existing Codex CLI login (`auth.json`), read-only, or a helper on another machine |
 | Claude Pro / Max | 5-hour and weekly limits, token usage | Existing Claude Code login, read-only, or a helper on another machine |
 
 Quota retrieval uses undocumented provider endpoints. They may change or stop working at any time.
@@ -118,7 +118,7 @@ Developer and test-design notes live in [`docs/dev/`](./docs/dev/README.md).
 ## Privacy and local data
 
 - Each provider is **off by default** and needs its own explicit consent. Disabling a provider stops its polling and clears its cached quota.
-- Credentials are read only from the official CLI login files. AIBar never refreshes tokens, changes a login or stores credentials of its own.
+- Local quota credentials are read only from the official CLI login files. While remote quota is selected, AIBar reads only that provider's sanitized usage file, never its local credential. AIBar never refreshes tokens, changes a login or stores credentials of its own.
 - Data stays under `%LOCALAPPDATA%\AIBar`: quota cache, history, analytics and the YASB snapshot. There is no AIBar backend and no telemetry.
 - Requests go straight from your PC to OpenAI, Anthropic and their public status pages.
 - OpenCode and Pi local usage is no longer scanned. Existing local-usage files are retained until **Clear AIBar Data**, whose runtime operation still removes local caches, history and exports. Use **Settings → General → Clear AIBar Data**; provider logins are not touched.

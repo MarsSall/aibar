@@ -208,7 +208,7 @@ await drain;
 var now = _clock.UtcNow;
 using var linked = CancellationTokenSource.CreateLinkedTokenSource(current.Token, cancellationToken);
 var document = unavailable
-    ? QuotaExportProjector.Project(new(new(null, FreshnessState.Unavailable, false, new(QuotaErrorKind.Unavailable, "quota_other_machine_pending"), null)), now)
+    ? QuotaExportProjector.Project(new(new(null, FreshnessState.Unavailable, false, new(QuotaErrorKind.Unavailable, "quota_unavailable"), null)), now)
     : restore ? QuotaExportProjector.Project(new(Redact(_authority.State)), now) : QuotaExportWire.Disabled(now);
 await _writer.WriteAsync(document, now, linked.Token);
 if (enabled) lock (_gate) if (!_disposed && epoch == _epoch)
