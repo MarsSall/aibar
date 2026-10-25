@@ -89,12 +89,12 @@ public sealed class CodexBarPanelTests
                     Assert.Equal(Visibility.Visible, summary.Visibility);
                     Assert.Same(window.DetailsWindow, Window.GetWindow(detail));
                     Assert.Equal(Visibility.Visible, detail.Visibility);
-                    Assert.True(back.IsKeyboardFocused);
+                    AssertFocused(back);
                     Assert.Contains(Visuals<TextBlock>(detail), text => text.IsVisible && text.Text == "Usage history");
                     Assert.Single(Visuals<QuotaHistoryChart>(detail));
                     Invoke(back); window.UpdateLayout();
                     Assert.Equal(Visibility.Visible, summary.Visibility);
-                    Assert.True(cost.IsKeyboardFocused);
+                    AssertFocused(cost);
                 }
                 Invoke(cost); window.UpdateLayout();
                 Assert.Equal(Visibility.Visible, detail.Visibility);
@@ -174,6 +174,14 @@ public sealed class CodexBarPanelTests
             var unavailable = (SolidColorBrush)converter.Convert(new object[] { DependencyProperty.UnsetValue, surface, surface.Color, true, provider }, typeof(Brush), "Meter", System.Globalization.CultureInfo.InvariantCulture);
             Assert.Equal(unavailable.Color.R, unavailable.Color.G); Assert.Equal(unavailable.Color.G, unavailable.Color.B);
         });
+    }
+
+    // Focus must land on the element inside its window. Keyboard focus also needs Windows to activate that
+    // window, which CI runners grant nondeterministically to a background test process, so it is asserted only when active.
+    private static void AssertFocused(UIElement element)
+    {
+        Assert.Same(element, FocusManager.GetFocusedElement(FocusManager.GetFocusScope(element)));
+        if (Window.GetWindow(element) is { IsActive: true }) Assert.True(element.IsKeyboardFocused);
     }
 
     private static void Invoke(Button button)
