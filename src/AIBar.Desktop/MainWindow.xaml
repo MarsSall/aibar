@@ -139,7 +139,7 @@
                         <TextBlock Text="{Binding WarningLabel}" TextWrapping="Wrap" FontSize="13" Margin="0,6,0,10" />
                         <WrapPanel>
                             <Button Content="Try again" Command="{Binding DataContext.RefreshCommand, RelativeSource={RelativeSource AncestorType=Window}}" MinHeight="32" Margin="0,0,8,0" automation:AutomationProperties.Name="Try sign-in again" />
-                            <Button Content="Use other machine" Click="OnUseOtherMachine" MinHeight="32" automation:AutomationProperties.Name="Use other machine for quota data">
+                            <Button Content="Use other machine" Click="OnUseOtherMachine" MinHeight="32" automation:AutomationProperties.Name="Use other machine for Claude quota">
                                 <Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding SelectedProvider, RelativeSource={RelativeSource AncestorType=local:MainWindow}}" Value="Claude"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></Button.Style>
                             </Button>
                         </WrapPanel>

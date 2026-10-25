@@ -7,47 +7,41 @@ public sealed class SettingsProviderCommands(
     Func<bool> codexEnabled, Func<bool> claudeEnabled, Func<ClaudeQuotaSource> source,
     Func<bool> confirmCodex, Func<bool> confirmClaude,
     Func<bool, Task> setCodex, Func<bool, Task> setClaude, Func<ClaudeQuotaSource, Task> setSource,
-    Func<string>? sourceDescription = null, SettingsGeneralCommands? general = null, bool reconcileSource = false)
+    Func<string>? sourceDescription = null, SettingsGeneralCommands? general = null,
+    Func<DataSource>? codexSource = null, Func<DataSource, Task>? setCodexSource = null)
 {
     public bool CodexEnabled => codexEnabled();
     public bool ClaudeEnabled => claudeEnabled();
     public ClaudeQuotaSource Source => source();
+    public DataSource CodexSource => codexSource?.Invoke() ?? DataSource.Automatic;
     public SettingsGeneralCommands? General => general;
     public string SourceDescription => sourceDescription?.Invoke() ?? "Source changes apply when you save.";
 
-    public async Task<bool> SaveAsync(bool codex, bool claude, ClaudeQuotaSource selectedSource)
+    public Task<bool> SaveAsync(bool codex, bool claude, ClaudeQuotaSource selectedSource) =>
+        SaveAsync(codex, claude, CodexSource, selectedSource);
+
+    public async Task<bool> SaveAsync(bool codex, bool claude, DataSource selectedCodexSource, ClaudeQuotaSource selectedSource)
     {
         // Collect both approvals before any write, and never prompt for revocation.
         if (codex && !CodexEnabled && !confirmCodex()) return false;
         if (claude && !ClaudeEnabled && !confirmClaude()) return false;
-        // Production reconciles even an unchanged selection after a partial save or clear.
-        if (selectedSource != Source || reconcileSource) await setSource(selectedSource);
+        if (selectedCodexSource != CodexSource && setCodexSource is not null) await setCodexSource(selectedCodexSource);
+        if (selectedSource != Source) await setSource(selectedSource);
         if (codex != CodexEnabled) await setCodex(codex);
         if (claude != ClaudeEnabled) await setClaude(claude);
         return true;
     }
 
-    public static async Task ApplySourceAsync(DataSource source, BetaRuntime codex, ClaudeQuotaRuntime claude)
-    {
-        // Codex persists the general choice before applying it. Both runtimes load it on restart.
-        await codex.SetSourceAsync(source, default);
-        await claude.SetSourceAsync(source.ToClaude(), default);
-    }
-
     public static SettingsProviderCommands Create(NativeSettingsCommands settings, ClaudeQuotaRuntime claude, BetaRuntime codex) => new(
-        () => settings.PrivateIntegrationEnabled, () => claude.IsConsentEnabled, () => codex.Source.ToClaude(),
+        () => settings.PrivateIntegrationEnabled, () => claude.IsConsentEnabled, () => claude.Source,
         new WindowsPrivateIntegrationConsentPrompt().Confirm, new WindowsClaudeQuotaConsentPrompt().Confirm,
         enabled => (enabled ? settings.EnablePrivateIntegrationAsync(default) : settings.DisablePrivateIntegrationAsync(default)).AsTask(),
         enabled => (enabled ? claude.GrantConsentAsync(default) : claude.RevokeConsentAsync(default)).AsTask(),
-        selected => ApplySourceAsync(selected switch
-        {
-            ClaudeQuotaSource.ThisPc => DataSource.ThisPc,
-            ClaudeQuotaSource.OtherMachine => DataSource.OtherMachine,
-            _ => DataSource.Automatic
-        }, codex, claude),
-        () => "Source changes apply to Codex and Claude.",
+        selected => claude.SetSourceAsync(selected, default).AsTask(),
+        () => "Each source applies only to its provider when you save.",
         new(() => settings.LoadStartupAsync(default).AsTask(), () => settings.ToggleStartupAsync(default).AsTask(),
-            ConfirmClear, () => settings.ClearAiBarDataAsync(default).AsTask()), reconcileSource: true);
+            ConfirmClear, () => settings.ClearAiBarDataAsync(default).AsTask()),
+        codexSource: () => codex.Source, setCodexSource: selected => codex.SetSourceAsync(selected, default).AsTask());
 
     public const string ClearConfirmation = "Clear AIBar Data? This removes AIBar's local data and turns off Codex quota access. Your provider logins are not touched.";
     private static bool ConfirmClear()

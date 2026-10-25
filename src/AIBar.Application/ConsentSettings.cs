@@ -17,10 +17,14 @@ public sealed class ConsentSettings(string path)
     public async ValueTask<bool> LoadClaudeAsync(CancellationToken cancellationToken) =>
         await ReadAsync<StoredConsent>(cancellationToken) is { Schema: Schema, PrivateClaudeConsent: true };
 
-    public async ValueTask<DataSource> LoadDataSourceAsync(CancellationToken cancellationToken)
+    // Compatibility entry points now refer exclusively to Codex; dataSource is migration-only.
+    public ValueTask<DataSource> LoadDataSourceAsync(CancellationToken cancellationToken) => LoadCodexSourceAsync(cancellationToken);
+    public ValueTask SaveDataSourceAsync(DataSource source, CancellationToken cancellationToken) => SaveCodexSourceAsync(source, cancellationToken);
+
+    public async ValueTask<DataSource> LoadCodexSourceAsync(CancellationToken cancellationToken)
     {
         var stored = await ReadAsync<StoredSource>(cancellationToken);
-        var value = stored is { Schema: Schema } ? ParseSource(stored.DataSource.ValueKind == JsonValueKind.Undefined ? stored.ClaudeSource : stored.DataSource) : null;
+        var value = stored is { Schema: Schema } ? ParseSource(stored.CodexSource.ValueKind == JsonValueKind.Undefined ? stored.DataSource : stored.CodexSource) : null;
         return value switch
         {
             ClaudeQuotaSource.ThisPc => DataSource.ThisPc,
@@ -29,13 +33,13 @@ public sealed class ConsentSettings(string path)
         };
     }
 
-    public ValueTask SaveDataSourceAsync(DataSource source, CancellationToken cancellationToken) =>
-        SaveDecisionAsync(null, null, cancellationToken, dataSource: source.ToClaude());
+    public ValueTask SaveCodexSourceAsync(DataSource source, CancellationToken cancellationToken) =>
+        SaveDecisionAsync(null, null, cancellationToken, codexSource: source.ToClaude());
 
     public async ValueTask<ClaudeQuotaSource> LoadClaudeSourceAsync(CancellationToken cancellationToken)
     {
         var stored = await ReadAsync<StoredSource>(cancellationToken);
-        return stored is { Schema: Schema } ? ParseSource(stored.ClaudeSource) ?? ClaudeQuotaSource.Automatic : ClaudeQuotaSource.Automatic;
+        return stored is { Schema: Schema } ? ParseSource(stored.ClaudeSource.ValueKind == JsonValueKind.Undefined ? stored.DataSource : stored.ClaudeSource) ?? ClaudeQuotaSource.Automatic : ClaudeQuotaSource.Automatic;
     }
     public ValueTask SaveClaudeSourceAsync(ClaudeQuotaSource source, CancellationToken cancellationToken)
     {
@@ -88,7 +92,7 @@ public sealed class ConsentSettings(string path)
     }
 
     private async ValueTask SaveDecisionAsync(bool? codex, bool? claude, CancellationToken cancellationToken,
-        ClaudeQuotaSource? source = null, ClaudeQuotaSource? cacheSource = null, ClaudeQuotaSource? dataSource = null)
+        ClaudeQuotaSource? source = null, ClaudeQuotaSource? cacheSource = null, ClaudeQuotaSource? codexSource = null)
     {
         var gate = SaveGates.GetOrAdd(Path.GetFullPath(_path), _ => new(1, 1));
         await gate.WaitAsync(cancellationToken);
@@ -106,15 +110,15 @@ public sealed class ConsentSettings(string path)
                     value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.GetBoolean() : null;
                 JsonElement? Field(string name) => root.TryGetProperty(name, out var value) ? value.Clone() : null;
                 previous = new(Schema, Decision("privateCodexConsent") ?? false, Decision("privateClaudeConsent"),
-                    Field("claudeSource"), Field("claudeCacheSource"), Field("dataSource") ?? default);
+                    Field("claudeSource") ?? Field("dataSource"), Field("claudeCacheSource"),
+                    Field("codexSource") ?? Field("dataSource"));
             }
-            var sourceValue = source is null ? previous?.ClaudeSource :
-                JsonSerializer.SerializeToElement(SourceWireValue(source.Value));
+            var sourceValue = JsonSerializer.SerializeToElement(SourceWireValue(source ?? ParseSource(previous?.ClaudeSource) ?? ClaudeQuotaSource.Automatic));
             var cacheValue = cacheSource is null ? previous?.ClaudeCacheSource :
                 JsonSerializer.SerializeToElement(SourceWireValue(cacheSource.Value));
             var settings = new StoredConsent(Schema, codex ?? previous?.PrivateCodexConsent ?? false,
                 claude ?? previous?.PrivateClaudeConsent, sourceValue, cacheValue,
-                dataSource is null ? previous?.DataSource ?? default : JsonSerializer.SerializeToElement(SourceWireValue(dataSource.Value)));
+                JsonSerializer.SerializeToElement(SourceWireValue(codexSource ?? ParseSource(previous?.CodexSource) ?? ClaudeQuotaSource.Automatic)));
             var directory = Path.GetDirectoryName(_path) ?? throw new InvalidOperationException("Consent settings require a directory.");
             Directory.CreateDirectory(directory);
             var temporary = Path.Combine(directory, $".{Path.GetFileName(_path)}.{Guid.NewGuid():N}.tmp");
@@ -139,11 +143,12 @@ public sealed class ConsentSettings(string path)
         [property: JsonPropertyName("privateClaudeConsent"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? PrivateClaudeConsent = null,
         [property: JsonPropertyName("claudeSource"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? ClaudeSource = null,
         [property: JsonPropertyName("claudeCacheSource"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? ClaudeCacheSource = null,
-        [property: JsonPropertyName("dataSource"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] JsonElement DataSource = default);
+        [property: JsonPropertyName("codexSource"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? CodexSource = null);
 
     private sealed record StoredSource(
         [property: JsonPropertyName("schema")] int Schema,
-        [property: JsonPropertyName("claudeSource")] JsonElement? ClaudeSource,
+        [property: JsonPropertyName("claudeSource")] JsonElement ClaudeSource,
         [property: JsonPropertyName("claudeCacheSource")] JsonElement? ClaudeCacheSource,
-        [property: JsonPropertyName("dataSource")] JsonElement DataSource);
+        [property: JsonPropertyName("dataSource")] JsonElement DataSource,
+        [property: JsonPropertyName("codexSource")] JsonElement CodexSource);
 }

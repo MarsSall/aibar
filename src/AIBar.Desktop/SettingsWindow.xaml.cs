@@ -67,7 +67,7 @@ public partial class SettingsWindow : Window
         // The layered host stays transparent: applying the opaque popup policy here
         // would remove AllowsTransparency and clip the exterior Settings glow.
         UpdateWindowDecoration();
-        CodexEnabled.IsEnabled = ClaudeEnabled.IsEnabled = SourceChoices.IsEnabled = providers is not null;
+        CodexEnabled.IsEnabled = ClaudeEnabled.IsEnabled = CodexSource.IsEnabled = ClaudeSource.IsEnabled = providers is not null;
         StartWithWindows.IsEnabled = ClearData.IsEnabled = providers?.General is not null;
         FloatingWidget.IsEnabled = dock is not null;
         UpdateFontStatus();
@@ -90,9 +90,8 @@ public partial class SettingsWindow : Window
         if (_providers is { } providers)
         {
             CodexEnabled.IsChecked = providers.CodexEnabled; ClaudeEnabled.IsChecked = providers.ClaudeEnabled;
-            SourceThisPc.IsChecked = providers.Source == ClaudeQuotaSource.ThisPc;
-            SourceOtherMachine.IsChecked = providers.Source == ClaudeQuotaSource.OtherMachine;
-            SourceAutomatic.IsChecked = providers.Source == ClaudeQuotaSource.Automatic;
+            CodexSource.SelectedIndex = providers.CodexSource switch { DataSource.ThisPc => 1, DataSource.OtherMachine => 2, _ => 0 };
+            ClaudeSource.SelectedIndex = providers.Source switch { ClaudeQuotaSource.ThisPc => 1, ClaudeQuotaSource.OtherMachine => 2, _ => 0 };
             SourceStatus.Text = "ⓘ " + providers.SourceDescription;
         }
         else SourceStatus.Text = "Provider settings are unavailable.";
@@ -155,7 +154,8 @@ public partial class SettingsWindow : Window
         try
         {
             if (_providers is { } providers && !await providers.SaveAsync(CodexEnabled.IsChecked == true, ClaudeEnabled.IsChecked == true,
-                SourceThisPc.IsChecked == true ? ClaudeQuotaSource.ThisPc : SourceOtherMachine.IsChecked == true ? ClaudeQuotaSource.OtherMachine : ClaudeQuotaSource.Automatic))
+                CodexSource.SelectedIndex switch { 1 => DataSource.ThisPc, 2 => DataSource.OtherMachine, _ => DataSource.Automatic },
+                ClaudeSource.SelectedIndex switch { 1 => ClaudeQuotaSource.ThisPc, 2 => ClaudeQuotaSource.OtherMachine, _ => ClaudeQuotaSource.Automatic }))
             {
                 SaveStatus.Text = "Consent declined. Changes were not saved."; return;
             }
@@ -211,6 +211,8 @@ public partial class SettingsWindow : Window
     }
     private void OnSettingsKeyDown(object sender, KeyEventArgs e)
     {
+        // Let the open dropdown accept or dismiss its selection before window-level shortcuts.
+        if ((CodexSource.IsDropDownOpen || ClaudeSource.IsDropDownOpen) && e.Key is Key.Enter or Key.Escape) return;
         if (e.Key == Key.Tab && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
             var direction = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1;

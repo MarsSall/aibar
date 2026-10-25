@@ -59,8 +59,8 @@ public sealed class BetaRuntime : IAsyncDisposable
         await _consentGate.WaitAsync(cancellationToken);
         try
         {
-            await _settings.SaveDataSourceAsync(source, cancellationToken);
             if (_source == source) return;
+            await _settings.SaveCodexSourceAsync(source, cancellationToken);
             _source = source;
             // Drain any local request before completing the handoff; direct coordinator
             // callers (manual refresh and lifecycle) must also remain paused remotely.
@@ -87,7 +87,7 @@ public sealed class BetaRuntime : IAsyncDisposable
     public async ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        _source = await _settings.LoadDataSourceAsync(cancellationToken);
+        _source = await _settings.LoadCodexSourceAsync(cancellationToken);
         if (IsRemoteOnly) await _coordinator.CancelAndWaitAsync(cancellationToken);
         var enabled = await _settings.LoadAsync(cancellationToken);
         if (_publisher is not null) await (enabled

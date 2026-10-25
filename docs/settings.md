@@ -10,7 +10,7 @@ Changes apply when you select **Save**. **Cancel**, Escape and closing the windo
 
 - **Ctrl+Tab** cycles pivots; **Ctrl+Shift+Tab** cycles backwards.
 - **Tab / Shift+Tab** move through controls; **Space** toggles checkboxes and switches.
-- **Arrow keys** move through radio groups (panel colors, YASB colors, refresh interval and data source). **Home / End** select the first / last refresh interval; the refresh group has one Tab stop.
+- **Arrow keys** move through radio groups (panel colors, YASB colors and refresh interval) and provider Source dropdowns. **Alt+Down** opens a dropdown. **Home / End** select the first / last refresh interval; the refresh group has one Tab stop.
 - **Enter** saves, unless validation fails; **Escape** cancels.
 - The opacity slider supports arrows in 5-point steps and Page Up/Down in 10-point steps.
 
@@ -21,16 +21,6 @@ Selected pivots have an accent underline and semibold text. Controls have named 
 **Start with Windows** loads the current Windows registration. Clicking it toggles the native registration and displays the actual readback result, not an assumed success.
 
 **Clear AIBar Data** asks: “Clear AIBar Data? This removes AIBar's local data and turns off Codex quota access. Your provider logins are not touched.” Choose **Clear** or **Cancel** (the safe default). Cancel does nothing; Clear drains the existing runtime work and removes AIBar-owned data. The result appears inline and Settings reloads its controls.
-
-**Data source** applies to both Codex and Claude on Save:
-
-| Choice | Meaning |
-| --- | --- |
-| Automatic (default) | Uses data sent from another machine when it exists, otherwise this PC's logins. Claude prefers its remote file when present; Codex remains local because it has no remote quota reader yet. |
-| This PC | Only this PC's Codex and Claude logins. |
-| Other machine | Only data sent from another machine. Codex has no remote quota yet: it shows **No data from the other machine yet**, hides cached local quota and does not read the local Codex credential or call its quota endpoint. |
-
-Switching back to This PC or Automatic resumes Codex refresh only if consent is enabled. Source selection never grants consent. The panel's **Use other machine** action selects this same general setting for both providers. A Codex remote helper is a separate follow-up, not included here.
 
 ## Appearance
 
@@ -69,7 +59,19 @@ Delivery policy, freshness checks, consent checks and deduplication remain owned
 
 ## Providers
 
-**Codex** and **Claude** switches stage their enabled state until Save. Official OpenAI and Claude marks are retained rather than using the design export's placeholders.
+**Show Codex in AIBar** and **Show Claude in AIBar** each have a compact **Source** dropdown on the same line. Each provider stages its own enabled state and source until Save. Official OpenAI and Claude marks are retained rather than using the design export's placeholders.
+
+| Source | Meaning for the selected provider |
+| --- | --- |
+| Automatic (default) | Uses data sent from another machine when it exists, otherwise this PC's login. Claude prefers its remote quota file when present; Codex remains local because it has no remote quota reader yet. |
+| This PC | Only this PC's login. |
+| Other machine | Only data sent from another machine. Codex has no remote quota yet: it shows **No data from the other machine yet**, hides cached local quota and never reads its local credential or calls its quota endpoint. |
+
+The dropdowns have accessible names **Codex source** and **Claude source**; each item has a tooltip explaining its choice. You can mix choices, such as Codex Automatic and Claude Other machine. General has no source control.
+
+Codex Other machine also publishes a value-free YASB export, drops queued local alerts and stops local analytics. Returning to This PC or Automatic resumes local refresh and analytics only with Codex consent. Source selection never grants consent. The panel's **Use other machine** action changes only Claude; a Codex remote quota helper remains a separate follow-up (#85).
+
+Cost follows each provider's own source too: Codex Automatic combines local and remote token rows, This PC uses local rows only, and Other machine uses remote rows only. Claude uses remote token rows in Automatic and Other machine; This PC has no local token reader and shows cost as unavailable. Each provider's source change refreshes its cost view without waiting for a quota poll.
 
 Enabling a disabled provider shows the existing provider-specific consent disclosure. Declining either required disclosure performs no provider/source writes and leaves the draft open. Disabling requires no prompt. Runtime commands remain the only consent writers; Settings never reads or writes credentials.
 
@@ -77,11 +79,13 @@ Enabling a disabled provider shows the existing provider-specific consent disclo
 
 Opening the panel still refreshes data older than one minute, with a one-minute attempt throttle; manual **Refresh** is unchanged. The interval does not change freshness thresholds, consent, or YASB.
 
-Source selection has moved to **General → Data source**. Providers retains only the Codex/Claude switches and refresh interval. The shared source is applied before granting consent; the Claude remote payload and reader contract are unchanged. Without runtime command bindings, the corresponding controls are explicitly unavailable.
+Save applies only changed sources to their respective runtimes before granting consent. Changing one source does not change the other. The Claude remote payload and reader contract are unchanged. Without runtime command bindings, the corresponding controls are explicitly unavailable.
 
 ## Persistence and clearing
 
-`%LOCALAPPDATA%\AIBar\settings.json` stores `dataSource` as `automatic`, `this-pc` or `other-machine`. If absent, the existing `claudeSource` choice is used; absent or invalid choices default to Automatic. A present invalid `dataSource` does not fall back to the legacy choice. Saving writes the general field atomically while preserving independent consent and Claude cache provenance.
+`%LOCALAPPDATA%\AIBar\settings.json` stores independent `codexSource` and `claudeSource` values: `automatic`, `this-pc` or `other-machine`. When `codexSource` is absent, it migrates from the saved general `dataSource`, or defaults to Automatic. When `claudeSource` is absent, it also migrates from `dataSource`; an existing Claude choice wins. A Claude-only legacy choice never selects Codex's source. Present invalid provider values default to Automatic rather than falling back to the general value.
+
+Every save writes the provider fields atomically and stops writing `dataSource`; that field is read only for migration. Consent decisions and Claude cache provenance are preserved regardless of save order, even if an unrelated consent field is malformed.
 
 `%LOCALAPPDATA%\AIBar\appearance.json` remains schema 1:
 
@@ -109,8 +113,8 @@ Only `Settings*` tokens were added to `Semantic.Light.xaml`, `Semantic.Dark.xaml
 
 ## Windows verification
 
-No local .NET/PowerShell verification is available in the Linux worktree. For this General/data-source change, strict TDD is disabled by explicit parent choice; tests were written first but nothing was compiled or executed locally. Windows CI must compile and run the new tests.
+No local .NET/PowerShell verification is available in the Linux worktree. For the per-provider source change, the parent split RED-first development into a tests-only revision and a production revision. Nothing was compiled or executed locally. Windows CI must establish RED/GREEN and run the new tests.
 
-Focused coverage: `RefreshIntervalSettingsTests`, `RefreshIntervalWindowTests`, `RefreshIntervalRuntimeTests`, `AppearanceSettingsTests`, `SettingsWindowTests`, `SettingsProviderTests`, `SettingsAlertOptionsTests`; existing delivery/clear/privacy tests must remain green. Test deadlines remain at least 60 seconds for asynchronous WPF saves.
+Focused coverage: `RefreshIntervalSettingsTests`, `RefreshIntervalWindowTests`, `RefreshIntervalRuntimeTests`, `AppearanceSettingsTests`, `SettingsWindowTests`, `SettingsProviderTests`, `DataSourceSettingsTests`, `DataSourceCostTests`, `CodexDataSourceTests`, `SettingsAlertOptionsTests`; existing delivery/clear/privacy tests must remain green. Test deadlines remain at least 60 seconds for asynchronous WPF saves.
 
 Native frame comparison is still required against export frames **09** (Alerts dark), **10** (Appearance light), **11** (threshold error light) and **12** (Providers dark), and all four spec sheets. Exercise save/reopen, Cancel with edits in all pivots, Ctrl+Tab, radio arrows, Space, Enter, Escape, declined consent, failed persistence, live theme changes, minimum size, mixed DPI, high contrast and reduced motion. Check effect preview placement and verify overlays never take focus or intercept clicks.

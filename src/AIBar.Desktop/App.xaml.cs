@@ -175,8 +175,8 @@ public partial class App : System.Windows.Application
         window.QuitRequested += tray.RequestExit;
         window.UseOtherMachineRequested += async () =>
         {
-            if (composition.ClaudeQuota is not { } claude || composition.CodexQuota is not { } codex) return;
-            try { await SettingsProviderCommands.ApplySourceAsync(DataSource.OtherMachine, codex, claude); }
+            if (composition.ClaudeQuota is not { } claude) return;
+            try { await claude.SetSourceAsync(ClaudeQuotaSource.OtherMachine, default); }
             catch (Exception error) { ReportFault(error); }
         };
         _runtime = new TrayHostRuntime(_instance!, tray, new WpfPopoverRuntime(window, _theme, () => WindowsPopoverPlacementContextProvider.Get(window), null, () => themeSource.Current), _taskbar,

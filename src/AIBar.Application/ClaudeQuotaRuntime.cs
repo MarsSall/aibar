@@ -284,7 +284,7 @@ public sealed class ClaudeQuotaRuntime : IAsyncDisposable, IAiBarClearWork
         {
             ThrowIfDisposed();
             if (_initialized) return;
-            _source = (await _settings.LoadDataSourceAsync(cancellationToken)).ToClaude();
+            _source = await _settings.LoadClaudeSourceAsync(cancellationToken);
             _resolvedSource = ResolveSource(_source);
             _initialized = true;
             Notify(Notification.Source);

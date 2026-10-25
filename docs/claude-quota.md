@@ -14,7 +14,7 @@ AIBar never refreshes tokens or changes the login. If the local session expires 
 
 To use a Linux Claude Code login, follow
 [the optional remote usage helper instructions](../tools/claude-remote-usage/README.md).
-No source change is needed after installing the helper: **Settings → General → Data source: Automatic**
+No source change is needed after installing the helper: **Settings → Providers → Claude → Source: Automatic**
 detects `%LOCALAPPDATA%\AIBar\claude-remote-usage.json` on initialization and each
 refresh, including polls (the saved refresh interval when resolved to This PC,
 default five minutes; every minute when resolved to Other machine). Claude consent is still required once.
@@ -27,7 +27,7 @@ marked stale after 15 minutes. An existing stale or invalid file stays remote;
 AIBar never silently falls back to the local login. Reparse-point files are not
 eligible for automatic detection.
 
-**Settings → General → Data source** offers **Automatic / This PC / Other machine** for every provider. Existing `claudeSource` choices migrate when `dataSource` is absent. Codex has no remote quota reader yet: Other machine hides its local quota, never reads its local credential or calls its quota endpoint, and shows **No data from the other machine yet**. Source selection does not grant provider consent. The tray no longer contains source or consent controls. Choose **This PC** to
+**Settings → Providers** has a separate **Source** dropdown beside each provider's visibility checkbox, with **Automatic / This PC / Other machine**. Claude keeps its existing `claudeSource` choice; only a missing choice migrates from the former general `dataSource`. Codex saves its independent `codexSource` (migrating from `dataSource` if absent, otherwise defaulting to Automatic). Saves stop writing the general field. Source selection never grants provider consent or changes the other provider. The panel's **Use other machine** changes only Claude. The tray no longer contains source or consent controls. Choose **This PC** for Claude to
 force the Windows login even while a remote file exists, or **Other machine** to
 force the remote source even when its file is missing. Existing explicit choices
 are preserved. Return to **Automatic** to detect the source again. When the file
@@ -45,7 +45,7 @@ Claude has its own loading, unavailable and stale-cache status. If its login is 
 ## Cost and tokens
 
 While Claude is enabled, **Pace & details** shows **Today** and **Last 30 days**
-rows from Linux log aggregates, independently of the selected quota source.
+rows from Linux log aggregates when Claude's Source is **Automatic** or **Other machine**. **This PC** excludes remote token rows and shows cost as unavailable because there is no local Claude token reader. Changing Claude's Source refreshes its cost view immediately, independently of Codex's Source.
 No prompt, source path, message ID or authentication token is sent. Estimates use
 the checked-in official list-price catalog; unpriced models are visibly partial,
 never silently charged at zero. Missing, invalid or more-than-two-hour-old token

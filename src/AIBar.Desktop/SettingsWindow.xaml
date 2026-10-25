@@ -75,11 +75,21 @@
    </ControlTemplate></Setter.Value></Setter>
   </Style>
   <Style TargetType="RadioButton" BasedOn="{StaticResource SettingsRadio}"/>
-  <Style x:Key="SettingsSourceRadio" TargetType="RadioButton" BasedOn="{StaticResource SettingsRadio}">
-   <Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="16,8"/>
-   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton"><Border BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}"><DockPanel>
-    <Grid DockPanel.Dock="Left" Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,12,0"><Ellipse Fill="{DynamicResource SettingsCardBrush}" Stroke="{DynamicResource SettingsSecondaryBrush}"/><Ellipse x:Name="SourceDot" Margin="4" Fill="{DynamicResource SettingsIndicatorBrush}" Visibility="Collapsed"/></Grid><ContentPresenter/>
-   </DockPanel></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter Property="FontWeight" Value="SemiBold"/><Setter TargetName="SourceDot" Property="Visibility" Value="Visible"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  <Style TargetType="ComboBoxItem">
+   <Setter Property="Foreground" Value="{DynamicResource SettingsTextBrush}"/><Setter Property="Background" Value="{DynamicResource SettingsCardBrush}"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem"><Border x:Name="Item" Background="{TemplateBinding Background}" Padding="8,6"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource SettingsHoverBrush}"/><Setter Property="Foreground" Value="{DynamicResource SettingsHoverTextBrush}"/></Trigger><Trigger Property="IsSelected" Value="True"><Setter Property="FontWeight" Value="SemiBold"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style TargetType="ComboBox">
+   <Setter Property="Foreground" Value="{DynamicResource SettingsTextBrush}"/><Setter Property="Background" Value="{DynamicResource SettingsCardBrush}"/>
+   <Setter Property="BorderBrush" Value="{DynamicResource SettingsControlBorderBrush}"/><Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/>
+   <Setter Property="Width" Value="130"/><Setter Property="Height" Value="32"/><Setter Property="VerticalAlignment" Value="Center"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox"><Grid>
+    <ToggleButton Focusable="False" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+     <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="{DynamicResource SettingsCardBrush}" BorderBrush="{DynamicResource SettingsControlBorderBrush}" BorderThickness="1" CornerRadius="4"><TextBlock Text="▾" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource SettingsTextBrush}"/></Border></ControlTemplate></ToggleButton.Template>
+    </ToggleButton>
+    <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" Margin="8,0,24,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+    <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False"><Border Background="{DynamicResource SettingsCardBrush}" BorderBrush="{DynamicResource SettingsControlBorderBrush}" BorderThickness="1" CornerRadius="4" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"><ScrollViewer><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer></Border></Popup>
+   </Grid><ControlTemplate.Triggers><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
   </Style>
   <Style TargetType="TabItem"><Setter Property="Foreground" Value="{DynamicResource SettingsSecondaryBrush}"/><Setter Property="FocusVisualStyle" Value="{StaticResource SettingsFocus}"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem"><Grid Height="40" Margin="12,0"><ContentPresenter ContentSource="Header" VerticalAlignment="Center"/><Border x:Name="Underline" Width="16" Height="3" CornerRadius="1" Background="{DynamicResource SettingsIndicatorBrush}" VerticalAlignment="Bottom" Visibility="Collapsed"/></Grid>
@@ -136,13 +146,6 @@
        <Border Style="{StaticResource SettingsCard}" Padding="16,10">
         <CheckBox x:Name="StartWithWindows" Content="Start with Windows" AutomationProperties.Name="Start with Windows" Click="OnToggleStartup"/>
        </Border>
-       <TextBlock Text="DATA SOURCE" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
-       <Border Style="{StaticResource SettingsCard}"><StackPanel x:Name="SourceChoices" KeyboardNavigation.DirectionalNavigation="Contained">
-        <RadioButton x:Name="SourceAutomatic" Style="{StaticResource SettingsSourceRadio}" GroupName="DataSource" IsChecked="True" AutomationProperties.Name="Data source: Automatic"><StackPanel><TextBlock Text="Automatic"/><TextBlock x:Name="AutomaticDescription" Text="Uses data sent from another machine when it exists, otherwise this PC's logins." Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
-        <RadioButton x:Name="SourceThisPc" Style="{StaticResource SettingsSourceRadio}" GroupName="DataSource" AutomationProperties.Name="Data source: This PC"><StackPanel><TextBlock Text="This PC"/><TextBlock Text="Only this PC's Codex and Claude logins." Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
-        <RadioButton x:Name="SourceOtherMachine" Style="{StaticResource SettingsSourceRadio}" BorderThickness="0" GroupName="DataSource" AutomationProperties.Name="Data source: Other machine"><StackPanel><TextBlock Text="Other machine"/><TextBlock Text="Only data sent from another machine. Codex has no remote quota yet." Style="{StaticResource SettingsMeta}"/></StackPanel></RadioButton>
-       </StackPanel></Border>
-       <TextBlock x:Name="SourceStatus" Style="{StaticResource SettingsMeta}" Margin="2,10,0,0" AutomationProperties.LiveSetting="Polite"/>
        <TextBlock Text="LOCAL DATA" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
        <Border Style="{StaticResource SettingsCard}" Padding="16,10"><StackPanel>
         <Button x:Name="ClearData" Content="Clear AIBar Data" AutomationProperties.Name="Clear AIBar Data" Click="OnClearData" HorizontalAlignment="Left"/>
@@ -242,10 +245,29 @@
       <StackPanel Margin="24,16">
        <TextBlock Text="SHOW IN AIBAR" Style="{StaticResource SettingsHeading}"/>
        <Border Style="{StaticResource SettingsCard}"><StackPanel>
-        <Grid MinHeight="44" Margin="16,6"><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Border Background="{DynamicResource SettingsFooterBrush}" Width="32" Height="32" CornerRadius="6"><Path x:Name="CodexMark" Data="{StaticResource SettingsOpenAiMark}" Width="20" Height="20" Stretch="Uniform" Fill="{DynamicResource SettingsCodexBrush}"/></Border><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Codex"/><TextBlock Text="OpenAI · weekly limit" Style="{StaticResource SettingsMeta}"/></StackPanel><CheckBox x:Name="CodexEnabled" Grid.Column="2" Style="{StaticResource SettingsToggle}" AutomationProperties.Name="Show Codex in AIBar"/></Grid>
+        <Grid MinHeight="44" Margin="12,6"><Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+         <Border Background="{DynamicResource SettingsFooterBrush}" Width="28" Height="28" CornerRadius="6"><Path x:Name="CodexMark" Data="{StaticResource SettingsOpenAiMark}" Width="20" Height="20" Stretch="Uniform" Fill="{DynamicResource SettingsCodexBrush}"/></Border>
+         <CheckBox x:Name="CodexEnabled" Grid.Column="1" Content="Show Codex in AIBar" VerticalAlignment="Center" AutomationProperties.Name="Show Codex in AIBar"/>
+         <Label Grid.Column="2" Content="Source" Target="{Binding ElementName=CodexSource}" Foreground="{DynamicResource SettingsSecondaryBrush}" VerticalAlignment="Center" Padding="4,0,6,0"/>
+         <ComboBox x:Name="CodexSource" Grid.Column="3" SelectedIndex="0" AutomationProperties.Name="Codex source">
+          <ComboBoxItem Content="Automatic" ToolTip="Uses data sent from another machine when it exists, otherwise this PC's login. Codex has no remote quota yet."/>
+          <ComboBoxItem Content="This PC" ToolTip="Only this PC's login. Codex has no remote quota yet."/>
+          <ComboBoxItem Content="Other machine" ToolTip="Only data sent from another machine. Codex has no remote quota yet."/>
+         </ComboBox>
+        </Grid>
         <Border BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="0,1,0,0"/>
-        <Grid MinHeight="44" Margin="16,6"><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Border Background="{DynamicResource SettingsFooterBrush}" Width="32" Height="32" CornerRadius="6"><Path x:Name="ClaudeMark" Data="{StaticResource SettingsClaudeMark}" Width="20" Height="20" Stretch="Uniform" Fill="{DynamicResource SettingsClaudeBrush}"/></Border><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Claude"/><TextBlock Text="Anthropic · session and weekly limits" Style="{StaticResource SettingsMeta}"/></StackPanel><CheckBox x:Name="ClaudeEnabled" Grid.Column="2" Style="{StaticResource SettingsToggle}" AutomationProperties.Name="Show Claude in AIBar"/></Grid>
+        <Grid MinHeight="44" Margin="12,6"><Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+         <Border Background="{DynamicResource SettingsFooterBrush}" Width="28" Height="28" CornerRadius="6"><Path x:Name="ClaudeMark" Data="{StaticResource SettingsClaudeMark}" Width="20" Height="20" Stretch="Uniform" Fill="{DynamicResource SettingsClaudeBrush}"/></Border>
+         <CheckBox x:Name="ClaudeEnabled" Grid.Column="1" Content="Show Claude in AIBar" VerticalAlignment="Center" AutomationProperties.Name="Show Claude in AIBar"/>
+         <Label Grid.Column="2" Content="Source" Target="{Binding ElementName=ClaudeSource}" Foreground="{DynamicResource SettingsSecondaryBrush}" VerticalAlignment="Center" Padding="4,0,6,0"/>
+         <ComboBox x:Name="ClaudeSource" Grid.Column="3" SelectedIndex="0" AutomationProperties.Name="Claude source">
+          <ComboBoxItem Content="Automatic" ToolTip="Uses data sent from another machine when it exists, otherwise this PC's login."/>
+          <ComboBoxItem Content="This PC" ToolTip="Only this PC's login."/>
+          <ComboBoxItem Content="Other machine" ToolTip="Only data sent from another machine."/>
+         </ComboBox>
+        </Grid>
        </StackPanel></Border>
+       <TextBlock x:Name="SourceStatus" Style="{StaticResource SettingsMeta}" Margin="2,10,0,0" AutomationProperties.LiveSetting="Polite"/>
        <TextBlock Text="REFRESH EVERY" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
        <UniformGrid x:Name="RefreshChoices" Rows="1" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Contained" PreviewKeyDown="OnRefreshKeyDown" AutomationProperties.Name="Refresh every">
         <RadioButton x:Name="Refresh1" Style="{StaticResource SettingsRefreshRadio}" GroupName="RefreshInterval" Content="1 min" Tag="1" IsTabStop="False" Checked="OnRefreshSelected" AutomationProperties.Name="Refresh every 1 min"/>
