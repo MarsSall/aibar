@@ -49,6 +49,51 @@ account/email, paths, error details and HTTP bodies are never output, logged,
 or pushed. This quota contract contains no token counts. Normal logs contain only state and UTC time.
 The token is necessarily handled in Python process memory, not erased securely.
 
+## Codex quota from Gentle Shell/Pi
+
+`codex_remote_usage.py` sends Codex five-hour and weekly quota to
+**`%LOCALAPPDATA%\AIBar\codex-remote-usage.json`**. Install it at
+`~/.local/lib/aibar/codex_remote_usage.py` alongside `claude_remote_usage.py`,
+whose contract encoder, plan whitelist and atomic push it imports. It uses the
+same `~/.config/aibar/claude-remote-usage.conf` and `remote_dir` as Claude.
+The service runs it as an independent, failure-tolerant pre-step before Claude quota.
+
+It opens `<agent-dir>/auth.json` read-only and uses only the `openai-codex`
+OAuth entry's `type`, `access`, `expires` (epoch milliseconds) and `accountId`.
+Agent directory selection is, in order:
+
+1. `GENTLE_SHELL_HOME`, when set.
+2. `PI_CODING_AGENT_DIR`, when set.
+3. `~/.gentle-shell/agent`, if its auth file has an `openai-codex` entry.
+4. Otherwise `~/.pi/agent`.
+
+It **never refreshes a login or writes credentials**, and does not read Codex CLI
+credentials. Missing/malformed credentials or expiry produce `unavailable`;
+expired credentials or credentials expiring within 60 seconds produce
+`authentication-required` without an HTTP request. Sign in again with Gentle Shell/Pi
+on Linux when authentication is required. Agent-directory overrides can be set
+in a systemd user-service drop-in; never put tokens in a unit or environment variable.
+
+The helper calls `https://chatgpt.com/backend-api/wham/usage` using Bearer auth,
+`ChatGPT-Account-Id` and `User-Agent: aibar-remote-usage`. This unofficial endpoint
+may change. Requests time out after ten seconds, reject redirects and accept at
+most 64 KiB. HTTP 401/403 mean `authentication-required`; other failures mean
+`unavailable`. Primary/secondary windows under `rate_limit` or the root are mapped
+by duration (18000 seconds → five-hour, 604800 → weekly), not position.
+Duplicate keys, ambiguous windows and invalid percentages/resets are rejected.
+
+The output is the **same ordered schema-1 quota contract shown above**, capped at
+4096 UTF-8 bytes: `schemaVersion`, `generatedAt`, `state`, `fiveHour`, `weekly`,
+then optional `plan`. Each non-null window has `percentageUsed` (0–100) and required
+`resetAt` normalized to UTC `Z`; a window without a reset is dropped. Current data
+requires at least one window; non-current data has both windows null. Only the
+known simple plan tiers listed above are forwarded from `plan_type`, never free text.
+No access/refresh token, account ID, email, path, HTTP body, error detail or token
+count is published. Normal logs contain only `<state> <generatedAt>`.
+The atomic `File.Replace` push and 15-minute freshness rule are shared with Claude.
+`--once` and `--dry-run` behave like Claude's helper; dry-run still reads the credential
+and calls the endpoint, but prints only the safe quota contract and never runs SSH.
+
 ## Cost and tokens: separate aggregate file
 
 `claude_remote_tokens.py` additionally reads assistant usage in
@@ -104,14 +149,16 @@ Run these commands from this helper directory on Linux **only when ready**:
 python3 claude_remote_usage.py --dry-run
 python3 claude_remote_tokens.py --dry-run
 python3 codex_remote_tokens.py --dry-run
+python3 codex_remote_usage.py --dry-run
 install -d -m 700 ~/.config/aibar ~/.local/lib/aibar ~/.config/systemd/user
 install -m 600 claude-remote-usage.conf.example ~/.config/aibar/claude-remote-usage.conf
 # Edit host and remote_dir in that config before the first push.
-install -m 700 claude_remote_usage.py claude_remote_tokens.py codex_remote_tokens.py claude_remote_request.py ~/.local/lib/aibar/
+install -m 700 claude_remote_usage.py claude_remote_tokens.py codex_remote_tokens.py codex_remote_usage.py claude_remote_request.py ~/.local/lib/aibar/
 install -m 644 aibar-claude-remote-usage.service aibar-claude-remote-usage.timer aibar-claude-remote-request.service ~/.config/systemd/user/
 python3 ~/.local/lib/aibar/claude_remote_usage.py --once
 python3 ~/.local/lib/aibar/claude_remote_tokens.py --once
 python3 ~/.local/lib/aibar/codex_remote_tokens.py --once
+python3 ~/.local/lib/aibar/codex_remote_usage.py --once
 systemctl --user daemon-reload
 systemctl --user enable --now aibar-claude-remote-usage.timer
 systemctl --user enable --now aibar-claude-remote-request.service
@@ -149,9 +196,9 @@ same destination. AIBar treats data older than 15 minutes as stale, not current.
   and state-only logs with `journalctl --user -u aibar-claude-remote-usage.service`.
 - To uninstall, run `systemctl --user disable --now aibar-claude-remote-request.service aibar-claude-remote-usage.timer`,
   stop any active service with `systemctl --user stop aibar-claude-remote-usage.service`,
-  then remove the three installed unit files, the three installed Python helpers, and
+  then remove the three installed unit files, the five installed Python helpers, and
   `~/.config/aibar/claude-remote-usage.conf`; run `systemctl --user daemon-reload`.
-  Remove both remote JSON files and their `.tmp` files separately if desired; **Automatic**
+  Remove the Claude/Codex quota and token JSON files and their `.tmp` files separately if desired; **Automatic**
   returns to the Windows login after the JSON is removed, on the next refresh.
   Alternatively, select **This PC** to force local use or disable Claude quota.
   Never remove Claude Code credentials. Leaving a stopped helper's JSON in place
