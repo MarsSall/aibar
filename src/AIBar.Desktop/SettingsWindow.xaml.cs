@@ -50,10 +50,13 @@ public partial class SettingsWindow : Window
     private readonly SettingsProviderCommands? _providers;
     private readonly Action? _previewNotification;
     private readonly IWindowsThemeSource _themeSource;
+    private readonly DockSettings? _dock;
+    private readonly SettingsGlyphFont? _font;
     private bool _saving;
     public SettingsWindow(AppearanceSettings appearance, AlertSettings alerts, Func<AlertOptions, Task>? saveAlerts = null, IWindowsThemeSource? themeSource = null,
-        SettingsProviderCommands? providers = null, Action? previewNotification = null)
+        SettingsProviderCommands? providers = null, Action? previewNotification = null, DockSettings? dock = null, SettingsGlyphFont? font = null)
     {
+        _dock = dock; _font = font;
         _appearance = appearance; _alerts = alerts; _providers = providers; _previewNotification = previewNotification;
         _themeSource = themeSource ?? new WindowsThemeSource();
         _saveAlerts = saveAlerts ?? (options => alerts.SaveAsync(options, default).AsTask());
@@ -65,6 +68,8 @@ public partial class SettingsWindow : Window
         // would remove AllowsTransparency and clip the exterior Settings glow.
         UpdateWindowDecoration();
         CodexEnabled.IsEnabled = ClaudeEnabled.IsEnabled = SourceChoices.IsEnabled = providers is not null;
+        FloatingWidget.IsEnabled = dock is not null;
+        UpdateFontStatus();
         UpdateThemeDescription();
         ValidateThresholds();
     }
@@ -76,6 +81,8 @@ public partial class SettingsWindow : Window
         YasbBrand.IsChecked = appearance.YasbColors == "brand"; YasbUsage.IsChecked = !YasbBrand.IsChecked;
         BackgroundOpacity.Value = appearance.BackgroundOpacity;
         ProviderTint.IsChecked = appearance.ProviderTint;
+        if (_dock is { } dock) FloatingWidget.IsChecked = (await dock.LoadAsync(default)).Enabled;
+        UpdateFontStatus();
         foreach (var choice in RefreshChoices.Children.OfType<RadioButton>())
             choice.IsChecked = RefreshMinutes(choice) == appearance.RefreshMinutes;
         if (_providers is { } providers)
@@ -128,6 +135,11 @@ public partial class SettingsWindow : Window
             var currentAppearance = await _appearance.LoadAsync(default);
             await _appearance.SaveAsync(new(BarUsage.IsChecked == true ? "usage" : "brand", YasbBrand.IsChecked == true ? "brand" : "usage", (int)BackgroundOpacity.Value,
                 RefreshChoices.Children.OfType<RadioButton>().Where(choice => choice.IsChecked == true).Select(RefreshMinutes).Single(), ProviderTint.IsChecked == true, currentAppearance.ChartStyle), default);
+            if (_dock is { } dock)
+            {
+                var current = await dock.LoadAsync(default);
+                await dock.SaveAsync(current with { Enabled = FloatingWidget.IsChecked == true }, default);
+            }
             SaveStatus.Text = "Changes saved.";
             if (_providers is { } currentProviders) SourceStatus.Text = "ⓘ " + currentProviders.SourceDescription;
         }
@@ -229,13 +241,31 @@ public partial class SettingsWindow : Window
         if (_previewNotification is { } preview) preview();
         else SaveStatus.Text = "Notification preview is unavailable.";
     }
+    private void UpdateFontStatus()
+    {
+        var installed = _font?.IsInstalled() == true;
+        var available = _font?.IsBundledFontAvailable() == true;
+        InstallYasbFont.IsEnabled = !installed && available;
+        FontStatus.Text = installed ? "IosevkaTerm Nerd Font is installed." : available ? "Install the bundled font for YASB quota glyphs." : "Bundled font not found.";
+    }
+    private void OnInstallYasbFont(object sender, RoutedEventArgs e)
+    {
+        if (_font is null || !InstallYasbFont.IsEnabled) return;
+        try
+        {
+            var failure = _font.Install();
+            UpdateFontStatus();
+            FontStatus.Text = failure ?? "Installed. Restart YASB to use it.";
+        }
+        catch (Exception) { FontStatus.Text = "Could not install the font. Please try again."; }
+    }
     private void OnPreviewGlow(object sender, RoutedEventArgs e) => EdgeGlowWindow.ShowOnAllMonitors(true);
     private void OnPreviewConfetti(object sender, RoutedEventArgs e) => ConfettiWindow.ShowOnAllMonitors(true);
 }
 
 /// <summary>Single live settings window. Call Show(owner) from either the panel or the tray on the UI thread.</summary>
 public sealed class SettingsWindowHost(AppearanceSettings appearance, QuotaAlertObserver alerts,
-    SettingsProviderCommands? providers = null, Action? previewNotification = null) : IDisposable
+    SettingsProviderCommands? providers = null, Action? previewNotification = null, DockSettings? dock = null, SettingsGlyphFont? font = null) : IDisposable
 {
     private SettingsWindow? _window;
     private bool _disposed;
@@ -243,7 +273,7 @@ public sealed class SettingsWindowHost(AppearanceSettings appearance, QuotaAlert
     {
         if (_disposed) return;
         if (_window is { } existing) { if (existing.IsVisible) existing.Activate(); return; }
-        var window = new SettingsWindow(appearance, alerts.Settings, alerts.SaveSettingsAsync, providers: providers, previewNotification: previewNotification);
+        var window = new SettingsWindow(appearance, alerts.Settings, alerts.SaveSettingsAsync, providers: providers, previewNotification: previewNotification, dock: dock, font: font);
         _window = window;
         if (owner is { IsVisible: true }) window.Owner = owner;
         window.Closed += (_, _) => { if (ReferenceEquals(_window, window)) _window = null; };

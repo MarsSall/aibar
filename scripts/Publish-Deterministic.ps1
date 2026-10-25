@@ -26,6 +26,11 @@ param(
     [int]$CancelAfterMilliseconds = 0,
     [string]$KnownDescendantIdentityPath,
     [switch]$PrivateBeta,
+    [string]$GlyphFontDirectory,
+    # Synthetic offline packaging tests only; requires explicit test mode AND local inputs.
+    [string]$TestGlyphFontSha256,
+    [long]$TestGlyphFontLength,
+    [string]$TestGlyphLicenseSha256,
     [string]$ExpectedSourceCommit,
     [switch]$PrepareOnly,
     [string]$BetaBaselineCommit,
@@ -34,10 +39,15 @@ param(
     [int]$SmokeStartupMilliseconds = 1000
 )
 $ErrorActionPreference = "Stop"
-if (($PSBoundParameters.ContainsKey('ExpectedSourceCommit') -or $PSBoundParameters.ContainsKey('PrepareOnly')) -and
+if (($PSBoundParameters.ContainsKey('ExpectedSourceCommit') -or $PSBoundParameters.ContainsKey('PrepareOnly') -or
+     $PSBoundParameters.ContainsKey('GlyphFontDirectory') -or $PSBoundParameters.ContainsKey('TestGlyphFontSha256') -or
+     $PSBoundParameters.ContainsKey('TestGlyphFontLength') -or $PSBoundParameters.ContainsKey('TestGlyphLicenseSha256')) -and
     (-not $PrivateBeta -or $CapabilityPlan -or $GraphProjection)) {
     throw "BETA_OPTIONS_REQUIRE_PRIVATE_BETA"
 }
+$glyphTestPins = $PSBoundParameters.ContainsKey('TestGlyphFontSha256') -or $PSBoundParameters.ContainsKey('TestGlyphFontLength') -or $PSBoundParameters.ContainsKey('TestGlyphLicenseSha256')
+if ($glyphTestPins -and ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne '1' -or [string]::IsNullOrWhiteSpace($GlyphFontDirectory))) { throw "BETA_TEST_OVERRIDE_DENIED" }
+if ($glyphTestPins -and ($TestGlyphFontSha256 -cnotmatch '^[0-9a-f]{64}$' -or $TestGlyphLicenseSha256 -cnotmatch '^[0-9a-f]{64}$' -or $TestGlyphFontLength -le 0)) { throw "BETA_GLYPH_TEST_PINS_INVALID" }
 function Write-CapabilityPlan {
     $publisher = "CN=AIBar Development"
     $hasMakeAppx = -not [string]::IsNullOrWhiteSpace($MakeAppxPath)
@@ -228,6 +238,36 @@ function Copy-PrivateBetaYasbAssets([string]$Repository, [string]$Publish) {
         if ((Get-Item -LiteralPath $source).Length -ne (Get-Item -LiteralPath $destination).Length -or (Sha $source) -ne (Sha $destination)) { throw "BETA_YASB_ASSET_MISMATCH" }
     }
 }
+function Copy-PrivateBetaGlyphFont([string]$Publish) {
+    # No cache: downloaded inputs go only into this invocation's owned publish tree.
+    $fontUrl = 'https://raw.githubusercontent.com/ryanoasis/nerd-fonts/v3.5.1/patched-fonts/IosevkaTerm/IosevkaTermNerdFont-Regular.ttf'
+    $licenseUrl = 'https://raw.githubusercontent.com/ryanoasis/nerd-fonts/v3.5.1/patched-fonts/IosevkaTerm/LICENSE.md'
+    $fontLength = 14442592L
+    $fontSha256 = '5c12e7d30e97ff997c10e9b0acb2ed7f8495134e0f33b1176136f9e6d36d8e00'
+    $licenseSha256 = '7484961b97b41985d54c21700e53f7142a7007d72401acbd32c0b9c6a5a0b558'
+    if ($glyphTestPins) { $fontLength = $TestGlyphFontLength; $fontSha256 = $TestGlyphFontSha256; $licenseSha256 = $TestGlyphLicenseSha256 }
+    $directory = Join-Path $Publish 'fonts'
+    New-Item -ItemType Directory -Path $directory -ErrorAction Stop | Out-Null
+    foreach ($asset in @(
+        @{ name='IosevkaTermNerdFont-Regular.ttf'; url=$fontUrl; length=$fontLength; sha256=$fontSha256 },
+        @{ name='IosevkaTerm-LICENSE.md'; url=$licenseUrl; length=$null; sha256=$licenseSha256 }
+    )) {
+        $destination = Join-Path $directory $asset.name
+        if (-not [string]::IsNullOrWhiteSpace($GlyphFontDirectory)) {
+            $source = Join-Path $GlyphFontDirectory $asset.name
+            if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "BETA_GLYPH_SOURCE_MISSING: $($asset.name)" }
+            # Check before copying; check the destination again to catch changed input bytes.
+            if (($null -ne $asset.length -and (Get-Item -LiteralPath $source).Length -ne $asset.length) -or (Sha $source) -cne $asset.sha256) { throw "BETA_GLYPH_SOURCE_MISMATCH: $($asset.name)" }
+            [IO.File]::Copy($source, $destination, $false)
+            if ((Get-Item -LiteralPath $source).Length -ne (Get-Item -LiteralPath $destination).Length) { throw "BETA_GLYPH_SOURCE_MISMATCH: $($asset.name)" }
+        } else {
+            try { Invoke-WebRequest -Uri $asset.url -OutFile $destination -TimeoutSec $ProcessTimeoutSeconds | Out-Null }
+            catch { throw "BETA_GLYPH_DOWNLOAD_FAILED: $($asset.name)" }
+        }
+        # The license's exact bytes (and therefore length) are bound by its SHA-256.
+        if (($null -ne $asset.length -and (Get-Item -LiteralPath $destination).Length -ne $asset.length) -or (Sha $destination) -cne $asset.sha256) { throw "BETA_GLYPH_SOURCE_MISMATCH: $($asset.name)" }
+    }
+}
 function Invoke-PrivateBeta {
     $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
     $canonical = (& git -C $projectRoot rev-parse --show-toplevel).Trim()
@@ -263,6 +303,7 @@ function Invoke-PrivateBeta {
         }
         Invoke-OwnedProcess $PublishCommand $publishArguments "BETA_PUBLISH_FAILED"
         Copy-PrivateBetaYasbAssets $projectRoot $publish
+        Copy-PrivateBetaGlyphFont $publish
         $notice = "AIBar $version is an unsigned private beta for Windows x64. It is manually distributed and has no updater or installer.`nBaseline ancestor: $baseline`nSource commit: $source`n"
         [IO.File]::WriteAllText((Join-Path $publish "PRIVATE-BETA.txt"), $notice, [Text.UTF8Encoding]::new($false))
         $files = @{}; Get-ChildItem -LiteralPath $publish -Recurse -File | ForEach-Object { $relative = $_.FullName.Substring($publish.Length).TrimStart('\','/') -replace '\\','/'; if ($relative.StartsWith('/') -or $relative.Split('/') -contains '..' -or $files.ContainsKey($relative)) { throw "BETA_INVENTORY_INVALID" }; $files[$relative] = [ordered]@{ path=$relative; length=$_.Length; sha256=(Sha $_.FullName) } }

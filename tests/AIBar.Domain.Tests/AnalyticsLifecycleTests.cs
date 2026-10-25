@@ -53,7 +53,8 @@ public sealed class AnalyticsLifecycleTests
         Assert.True(harness.Entered.Wait(TimeSpan.FromSeconds(2)));
 
         var exit = harness.ExitAsync();
-        await harness.CancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        // Upper bound only: a loaded CI runner can take longer than 2 s to reach cancellation; a hang still fails.
+        await harness.CancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(10));
         harness.Release.Set();
         await exit;
 

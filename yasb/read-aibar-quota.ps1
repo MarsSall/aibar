@@ -26,17 +26,22 @@ function Get-BlockingWindow($Five, $Weekly) {
 
 function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable', $Five = $null, $Weekly = $null, $Source = $null, [Parameter(Mandatory = $true)][DateTimeOffset]$Now) {
     function Slot([string]$Name, $Window) { if ($null -eq $Window) { return "${Name}: --" }; return ('{0}: {1}%' -f $Name, ([double]$Window.percentageUsed).ToString('0.#', [Globalization.CultureInfo]::InvariantCulture)) }
-    function Reset([string]$Name, $Window) {
-        if ($null -eq $Window -or $null -eq $Window.resetAt) { return "$Name reset: --" }
+    function Reset($Window) {
+        if ($null -eq $Window -or $null -eq $Window.resetAt) { return 'reset: --' }
         $reset = [DateTimeOffset]$Window.resetAt
-        if ($reset -le $Now) { return "$Name reset: due" }
+        if ($reset -le $Now) { return 'reset: due' }
         # Compact countdown like the panel; no seconds and no markup characters in the tooltip.
         $left = $reset - $Now
         $text = if ($left.TotalDays -ge 1) { '{0}d {1}h' -f [math]::Floor($left.TotalDays), $left.Hours }
             elseif ($left.TotalHours -ge 1) { '{0}h {1}m' -f [math]::Floor($left.TotalHours), $left.Minutes }
             elseif ($left.TotalMinutes -ge 1) { '{0}m' -f [math]::Floor($left.TotalMinutes) }
             else { 'under 1m' }
-        return "$Name resets in $text"
+        return "resets in $text"
+    }
+    $dot = [char]0x00B7
+    function WindowLine([string]$Name, $Window) {
+        $percentage = ([double]$Window.percentageUsed).ToString('0.#', [Globalization.CultureInfo]::InvariantCulture)
+        return ('{0}  {1}% {2} {3}' -f $Name, $percentage, $dot, (Reset $Window))
     }
     $stateText = switch -CaseSensitive ($State) {
         'current' { 'current' }; 'refreshing' { 'refreshing' }; 'stale' { 'stale' }
@@ -59,11 +64,13 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
         elseif ($span.TotalHours -ge 1) { $age = ('{0}h' -f [math]::Floor($span.TotalHours)) }
         else { $age = ('{0}m' -f [math]::Max(0, [math]::Floor($span.TotalMinutes))) }
     }
-    $tooltip = @($stateText)
-    if ($distinctWarning) { $tooltip += $warningText }
-    if ($null -ne $Five) { $tooltip += Reset '5h' $Five }
-    if ($null -ne $Weekly) { $tooltip += Reset '7d' $Weekly }
-    $tooltip += "age: $age"
+    $tooltip = @('Codex')
+    if ($null -ne $Five) { $tooltip += WindowLine '5h' $Five }
+    if ($null -ne $Weekly) { $tooltip += WindowLine 'Weekly' $Weekly }
+    $statusLine = @($stateText)
+    if ($distinctWarning) { $statusLine += $warningText }
+    $statusLine += "age: $age"
+    $tooltip += ($statusLine -join " $dot ")
     $hero = Get-BlockingWindow $Five $Weekly
     $glyphCodes = @(0xF0766, 0xF0A9E, 0xF0A9F, 0xF0AA0, 0xF0AA1, 0xF0AA2, 0xF0AA3, 0xF0AA4, 0xF0AA5)
     $glyphIndex = 0
@@ -87,7 +94,7 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
         compactText = $compactText
         progressGlyph = [char]::ConvertFromUtf32($glyphCodes[$glyphIndex])
         progressColor = $color
-        tooltip = ($tooltip -join ' | ')
+        tooltip = ($tooltip -join "`n")
         className = "aibar-quota state-$State$(if ($null -ne $Warning) { " warning-$Warning" })"
     }
 }
@@ -193,9 +200,9 @@ function Invoke-AiBarQuotaReader {
         $result.progressColor = if ($Provider -ceq 'Claude') { '#E0876A' } else { '#2FBF98' }
     }
     if ($Provider -ceq 'Claude') {
-        # The widget shows the Claude mark beside the compact text; words name Claude in the alternate label and tooltip.
+        # The widget shows the Claude mark; the tooltip names the provider on its own line.
         $result.label = 'Claude ' + $result.label
-        $result.tooltip = 'Claude ' + $result.tooltip
+        $result.tooltip = $result.tooltip -creplace '^Codex\n', "Claude`n"
     }
     return $result
 }

@@ -2,6 +2,7 @@ BeforeAll {
     $root = Split-Path -Parent $PSScriptRoot
     $reader = Join-Path $root 'read-aibar-quota.ps1'
     $now = [DateTimeOffset]'2026-07-12T12:00:00Z'
+    $dot = [char]0x00B7
     $readerModule = New-Module -ScriptBlock {
         param([string]$readerPath)
         . $readerPath
@@ -44,6 +45,8 @@ Invoke-AiBarQuotaReader
         ($names -join ',') | Should -Be 'label,compactText,progressGlyph,progressColor,tooltip,className'
         $result.compactText.Length | Should -BeLessOrEqual 64
         $result.compactText | Should -Not -Match '[<>&{}]'
+        $result.tooltip | Should -Not -Match '[<>&{}]'
+        $result.tooltip | Should -Not -Match "`r"
         ($result.progressColor -cin @('#3DDC84', '#FFC531', '#FF8A3D', '#FF4D5E', '#8995A4')) | Should -Be $true
     }
     function Assert-Compact($result, [string]$text) {
@@ -91,7 +94,7 @@ Describe 'AIBar YASB reader' {
             $output = $process.StandardOutput.ReadToEnd(); $errors = $process.StandardError.ReadToEnd()
             $process.WaitForExit()
             $process.ExitCode | Should -Be 1
-            $fallback = '{"label":"unavailable","compactText":"unavailable","progressGlyph":"' + [char]::ConvertFromUtf32(0xF0766) + '","progressColor":"#8995A4","tooltip":"unavailable | age: --","className":"aibar-quota state-unavailable warning-unavailable"}'
+            $fallback = '{"label":"unavailable","compactText":"unavailable","progressGlyph":"' + [char]::ConvertFromUtf32(0xF0766) + '","progressColor":"#8995A4","tooltip":"Codex\nunavailable ' + [char]0x00B7 + ' age: --","className":"aibar-quota state-unavailable warning-unavailable"}'
             $output | Should -BeExactly ($fallback + "`r`n")
             $errors | Should -Be ''
             $process.Dispose()
@@ -100,15 +103,15 @@ Describe 'AIBar YASB reader' {
 
     It 'renders every valid fixture as its exact state, warning, text, and class' {
         $cases = @(
-            @{ Name = 'current.json'; Label = '5h: 12.5% | 7d: 40% | current'; Tooltip = 'current | 5h resets in 1h 0m | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'refreshing.json'; Label = '5h: 12% | refreshing'; Tooltip = 'refreshing | 5h resets in 1h 0m | age: 2h'; ClassName = 'aibar-quota state-refreshing' },
-            @{ Name = 'stale-refresh.json'; Label = '5h: 12% | 7d: 40% | stale | refresh failed'; Tooltip = 'stale | refresh failed | 5h reset: due | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-stale warning-refresh-failed' },
-            @{ Name = 'stale-auth.json'; Label = '5h: 12% | 7d: 40% | stale | authentication failed'; Tooltip = 'stale | authentication failed | 5h reset: -- | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-stale warning-authentication-failed' },
-            @{ Name = 'unavailable.json'; Label = 'unavailable'; Tooltip = 'unavailable | age: --'; ClassName = 'aibar-quota state-unavailable warning-unavailable' },
-            @{ Name = 'disabled.json'; Label = 'disabled'; Tooltip = 'disabled | age: --'; ClassName = 'aibar-quota state-disabled warning-disabled' },
-            @{ Name = 'partial.json'; Label = '7d: 40% | current'; Tooltip = 'current | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'nullable-reset.json'; Label = '5h: 12% | 7d: 40% | current'; Tooltip = 'current | 5h reset: -- | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'reset-equal.json'; Label = '5h: 12% | current'; Tooltip = 'current | 5h reset: due | age: 0m'; ClassName = 'aibar-quota state-current' }
+            @{ Name = 'current.json'; Label = '5h: 12.5% | 7d: 40% | current'; Tooltip = "Codex`n5h  12.5% $dot resets in 1h 0m`nWeekly  40% $dot resets in 1d 22h`ncurrent $dot age: 2h"; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'refreshing.json'; Label = '5h: 12% | refreshing'; Tooltip = "Codex`n5h  12% $dot resets in 1h 0m`nrefreshing $dot age: 2h"; ClassName = 'aibar-quota state-refreshing' },
+            @{ Name = 'stale-refresh.json'; Label = '5h: 12% | 7d: 40% | stale | refresh failed'; Tooltip = "Codex`n5h  12% $dot reset: due`nWeekly  40% $dot resets in 1d 22h`nstale $dot refresh failed $dot age: 2h"; ClassName = 'aibar-quota state-stale warning-refresh-failed' },
+            @{ Name = 'stale-auth.json'; Label = '5h: 12% | 7d: 40% | stale | authentication failed'; Tooltip = "Codex`n5h  12% $dot reset: --`nWeekly  40% $dot resets in 1d 22h`nstale $dot authentication failed $dot age: 2h"; ClassName = 'aibar-quota state-stale warning-authentication-failed' },
+            @{ Name = 'unavailable.json'; Label = 'unavailable'; Tooltip = "Codex`nunavailable $dot age: --"; ClassName = 'aibar-quota state-unavailable warning-unavailable' },
+            @{ Name = 'disabled.json'; Label = 'disabled'; Tooltip = "Codex`ndisabled $dot age: --"; ClassName = 'aibar-quota state-disabled warning-disabled' },
+            @{ Name = 'partial.json'; Label = '7d: 40% | current'; Tooltip = "Codex`nWeekly  40% $dot resets in 1d 22h`ncurrent $dot age: 2h"; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'nullable-reset.json'; Label = '5h: 12% | 7d: 40% | current'; Tooltip = "Codex`n5h  12% $dot reset: --`nWeekly  40% $dot resets in 1d 22h`ncurrent $dot age: 2h"; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'reset-equal.json'; Label = '5h: 12% | current'; Tooltip = "Codex`n5h  12% $dot reset: due`ncurrent $dot age: 0m"; ClassName = 'aibar-quota state-current' }
         )
         $compact = @('40%', '12%', '40% | stale | refresh failed', '40% | stale | authentication failed', 'unavailable', 'disabled', '40%', '40%', '12%')
         $index = 0
@@ -121,22 +124,27 @@ Describe 'AIBar YASB reader' {
             $result.className | Should -Be $case.ClassName
         }
 
+        # S6 regression: the limit omitted from compactText still has usage and reset in the tooltip.
+        $twoWindow = Read-Fixture 'current.json'
+        Assert-Compact $twoWindow '40%'
+        $twoWindow.tooltip | Should -BeExactly "Codex`n5h  12.5% $dot resets in 1h 0m`nWeekly  40% $dot resets in 1d 22h`ncurrent $dot age: 2h"
+
         $five = [ordered]@{ percentageUsed = 12.5; resetAt = '2026-07-12T13:00:00Z' }
         $weekly35 = [ordered]@{ percentageUsed = 35; resetAt = '2026-07-14T10:00:00Z' }
         $weekly25 = [ordered]@{ percentageUsed = 25; resetAt = '2026-07-14T10:00:00Z' }
         $source = '2026-07-12T10:00:00Z'
         $nullableCases = @(
-            @{ Name = 'both windows'; Five = $five; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = '5h: 12.5% | 7d: 35% | current'; Tooltip = 'current | 5h resets in 1h 0m | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'weekly-only 35'; Five = $null; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = '7d: 35% | current'; Tooltip = 'current | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'weekly-only 25'; Five = $null; Weekly = $weekly25; State = 'current'; Warning = $null; Source = $source; Label = '7d: 25% | current'; Tooltip = 'current | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'five-hour-only'; Five = $five; Weekly = $null; State = 'current'; Warning = $null; Source = $source; Label = '5h: 12.5% | current'; Tooltip = 'current | 5h resets in 1h 0m | age: 2h'; ClassName = 'aibar-quota state-current' },
-            @{ Name = 'stale weekly-only'; Five = $null; Weekly = $weekly35; State = 'stale'; Warning = 'refresh-failed'; Source = $source; Label = '7d: 35% | stale | refresh failed'; Tooltip = 'stale | refresh failed | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-stale warning-refresh-failed' },
-            @{ Name = 'stale service unavailable'; Five = $null; Weekly = $weekly35; State = 'stale'; Warning = 'unavailable'; Source = $source; Label = '7d: 35% | stale | service unavailable'; Tooltip = 'stale | service unavailable | 7d resets in 1d 22h | age: 2h'; ClassName = 'aibar-quota state-stale warning-unavailable' },
-            @{ Name = 'stale five-hour-only'; Five = $five; Weekly = $null; State = 'stale'; Warning = 'authentication-failed'; Source = $source; Label = '5h: 12.5% | stale | authentication failed'; Tooltip = 'stale | authentication failed | 5h resets in 1h 0m | age: 2h'; ClassName = 'aibar-quota state-stale warning-authentication-failed' },
-            @{ Name = 'refreshing without windows'; Five = $null; Weekly = $null; State = 'refreshing'; Warning = $null; Source = $null; Label = 'refreshing'; Tooltip = 'refreshing | age: --'; ClassName = 'aibar-quota state-refreshing' },
-            @{ Name = 'unavailable without warning'; Five = $null; Weekly = $null; State = 'unavailable'; Warning = $null; Source = $null; Label = 'unavailable'; Tooltip = 'unavailable | age: --'; ClassName = 'aibar-quota state-unavailable' },
-            @{ Name = 'zero-window current fails closed'; Five = $null; Weekly = $null; State = 'current'; Warning = $null; Source = $source; Label = 'unavailable'; Tooltip = 'unavailable | age: --'; ClassName = 'aibar-quota state-unavailable warning-unavailable' },
-            @{ Name = 'malformed-present sibling fails closed'; Five = [ordered]@{ percentageUsed = -1; resetAt = $null }; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = 'unavailable'; Tooltip = 'unavailable | age: --'; ClassName = 'aibar-quota state-unavailable warning-unavailable' }
+            @{ Name = 'both windows'; Five = $five; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = '5h: 12.5% | 7d: 35% | current'; Tooltip = "Codex`n5h  12.5% $dot resets in 1h 0m`nWeekly  35% $dot resets in 1d 22h`ncurrent $dot age: 2h"; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'weekly-only 35'; Five = $null; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = '7d: 35% | current'; Tooltip = "Codex`nWeekly  35% $dot resets in 1d 22h`ncurrent $dot age: 2h"; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'weekly-only 25'; Five = $null; Weekly = $weekly25; State = 'current'; Warning = $null; Source = $source; Label = '7d: 25% | current'; Tooltip = "Codex`nWeekly  25% $dot resets in 1d 22h`ncurrent $dot age: 2h"; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'five-hour-only'; Five = $five; Weekly = $null; State = 'current'; Warning = $null; Source = $source; Label = '5h: 12.5% | current'; Tooltip = "Codex`n5h  12.5% $dot resets in 1h 0m`ncurrent $dot age: 2h"; ClassName = 'aibar-quota state-current' },
+            @{ Name = 'stale weekly-only'; Five = $null; Weekly = $weekly35; State = 'stale'; Warning = 'refresh-failed'; Source = $source; Label = '7d: 35% | stale | refresh failed'; Tooltip = "Codex`nWeekly  35% $dot resets in 1d 22h`nstale $dot refresh failed $dot age: 2h"; ClassName = 'aibar-quota state-stale warning-refresh-failed' },
+            @{ Name = 'stale service unavailable'; Five = $null; Weekly = $weekly35; State = 'stale'; Warning = 'unavailable'; Source = $source; Label = '7d: 35% | stale | service unavailable'; Tooltip = "Codex`nWeekly  35% $dot resets in 1d 22h`nstale $dot service unavailable $dot age: 2h"; ClassName = 'aibar-quota state-stale warning-unavailable' },
+            @{ Name = 'stale five-hour-only'; Five = $five; Weekly = $null; State = 'stale'; Warning = 'authentication-failed'; Source = $source; Label = '5h: 12.5% | stale | authentication failed'; Tooltip = "Codex`n5h  12.5% $dot resets in 1h 0m`nstale $dot authentication failed $dot age: 2h"; ClassName = 'aibar-quota state-stale warning-authentication-failed' },
+            @{ Name = 'refreshing without windows'; Five = $null; Weekly = $null; State = 'refreshing'; Warning = $null; Source = $null; Label = 'refreshing'; Tooltip = "Codex`nrefreshing $dot age: --"; ClassName = 'aibar-quota state-refreshing' },
+            @{ Name = 'unavailable without warning'; Five = $null; Weekly = $null; State = 'unavailable'; Warning = $null; Source = $null; Label = 'unavailable'; Tooltip = "Codex`nunavailable $dot age: --"; ClassName = 'aibar-quota state-unavailable' },
+            @{ Name = 'zero-window current fails closed'; Five = $null; Weekly = $null; State = 'current'; Warning = $null; Source = $source; Label = 'unavailable'; Tooltip = "Codex`nunavailable $dot age: --"; ClassName = 'aibar-quota state-unavailable warning-unavailable' },
+            @{ Name = 'malformed-present sibling fails closed'; Five = [ordered]@{ percentageUsed = -1; resetAt = $null }; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = 'unavailable'; Tooltip = "Codex`nunavailable $dot age: --"; ClassName = 'aibar-quota state-unavailable warning-unavailable' }
         )
         $compact = @('35%', '35%', '25%', '12.5%', '35% | stale | refresh failed', '35% | stale | service unavailable', '12.5% | stale | authentication failed', 'refreshing', 'unavailable', 'unavailable', 'unavailable')
         $index = 0
@@ -159,8 +167,8 @@ Describe 'AIBar YASB reader' {
             $result.label | Should -Not -Match '5h: --|7d: --|partial'
             $result.tooltip | Should -Not -Match 'state:|warning:'
             $result.className | Should -Not -Match 'partial'
-            if ($null -eq $case.Five) { $result.tooltip | Should -Not -Match '5h reset' }
-            if ($null -eq $case.Weekly) { $result.tooltip | Should -Not -Match '7d reset' }
+            if ($null -eq $case.Five) { $result.tooltip | Should -Not -Match '(?m)^5h  ' }
+            if ($null -eq $case.Weekly) { $result.tooltip | Should -Not -Match '(?m)^Weekly  ' }
         }
         $stages = @(
             @(0, 12.5, 0xF0766), @(12.5, 25, 0xF0A9E), @(25, 37.5, 0xF0A9F),
@@ -183,6 +191,9 @@ Describe 'AIBar YASB reader' {
                         Assert-Compact $result (([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%')
                         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32($stage[2]))
                         $result.progressColor | Should -BeExactly $color
+                        $formatted = ([double]$value).ToString('0.#', [Globalization.CultureInfo]::InvariantCulture)
+                        $windowName = if ($weeklyHero) { 'Weekly' } else { '5h' }
+                        $result.tooltip | Should -Match ([regex]::Escape("$windowName  $formatted% $dot reset: --"))
                     }
                 }
             }
@@ -207,14 +218,14 @@ Describe 'AIBar YASB reader' {
             Assert-SafeFields $result
             $result.label | Should -Be 'unavailable'
             Assert-Compact $result 'unavailable'
-            $result.tooltip | Should -Be 'unavailable | age: --'
+            $result.tooltip | Should -Be "Codex`nunavailable $dot age: --"
             $result.className | Should -Be 'aibar-quota state-unavailable warning-unavailable'
         }
         $rollback = Read-Fixture 'clock-rollback.json' ([DateTimeOffset]'2026-07-12T08:00:00Z')
         Assert-SafeFields $rollback
         $rollback.label | Should -Be 'unavailable'
         Assert-Compact $rollback 'unavailable'
-        $rollback.tooltip | Should -Be 'unavailable | age: --'
+        $rollback.tooltip | Should -Be "Codex`nunavailable $dot age: --"
         $rollback.className | Should -Be 'aibar-quota state-unavailable warning-unavailable'
     }
 
@@ -275,9 +286,10 @@ aibar_quota:
         foreach ($case in $cases) {
             $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 12; resetAt = $case[0] }; weekly = $null }
             $result = Read-Document $document
-            $result.tooltip | Should -BeExactly ('current | ' + $case[1] + ' | age: 2h')
+            $resetText = $case[1].Substring(3)
+            $result.tooltip | Should -BeExactly "Codex`n5h  12% $dot $resetText`ncurrent $dot age: 2h"
             # Tooltips may render as rich text: no seconds, no UTC suffix, no markup characters.
-            $result.tooltip | Should -Not -Match '[0-9]{2}:[0-9]{2}:[0-9]{2}|Z\b|[<>&]'
+            $result.tooltip | Should -Not -Match '[0-9]{2}:[0-9]{2}:[0-9]{2}|Z\b|[<>&{}]'
         }
     }
 
@@ -305,6 +317,9 @@ aibar_quota:
         $css | Should -Match 'warning-authentication-failed'
         $expectedCss = @'
 /* Copy and customize; state/warning text remains visible in the widget. */
+/* After installing the bundled font, set the bar font or enable this label rule:
+.aibar-quota .label { font-family: "IosevkaTerm Nerd Font"; }
+*/
 .aibar-quota { padding: 0 8px; border-radius: 6px; }
 .aibar-quota.state-current { background: #244f36; }
 .aibar-quota.state-refreshing { background: #29496b; }
@@ -379,7 +394,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
             $claude = Read-ClaudeFixture $case[0]
             $claude.compactText | Should -BeExactly $case[1]
             $claude.label | Should -BeExactly ('Claude ' + $codex.label)
-            $claude.tooltip | Should -BeExactly ('Claude ' + $codex.tooltip)
+            $claude.tooltip | Should -BeExactly ($codex.tooltip -creplace '^Codex\n', "Claude`n")
             $claude.progressGlyph | Should -BeExactly $codex.progressGlyph
             $claude.progressColor | Should -BeExactly $codex.progressColor
             # Selecting Claude must not mutate the module's subsequent default provider.
@@ -397,7 +412,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
             $result = Read-ClaudeFixture $name
             $result.label | Should -BeExactly 'Claude unavailable'
             Assert-Compact $result 'unavailable'
-            $result.tooltip | Should -BeExactly 'Claude unavailable | age: --'
+            $result.tooltip | Should -BeExactly "Claude`nunavailable $dot age: --"
         }
     }
 
@@ -428,7 +443,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA4))
         $result.progressColor | Should -BeExactly '#FF4D5E'
         $result.label | Should -BeExactly 'Claude 5h: 92% | 7d: 40% | current'
-        $result.tooltip | Should -BeExactly 'Claude current | 5h resets in 1h 0m | 7d resets in 1d 22h | age: 2h'
+        $result.tooltip | Should -BeExactly "Claude`n5h  92% $dot resets in 1h 0m`nWeekly  40% $dot resets in 1d 22h`ncurrent $dot age: 2h"
         # Cached/stale data uses the same selection without losing its explicit warning.
         $document.state = 'stale'; $document.warning = 'refresh-failed'
         $result = Read-ClaudeDocument $document
@@ -444,7 +459,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA3))
         $result.progressColor | Should -BeExactly '#FF8A3D'
         $result.label | Should -BeExactly 'Claude 5h: 40% | 7d: 78% | current'
-        $result.tooltip | Should -BeExactly 'Claude current | 5h resets in 1h 0m | 7d resets in 1d 22h | age: 2h'
+        $result.tooltip | Should -BeExactly "Claude`n5h  40% $dot resets in 1h 0m`nWeekly  78% $dot resets in 1d 22h`ncurrent $dot age: 2h"
     }
 
     It 'breaks equal usage ties by the sooner known reset in either window' {
@@ -480,7 +495,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA2))
         $result.progressColor | Should -BeExactly '#FFC531'
         $result.label | Should -BeExactly '7d: 62.5% | current'
-        $result.tooltip | Should -BeExactly 'current | 7d resets in 1d 22h | age: 2h'
+        $result.tooltip | Should -BeExactly "Codex`nWeekly  62.5% $dot resets in 1d 22h`ncurrent $dot age: 2h"
     }
 
     It 'uses the sole Claude window when either sibling is null including zero usage' {
@@ -494,7 +509,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
                 $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32($(if ($used -eq 0) { 0xF0766 } else { 0xF0AA5 })))
                 $result.progressColor | Should -BeExactly $(if ($used -eq 0) { '#3DDC84' } else { '#FF4D5E' })
                 $result.label | Should -BeExactly $(if ($weeklyOnly) { "Claude 7d: $used% | current" } else { "Claude 5h: $used% | current" })
-                $result.tooltip | Should -BeExactly $(if ($weeklyOnly) { 'Claude current | 7d reset: -- | age: 2h' } else { 'Claude current | 5h reset: -- | age: 2h' })
+                $result.tooltip | Should -BeExactly $(if ($weeklyOnly) { "Claude`nWeekly  $used% $dot reset: --`ncurrent $dot age: 2h" } else { "Claude`n5h  $used% $dot reset: --`ncurrent $dot age: 2h" })
             }
         }
     }
@@ -514,7 +529,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
             Assert-SafeFields $result
             $result.label | Should -Match '^Claude '
             $result.compactText | Should -Not -Match 'Claude'
-            $result.tooltip | Should -Match '^Claude '
+            $result.tooltip | Should -Match '^Claude\n'
         } finally { $process.Dispose() }
     }
 
@@ -536,7 +551,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
                 Assert-SafeFields $result
                 Assert-Compact $result 'unavailable'
                 $result.label | Should -BeExactly 'unavailable'
-                $result.tooltip | Should -BeExactly 'unavailable | age: --'
+                $result.tooltip | Should -BeExactly "Codex`nunavailable $dot age: --"
                 $output | Should -Not -Match 'secret|Other|extra|<|>|&'
             } finally { $process.Dispose() }
         }

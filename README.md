@@ -87,6 +87,8 @@ AIBar starts in the tray. Enable Codex and Claude from the tray menu; each provi
 - **Provider status.** Incident badges from the official status pages and one-click links to each provider's usage page. See [provider status](./docs/provider-status.md).
 - **Copy summary.** Puts the displayed quota on the clipboard as plain text. See [quota summary](./docs/quota-summary.md).
 - **Settings.** Follows Windows light, dark and high-contrast themes; opacity, provider tint, bar colors, alert thresholds and refresh interval. Fully keyboard accessible. See [settings](./docs/settings.md).
+- **Floating widget.** No YASB? Enable an always-on-top quota-ring strip in Settings, or accept the one-time startup offer. Drag it to any screen edge.
+- **YASB font.** AIBar offers to install the bundled IosevkaTerm Nerd Font when YASB is detected and the font is missing. You can also install it from Settings (per user, no admin or download).
 - **YASB widget.** Optional [YASB](https://github.com/amnweb/yasb) CustomWidget that shows a sanitized quota snapshot in your status bar. See [`yasb/README.txt`](./yasb/README.txt).
 - **Remote usage.** Optional Linux helpers send Claude quota and Codex token aggregates from another machine over SSH. See [`tools/claude-remote-usage`](./tools/claude-remote-usage/README.md).
 
