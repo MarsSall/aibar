@@ -97,15 +97,19 @@ public partial class App : System.Windows.Application
                 Path.Combine(dataDirectory, "claude-remote-usage.json"))),
             () => ClaudeRemoteUsageProvider.IsAvailableForAutomatic(Path.Combine(dataDirectory, "claude-remote-usage.json")), historyStore: historyStore,
             remoteRefresh: new ClaudeRemoteRefreshChannel(dataDirectory), remoteAbsenceConfirmation: TimeSpan.FromSeconds(2));
-        var claudeCost = new UsageCostView(() => claudeRuntime.IsConsentEnabled,
+        var claudeCost = new UsageCostView(() => claudeRuntime.IsConsentEnabled && claudeRuntime.Source != ClaudeQuotaSource.ThisPc,
             token => ClaudeRemoteTokens.ReadAsync(Path.Combine(dataDirectory, "claude-remote-tokens.json"), clock.UtcNow, token));
         claudeRuntime.ConsentChanged += () => { _ = claudeCost.RefreshAsync(default); };
         claudeRuntime.StateChanged += () => { _ = claudeCost.RefreshAsync(default); };
+        claudeRuntime.SourceChanged += () => { _ = claudeCost.RefreshForSourceAsync(default); };
         var codexCost = new UsageCostView(() => policy.IsEnabled, async token =>
         {
-            var remote = await RemoteTokens.ReadRowsAsync(Path.Combine(dataDirectory, "codex-remote-tokens.json"), clock.UtcNow, token);
-            return RemoteTokens.Combine(analytics.State, remote, DateOnly.FromDateTime(clock.UtcNow.LocalDateTime));
+            var source = betaRuntime.Source;
+            var remote = source == DataSource.ThisPc ? RemoteTokenRows.Unavailable :
+                await RemoteTokens.ReadRowsAsync(Path.Combine(dataDirectory, "codex-remote-tokens.json"), clock.UtcNow, token);
+            return RemoteTokens.Combine(analytics.State, remote, DateOnly.FromDateTime(clock.UtcNow.LocalDateTime), source);
         });
+        betaRuntime.SourceChanged += () => { _ = codexCost.RefreshForSourceAsync(default); };
         analytics.StateChanged += state => { _ = codexCost.RefreshAsync(default); };
         coordinator.StateChanged += state => { _ = codexCost.RefreshAsync(default); };
         var appearance = new AppearanceSettings(Path.Combine(dataDirectory, "appearance.json"));
@@ -113,7 +117,7 @@ public partial class App : System.Windows.Application
         var onboarding = new OnboardingSettings(Path.Combine(dataDirectory, OnboardingSettings.FileName));
         var alerts = new QuotaAlertObserver(dataDirectory, clock);
         coordinator.AuthorityUpdated += update => alerts.Observe("Codex", update,
-            () => policy.IsEnabled && coordinator.State.Freshness == FreshnessState.Current && coordinator.State.Failure is null);
+            () => betaRuntime.CanDeliverAlerts);
         claudeRuntime.AuthorityUpdated += update => alerts.Observe("Claude", update,
             () => claudeRuntime.IsConsentEnabled && claudeRuntime.State.Freshness == FreshnessState.Current && claudeRuntime.State.Failure is null);
         var lifecycleAdapter = new QuotaRefreshLifecycleAdapter(lifecycleEvents, coordinator);

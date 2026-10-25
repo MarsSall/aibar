@@ -94,10 +94,20 @@ public sealed class ConsentSettings(string path)
         await gate.WaitAsync(cancellationToken);
         try
         {
-            var previous = await ReadAsync<StoredConsent>(cancellationToken);
-            if (previous?.Schema != Schema) previous = null;
-            if (previous is null && await ReadAsync<StoredCodexConsent>(cancellationToken) is { Schema: Schema } codexOnly)
-                previous = new(Schema, codexOnly.PrivateCodexConsent);
+            // Read fields independently: a malformed unrelated consent must not erase
+            // source selection or cache provenance when another setting is saved.
+            using var document = await ReadAsync<JsonDocument>(cancellationToken);
+            StoredConsent? previous = null;
+            if (document?.RootElement is { ValueKind: JsonValueKind.Object } root &&
+                root.TryGetProperty("schema", out var schema) && schema.ValueKind == JsonValueKind.Number &&
+                schema.TryGetInt32(out var version) && version == Schema)
+            {
+                bool? Decision(string name) => root.TryGetProperty(name, out var value) &&
+                    value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.GetBoolean() : null;
+                JsonElement? Field(string name) => root.TryGetProperty(name, out var value) ? value.Clone() : null;
+                previous = new(Schema, Decision("privateCodexConsent") ?? false, Decision("privateClaudeConsent"),
+                    Field("claudeSource"), Field("claudeCacheSource"), Field("dataSource") ?? default);
+            }
             var sourceValue = source is null ? previous?.ClaudeSource :
                 JsonSerializer.SerializeToElement(SourceWireValue(source.Value));
             var cacheValue = cacheSource is null ? previous?.ClaudeCacheSource :

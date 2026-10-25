@@ -40,6 +40,21 @@ public sealed class UsageCostView(Func<bool> enabled, Func<CancellationToken, Va
         finally { _gate.Release(); }
     }
 
+    /// <summary>Invalidate reads admitted under the previous source before queuing the new projection.</summary>
+    public async ValueTask RefreshForSourceAsync(CancellationToken token)
+    {
+        CancellationTokenSource previous;
+        lock (_sync)
+        {
+            if (_disposed || _paused) return;
+            previous = _epoch;
+            _epoch = new();
+            previous.Cancel();
+        }
+        try { await RefreshAsync(token); }
+        finally { previous.Dispose(); }
+    }
+
     public async ValueTask CancelAndWaitAsync(CancellationToken token)
     {
         lock (_sync) { _paused = true; _epoch.Cancel(); }

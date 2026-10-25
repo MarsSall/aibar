@@ -44,6 +44,9 @@ public sealed class BetaRuntime : IAsyncDisposable
     private volatile DataSource _source = DataSource.Automatic;
     public DataSource Source => _source;
     public bool IsRemoteOnly => Source == DataSource.OtherMachine;
+    // Used both when admitting an alert and again at queued tray delivery.
+    public bool CanDeliverAlerts => _policy.IsEnabled && !IsRemoteOnly &&
+        State.Freshness == FreshnessState.Current && State.Failure is null;
     public event Action? SourceChanged;
     public QuotaRefreshState State => IsRemoteOnly
         ? new(null, FreshnessState.Unavailable, false, new(QuotaErrorKind.Unavailable, "quota_other_machine_pending"), null)
@@ -62,12 +65,20 @@ public sealed class BetaRuntime : IAsyncDisposable
             // Drain any local request before completing the handoff; direct coordinator
             // callers (manual refresh and lifecycle) must also remain paused remotely.
             await _coordinator.CancelAndWaitAsync(CancellationToken.None);
+            if (IsRemoteOnly)
+            {
+                if (_publisher is not null && _policy.IsEnabled) await _publisher.SuspendForSourceAsync(CancellationToken.None);
+                if (_analytics is not null) await _analytics.StopAsync(CancellationToken.None);
+            }
+            else if (_policy.IsEnabled)
+            {
+                if (_publisher is not null) await _publisher.RestoreAsync(CancellationToken.None);
+                _coordinator.ResumeAfterClear();
+                if (_analytics is not null) await _analytics.StartAsync(_lifetime.Token);
+            }
             SourceChanged?.Invoke();
             if (!IsRemoteOnly && _policy.IsEnabled)
-            {
-                _coordinator.ResumeAfterClear();
                 await RefreshAsync(RefreshTrigger.Manual, CancellationToken.None);
-            }
         }
         finally { _consentGate.Release(); }
     }
@@ -79,7 +90,9 @@ public sealed class BetaRuntime : IAsyncDisposable
         _source = await _settings.LoadDataSourceAsync(cancellationToken);
         if (IsRemoteOnly) await _coordinator.CancelAndWaitAsync(cancellationToken);
         var enabled = await _settings.LoadAsync(cancellationToken);
-        if (_publisher is not null) await (enabled ? _publisher.RestoreAsync(cancellationToken) : _publisher.DisableAsync(cancellationToken));
+        if (_publisher is not null) await (enabled
+            ? IsRemoteOnly ? _publisher.SuspendForSourceAsync(cancellationToken) : _publisher.RestoreAsync(cancellationToken)
+            : _publisher.DisableAsync(cancellationToken));
         if (enabled) _policy.Enable(); else _policy.Disable();
         CredentialAvailability = _policy.IsEnabled ? CredentialAvailability.Missing : CredentialAvailability.Disabled;
         await _coordinator.InitializeAsync(cancellationToken);
@@ -87,7 +100,7 @@ public sealed class BetaRuntime : IAsyncDisposable
         {
             _polling = PollAsync(_lifetime.Token);
             _ = RefreshAsync(RefreshTrigger.Poll, _lifetime.Token).AsTask();
-            if (_analytics is not null) await _analytics.StartAsync(_lifetime.Token);
+            if (_analytics is not null && !IsRemoteOnly) await _analytics.StartAsync(_lifetime.Token);
         }
     }
 
@@ -108,10 +121,14 @@ public sealed class BetaRuntime : IAsyncDisposable
         if (_publisher is not null) await _publisher.EnableAsync(cancellationToken);
         await _settings.SaveAsync(true, cancellationToken);
         _policy.Enable();
-        if (IsRemoteOnly) await _coordinator.CancelAndWaitAsync(cancellationToken);
+        if (IsRemoteOnly)
+        {
+            await _coordinator.CancelAndWaitAsync(cancellationToken);
+            if (_publisher is not null) await _publisher.SuspendForSourceAsync(cancellationToken);
+        }
         else _coordinator.ResumeAfterClear();
         _polling ??= PollAsync(_lifetime.Token);
-        if (_analytics is not null) await _analytics.StartAsync(_lifetime.Token);
+        if (_analytics is not null && !IsRemoteOnly) await _analytics.StartAsync(_lifetime.Token);
         await RefreshAsync(RefreshTrigger.Manual, cancellationToken);
     }
 

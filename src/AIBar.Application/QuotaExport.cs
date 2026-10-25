@@ -166,6 +166,8 @@ public ValueTask EnableAsync(CancellationToken cancellationToken) => ChangeDiscl
 /// <summary>Enables persisted consent at startup: not a privacy action, so it never publishes "disabled".</summary>
 public ValueTask RestoreAsync(CancellationToken cancellationToken) => ChangeDisclosureAsync(true, cancellationToken, restore: true);
 public ValueTask DisableAsync(CancellationToken cancellationToken) => ChangeDisclosureAsync(false, cancellationToken);
+/// <summary>Close local publication, drain even cancellation-ignoring writers, then replace their values.</summary>
+public ValueTask SuspendForSourceAsync(CancellationToken cancellationToken) => ChangeDisclosureAsync(false, cancellationToken, unavailable: true);
 public async ValueTask CancelAndWaitAsync(CancellationToken cancellationToken)
 {
 await _privacyGate.WaitAsync(cancellationToken);
@@ -185,7 +187,7 @@ finally { prior.Dispose(); }
 finally { _privacyGate.Release(); }
 }
 public void ResumeAfterClear() { }
-private async ValueTask ChangeDisclosureAsync(bool enabled, CancellationToken cancellationToken, bool restore = false)
+private async ValueTask ChangeDisclosureAsync(bool enabled, CancellationToken cancellationToken, bool restore = false, bool unavailable = false)
 {
     await _privacyGate.WaitAsync(cancellationToken);
     CancellationTokenSource prior; CancellationTokenSource current; Task drain; long epoch;
@@ -205,7 +207,9 @@ try
 await drain;
 var now = _clock.UtcNow;
 using var linked = CancellationTokenSource.CreateLinkedTokenSource(current.Token, cancellationToken);
-var document = restore ? QuotaExportProjector.Project(new(Redact(_authority.State)), now) : QuotaExportWire.Disabled(now);
+var document = unavailable
+    ? QuotaExportProjector.Project(new(new(null, FreshnessState.Unavailable, false, new(QuotaErrorKind.Unavailable, "quota_other_machine_pending"), null)), now)
+    : restore ? QuotaExportProjector.Project(new(Redact(_authority.State)), now) : QuotaExportWire.Disabled(now);
 await _writer.WriteAsync(document, now, linked.Token);
 if (enabled) lock (_gate) if (!_disposed && epoch == _epoch)
 {
