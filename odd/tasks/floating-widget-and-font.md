@@ -10,6 +10,7 @@ Branch: `feat/floating-widget-and-font`. Verification runs on Windows CI (`.gith
 - S3 Floating widget: "con widget me refería a algo flotante, exacto, como ofrece quorb" (quorb: an always-on-top strip docked to a screen edge, one ring per provider, hover for details, drag to any edge, vertical on the sides).
 - S4 Rings: answer → "Dos concéntricos: 5h afuera, semanal adentro (Recom.)": per provider (Codex, Claude), outer ring = 5h used %, inner ring = weekly used %; hover shows percentages, resets and plan.
 - S5 Activation: answer → "Toggle en Settings + oferta si no hay YASB (Recom.)": Settings toggle, off by default; when YASB is not detected, AIBar asks once at startup whether to turn it on.
+- S6 YASB tooltip like the dock card: "quedo muy bueno!! me gustaria que la info que da la tarjetita al estar parado sobre los widgest apapresca asi en la yasb var, me refieor a que la que ofrece ahora yasb es solo momentos de rest pero no el otro limite que no se muestra". The YASB tooltip shows, one per line like the dock card: provider name, `5h  <used>% · resets in <countdown>`, `Weekly  <used>% · resets in <countdown>`, then state (and distinct warning) with source age. Plan stays out (the YASB export carries no plan text by contract).
 
 ## Tasks
 
@@ -17,6 +18,8 @@ Branch: `feat/floating-widget-and-font`. Verification runs on Windows CI (`.gith
 - T2 [S1] Bundled glyph font: Publish-Deterministic downloads pinned IosevkaTermNerdFont-Regular.ttf + LICENSE.md (v3.5.1, SHA-256 pinned) into `fonts/`; `GlyphFontInstaller` (detect, per-user install, WM_FONTCHANGE) + tests; YASB docs — worker (background, parallel with T1) — commit: f1c99a9 (packaging), 7a660a6 (installer). Risk: item 5 (writes the user's font registry/files).
 - T3 [S2, S5] Wiring: `YasbPresence`, `OnboardingSettings` (onboarding.json, in clear-data list), startup offers (font when YASB + missing font; dock when no YASB), Settings toggle + install button, App composition — standalone pieces inline, wiring by worker (context backstop) — commit: cbe7ccc
 - T4 [S1-S5] Docs, Windows CI, deploy to the user's PC, acceptance — inline — commit: pending
+
+- T5 [S6] YASB reader tooltip mirrors the dock card (both windows with % and reset, multi-line) + Pester + docs — worker (context backstop) — commit: pending
 
 ## Log
 
@@ -31,3 +34,5 @@ Branch: `feat/floating-widget-and-font`. Verification runs on Windows CI (`.gith
 - L9 (user): "hay algo que esta fallando, aibar se abre y se cierra sola, en relidad se cierra y cuando toco en yasb se vuelve a abrir"
 - L10 (evidence): Application log on Mars, 08:26:07 and 08:27:08: .NET Runtime 1026 unhandled System.NotSupportedException "la propiedad ToolTip no admite el elemento ToolTip con StaysOpen establecido en falso" at PopupControlService.ShowToolTip: the dock ring hover card (DockRing.cs:47) set StaysOpen = false, so hovering a ring killed the process; YASB's click relaunched it. Fix: drop StaysOpen = false; regression test in DockRingTests.
 - L11 (evidence): RED on Mars: DockRingTests.Hover_card_is_a_tooltip_wpf_can_open_without_crashing failed with the old DockRing.cs; GREEN: 32/32 Dock tests after the fix (first GREEN attempt was a stale incremental build: the copied file kept an older mtime). Fix commit 7bd1c0c. Redeployed: only AIBar.Desktop.dll changed, previous copy in %TEMP%\aibar-pr84-build\backup-before-fix; relaunched PID 24920 session 2.
+- L12 (user): "quedo muy bueno!! me gustaria que la info que da la tarjetita al estar parado sobre los widgest apapresca asi en la yasb var, me refieor a que la que ofrece ahora yasb es solo momentos de rest pero no el otro limite que no se muestra"
+- L13 (evidence): CI 40189228047 on 12ec181 green (.NET 1502/1502 incl. the hover regression test, Pester 29/29, Python).
