@@ -23,7 +23,8 @@ public sealed class BetaRuntime : IAsyncDisposable
     private Task? _polling;
     private bool _disposed;
 
-    public BetaRuntime(ConsentSettings settings, PrivateIntegrationPolicy policy, QuotaRefreshCoordinator coordinator, IClock clock, ConsentCredentialSource? credentials = null, ILocalAnalyticsLifecycle? analytics = null, QuotaExportPublisher? publisher = null, TimeProvider? timeProvider = null)
+    public BetaRuntime(ConsentSettings settings, PrivateIntegrationPolicy policy, QuotaRefreshCoordinator coordinator, IClock clock, ConsentCredentialSource? credentials = null, ILocalAnalyticsLifecycle? analytics = null, QuotaExportPublisher? publisher = null, TimeProvider? timeProvider = null,
+        Func<PrivateIntegrationPolicy, IQuotaProvider>? remoteProviderFactory = null, Func<bool>? remoteFileAvailable = null)
     {
         _settings = settings; _policy = policy; _coordinator = coordinator; _clock = clock; _credentials = credentials; _analytics = analytics; _publisher = publisher;
         _pollTimer = new(TimeSpan.FromMinutes(5), timeProvider ?? TimeProvider.System);

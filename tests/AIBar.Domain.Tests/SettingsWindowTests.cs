@@ -41,7 +41,7 @@ public sealed class SettingsWindowTests
                     var source = Assert.IsType<ComboBox>(window.FindName(provider + "Source"));
                     Assert.Equal(provider + " source", AutomationProperties.GetName(source));
                     Assert.Equal(new[] { "Automatic", "This PC", "Other machine" }, source.Items.Cast<ComboBoxItem>().Select(item => (string)item.Content));
-                    var suffix = provider == "Codex" ? " Codex has no remote quota yet." : "";
+                    var suffix = "";
                     Assert.Equal(new[] {
                         "Uses data sent from another machine when it exists, otherwise this PC's login." + suffix,
                         "Only this PC's login." + suffix,

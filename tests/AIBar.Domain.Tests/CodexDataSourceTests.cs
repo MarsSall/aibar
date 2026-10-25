@@ -11,7 +11,7 @@ public sealed class CodexDataSourceTests
     [Theory]
     [InlineData(DataSource.ThisPc)]
     [InlineData(DataSource.Automatic)]
-    public async Task Remote_only_blocks_credentials_endpoint_and_cached_values_then_local_refresh_resumes(DataSource local)
+    public async Task Remote_only_retrieves_remote_without_credentials_endpoint_or_local_cache_then_local_refresh_resumes(DataSource local)
     {
         var root = Path.Combine(Path.GetTempPath(), $"aibar-codex-source-{Guid.NewGuid():N}");
         try
@@ -26,16 +26,20 @@ public sealed class CodexDataSourceTests
             var provider = new Provider(credentials);
             var clock = new FixedClock();
             var coordinator = new QuotaRefreshCoordinator(new Store(), provider, clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
-            await using var runtime = new BetaRuntime(settings, policy, coordinator, clock);
+            var remote = new CurrentProvider(clock, 73);
+            await using var runtime = new BetaRuntime(settings, policy, coordinator, clock,
+                remoteProviderFactory: _ => remote, remoteFileAvailable: () => false);
             await runtime.InitializeAsync(default);
             await runtime.RefreshAsync(RefreshTrigger.Manual, default);
             // Also protect callers that use the coordinator directly (panel and lifecycle).
             await coordinator.RefreshAsync(RefreshTrigger.Manual, default);
             Assert.Equal(0, files.Reads); Assert.Equal(0, provider.Calls);
-            Assert.Null(runtime.State.Snapshot);
+            Assert.NotNull(runtime.State.Snapshot);
             var shown = new QuotaPresentationMapper(clock).Map(runtime.State);
-            Assert.True(shown.IsUnavailable);
-            Assert.Equal("No data from the other machine yet", shown.ErrorLabel);
+            Assert.True(shown.IsCurrent);
+            Assert.Equal(73m, shown.Primary.PercentageUsed);
+            Assert.True(remote.Calls > 0);
+            Assert.Null(shown.ErrorLabel);
             await using var claude = new ClaudeQuotaRuntime(settings, new Store(), _ => provider, clock,
                 remoteProviderFactory: _ => provider, remoteFileAvailable: () => false);
             await claude.InitializeAsync(default);
@@ -54,8 +58,10 @@ public sealed class CodexDataSourceTests
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
-    [Fact]
-    public async Task Switching_remote_drains_inflight_request_and_hides_its_late_local_result()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Switching_remote_drains_inflight_request_and_hides_its_late_local_result(bool automatic)
     {
         var root = Path.Combine(Path.GetTempPath(), $"aibar-source-drain-{Guid.NewGuid():N}");
         try
@@ -64,24 +70,35 @@ public sealed class CodexDataSourceTests
             await settings.SaveAsync(true, default);
             var provider = new BlockingProvider(); var clock = new FixedClock();
             var coordinator = new QuotaRefreshCoordinator(new Store(), provider, clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
-            await using var runtime = new BetaRuntime(settings, new PrivateIntegrationPolicy(), coordinator, clock);
+            var remote = new CurrentProvider(clock);
+            var available = false;
+            await using var runtime = new BetaRuntime(settings, new PrivateIntegrationPolicy(), coordinator, clock,
+                remoteProviderFactory: _ => remote, remoteFileAvailable: () => available);
             await runtime.InitializeAsync(default);
             await provider.Started.Task.WaitAsync(TimeSpan.FromSeconds(60));
-            var change = runtime.SetSourceAsync(DataSource.OtherMachine, default).AsTask();
-            await provider.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(60));
-            Assert.False(change.IsCompleted);
-            provider.Result.SetResult(new(new(new(80, clock.UtcNow.AddHours(1)), null, clock.UtcNow), null));
+            available = true;
+            var change = automatic ? runtime.RefreshAsync(RefreshTrigger.Manual, default).AsTask()
+                : runtime.SetSourceAsync(DataSource.OtherMachine, default).AsTask();
+            try
+            {
+                await provider.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                Assert.False(change.IsCompleted);
+            }
+            finally { provider.Result.TrySetResult(new(new(new(80, clock.UtcNow.AddHours(1)), null, clock.UtcNow), null)); }
             await change;
-            Assert.Null(runtime.State.Snapshot);
+            Assert.Equal(42m, runtime.State.Snapshot!.Primary!.PercentageUsed);
+            Assert.Equal(FreshnessState.Current, runtime.State.Freshness);
             await coordinator.RefreshAsync(RefreshTrigger.Manual, default);
             Assert.Equal(1, provider.Calls);
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Other_machine_replaces_export_and_drains_even_a_cancellation_ignoring_local_write(bool pendingWrite)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Other_machine_replaces_export_and_drains_even_a_cancellation_ignoring_local_write(bool pendingWrite, bool remoteAvailable)
     {
         var root = Path.Combine(Path.GetTempPath(), $"aibar-source-export-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
@@ -91,13 +108,16 @@ public sealed class CodexDataSourceTests
         {
             var settings = new ConsentSettings(Path.Combine(root, "settings.json"));
             await settings.SaveAsync(true, default);
+            await settings.SaveDataSourceAsync(DataSource.ThisPc, default);
             var clock = new FixedClock();
             var coordinator = new QuotaRefreshCoordinator(new Store(), new CurrentProvider(clock), clock, new FreshnessPolicy(TimeSpan.FromMinutes(10)), TimeSpan.Zero);
             QuotaAuthorityUpdate latest = null!;
             coordinator.AuthorityUpdated += update => latest = update;
             var writer = new DelayedWriter(WindowsAtomicQuotaExportWriter.ForOwnedSyntheticDataDirectory(root), release);
             await using var publisher = new QuotaExportPublisher(coordinator, writer, clock);
-            await using var runtime = new BetaRuntime(settings, new PrivateIntegrationPolicy(), coordinator, clock, publisher: publisher);
+            await using var runtime = new BetaRuntime(settings, new PrivateIntegrationPolicy(), coordinator, clock, publisher: publisher,
+                remoteProviderFactory: _ => remoteAvailable ? new CurrentProvider(clock, 73) : new MissingProvider(),
+                remoteFileAvailable: () => remoteAvailable);
             await runtime.InitializeAsync(default);
             await runtime.RefreshAsync(RefreshTrigger.Manual, default);
             await publisher.PublicationCompletion;
@@ -117,10 +137,10 @@ public sealed class CodexDataSourceTests
                 release.TrySetResult();
             }
             await change;
-            AssertExport("unavailable", false);
+            AssertExport(remoteAvailable ? "current" : "unavailable", remoteAvailable, remoteAvailable ? 73 : null);
             publisher.Accept(latest with { EventSequence = latest.EventSequence + 1 });
             await publisher.PublicationCompletion;
-            AssertExport("unavailable", false);
+            AssertExport(remoteAvailable ? "current" : "unavailable", remoteAvailable, remoteAvailable ? 73 : null);
             writer.Block = false;
             await runtime.SetSourceAsync(DataSource.ThisPc, default);
             // Real authority retrievals must resume publishing, not just the panel.
@@ -128,7 +148,7 @@ public sealed class CodexDataSourceTests
             await publisher.PublicationCompletion;
             AssertExport("current", true);
 
-            void AssertExport(string state, bool values)
+            void AssertExport(string state, bool values, decimal? percentage = null)
             {
                 using var json = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "yasb-quota.json")));
                 var document = json.RootElement;
@@ -137,6 +157,7 @@ public sealed class CodexDataSourceTests
                 Assert.Equal(values ? JsonValueKind.Object : JsonValueKind.Null, document.GetProperty("fiveHour").ValueKind);
                 Assert.Equal(JsonValueKind.Null, document.GetProperty("weekly").ValueKind);
                 if (!values) Assert.Equal(JsonValueKind.Null, document.GetProperty("sourceRetrievedAt").ValueKind);
+                if (percentage is not null) Assert.Equal(percentage.Value, document.GetProperty("fiveHour").GetProperty("percentageUsed").GetDecimal());
             }
         }
         finally
@@ -233,10 +254,19 @@ public sealed class CodexDataSourceTests
         public int Delivered;
         public void ShowAlert(string title, string body) => Delivered++;
     }
-    private sealed class CurrentProvider(IClock clock) : IQuotaProvider
+    private sealed class CurrentProvider(IClock clock, decimal percentage = 42) : IQuotaProvider
+    {
+        public int Calls;
+        public ValueTask<QuotaProviderResult> GetQuotaAsync(CancellationToken token)
+        {
+            Interlocked.Increment(ref Calls);
+            return ValueTask.FromResult(new QuotaProviderResult(new(new(percentage, clock.UtcNow.AddHours(1)), null, clock.UtcNow), null));
+        }
+    }
+    private sealed class MissingProvider : IQuotaProvider
     {
         public ValueTask<QuotaProviderResult> GetQuotaAsync(CancellationToken token) =>
-            ValueTask.FromResult(new QuotaProviderResult(new(new(42, clock.UtcNow.AddHours(1)), null, clock.UtcNow), null));
+            ValueTask.FromResult(new QuotaProviderResult(null, new(QuotaErrorKind.Unavailable, "quota_unavailable")));
     }
     private sealed class DelayedWriter(IQuotaExportWriter inner, TaskCompletionSource release) : IQuotaExportWriter
     {
