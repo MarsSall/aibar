@@ -54,6 +54,9 @@ public sealed class SettingsStyleTests
                     Assert.Null(Assert.IsType<Border>(window.FindName("SettingsShadow")).Effect);
                 }
 
+                // General opens first; the opacity slider lives on Appearance.
+                var sections = Assert.IsType<TabControl>(window.FindName("Sections"));
+                sections.SelectedItem = sections.Items.Cast<TabItem>().Single(tab => AutomationProperties.GetName(tab) == "Appearance"); window.UpdateLayout();
                 var slider = Assert.IsType<Slider>(window.FindName("BackgroundOpacity"));
                 Assert.NotNull(slider.FocusVisualStyle);
                 var track = Assert.IsType<Track>(slider.Template.FindName("PART_Track", slider));

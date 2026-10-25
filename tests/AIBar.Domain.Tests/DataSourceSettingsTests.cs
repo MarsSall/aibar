@@ -52,5 +52,25 @@ public sealed class DataSourceSettingsTests : IDisposable
         Assert.Equal(DataSource.ThisPc, await settings.LoadDataSourceAsync(default));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => settings.SaveDataSourceAsync((DataSource)99, default).AsTask());
     }
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Consent_and_source_saves_preserve_parseable_fields_when_unrelated_consent_is_malformed(bool sourceFirst)
+    {
+        Directory.CreateDirectory(_root);
+        await File.WriteAllTextAsync(FilePath, """{"schema":1,"privateCodexConsent":false,"privateClaudeConsent":"bad","dataSource":"other-machine","claudeSource":"this-pc","claudeCacheSource":"other-machine"}""");
+        var settings = new ConsentSettings(FilePath);
+        if (sourceFirst) await settings.SaveDataSourceAsync(DataSource.OtherMachine, default);
+        await settings.SaveAsync(true, default);
+        if (!sourceFirst) await settings.SaveDataSourceAsync(DataSource.OtherMachine, default);
+        await settings.SaveClaudeAsync(true, default);
+        using var json = JsonDocument.Parse(await File.ReadAllTextAsync(FilePath));
+        var root = json.RootElement;
+        Assert.True(root.GetProperty("privateCodexConsent").GetBoolean());
+        Assert.True(root.GetProperty("privateClaudeConsent").GetBoolean());
+        Assert.Equal("other-machine", root.GetProperty("dataSource").GetString());
+        Assert.Equal("this-pc", root.GetProperty("claudeSource").GetString());
+        Assert.Equal("other-machine", root.GetProperty("claudeCacheSource").GetString());
+    }
     public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }
 }
