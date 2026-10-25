@@ -17,7 +17,7 @@ Branch: `feat/tray-settings-cleanup`, stacked on `feat/floating-widget-and-font`
 - T2 [S3, S4] General tab (Start with Windows, Clear AIBar Data with confirmation, Data source for all providers with claudeSource migration and Codex other-machine state); Providers loses Claude source; tests + docs — worker after T1 — commit: 8c24cb4, fixes b3f4e75 (tests) + c24750f
 - T3 [S1-S5] Windows CI, deploy to the user's PC, acceptance, Codex remote quota issue — inline — commit: pending
 
-- T4 [S4 revised] Per-provider Source dropdowns in Providers; remove General Data source; per-provider persistence/migration; tests + docs — worker — commit: pending
+- T4 [S4 revised] Per-provider Source dropdowns in Providers; remove General Data source; per-provider persistence/migration; tests + docs — worker — commit: e7b77bd (tests), 0ec9ac7, aceed9f
 
 ## Log
 
@@ -41,3 +41,4 @@ Branch: `feat/tray-settings-cleanup`, stacked on `feat/floating-widget-and-font`
 - L18 (analysis): DataSourceCostTests drive each runtime's SetSourceAsync directly; c24750f already keyed Codex cost on BetaRuntime.Source and Claude cost on ClaudeQuotaRuntime's source, so these cases were already correct (pinning, not a vacuous test). The missing behavior is persistence, migration and Settings dropdowns.
 - L19 (evidence): GREEN attempt CI 40197180074 on 0ec9ac7 FAILED: .NET job cancelled at the 20-minute limit (a test likely hangs); 12 existing tests failed because every settings save now writes claudeSource and codexSource even when nobody chose them (BetaConsentOrQuota 'persists only the disclosed decision', ClaudeQuotaRuntime 'each save preserves', ClaudeRemoteUsage/ClaudeAutomaticSource legacy round trips 'do not add a source'), plus ClaudeAutomaticSourceTests.Every_refresh_redetects_appearance_and_removal (line 135). Rule kept from the earlier features: a provider's source field is written only when it was already present or the user sets it.
 - L20 (fix): worker mvnvmkk9-3-um16 — ConsentSettings preserves absent source fields (written only by that provider's source save), migration is load-only with the legacy dataSource kept as fallback until both provider fields exist, and all ConsentSettings awaits use ConfigureAwait(false) (static deadlock: Provider_dropdowns test blocks the WPF dispatcher on source loads whose continuations captured it). Parent aligned the new test General_source_migrates_to_both_providers with the established shape-stability contract (consent save keeps dataSource, adds no provider fields).
+- L21 (evidence): GREEN CI 40199085585 on aceed9f: .NET 1537/1537 in 4m42s (no hang), Pester 29/29, Python.
