@@ -285,7 +285,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         if (_disposed) return;
         var revision = ++_historyRevision;
         _state = Map(state);
-        if (_history is not null && _state.IsCurrent && _refreshAvailable() && _runtime?.IsUsingRemote != true) _ = ApplyHistoryAsync(state, revision);
+        if (_history is not null && _state.IsCurrent && _refreshAvailable()) _ = ApplyHistoryAsync(state, revision);
         CopySummaryCommand.RefreshState();
         if (state.Failure != _reportedFailure)
         {
@@ -299,8 +299,10 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         try
         {
             var historyRevision = _history!.Revision;
-            var samples = await _history.ReadPaceAsync(QuotaHistoryProvider.Codex);
-            if (_disposed || revision != _historyRevision || !_refreshAvailable() || _runtime?.IsUsingRemote == true || !_history.CanPublish(historyRevision)) return;
+            var source = _runtime?.IsUsingRemote == true ? QuotaHistorySource.CodexRemote : QuotaHistorySource.CodexLocal;
+            var samples = await _history.ReadPaceAsync(QuotaHistoryProvider.Codex, source);
+            var currentSource = _runtime?.IsUsingRemote == true ? QuotaHistorySource.CodexRemote : QuotaHistorySource.CodexLocal;
+            if (_disposed || revision != _historyRevision || !_refreshAvailable() || source != currentSource || !_history.CanPublish(historyRevision)) return;
             _state = Decorate(_mapper.Map(_runtime?.State ?? state, samples));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         }

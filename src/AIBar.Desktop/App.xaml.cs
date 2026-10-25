@@ -122,7 +122,7 @@ public partial class App : System.Windows.Application
         var onboarding = new OnboardingSettings(Path.Combine(dataDirectory, OnboardingSettings.FileName));
         var alerts = new QuotaAlertObserver(dataDirectory, clock);
         coordinator.AuthorityUpdated += update => alerts.Observe("Codex", update,
-            betaRuntime.CaptureAlertEligibility());
+            betaRuntime.CaptureAlertEligibility(update));
         claudeRuntime.AuthorityUpdated += update => alerts.Observe("Claude", update,
             () => claudeRuntime.IsConsentEnabled && claudeRuntime.State.Freshness == FreshnessState.Current && claudeRuntime.State.Failure is null);
         var lifecycleAdapter = new QuotaRefreshLifecycleAdapter(lifecycleEvents, coordinator);

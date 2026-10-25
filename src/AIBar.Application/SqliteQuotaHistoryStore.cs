@@ -4,7 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace AIBar.Application;
 
-/// <summary>Independent schema-v1 history database. Each operation owns and closes its connection;
+/// <summary>Independent schema-v2 history database (migrates v1 without losing rows). Each operation owns and closes its connection;
 /// the semaphore serializes reads, writes, privacy drains and disposal.</summary>
 public sealed class SqliteQuotaHistoryStore : IQuotaHistoryStore, IAiBarClearWork, IAsyncDisposable
 {
@@ -123,12 +123,23 @@ public sealed class SqliteQuotaHistoryStore : IQuotaHistoryStore, IAiBarClearWor
             await using var command = connection.CreateCommand();
             command.CommandText = "PRAGMA user_version;";
             var version = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
-            if (version > 1) throw new InvalidOperationException("Unsupported future quota history schema.");
+            if (version > 2) throw new InvalidOperationException("Unsupported future quota history schema.");
             command.CommandText = "PRAGMA journal_mode = WAL;";
             await command.ExecuteNonQueryAsync(cancellationToken);
+            const string createTable = "CREATE TABLE quota_history (provider TEXT NOT NULL CHECK(provider IN ('codex','claude')), window TEXT NOT NULL CHECK(window IN ('five-hour','weekly')), percentage TEXT NOT NULL, reset_at INTEGER NOT NULL, retrieved_at INTEGER NOT NULL, source TEXT NOT NULL CHECK(source IN ('codex-local','codex-remote','claude-local','claude-remote')), PRIMARY KEY(provider, window, retrieved_at));";
+            const string finishSchema = "CREATE INDEX quota_history_retention ON quota_history(retrieved_at); PRAGMA user_version = 2; COMMIT;";
             if (version == 0)
             {
-                command.CommandText = "BEGIN; CREATE TABLE quota_history (provider TEXT NOT NULL CHECK(provider IN ('codex','claude')), window TEXT NOT NULL CHECK(window IN ('five-hour','weekly')), percentage TEXT NOT NULL, reset_at INTEGER NOT NULL, retrieved_at INTEGER NOT NULL, source TEXT NOT NULL CHECK(source IN ('codex-local','claude-local','claude-remote')), PRIMARY KEY(provider, window, retrieved_at)); CREATE INDEX quota_history_retention ON quota_history(retrieved_at); PRAGMA user_version = 1; COMMIT;";
+                command.CommandText = "BEGIN IMMEDIATE; " + createTable + finishSchema;
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+            else if (version == 1)
+            {
+                // SQLite cannot alter a CHECK constraint. Replace the table atomically;
+                // old source values, row identities and retention index are preserved.
+                command.CommandText = "BEGIN IMMEDIATE; ALTER TABLE quota_history RENAME TO quota_history_v1; " + createTable +
+                    "INSERT INTO quota_history SELECT provider, window, percentage, reset_at, retrieved_at, source FROM quota_history_v1; " +
+                    "DROP TABLE quota_history_v1; " + finishSchema;
                 await command.ExecuteNonQueryAsync(cancellationToken);
             }
             return connection;
@@ -141,7 +152,7 @@ public sealed class SqliteQuotaHistoryStore : IQuotaHistoryStore, IAiBarClearWor
         ArgumentNullException.ThrowIfNull(sample);
         _ = ProviderName(sample.Provider); _ = WindowName(sample.Window); _ = SourceName(sample.Source);
         if (sample.Percentage is < 0 or > 100) throw new ArgumentOutOfRangeException(nameof(sample.Percentage));
-        if ((sample.Provider == QuotaHistoryProvider.Codex) != (sample.Source == QuotaHistorySource.CodexLocal))
+        if ((sample.Provider == QuotaHistoryProvider.Codex) != (sample.Source is QuotaHistorySource.CodexLocal or QuotaHistorySource.CodexRemote))
             throw new ArgumentException("Quota history source must match its provider.", nameof(sample));
     }
 
@@ -155,10 +166,10 @@ public sealed class SqliteQuotaHistoryStore : IQuotaHistoryStore, IAiBarClearWor
     };
     private static string SourceName(QuotaHistorySource source) => source switch
     {
-        QuotaHistorySource.CodexLocal => "codex-local", QuotaHistorySource.ClaudeLocal => "claude-local", QuotaHistorySource.ClaudeRemote => "claude-remote", _ => throw new ArgumentOutOfRangeException(nameof(source))
+        QuotaHistorySource.CodexLocal => "codex-local", QuotaHistorySource.CodexRemote => "codex-remote", QuotaHistorySource.ClaudeLocal => "claude-local", QuotaHistorySource.ClaudeRemote => "claude-remote", _ => throw new ArgumentOutOfRangeException(nameof(source))
     };
     private static QuotaHistorySource ReadSource(string source) => source switch
     {
-        "codex-local" => QuotaHistorySource.CodexLocal, "claude-local" => QuotaHistorySource.ClaudeLocal, "claude-remote" => QuotaHistorySource.ClaudeRemote, _ => throw new InvalidDataException("Invalid quota history source.")
+        "codex-local" => QuotaHistorySource.CodexLocal, "codex-remote" => QuotaHistorySource.CodexRemote, "claude-local" => QuotaHistorySource.ClaudeLocal, "claude-remote" => QuotaHistorySource.ClaudeRemote, _ => throw new InvalidDataException("Invalid quota history source.")
     };
 }

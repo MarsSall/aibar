@@ -2,7 +2,7 @@ namespace AIBar.Domain;
 
 public enum QuotaHistoryProvider { Codex, Claude }
 public enum QuotaHistoryWindow { FiveHour, Weekly }
-public enum QuotaHistorySource { CodexLocal, ClaudeLocal, ClaudeRemote }
+public enum QuotaHistorySource { CodexLocal, ClaudeLocal, ClaudeRemote, CodexRemote }
 
 /// <summary>A normalized retrieval sample. Contains no credentials, account identifiers or paths.</summary>
 public sealed record QuotaHistorySample(QuotaHistoryProvider Provider, QuotaHistoryWindow Window,

@@ -140,6 +140,8 @@ public sealed class QuotaExportPublisher : IAsyncDisposable, IAiBarClearWork
     internal Task PublicationCompletion { get { lock (_gate) return _drain; } }
 internal void Accept(QuotaAuthorityUpdate update)
 {
+    // A delayed old-source event must not reopen publication after a handoff.
+    if (!_authority.IsCurrentUpdate(update)) return;
     lock (_gate)
     {
 if (_disposed || _latest is { } latest && update.EventSequence <= latest.EventSequence) return;

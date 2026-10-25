@@ -3,9 +3,11 @@
 This optional helper sends Linux Claude Code usage to Windows AIBar. Enable
 Claude quota and accept its disclosure once. **Claude source: Automatic** is the
 default: no tray change is needed after installing the helper. AIBar detects the
-remote usage file on initialization and every refresh (including five-minute
-polls); without that file it uses the normal Windows Claude Code login.
-The helper never enables consent.
+remote usage file on initialization and every refresh; without that file it uses
+the normal Windows Claude Code login. While resolved remote, AIBar reads the local
+pushed file every **one minute**. This is separate from the helper's scheduled
+**five-minute** endpoint query/push: reading the file does not query the provider.
+The same cadence distinction applies to Codex below. The helper never enables consent.
 
 For a manual override, choose **Claude source: This PC** to force the Windows
 login, or **Other machine** to force the remote file even when it is missing.

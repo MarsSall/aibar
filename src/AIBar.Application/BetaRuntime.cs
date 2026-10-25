@@ -69,6 +69,12 @@ public sealed class BetaRuntime : IAsyncDisposable, IQuotaPlanMetadata
         var admitted = !_handoff && _policy.IsEnabled;
         return () => admitted && epoch == Interlocked.Read(ref _sourceEpoch) && CanDeliverAlerts;
     }
+    public Func<bool> CaptureAlertEligibility(QuotaAuthorityUpdate update)
+    {
+        var sourceEligible = CaptureAlertEligibility();
+        var updateEligible = _coordinator.CaptureUpdateValidity(update);
+        return () => updateEligible() && sourceEligible();
+    }
     public event Action? SourceChanged;
     public QuotaRefreshState State => _coordinator.State;
     public TimeSpan? CachedAge => State.Snapshot is { } snapshot ? _clock.UtcNow - snapshot.RetrievedAt : null;
@@ -149,6 +155,9 @@ public sealed class BetaRuntime : IAsyncDisposable, IQuotaPlanMetadata
         }
         finally { _consentGate.Release(); }
         await RefreshAsync(RefreshTrigger.Manual, CancellationToken.None);
+        // A completed source change must include publication, not just retrieval.
+        // Restore writes a value-free document; the new valued write is asynchronous.
+        if (_publisher is not null) await _publisher.PublicationCompletion;
     }
 
     // The gate serializes resolution, but never spans retrieval: another source/consent

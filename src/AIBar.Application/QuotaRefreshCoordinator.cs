@@ -1,4 +1,5 @@
 using System.Runtime.ExceptionServices;
+using System.Runtime.CompilerServices;
 using AIBar.Domain;
 
 namespace AIBar.Application;
@@ -17,6 +18,27 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
     private TimeSpan _minimumPollInterval;
     private readonly object _gate = new();
     private readonly Queue<QuotaAuthorityUpdate> _updates = new();
+    // Metadata is bound under the authority lock when the update is produced, not
+    // when a potentially delayed event subscriber eventually receives it.
+    private sealed record UpdateOrigin(long Generation, bool Remote);
+    private readonly ConditionalWeakTable<QuotaAuthorityUpdate, UpdateOrigin> _origins = new();
+    internal bool WasRemote(QuotaAuthorityUpdate update)
+    {
+        lock (_gate) return _origins.TryGetValue(update, out var origin) && origin.Remote;
+    }
+    internal bool IsCurrentUpdate(QuotaAuthorityUpdate update)
+    {
+        // Unstamped updates are supported for the publisher's internal synthetic API.
+        lock (_gate) return !_disposed && (!_origins.TryGetValue(update, out var origin) || origin.Generation == _generation);
+    }
+    internal Func<bool> CaptureUpdateValidity(QuotaAuthorityUpdate update)
+    {
+        lock (_gate)
+        {
+            if (!_origins.TryGetValue(update, out var origin)) return () => false;
+            return () => { lock (_gate) return !_disposed && origin.Generation == _generation; };
+        }
+    }
     private CancellationTokenSource _lifetime = new();
     private Task? _active;
     private QuotaRefreshState _state;
@@ -224,7 +246,9 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
         if (state is null) return false;
         _state = state;
         if (retrieval) _retrievalGeneration++;
-        _updates.Enqueue(new(state, ++_eventSequence, _retrievalGeneration));
+        var update = new QuotaAuthorityUpdate(state, ++_eventSequence, _retrievalGeneration);
+        _origins.Add(update, new(_generation, _remoteSource));
+        _updates.Enqueue(update);
         if (_draining) return false;
         return _draining = true;
     }
