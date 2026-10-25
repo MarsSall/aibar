@@ -2,6 +2,8 @@
 
 Open **Settings…** from the panel or tray. One Settings window is reused. It follows Windows light, dark and high-contrast themes, with a custom 32-DIP title bar and **Appearance / Alerts / Providers** pivots. The default size is 520 × 600 DIPs (minimum 460 × 480); content scrolls without moving the footer.
 
+The tray now contains only **Refresh** (when its command can execute), **Settings…**, **Start with Windows** (checkable), and **Exit AIBar**, in that order. Provider consent/source choices and alerts are configured here, not in tray submenus. OpenCode/Pi scans are no longer composed or started, even with an old opt-in; retained files remain covered by Clear AIBar Data. The General tab and its Clear AIBar Data button are a follow-up, not part of this tray cleanup.
+
 Changes apply when you select **Save**. **Cancel**, Escape and closing the window discard edits that have not been saved. Save leaves the window open and announces success or failure. Preview buttons do not save preferences. **Install YASB font** is an immediate action, independent of Save or Cancel.
 
 ## Keyboard and accessibility
@@ -47,7 +49,7 @@ Three independently selectable effect tiles have a preview button and a checkbox
 - **Edge glow at limit**: preview uses the existing non-activating, click-through monitor overlays.
 - **Confetti on reset**: defaults off; preview uses the existing confetti overlays.
 
-Delivery policy, freshness checks, consent checks and deduplication remain owned by the alert runtime, not the Settings view. Preview does not create alert-state entries. See [Quota alerts](alerts.md) for delivery and persistence rules. The tray **Alerts** submenu retains its existing toggles; **Configure alerts…** opens Settings.
+Delivery policy, freshness checks, consent checks and deduplication remain owned by the alert runtime, not the Settings view. Preview does not create alert-state entries. See [Quota alerts](alerts.md) for delivery and persistence rules. There is no tray Alerts submenu; use this Alerts pivot.
 
 ## Providers
 
@@ -87,7 +89,7 @@ Saving multiple sections is **not a cross-file transaction**. A later persistenc
 
 `SettingsWindowHost(AppearanceSettings, QuotaAlertObserver, SettingsProviderCommands?, Action? previewNotification, DockSettings? dock, SettingsGlyphFont? font)` is the UI-thread entry point. The optional parameters preserve existing call sites. Alert saves still run on the observer's serialized queue.
 
-`App.xaml.cs` constructs `SettingsProviderCommands` from the existing `NativeSettingsCommands` and `ClaudeQuotaRuntime`, and passes the tray's notification entry point for preview. Codex uses `EnablePrivateIntegrationAsync` / `DisablePrivateIntegrationAsync`; Claude uses `GrantConsentAsync` / `RevokeConsentAsync` and `SetSourceAsync`. No `HostRuntime.cs` behavior is replaced.
+`App.xaml.cs` constructs `SettingsProviderCommands` from the existing `NativeSettingsCommands` and `ClaudeQuotaRuntime`, and passes the tray's notification entry point for preview. Codex uses `EnablePrivateIntegrationAsync` / `DisablePrivateIntegrationAsync`; Claude uses `GrantConsentAsync` / `RevokeConsentAsync` and `SetSourceAsync`. The tray's former provider/alert entry points are removed; the underlying runtime operations remain available to Settings.
 
 The appearance instance remains shared with startup composition and the clear lifecycle. Existing panel bar-color mapping stays intact. The parallel panel/notification units must load `BackgroundOpacity` initially and subscribe to `Changed` for updates, posting to their dispatcher **without awaiting it**. Do not apply `Window.Opacity`: content must stay opaque.
 

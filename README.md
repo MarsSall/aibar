@@ -66,7 +66,7 @@ dotnet build AIBar.sln
 dotnet run --project src/AIBar.Desktop
 ```
 
-AIBar starts in the tray. Enable Codex and Claude from the tray menu; each provider asks for its own consent and stays off until you accept it.
+AIBar starts in the tray. Open **Settings… → Providers** to enable Codex and Claude; each provider asks for its own consent and stays off until you accept it. The tray contains only **Refresh** (when available), **Settings…**, **Start with Windows** and **Exit AIBar**.
 
 ## Commands
 
@@ -121,7 +121,7 @@ Developer and test-design notes live in [`docs/dev/`](./docs/dev/README.md).
 - Credentials are read only from the official CLI login files. AIBar never refreshes tokens, changes a login or stores credentials of its own.
 - Data stays under `%LOCALAPPDATA%\AIBar`: quota cache, history, analytics and the YASB snapshot. There is no AIBar backend and no telemetry.
 - Requests go straight from your PC to OpenAI, Anthropic and their public status pages.
-- **Clear AIBar Data** in the tray removes local caches, history and exports.
+- OpenCode and Pi local usage is no longer scanned. Existing local-usage files are retained until **Clear AIBar Data**, whose runtime operation still removes local caches, history and exports. Its Settings button is planned in the next settings update; it is no longer a tray action.
 
 ## Roadmap
 

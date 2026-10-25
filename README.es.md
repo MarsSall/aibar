@@ -66,7 +66,7 @@ dotnet build AIBar.sln
 dotnet run --project src/AIBar.Desktop
 ```
 
-AIBar arranca en la bandeja. Activá Codex y Claude desde el menú de la bandeja: cada proveedor pide su propio consentimiento y queda apagado hasta que lo aceptes.
+AIBar arranca en la bandeja. Activá Codex y Claude desde **Settings… → Providers**: cada proveedor pide su propio consentimiento y queda apagado hasta que lo aceptes. La bandeja solo contiene **Refresh** (cuando está disponible), **Settings…**, **Start with Windows** y **Exit AIBar**.
 
 ## Comandos
 
@@ -121,7 +121,7 @@ Las notas de desarrollo y de diseño de tests están en [`docs/dev/`](./docs/dev
 - Las credenciales se leen solo de los archivos de login de las CLI oficiales. AIBar nunca renueva tokens, nunca modifica un login y no guarda credenciales propias.
 - Los datos quedan en `%LOCALAPPDATA%\AIBar`: caché de cuotas, historial, analíticas y la instantánea para YASB. AIBar no tiene backend ni telemetría.
 - Las consultas van directo desde tu PC a OpenAI, Anthropic y sus páginas de estado públicas.
-- **Clear AIBar Data**, en la bandeja, borra las cachés, el historial y las exportaciones locales.
+- AIBar ya no escanea el uso local de OpenCode ni Pi. Los archivos existentes se conservan hasta **Clear AIBar Data**, cuya operación interna sigue borrando las cachés, el historial y las exportaciones locales. El botón en Configuración llegará en la próxima actualización de ajustes; ya no es una acción de la bandeja.
 
 ## Roadmap
 

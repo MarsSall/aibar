@@ -143,26 +143,24 @@ public sealed class ClaudeRemoteUsageTests : IDisposable
     }
 
     [Fact]
-    public async Task Windows_tray_source_choices_are_exclusive_and_leave_Codex_menu_unchanged()
+    public async Task Windows_tray_has_no_provider_configuration_and_source_API_preserves_consent()
     {
         await using var tray = new WindowsTrayRuntime();
-        tray.SetSettingsAvailable(true); tray.SetPrivateIntegrationEnabled(true); tray.SetClaudeQuotaEnabled(false);
+        tray.SetSettingsAvailable(true);
         var menu = (Forms.ContextMenuStrip)typeof(WindowsTrayRuntime).GetField("_menu", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(tray)!;
-        var codexBefore = menu.Items.Cast<Forms.ToolStripItem>().Where(item => item.Text!.Contains("Private Quota Integration")).ToArray();
-        ClaudeQuotaSource? requested = null;
-        ((IClaudeQuotaSourceTray)tray).ClaudeSourceRequested += source => requested = source;
+        Assert.DoesNotContain(menu.Items.Cast<Forms.ToolStripItem>(), item => item.Text!.Contains("Claude") || item.Text.Contains("Private Quota"));
+        await using var runtime = new ClaudeQuotaRuntime(Settings, new Store(), _ => new Provider(), new Clock(), remoteFileAvailable: NoRemoteFile);
+        await runtime.InitializeAsync(default);
+        var sourceTray = new SourceTray(); var prompt = new Prompt();
+        using var controller = new ClaudeQuotaTrayController(sourceTray, runtime, prompt);
         foreach (var source in new[] { ClaudeQuotaSource.Automatic, ClaudeQuotaSource.ThisPc, ClaudeQuotaSource.OtherMachine })
         {
-            tray.SetClaudeSource(source);
-            var parent = Assert.Single(menu.Items.OfType<Forms.ToolStripMenuItem>(), item => item.Text == "Claude source");
-            var children = parent.DropDownItems.OfType<Forms.ToolStripMenuItem>().ToArray();
-            Assert.Equal(new[] { "Automatic", "This PC", "Other machine" }, children.Select(item => item.Text));
-            Assert.Equal(source == ClaudeQuotaSource.Automatic, children[0].Checked);
-            Assert.Equal(source == ClaudeQuotaSource.ThisPc, children[1].Checked);
-            Assert.Equal(source == ClaudeQuotaSource.OtherMachine, children[2].Checked);
-            Assert.Equal(codexBefore, menu.Items.Cast<Forms.ToolStripItem>().Where(item => item.Text!.Contains("Private Quota Integration")).ToArray());
-            children[2].PerformClick(); Assert.Equal(ClaudeQuotaSource.OtherMachine, requested);
+            await controller.SetSourceAsync(source, default);
+            Assert.Equal(source, sourceTray.Selected);
+            Assert.Equal(source, await Settings.LoadClaudeSourceAsync(default));
+            Assert.False(runtime.IsConsentEnabled);
         }
+        Assert.Equal(0, prompt.Calls);
         Assert.DoesNotContain(typeof(ITrayRuntime).GetMembers(), member => member.Name.Contains("Claude"));
     }
 

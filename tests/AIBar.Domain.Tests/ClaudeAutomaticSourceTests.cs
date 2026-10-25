@@ -340,29 +340,24 @@ public sealed class ClaudeAutomaticSourceTests : IDisposable
             Assert.Contains(text, ClaudeQuotaRuntime.ConsentDisclosure, StringComparison.OrdinalIgnoreCase);
     }
 
-    // f: default menu state before any SetClaudeSource call, plus manual force overrides.
     [Fact]
-    public async Task Tray_starts_with_automatic_checked_and_routes_all_three_radio_choices()
+    public async Task Tray_has_no_Claude_configuration_and_runtime_still_routes_all_source_choices()
     {
         await using var tray = new WindowsTrayRuntime();
         tray.SetSettingsAvailable(true);
-        tray.SetClaudeQuotaEnabled(false);
         var menu = (Forms.ContextMenuStrip)typeof(WindowsTrayRuntime).GetField("_menu", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(tray)!;
-        var parent = Assert.Single(menu.Items.OfType<Forms.ToolStripMenuItem>(), item => item.Text == "Claude source");
-        var choices = parent.DropDownItems.OfType<Forms.ToolStripMenuItem>().ToArray();
-        Assert.Equal(new[] { "Automatic", "This PC", "Other machine" }, choices.Select(item => item.Text));
-        Assert.True(choices[0].Checked);
-        Assert.All(choices.Skip(1), item => Assert.False(item.Checked));
-        ClaudeQuotaSource? requested = null;
-        ((IClaudeQuotaSourceTray)tray).ClaudeSourceRequested += source => requested = source;
-        var sources = new[] { ClaudeQuotaSource.Automatic, ClaudeQuotaSource.ThisPc, ClaudeQuotaSource.OtherMachine };
-        for (var i = 0; i < sources.Length; i++)
+        Assert.DoesNotContain(menu.Items.Cast<Forms.ToolStripItem>(), item => item.Text!.Contains("Claude"));
+        var local = new Provider(11); var remote = new Provider(73);
+        await using var runtime = Runtime(new Store(), _ => local, _ => remote, () => true);
+        await runtime.InitializeAsync(default);
+        Assert.Equal(ClaudeQuotaSource.Automatic, runtime.Source);
+        await runtime.GrantConsentAsync(default);
+        foreach (var source in new[] { ClaudeQuotaSource.Automatic, ClaudeQuotaSource.ThisPc, ClaudeQuotaSource.OtherMachine })
         {
-            choices[i].PerformClick();
-            Assert.Equal(sources[i], requested);
-            tray.SetClaudeSource(sources[i]);
-            Assert.Single(choices.Where(item => item.Checked));
-            Assert.True(choices[i].Checked);
+            await runtime.SetSourceAsync(source, default);
+            Assert.Equal(source, runtime.Source);
+            Assert.Equal(source == ClaudeQuotaSource.ThisPc ? ClaudeQuotaSource.ThisPc : ClaudeQuotaSource.OtherMachine, runtime.ResolvedSource);
+            Assert.Equal(source == ClaudeQuotaSource.ThisPc ? 11m : 73m, runtime.State.Snapshot!.Primary!.PercentageUsed);
         }
     }
 
