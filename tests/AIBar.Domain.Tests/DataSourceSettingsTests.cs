@@ -29,10 +29,11 @@ public sealed class DataSourceSettingsTests : IDisposable
         await settings.SaveAsync(true, default);
         Assert.Equal(codex, await settings.LoadDataSourceAsync(default));
         Assert.Equal(claude, await settings.LoadClaudeSourceAsync(default));
+        // A consent save keeps the file's shape: the legacy value stays, no provider fields appear.
         using var json = JsonDocument.Parse(await File.ReadAllTextAsync(FilePath));
-        Assert.False(json.RootElement.TryGetProperty("dataSource", out _));
-        Assert.Equal(wire, json.RootElement.GetProperty("codexSource").GetString());
-        Assert.Equal(wire, json.RootElement.GetProperty("claudeSource").GetString());
+        Assert.Equal(wire, json.RootElement.GetProperty("dataSource").GetString());
+        Assert.False(json.RootElement.TryGetProperty("codexSource", out _));
+        Assert.False(json.RootElement.TryGetProperty("claudeSource", out _));
     }
 
     [Fact]

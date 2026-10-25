@@ -85,7 +85,9 @@ Save applies only changed sources to their respective runtimes before granting c
 
 `%LOCALAPPDATA%\AIBar\settings.json` stores independent `codexSource` and `claudeSource` values: `automatic`, `this-pc` or `other-machine`. When `codexSource` is absent, it migrates from the saved general `dataSource`, or defaults to Automatic. When `claudeSource` is absent, it also migrates from `dataSource`; an existing Claude choice wins. A Claude-only legacy choice never selects Codex's source. Present invalid provider values default to Automatic rather than falling back to the general value.
 
-Every save writes the provider fields atomically and stops writing `dataSource`; that field is read only for migration. Consent decisions and Claude cache provenance are preserved regardless of save order, even if an unrelated consent field is malformed.
+Migration happens on load, in memory. Consent and cache-provenance saves preserve absent source fields: `claudeSource` or `codexSource` is written only if it was already present or that provider's source is explicitly saved. Default Automatic is not materialized by a consent save. Existing source values, consent decisions and Claude cache provenance are preserved regardless of save order, even if an unrelated consent field is malformed.
+
+AIBar never creates or updates the legacy `dataSource` choice. An existing field is carried forward as a migration fallback while either provider still lacks an explicit source; deleting it sooner would reset that provider on restart. Once both provider fields exist, an explicit source save removes the obsolete general field. Consent-only saves leave the source-field shape unchanged. Writes remain atomic.
 
 `%LOCALAPPDATA%\AIBar\appearance.json` remains schema 1:
 
