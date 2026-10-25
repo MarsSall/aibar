@@ -212,7 +212,8 @@ public sealed class CodexRemoteUsageTests : IDisposable
     [Fact]
     public async Task Remote_current_threshold_is_admitted_to_alert_delivery()
     {
-        var clock = new Clock(); var files = new Files(Valid.Replace("\"percentageUsed\":81", "\"percentageUsed\":10"));
+        // The first reading is a minute older: alerts only accept a reading newer than the last one.
+        var clock = new Clock(); var files = new Files(Valid.Replace("\"percentageUsed\":81", "\"percentageUsed\":10").Replace("2030-01-01T12:00:00Z", "2030-01-01T11:59:00Z"));
         await Settings.SaveAsync(true, default); await Settings.SaveDataSourceAsync(DataSource.OtherMachine, default);
         var coordinator = Coordinator(new LocalProvider(), clock);
         await using var runtime = new BetaRuntime(Settings, new PrivateIntegrationPolicy(), coordinator, clock,
