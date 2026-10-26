@@ -81,7 +81,9 @@ function Get-SafeOutput([string]$State = 'unavailable', $Warning = 'unavailable'
         $glyphIndex = [int][math]::Min(8, [math]::Floor($used / 12.5))
         # Same 8-step fill and breakpoints; green, yellow, orange and red as usage grows.
         $color = if ($used -lt 50) { '#3DDC84' } elseif ($used -lt 75) { '#FFC531' } elseif ($used -lt 90) { '#FF8A3D' } else { '#FF4D5E' }
-        $compact += $used.ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%'
+        # Name the window after the percentage so the bar shows which limit it is.
+        $windowLabel = if ([object]::ReferenceEquals($hero, $Five)) { '5hr' } else { '7d' }
+        $compact += $used.ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '% ' + $windowLabel
     }
     if ($null -eq $hero -or $State -ceq 'stale') {
         $compact += $stateText
