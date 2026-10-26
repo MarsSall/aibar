@@ -442,7 +442,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
     It 'uses Claude five-hour usage when it is higher and retains both window details' {
         $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 92; resetAt = '2026-07-12T13:00:00Z' }; weekly = [ordered]@{ percentageUsed = 40; resetAt = '2026-07-14T10:00:00Z' } }
         $result = Read-ClaudeDocument $document
-        Assert-Compact $result '92%'
+        Assert-Compact $result '92% 5hr'
         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA4))
         $result.progressColor | Should -BeExactly '#FF4D5E'
         $result.label | Should -BeExactly 'Claude 5h: 92% | 7d: 40% | current'
@@ -450,7 +450,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         # Cached/stale data uses the same selection without losing its explicit warning.
         $document.state = 'stale'; $document.warning = 'refresh-failed'
         $result = Read-ClaudeDocument $document
-        Assert-Compact $result '92% | stale | refresh failed'
+        Assert-Compact $result '92% 5hr | stale | refresh failed'
         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA4))
         $result.progressColor | Should -BeExactly '#FF4D5E'
     }
@@ -458,7 +458,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
     It 'uses Claude weekly usage when it is higher even if five-hour resets sooner' {
         $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 40; resetAt = '2026-07-12T13:00:00Z' }; weekly = [ordered]@{ percentageUsed = 78; resetAt = '2026-07-14T10:00:00Z' } }
         $result = Read-ClaudeDocument $document
-        Assert-Compact $result '78%'
+        Assert-Compact $result '78% 7d'
         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA3))
         $result.progressColor | Should -BeExactly '#FF8A3D'
         $result.label | Should -BeExactly 'Claude 5h: 40% | 7d: 78% | current'
@@ -477,7 +477,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         )) {
             $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 50; resetAt = $resets[0] }; weekly = [ordered]@{ percentageUsed = 50; resetAt = $resets[1] } }
             $result = Read-ClaudeDocument $document
-            Assert-Compact $result '50%'
+            Assert-Compact $result $(if ($resets[2] -eq 'weekly') { '50% 7d' } else { '50% 5hr' })
             $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA1))
             $result.progressColor | Should -BeExactly '#FFC531'
             $selected = & $readerModule {
@@ -494,7 +494,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $null; weekly = [ordered]@{ percentageUsed = 62.5; resetAt = '2026-07-14T10:00:00Z' } }
         $result = Read-Document $document
         Assert-SafeFields $result
-        Assert-Compact $result '62.5%'
+        Assert-Compact $result '62.5% 7d'
         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA2))
         $result.progressColor | Should -BeExactly '#FFC531'
         $result.label | Should -BeExactly '7d: 62.5% | current'
@@ -508,7 +508,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
                 $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $window; weekly = $null }
                 if ($weeklyOnly) { $document.fiveHour = $null; $document.weekly = $window }
                 $result = Read-ClaudeDocument $document
-                Assert-Compact $result ("$used%")
+                Assert-Compact $result $(if ($weeklyOnly) { "$used% 7d" } else { "$used% 5hr" })
                 $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32($(if ($used -eq 0) { 0xF0766 } else { 0xF0AA5 })))
                 $result.progressColor | Should -BeExactly $(if ($used -eq 0) { '#3DDC84' } else { '#FF4D5E' })
                 $result.label | Should -BeExactly $(if ($weeklyOnly) { "Claude 7d: $used% | current" } else { "Claude 5h: $used% | current" })
