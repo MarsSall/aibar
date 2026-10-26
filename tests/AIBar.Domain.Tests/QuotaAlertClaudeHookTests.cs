@@ -3,6 +3,13 @@ using AIBar.Domain;
 
 namespace AIBar.Domain.Tests;
 
+// The re-entrancy checks below wait up to 60 s for real runtime work. Run them after the parallel suite so a
+// saturated CI runner (many blocking tests finishing together) cannot starve them into a timeout; the waits
+// and assertions are unchanged.
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class QuotaAlertClaudeHookCollection { public const string Name = "QuotaAlertClaudeHook"; }
+
+[Collection(QuotaAlertClaudeHookCollection.Name)]
 public sealed class QuotaAlertClaudeHookTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"aibar-alert-claude-{Guid.NewGuid():N}");
