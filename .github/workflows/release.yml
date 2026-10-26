@@ -67,8 +67,11 @@ jobs:
           $ErrorActionPreference = 'Stop'
           function Test-PinnedCompiler([string]$path) {
               if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $false }
-              $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($path)
-              return ("$($info.FileMajorPart).$($info.FileMinorPart).$($info.FileBuildPart)" -eq '6.7.3')
+              # ISCC.exe has no version resource (0.0.0.0); the uninstaller Inno installs next to it carries the product version.
+              $uninstaller = Join-Path (Split-Path -Parent $path) 'unins000.exe'
+              if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) { return $false }
+              $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($uninstaller).ProductVersion
+              return ($null -ne $version -and $version.Trim() -eq '6.7.3')
           }
           $candidates = @(
               (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),

@@ -84,6 +84,10 @@ public sealed class ReleaseWorkflowTests
             "if ($actualHash -cne $expectedHash)", "throw", "Start-Process -FilePath $installer",
             "$process.ExitCode -ne 0", "if (-not (Test-PinnedCompiler $compiler))", "throw", "Build-Installer.ps1");
         Assert.Contains("-eq '6.7.3'", run);
+        // ISCC.exe and the compiler DLLs carry no version resource (0.0.0.0); the installed uninstaller does.
+        Assert.Contains("'unins000.exe'", run);
+        Assert.Contains("ProductVersion", run);
+        Assert.DoesNotContain("FileMajorPart", run);
     }
 
     [Fact]
