@@ -52,10 +52,12 @@ public partial class SettingsWindow : Window
     private readonly IWindowsThemeSource _themeSource;
     private readonly DockSettings? _dock;
     private readonly SettingsGlyphFont? _font;
+    private readonly ConsentSettings? _updateSettings;
     private bool _saving;
     public SettingsWindow(AppearanceSettings appearance, AlertSettings alerts, Func<AlertOptions, Task>? saveAlerts = null, IWindowsThemeSource? themeSource = null,
-        SettingsProviderCommands? providers = null, Action? previewNotification = null, DockSettings? dock = null, SettingsGlyphFont? font = null)
+        SettingsProviderCommands? providers = null, Action? previewNotification = null, DockSettings? dock = null, SettingsGlyphFont? font = null, ConsentSettings? updateSettings = null)
     {
+        _updateSettings = updateSettings;
         _dock = dock; _font = font;
         _appearance = appearance; _alerts = alerts; _providers = providers; _previewNotification = previewNotification;
         _themeSource = themeSource ?? new WindowsThemeSource();
@@ -70,6 +72,7 @@ public partial class SettingsWindow : Window
         CodexEnabled.IsEnabled = ClaudeEnabled.IsEnabled = CodexSource.IsEnabled = ClaudeSource.IsEnabled = providers is not null;
         StartWithWindows.IsEnabled = ClearData.IsEnabled = providers?.General is not null;
         FloatingWidget.IsEnabled = dock is not null;
+        CheckForUpdates.IsEnabled = updateSettings is not null;
         UpdateFontStatus();
         UpdateThemeDescription();
         ValidateThresholds();
@@ -77,6 +80,7 @@ public partial class SettingsWindow : Window
     public async Task LoadAsync()
     {
         if (_providers?.General is { } general) StartWithWindows.IsChecked = await general.LoadStartupAsync();
+        if (_updateSettings is { } updates) CheckForUpdates.IsChecked = await updates.LoadUpdateCheckAsync(default);
         var appearance = await _appearance.LoadAsync(default);
         var alerts = await _alerts.LoadAsync(default);
         BarUsage.IsChecked = appearance.BarColors == "usage"; BarBrand.IsChecked = !BarUsage.IsChecked;
@@ -169,6 +173,7 @@ public partial class SettingsWindow : Window
                 var current = await dock.LoadAsync(default);
                 await dock.SaveAsync(current with { Enabled = FloatingWidget.IsChecked == true }, default);
             }
+            if (_updateSettings is { } updates) await updates.SaveUpdateCheckAsync(CheckForUpdates.IsChecked == true, default);
             SaveStatus.Text = "Changes saved.";
             if (_providers is { } currentProviders) SourceStatus.Text = "ⓘ " + currentProviders.SourceDescription;
         }
@@ -296,7 +301,7 @@ public partial class SettingsWindow : Window
 
 /// <summary>Single live settings window. Call Show(owner) from either the panel or the tray on the UI thread.</summary>
 public sealed class SettingsWindowHost(AppearanceSettings appearance, QuotaAlertObserver alerts,
-    SettingsProviderCommands? providers = null, Action? previewNotification = null, DockSettings? dock = null, SettingsGlyphFont? font = null) : IDisposable
+    SettingsProviderCommands? providers = null, Action? previewNotification = null, DockSettings? dock = null, SettingsGlyphFont? font = null, ConsentSettings? updateSettings = null) : IDisposable
 {
     private SettingsWindow? _window;
     private bool _disposed;
@@ -304,7 +309,7 @@ public sealed class SettingsWindowHost(AppearanceSettings appearance, QuotaAlert
     {
         if (_disposed) return;
         if (_window is { } existing) { if (existing.IsVisible) existing.Activate(); return; }
-        var window = new SettingsWindow(appearance, alerts.Settings, alerts.SaveSettingsAsync, providers: providers, previewNotification: previewNotification, dock: dock, font: font);
+        var window = new SettingsWindow(appearance, alerts.Settings, alerts.SaveSettingsAsync, providers: providers, previewNotification: previewNotification, dock: dock, font: font, updateSettings: updateSettings);
         _window = window;
         if (owner is { IsVisible: true }) window.Owner = owner;
         window.Closed += (_, _) => { if (ReferenceEquals(_window, window)) _window = null; };

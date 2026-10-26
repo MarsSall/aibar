@@ -120,7 +120,7 @@ Las notas de desarrollo y de diseño de tests están en [`docs/dev/`](./docs/dev
 - Cada proveedor viene **apagado por defecto** y necesita su propio consentimiento explícito. Desactivar un proveedor corta su consulta periódica y borra su cuota en caché.
 - Las credenciales de cuota local se leen solo de los archivos de login de las CLI oficiales. Mientras usa cuota remota, AIBar lee únicamente el archivo sanitizado de ese proveedor, nunca su credencial local. AIBar nunca renueva tokens, nunca modifica un login y no guarda credenciales propias.
 - Los datos quedan en `%LOCALAPPDATA%\AIBar`: caché de cuotas, historial, analíticas y la instantánea para YASB. AIBar no tiene backend ni telemetría.
-- Las consultas van directo desde tu PC a OpenAI, Anthropic y sus páginas de estado públicas.
+- Las consultas van directo desde tu PC a OpenAI, Anthropic y sus páginas de estado públicas. La única otra consulta de red es una comprobación anónima de la última versión de AIBar en GitHub, activada por defecto y desactivable en **Settings → General → Check for new versions**. El aviso solo abre la página del release; AIBar nunca descarga ni ejecuta actualizaciones.
 - AIBar ya no escanea el uso local de OpenCode ni Pi. Los archivos existentes se conservan hasta **Clear AIBar Data**, cuya operación interna sigue borrando las cachés, el historial y las exportaciones locales. Usá **Settings → General → Clear AIBar Data**; no toca tus sesiones de los proveedores.
 
 ## Roadmap

@@ -120,7 +120,7 @@ Developer and test-design notes live in [`docs/dev/`](./docs/dev/README.md).
 - Each provider is **off by default** and needs its own explicit consent. Disabling a provider stops its polling and clears its cached quota.
 - Local quota credentials are read only from the official CLI login files. While remote quota is selected, AIBar reads only that provider's sanitized usage file, never its local credential. AIBar never refreshes tokens, changes a login or stores credentials of its own.
 - Data stays under `%LOCALAPPDATA%\AIBar`: quota cache, history, analytics and the YASB snapshot. There is no AIBar backend and no telemetry.
-- Requests go straight from your PC to OpenAI, Anthropic and their public status pages.
+- Requests go straight from your PC to OpenAI, Anthropic and their public status pages. The only other network request is an anonymous check for the latest AIBar release on GitHub, enabled by default and switchable off in **Settings → General → Check for new versions**. The notice only opens the release page; AIBar never downloads or runs updates.
 - OpenCode and Pi local usage is no longer scanned. Existing local-usage files are retained until **Clear AIBar Data**, whose runtime operation still removes local caches, history and exports. Use **Settings → General → Clear AIBar Data**; provider logins are not touched.
 
 ## Roadmap

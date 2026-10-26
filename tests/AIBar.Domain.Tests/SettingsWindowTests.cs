@@ -99,11 +99,14 @@ public sealed class SettingsWindowTests
             var dock = new DockSettings(Path.Combine(root, DockSettings.FileName));
             var initialDock = new DockOptions(true, "left", .25, "screen-2");
             dock.SaveAsync(initialDock, default).AsTask().GetAwaiter().GetResult();
-            var window = new SettingsWindow(appearance, alerts, dock: dock);
+            var updates = new ConsentSettings(Path.Combine(root, "settings.json"));
+            updates.SaveUpdateCheckAsync(false, default).AsTask().GetAwaiter().GetResult();
+            var window = new SettingsWindow(appearance, alerts, dock: dock, updateSettings: updates);
             try
             {
                 window.Show();
                 Pump(window.LoadAsync());
+                Assert.False(Assert.IsType<CheckBox>(window.FindName("CheckForUpdates")).IsChecked);
                 Assert.True(Assert.IsType<CheckBox>(window.FindName("FloatingWidget")).IsChecked == true);
                 Assert.IsType<CheckBox>(window.FindName("FloatingWidget")).IsChecked = false;
                 Assert.IsType<RadioButton>(window.FindName("BarUsage")).IsChecked = true;
@@ -119,11 +122,42 @@ public sealed class SettingsWindowTests
                 timer.Tick += (_, _) => frame.Continue = Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text == "Saving…" && DateTime.UtcNow < deadline;
                 timer.Start(); System.Windows.Threading.Dispatcher.PushFrame(frame); timer.Stop();
                 Assert.Equal("Changes saved.", Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text);
+                Assert.False(updates.LoadUpdateCheckAsync(default).AsTask().GetAwaiter().GetResult());
                 Assert.Equal(1, changed);
                 Assert.Equal(initialDock with { Enabled = false }, dock.LoadAsync(default).AsTask().GetAwaiter().GetResult());
                 Assert.Equal(new AppearanceOptions("usage", "brand", 70, ProviderTint: false, ChartStyle: "columns"), appearance.LoadAsync(default).AsTask().GetAwaiter().GetResult());
                 var saved = alerts.LoadAsync(default).AsTask().GetAwaiter().GetResult();
                 Assert.True(saved.Confetti); Assert.Equal(new[] { 20, 80, 100 }, saved.ThresholdValues.ToArray());
+            }
+            finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
+        });
+    }
+    [Fact]
+    public void Update_toggle_defaults_on_saves_and_reloads_without_changing_consent()
+    {
+        WpfTestApplicationHost.Run(_ =>
+        {
+            var root = Path.Combine(Path.GetTempPath(), $"aibar-settings-update-{Guid.NewGuid():N}");
+            var settings = new ConsentSettings(Path.Combine(root, "settings.json"));
+            var window = new SettingsWindow(new AppearanceSettings(Path.Combine(root, "appearance.json")),
+                new AlertSettings(Path.Combine(root, "alerts.json")), updateSettings: settings);
+            try
+            {
+                window.Show(); Pump(window.LoadAsync());
+                var toggle = Assert.IsType<CheckBox>(window.FindName("CheckForUpdates"));
+                Assert.True(toggle.IsChecked); Assert.True(toggle.IsEnabled);
+                Assert.Equal("Check for new versions", AutomationProperties.GetName(toggle));
+                toggle.IsChecked = false;
+                Assert.IsType<Button>(window.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                var frame = new System.Windows.Threading.DispatcherFrame();
+                var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+                var deadline = DateTime.UtcNow.AddSeconds(60);
+                timer.Tick += (_, _) => frame.Continue = Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text == "Saving…" && DateTime.UtcNow < deadline;
+                timer.Start(); System.Windows.Threading.Dispatcher.PushFrame(frame); timer.Stop();
+                Assert.Equal("Changes saved.", Assert.IsType<TextBlock>(window.FindName("SaveStatus")).Text);
+                Assert.False(settings.LoadUpdateCheckAsync(default).AsTask().GetAwaiter().GetResult());
+                Assert.False(settings.LoadAsync(default).AsTask().GetAwaiter().GetResult());
+                toggle.IsChecked = true; Pump(window.LoadAsync()); Assert.False(toggle.IsChecked);
             }
             finally { window.Close(); if (Directory.Exists(root)) Directory.Delete(root, true); }
         });
