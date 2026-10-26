@@ -140,6 +140,8 @@ public sealed class QuotaExportPublisher : IAsyncDisposable, IAiBarClearWork
     internal Task PublicationCompletion { get { lock (_gate) return _drain; } }
 internal void Accept(QuotaAuthorityUpdate update)
 {
+    // A delayed old-source event must not reopen publication after a handoff.
+    if (!_authority.IsCurrentUpdate(update)) return;
     lock (_gate)
     {
 if (_disposed || _latest is { } latest && update.EventSequence <= latest.EventSequence) return;
@@ -208,7 +210,7 @@ await drain;
 var now = _clock.UtcNow;
 using var linked = CancellationTokenSource.CreateLinkedTokenSource(current.Token, cancellationToken);
 var document = unavailable
-    ? QuotaExportProjector.Project(new(new(null, FreshnessState.Unavailable, false, new(QuotaErrorKind.Unavailable, "quota_other_machine_pending"), null)), now)
+    ? QuotaExportProjector.Project(new(new(null, FreshnessState.Unavailable, false, new(QuotaErrorKind.Unavailable, "quota_unavailable"), null)), now)
     : restore ? QuotaExportProjector.Project(new(Redact(_authority.State)), now) : QuotaExportWire.Disabled(now);
 await _writer.WriteAsync(document, now, linked.Token);
 if (enabled) lock (_gate) if (!_disposed && epoch == _epoch)

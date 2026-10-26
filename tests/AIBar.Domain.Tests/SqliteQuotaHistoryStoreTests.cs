@@ -52,14 +52,14 @@ public sealed class SqliteQuotaHistoryStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task Schema_is_v1_WAL_and_contains_only_normalized_sample_columns()
+    public async Task Schema_is_v2_WAL_and_contains_only_normalized_sample_columns()
     {
         await using var store = new SqliteQuotaHistoryStore(Database);
         await store.AppendAsync([Sample(Now)], Now, default);
         await using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Database, Pooling = false }.ToString());
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA user_version;"; Assert.Equal(1L, (long)(await command.ExecuteScalarAsync())!);
+        command.CommandText = "PRAGMA user_version;"; Assert.Equal(2L, (long)(await command.ExecuteScalarAsync())!);
         command.CommandText = "PRAGMA journal_mode;"; Assert.Equal("wal", (string)(await command.ExecuteScalarAsync())!);
         command.CommandText = "PRAGMA table_info(quota_history);";
         await using var reader = await command.ExecuteReaderAsync();
@@ -72,7 +72,7 @@ public sealed class SqliteQuotaHistoryStoreTests : IDisposable
     {
         await using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Database, Pooling = false }.ToString()))
         {
-            await connection.OpenAsync(); await using var command = connection.CreateCommand(); command.CommandText = "PRAGMA user_version = 2;"; await command.ExecuteNonQueryAsync();
+            await connection.OpenAsync(); await using var command = connection.CreateCommand(); command.CommandText = "PRAGMA user_version = 3;"; await command.ExecuteNonQueryAsync();
         }
         await using var store = new SqliteQuotaHistoryStore(Database);
         await Assert.ThrowsAsync<InvalidOperationException>(() => store.AppendAsync([Sample(Now)], Now, default).AsTask());

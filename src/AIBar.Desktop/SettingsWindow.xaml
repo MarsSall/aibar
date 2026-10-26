@@ -250,9 +250,9 @@
          <CheckBox x:Name="CodexEnabled" Grid.Column="1" Content="Show Codex in AIBar" VerticalAlignment="Center" AutomationProperties.Name="Show Codex in AIBar"/>
          <Label Grid.Column="2" Content="Source" Target="{Binding ElementName=CodexSource}" Foreground="{DynamicResource SettingsSecondaryBrush}" VerticalAlignment="Center" Padding="4,0,6,0"/>
          <ComboBox x:Name="CodexSource" Grid.Column="3" SelectedIndex="0" AutomationProperties.Name="Codex source">
-          <ComboBoxItem Content="Automatic" ToolTip="Uses data sent from another machine when it exists, otherwise this PC's login. Codex has no remote quota yet."/>
-          <ComboBoxItem Content="This PC" ToolTip="Only this PC's login. Codex has no remote quota yet."/>
-          <ComboBoxItem Content="Other machine" ToolTip="Only data sent from another machine. Codex has no remote quota yet."/>
+          <ComboBoxItem Content="Automatic" ToolTip="Uses data sent from another machine when it exists, otherwise this PC's login."/>
+          <ComboBoxItem Content="This PC" ToolTip="Only this PC's login."/>
+          <ComboBoxItem Content="Other machine" ToolTip="Only data sent from another machine."/>
          </ComboBox>
         </Grid>
         <Border BorderBrush="{DynamicResource SettingsBorderBrush}" BorderThickness="0,1,0,0"/>

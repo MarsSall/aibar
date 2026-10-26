@@ -134,7 +134,6 @@ public sealed class QuotaPresentationMapper(IClock clock, QuotaHistoryProvider p
         QuotaErrorKind.Network => "Network unavailable",
         QuotaErrorKind.Service => "Service unavailable",
         QuotaErrorKind.Redirect => "Redirect rejected",
-        QuotaErrorKind.Unavailable when failure.SafeCode == "quota_other_machine_pending" => "No data from the other machine yet",
         QuotaErrorKind.Unavailable when failure.SafeCode == "quota_refresh_failed" => "Refresh failed",
         QuotaErrorKind.Unavailable => "Quota unavailable",
         _ => null
@@ -238,7 +237,9 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
     public bool IsRefreshAvailable => !_disposed && (_refreshAvailable() || _claude?.IsEnabled == true);
     private async ValueTask RefreshAllAsync(CancellationToken token)
     {
-        var codex = _refreshAvailable() ? _coordinator.RefreshAsync(RefreshTrigger.Manual, token).AsTask() : Task.CompletedTask;
+        var codex = _refreshAvailable()
+            ? (_runtime is not null ? _runtime.RefreshAsync(RefreshTrigger.Manual, token) : _coordinator.RefreshAsync(RefreshTrigger.Manual, token)).AsTask()
+            : Task.CompletedTask;
         var claude = _claude?.IsEnabled == true ? _claude.RefreshAsync(token).AsTask() : Task.CompletedTask;
         await Task.WhenAll(codex, claude);
     }
@@ -284,7 +285,7 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         if (_disposed) return;
         var revision = ++_historyRevision;
         _state = Map(state);
-        if (_history is not null && _state.IsCurrent && _refreshAvailable() && _runtime?.IsRemoteOnly != true) _ = ApplyHistoryAsync(state, revision);
+        if (_history is not null && _state.IsCurrent && _refreshAvailable()) _ = ApplyHistoryAsync(state, revision);
         CopySummaryCommand.RefreshState();
         if (state.Failure != _reportedFailure)
         {
@@ -298,17 +299,20 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
         try
         {
             var historyRevision = _history!.Revision;
-            var samples = await _history.ReadPaceAsync(QuotaHistoryProvider.Codex);
-            if (_disposed || revision != _historyRevision || !_refreshAvailable() || _runtime?.IsRemoteOnly == true || !_history.CanPublish(historyRevision)) return;
-            _state = _mapper.Map(state, samples) with { PlanLabel = _refreshAvailable() ? _planSource?.PlanLabel : null };
+            var source = _runtime?.IsUsingRemote == true ? QuotaHistorySource.CodexRemote : QuotaHistorySource.CodexLocal;
+            var samples = await _history.ReadPaceAsync(QuotaHistoryProvider.Codex, source);
+            var currentSource = _runtime?.IsUsingRemote == true ? QuotaHistorySource.CodexRemote : QuotaHistorySource.CodexLocal;
+            if (_disposed || revision != _historyRevision || !_refreshAvailable() || source != currentSource || !_history.CanPublish(historyRevision)) return;
+            _state = Decorate(_mapper.Map(_runtime?.State ?? state, samples));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         }
         catch (Exception) { /* History is optional; the snapshot estimate remains visible. */ }
     }
     private BetaPresentationState Map(QuotaRefreshState state)
     {
-        if (_runtime?.IsRemoteOnly == true) state = _runtime.State;
-        var mapped = _mapper.Map(state) with { PlanLabel = _refreshAvailable() && _runtime?.IsRemoteOnly != true ? _planSource?.PlanLabel : null };
+        // Dispatcher callbacks may have been queued before a source handoff. Always
+        // map the current authority, never a captured value from the previous source.
+        var mapped = Decorate(_mapper.Map(_runtime?.State ?? state));
         return _refreshAvailable() ? mapped : mapped with
         {
             FreshnessLabel = "Private quota integration disabled",
@@ -327,6 +331,25 @@ public sealed class QuotaPresentationHost : INotifyPropertyChanged, IAsyncDispos
             IsPrivateIntegrationDisabled = true,
         };
     }
+    private BetaPresentationState Decorate(BetaPresentationState mapped)
+    {
+        mapped = mapped with { PlanLabel = _refreshAvailable() ? _planSource?.PlanLabel : null };
+        if (_runtime is null) return mapped;
+        if (!_runtime.IsUsingRemote) return mapped with { SourceLabel = "This PC" };
+        var guidance = mapped.NeedsLogin
+            ? "Open Codex on the other machine to renew the session"
+            : mapped.IsUnavailable || mapped.ShowStaleBanner
+                ? "Usage from the other machine is stale or unavailable; check the helper on the other machine"
+                : mapped.WarningLabel;
+        return mapped with
+        {
+            SourceLabel = "Other machine",
+            WarningLabel = guidance,
+            ErrorLabel = guidance,
+            PrivateEndpointDisclosure = "Codex quota is read from a usage file supplied by the other machine; no local credentials are read."
+        };
+    }
+
     public ValueTask DisposeAsync()
     {
         if (!_disposed)

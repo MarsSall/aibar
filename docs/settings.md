@@ -63,21 +63,23 @@ Delivery policy, freshness checks, consent checks and deduplication remain owned
 
 | Source | Meaning for the selected provider |
 | --- | --- |
-| Automatic (default) | Uses data sent from another machine when it exists, otherwise this PC's login. Claude prefers its remote quota file when present; Codex remains local because it has no remote quota reader yet. |
+| Automatic (default) | Uses the selected provider's remote quota file when present, otherwise this PC's login. Both Codex and Claude resolve this on startup and every refresh. |
 | This PC | Only this PC's login. |
-| Other machine | Only data sent from another machine. Codex has no remote quota yet: it shows **No data from the other machine yet**, hides cached local quota and never reads its local credential or calls its quota endpoint. |
+| Other machine | Only data sent from another machine, even when its file is missing. Shows remote values, or stale/unavailable guidance naming the other machine. Never reads the local credential or calls the local quota endpoint. |
 
 The dropdowns have accessible names **Codex source** and **Claude source**; each item has a tooltip explaining its choice. You can mix choices, such as Codex Automatic and Claude Other machine. General has no source control.
 
-Codex Other machine also publishes a value-free YASB export, drops queued local alerts and stops local analytics. Returning to This PC or Automatic resumes local refresh and analytics only with Codex consent. Source selection never grants consent. The panel's **Use other machine** action changes only Claude; a Codex remote quota helper remains a separate follow-up (#85).
+Codex reads `%LOCALAPPDATA%\AIBar\codex-remote-usage.json`, supplied by the [Linux helper](../tools/claude-remote-usage/README.md). Current remote values appear in the panel, floating widget, tray tooltip and existing YASB export, and may trigger alerts. Source handoffs cancel and drain retrieval and export writes, clear the old cache, and invalidate queued alerts from the previous source even when the new source is current. Remote snapshots stay in memory rather than the local quota cache. Both modes still require Codex consent.
+
+Explicit Other machine stops local Codex analytics. Automatic keeps local analytics running even while quota comes from the remote file; the cost rules below are unchanged. Source selection never grants consent. The panel's **Use other machine** action still changes only Claude.
 
 Cost follows each provider's own source too: Codex Automatic combines local and remote token rows, This PC uses local rows only, and Other machine uses remote rows only. Claude uses remote token rows in Automatic and Other machine; This PC has no local token reader and shows cost as unavailable. Each provider's source change refreshes its cost view without waiting for a quota poll.
 
 Enabling a disabled provider shows the existing provider-specific consent disclosure. Declining either required disclosure performs no provider/source writes and leaves the draft open. Disabling requires no prompt. Runtime commands remain the only consent writers; Settings never reads or writes credentials.
 
-**Refresh every** offers **1 min / 2 min / 5 min / 15 min / 30 min**, default **5 min**. Save applies the choice live to both the poll timers and minimum intervals for Codex and Claude **This PC**, without restarting. Selecting **1 min** shows **May hit provider rate limits.** The warning disappears for the other choices. Claude **Other machine** continues reading its synced local file every **1 min**, including when Automatic resolves to Other machine; this does not change the helper's push cadence. Switching back to This PC uses the saved interval.
+**Refresh every** offers **1 min / 2 min / 5 min / 15 min / 30 min**, default **5 min**. Save applies the choice live to both the poll timers and minimum intervals for Codex and Claude **This PC**, without restarting. Selecting **1 min** shows **May hit provider rate limits.** The warning disappears for the other choices. Both providers in **Other machine** continue reading their synced local files every **1 min**, including when Automatic resolves to Other machine; this does not change the helper's push cadence. Switching back to This PC uses the saved interval.
 
-Opening the panel still refreshes data older than one minute, with a one-minute attempt throttle; manual **Refresh** is unchanged. The interval does not change freshness thresholds, consent, or YASB.
+Opening the panel still refreshes data older than one minute, with a one-minute attempt throttle; manual **Refresh** is unchanged. The interval does not change freshness thresholds, consent, or YASB. Remote quota becomes stale at its 15-minute deadline even between polls; an existing invalid or stale remote file does not cause Automatic to fall back to local credentials.
 
 Save applies only changed sources to their respective runtimes before granting consent. Changing one source does not change the other. The Claude remote payload and reader contract are unchanged. Without runtime command bindings, the corresponding controls are explicitly unavailable.
 

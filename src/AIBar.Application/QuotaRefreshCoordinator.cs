@@ -1,4 +1,5 @@
 using System.Runtime.ExceptionServices;
+using System.Runtime.CompilerServices;
 using AIBar.Domain;
 
 namespace AIBar.Application;
@@ -6,12 +7,38 @@ namespace AIBar.Application;
 public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
 {
     private readonly IQuotaSnapshotStore _store;
-    private readonly IQuotaProvider _provider;
+    private IQuotaProvider _provider;
+    private bool _remoteSource;
+    internal IQuotaProvider Provider => _provider;
+    internal Func<RefreshTrigger, CancellationToken, ValueTask>? RefreshRouter { get; set; }
+    internal void UseProvider(IQuotaProvider provider) => _provider = provider;
     private readonly IClock _clock;
-    private readonly FreshnessPolicy _freshness;
+    private FreshnessPolicy _freshness;
+    private readonly FreshnessPolicy _localFreshness;
     private TimeSpan _minimumPollInterval;
     private readonly object _gate = new();
     private readonly Queue<QuotaAuthorityUpdate> _updates = new();
+    // Metadata is bound under the authority lock when the update is produced, not
+    // when a potentially delayed event subscriber eventually receives it.
+    private sealed record UpdateOrigin(long Generation, bool Remote);
+    private readonly ConditionalWeakTable<QuotaAuthorityUpdate, UpdateOrigin> _origins = new();
+    internal bool WasRemote(QuotaAuthorityUpdate update)
+    {
+        lock (_gate) return _origins.TryGetValue(update, out var origin) && origin.Remote;
+    }
+    internal bool IsCurrentUpdate(QuotaAuthorityUpdate update)
+    {
+        // Unstamped updates are supported for the publisher's internal synthetic API.
+        lock (_gate) return !_disposed && (!_origins.TryGetValue(update, out var origin) || origin.Generation == _generation);
+    }
+    internal Func<bool> CaptureUpdateValidity(QuotaAuthorityUpdate update)
+    {
+        lock (_gate)
+        {
+            if (!_origins.TryGetValue(update, out var origin)) return () => false;
+            return () => { lock (_gate) return !_disposed && origin.Generation == _generation; };
+        }
+    }
     private CancellationTokenSource _lifetime = new();
     private Task? _active;
     private QuotaRefreshState _state;
@@ -25,7 +52,7 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
 
     public QuotaRefreshCoordinator(IQuotaSnapshotStore store, IQuotaProvider provider, IClock clock, FreshnessPolicy freshness, TimeSpan minimumPollInterval)
     {
-        _store = store; _provider = provider; _clock = clock; _freshness = freshness;
+        _store = store; _provider = provider; _clock = clock; _freshness = _localFreshness = freshness;
         _minimumPollInterval = minimumPollInterval;
         _state = new(null, FreshnessState.Unavailable, false, null, null);
     }
@@ -57,23 +84,29 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
             Transition(_ => new(null, FreshnessState.Unavailable, false, RefreshFailure(), null), generation);
             return;
         }
-        Transition(_ => new(snapshot, _freshness.Evaluate(snapshot, _clock.UtcNow), false, null, null), generation);
+        Transition(_ => new(snapshot, EvaluateFreshness(snapshot), false, null, null), generation);
     }
 
-    public ValueTask ReevaluateAsync(RefreshTrigger trigger, CancellationToken cancellationToken)
+    public ValueTask ReevaluateAsync(RefreshTrigger trigger, CancellationToken cancellationToken) =>
+        RefreshRouter is { } route ? route(trigger, cancellationToken) : ReevaluateCoreAsync(trigger, cancellationToken);
+
+    internal ValueTask ReevaluateCoreAsync(RefreshTrigger trigger, CancellationToken cancellationToken)
     {
         lock (_gate) ThrowIfDisposed();
         Transition(state =>
         {
-            var freshness = _freshness.Evaluate(state.Snapshot, _clock.UtcNow);
+            var freshness = EvaluateFreshness(state.Snapshot);
             return freshness == state.Freshness ? null : state with { Freshness = freshness };
         });
         return trigger == RefreshTrigger.Sleep
             ? ValueTask.CompletedTask
-            : RefreshAsync(trigger, cancellationToken);
+            : RefreshCoreEntryAsync(trigger, cancellationToken);
     }
 
-    public ValueTask RefreshAsync(RefreshTrigger trigger, CancellationToken cancellationToken)
+    public ValueTask RefreshAsync(RefreshTrigger trigger, CancellationToken cancellationToken) =>
+        RefreshRouter is { } route ? route(trigger, cancellationToken) : RefreshCoreEntryAsync(trigger, cancellationToken);
+
+    private ValueTask RefreshCoreEntryAsync(RefreshTrigger trigger, CancellationToken cancellationToken)
     {
         Task active; TaskCompletionSource? start = null; long generation = 0; CancellationToken lifetime = default;
         lock (_gate)
@@ -123,6 +156,24 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
         finally { cancelled.Dispose(); }
     }
 
+    // Caller has cancelled and drained retrieval and publication before changing source.
+    internal async ValueTask ConfigureSourceAsync(bool remote, bool clear, CancellationToken token)
+    {
+        if (clear) await _store.ClearAsync(token);
+        lock (_gate)
+        {
+            ThrowIfDisposed();
+            _remoteSource = remote;
+            _freshness = remote ? new FreshnessPolicy(TimeSpan.FromMinutes(15)) : _localFreshness;
+            _lastAttempt = DateTimeOffset.MinValue;
+        }
+        if (clear) Transition(_ => new(null, FreshnessState.Unavailable, false, null, null));
+    }
+
+    private FreshnessState EvaluateFreshness(QuotaSnapshot? snapshot) =>
+        _remoteSource && snapshot is not null && _clock.UtcNow - snapshot.RetrievedAt >= TimeSpan.FromMinutes(15)
+            ? FreshnessState.Stale : _freshness.Evaluate(snapshot, _clock.UtcNow);
+
     public void ResumeAfterClear() { lock (_gate) if (!_disposed) _paused = false; }
 
     private bool Eligible(RefreshTrigger trigger)
@@ -158,20 +209,21 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
         catch (Exception) { Transition(FailureState, generation); return; }
         if (result.Snapshot is null)
         {
-            Transition(state => state with { IsLoading = false, Freshness = _freshness.Evaluate(state.Snapshot, _clock.UtcNow), Failure = result.Failure }, generation);
+            Transition(state => state with { IsLoading = false, Freshness = EvaluateFreshness(state.Snapshot), Failure = result.Failure }, generation);
             return;
         }
         var snapshot = new QuotaSnapshot(result.Snapshot.Primary, result.Snapshot.Weekly, result.Snapshot.RetrievedAt, result.ResetCredits);
-        try { await _store.SaveAsync(snapshot, lifetime); }
+        // Remote snapshots are memory-only, so restart cannot relabel them as local.
+        try { if (!_remoteSource) await _store.SaveAsync(snapshot, lifetime); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
         catch (Exception) { Transition(FailureState, generation); return; }
-        Transition(_ => new(snapshot, _freshness.Evaluate(snapshot, _clock.UtcNow), false, null, result.OptionalFailure), generation, retrieval: true);
+        Transition(_ => new(snapshot, EvaluateFreshness(snapshot), false, null, result.OptionalFailure), generation, retrieval: true);
     }
 
     private QuotaRefreshState FailureState(QuotaRefreshState state) => state with
     {
         IsLoading = false,
-        Freshness = _freshness.Evaluate(state.Snapshot, _clock.UtcNow),
+        Freshness = EvaluateFreshness(state.Snapshot),
         Failure = RefreshFailure()
     };
 
@@ -194,7 +246,9 @@ public sealed class QuotaRefreshCoordinator : IAsyncDisposable, IAiBarClearWork
         if (state is null) return false;
         _state = state;
         if (retrieval) _retrievalGeneration++;
-        _updates.Enqueue(new(state, ++_eventSequence, _retrievalGeneration));
+        var update = new QuotaAuthorityUpdate(state, ++_eventSequence, _retrievalGeneration);
+        _origins.Add(update, new(_generation, _remoteSource));
+        _updates.Enqueue(update);
         if (_draining) return false;
         return _draining = true;
     }

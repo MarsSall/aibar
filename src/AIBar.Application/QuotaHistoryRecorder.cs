@@ -36,9 +36,14 @@ public sealed class QuotaHistoryRecorder : IAiBarClearWork, IAsyncDisposable
             if (_disposed || update.RetrievalGeneration <= _lastRetrieval) return;
             _lastRetrieval = update.RetrievalGeneration;
             if (_paused || update.State.Snapshot is not { } snapshot) return;
+            // Codex keeps one coordinator across source changes. Use the origin
+            // stamped at retrieval, even if this callback runs after a later handoff.
+            var source = _provider == QuotaHistoryProvider.Codex
+                ? _authority.WasRemote(update) ? QuotaHistorySource.CodexRemote : QuotaHistorySource.CodexLocal
+                : _source;
             var samples = new List<QuotaHistorySample>(2);
-            if (snapshot.Primary is { } primary) samples.Add(new(_provider, QuotaHistoryWindow.FiveHour, primary.PercentageUsed, primary.ResetAt, snapshot.RetrievedAt, _source));
-            if (snapshot.Weekly is { } weekly) samples.Add(new(_provider, QuotaHistoryWindow.Weekly, weekly.PercentageUsed, weekly.ResetAt, snapshot.RetrievedAt, _source));
+            if (snapshot.Primary is { } primary) samples.Add(new(_provider, QuotaHistoryWindow.FiveHour, primary.PercentageUsed, primary.ResetAt, snapshot.RetrievedAt, source));
+            if (snapshot.Weekly is { } weekly) samples.Add(new(_provider, QuotaHistoryWindow.Weekly, weekly.PercentageUsed, weekly.ResetAt, snapshot.RetrievedAt, source));
             _pending.Enqueue((samples.ToArray(), _clock.UtcNow, _cancellation.Token));
             if (!_draining) { _draining = true; _drain = Task.Run(DrainCoreAsync); }
         }

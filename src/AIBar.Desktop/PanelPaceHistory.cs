@@ -32,7 +32,7 @@ public sealed class PanelPaceHistory(IQuotaHistoryStore store, IClock clock) : I
     }
     public DateTimeOffset Now => clock.UtcNow;
 
-    public async Task<IReadOnlyList<QuotaHistorySample>> ReadPaceAsync(QuotaHistoryProvider provider)
+    public async Task<IReadOnlyList<QuotaHistorySample>> ReadPaceAsync(QuotaHistoryProvider provider, QuotaHistorySource? source = null)
     {
         CancellationToken token; long revision;
         lock (_gate)
@@ -51,7 +51,10 @@ public sealed class PanelPaceHistory(IQuotaHistoryStore store, IClock clock) : I
         }, token).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
         if (!CanPublish(revision)) throw new OperationCanceledException();
-        return samples;
+        // Existing Codex callers are local by default. Remote quota presentation
+        // explicitly requests CodexRemote; Claude retains its existing behavior.
+        var selected = source ?? (provider == QuotaHistoryProvider.Codex ? QuotaHistorySource.CodexLocal : (QuotaHistorySource?)null);
+        return selected is { } value ? samples.Where(sample => sample.Source == value).ToArray() : samples;
     }
 
     public async Task<QuotaHistoryChartData> ReadChartAsync(QuotaHistoryChartRange range, CancellationToken cancellationToken)

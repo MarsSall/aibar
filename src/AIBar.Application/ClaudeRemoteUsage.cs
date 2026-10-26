@@ -11,6 +11,22 @@ public enum ClaudeQuotaSource { ThisPc, OtherMachine, Automatic }
 /// <summary>Reads only the bounded, normalized usage file pushed by the other machine.</summary>
 public sealed class ClaudeRemoteUsageProvider : IQuotaProvider, IQuotaPlanMetadata
 {
+    private readonly RemoteUsageReader _reader;
+    public ClaudeRemoteUsageProvider(PrivateIntegrationPolicy policy, string? path = null,
+        ICredentialFileReader? files = null, Func<string, FileAttributes>? attributes = null,
+        Func<DateTimeOffset>? utcNow = null) =>
+        _reader = new(policy, path ?? DefaultPath(), files, attributes, utcNow);
+    public string? PlanLabel => _reader.PlanLabel;
+    public ValueTask<QuotaProviderResult> GetQuotaAsync(CancellationToken cancellationToken) => _reader.GetQuotaAsync(cancellationToken);
+    public static string DefaultPath() => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AIBar", "claude-remote-usage.json");
+    public static bool IsAvailableForAutomatic(string? path = null, Func<string, FileAttributes>? attributes = null) =>
+        RemoteUsageReader.IsAvailableForAutomatic(path ?? DefaultPath(), attributes);
+}
+
+// Both providers intentionally use exactly the same bounded wire contract and file checks.
+internal sealed class RemoteUsageReader : IQuotaProvider, IQuotaPlanMetadata
+{
     private string? _planLabel;
     /// <summary>Plan from the optional trailing "plan" field of the last valid document; unknown plans stay unlabeled.</summary>
     public string? PlanLabel => _policy.IsEnabled ? _planLabel : null;
@@ -20,23 +36,23 @@ public sealed class ClaudeRemoteUsageProvider : IQuotaProvider, IQuotaPlanMetada
     private readonly Func<string, FileAttributes> _attributes;
     private readonly Func<DateTimeOffset> _utcNow;
 
-    public ClaudeRemoteUsageProvider(PrivateIntegrationPolicy policy, string? path = null,
+    public RemoteUsageReader(PrivateIntegrationPolicy policy, string path,
         ICredentialFileReader? files = null, Func<string, FileAttributes>? attributes = null,
         Func<DateTimeOffset>? utcNow = null)
     {
-        _policy = policy; _path = Path.GetFullPath(path ?? DefaultPath());
+        _policy = policy; _path = Path.GetFullPath(path);
         _files = files ?? new ReadOnlyCredentialFileReader();
         _attributes = attributes ?? File.GetAttributes;
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
     }
 
     // Detection is metadata-only: an invalid/stale payload still owns the remote source.
-    public static bool IsAvailableForAutomatic(string? path = null,
+    public static bool IsAvailableForAutomatic(string path,
         Func<string, FileAttributes>? attributes = null)
     {
         try
         {
-            var fullPath = Path.GetFullPath(path ?? DefaultPath());
+            var fullPath = Path.GetFullPath(path);
             var readAttributes = attributes ?? File.GetAttributes;
             for (string? current = fullPath; current is not null; current = Path.GetDirectoryName(current))
             {
@@ -52,9 +68,6 @@ public sealed class ClaudeRemoteUsageProvider : IQuotaProvider, IQuotaPlanMetada
             return false;
         }
     }
-
-    public static string DefaultPath() => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AIBar", "claude-remote-usage.json");
 
     public async ValueTask<QuotaProviderResult> GetQuotaAsync(CancellationToken cancellationToken)
     {

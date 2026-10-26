@@ -82,7 +82,12 @@ public partial class App : System.Windows.Application
             new SessionFileDiscovery(codexHome, userProfile, 50),
             new AnalyticsScanCoordinator(new SessionJsonlScanner(new SessionCheckpointStore(), "beta-v1", beforeStable: seams.BeforeAnalyticsStability), analyticsStore, new AnalyticsPolicy(new TimeZoneLocalDayPolicy(TimeZoneInfo.Local, "beta-v1"))),
             analyticsStore, () => clock.UtcNow), analytics, analyticsStore, seams.AnalyticsShutdownBound ?? TimeSpan.FromSeconds(2), seams.LifecycleObservation);
-        var betaRuntime = new BetaRuntime(new ConsentSettings(Path.Combine(dataDirectory, "settings.json")), policy, coordinator, clock, credentials, analyticsOwner, publisher);
+        var codexRemotePath = Path.Combine(dataDirectory, "codex-remote-usage.json");
+        var betaRuntime = new BetaRuntime(new ConsentSettings(Path.Combine(dataDirectory, "settings.json")), policy, coordinator, clock,
+            credentials, analyticsOwner, publisher,
+            remoteProviderFactory: codexPolicy => new CodexRemoteUsageProvider(codexPolicy, codexRemotePath, utcNow: () => clock.UtcNow),
+            remoteFileAvailable: () => CodexRemoteUsageProvider.IsAvailableForAutomatic(codexRemotePath),
+            remoteAbsenceConfirmation: TimeSpan.FromSeconds(2));
         var lifecycleEvents = new WindowsLifecycleEvents();
         var claudeRuntime = new ClaudeQuotaRuntime(new ConsentSettings(Path.Combine(dataDirectory, "settings.json")),
             new SqliteQuotaSnapshotStore(ClaudeQuotaRuntime.DatabasePath(dataDirectory)),
@@ -117,12 +122,12 @@ public partial class App : System.Windows.Application
         var onboarding = new OnboardingSettings(Path.Combine(dataDirectory, OnboardingSettings.FileName));
         var alerts = new QuotaAlertObserver(dataDirectory, clock);
         coordinator.AuthorityUpdated += update => alerts.Observe("Codex", update,
-            () => betaRuntime.CanDeliverAlerts);
+            betaRuntime.CaptureAlertEligibility(update));
         claudeRuntime.AuthorityUpdated += update => alerts.Observe("Claude", update,
             () => claudeRuntime.IsConsentEnabled && claudeRuntime.State.Freshness == FreshnessState.Current && claudeRuntime.State.Failure is null);
         var lifecycleAdapter = new QuotaRefreshLifecycleAdapter(lifecycleEvents, coordinator);
         var claudePresentation = new ClaudeQuotaPresentationHost(claudeRuntime, new ClaudeQuotaPresentationMapper(clock), paceHistory);
-        var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents, claudePresentation, paceHistory, codexProvider, betaRuntime);
+        var presentation = new QuotaPresentationHost(coordinator, new QuotaPresentationMapper(clock), () => policy.IsEnabled, ReportFault, lifecycleEvents, claudePresentation, paceHistory, betaRuntime, betaRuntime);
         var providerStatus = new ProviderStatusPresentation(presentation, claudePresentation, () => policy.IsEnabled);
         var startup = new PerUserStartupRegistration(new WindowsPackagedStartupTaskRegistration("AIBar"), new WindowsCurrentUserRunStore(), "AIBar", Environment.ProcessPath ?? throw new InvalidOperationException());
         var clear = new ClearAiBarDataService(dataDirectory, [paceHistory, codexCost, claudeCost, claudeRuntime, publisher, coordinator, historyRecorder, historyStore, alerts, appearance, dock, onboarding, analyticsOwner], CreateEmptyStateFactory(coordinator, analytics, publisher));

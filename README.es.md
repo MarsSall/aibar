@@ -86,17 +86,17 @@ AIBar arranca en la bandeja. Activá Codex y Claude desde **Settings… → Prov
 - **Alertas.** Avisos de reinicio, de umbral (por defecto 75/90/100%) y de "se agota antes del reinicio", con efectos opcionales de confeti y brillo en el borde. Ver [alertas](./docs/alerts.md).
 - **Estado de los proveedores.** Indicadores de incidentes tomados de las páginas de estado oficiales y acceso con un clic a la página de uso de cada proveedor. Ver [estado de proveedores](./docs/provider-status.md).
 - **Copiar resumen.** Copia la cuota que se está mostrando al portapapeles como texto plano. Ver [resumen de cuotas](./docs/quota-summary.md).
-- **Configuración.** General reúne Start with Windows y Clear AIBar Data con confirmación. Providers tiene un desplegable Source compacto por proveedor: Automatic / This PC / Other machine. Las elecciones son independientes y también filtran los datos de costo de cada proveedor. Automatic prioriza la cuota remota de ese proveedor cuando existe; Codex con Other machine queda sin cuota hasta que exista un helper remoto y no lee su sesión local. Use other machine en el panel cambia solo Claude. Sigue los temas claro, oscuro y de alto contraste de Windows: opacidad, tinte por proveedor, colores de las barras, umbrales de alerta e intervalo de actualización. Se puede usar entera con teclado. Ver [configuración](./docs/settings.md).
+- **Configuración.** General reúne Start with Windows y Clear AIBar Data con confirmación. Providers tiene un desplegable Source compacto por proveedor: Automatic / This PC / Other machine. Las elecciones son independientes y también filtran los datos de costo de cada proveedor. Automatic prioriza el archivo de cuota remota de ese proveedor cuando existe. Codex con Other machine muestra la cuota del helper en el panel, widget flotante, bandeja y YASB sin leer su sesión local; los datos vencidos o ausentes indican que hay que revisar la otra máquina. Use other machine en el panel cambia solo Claude. Sigue los temas claro, oscuro y de alto contraste de Windows: opacidad, tinte por proveedor, colores de las barras, umbrales de alerta e intervalo de actualización. Se puede usar entera con teclado. Ver [configuración](./docs/settings.md).
 - **Widget flotante.** ¿No tenés YASB? Activá una tira siempre visible con anillos de cuota desde Configuración, o aceptá la oferta al iniciar, que aparece una sola vez. Arrastrala a cualquier borde de la pantalla.
 - **Fuente para YASB.** Si detecta YASB sin la fuente, AIBar te ofrece instalar IosevkaTerm Nerd Font, incluida en el ZIP. También podés instalarla desde Configuración, solo para tu usuario, sin permisos de administrador ni descargas.
 - **Widget para YASB.** CustomWidget opcional para [YASB](https://github.com/amnweb/yasb) que muestra una instantánea sanitizada de la cuota en tu barra. Ver [`yasb/README.txt`](./yasb/README.txt).
-- **Uso remoto.** Helpers opcionales para Linux que mandan por SSH la cuota de Claude y los totales de tokens de Codex desde otra máquina. Ver [`tools/claude-remote-usage`](./tools/claude-remote-usage/README.md).
+- **Uso remoto.** Helpers opcionales para Linux que mandan por SSH las cuotas y los totales de tokens de Codex y Claude desde otra máquina. La cuota remota se lee cada minuto y se marca vencida a los 15 minutos; cada proveedor sigue requiriendo consentimiento. Ver [`tools/claude-remote-usage`](./tools/claude-remote-usage/README.md).
 
 ### Proveedores soportados
 
 | Proveedor | Datos | Conexión |
 | --- | --- | --- |
-| ChatGPT Codex | Límites de 5 horas y semanales, uso local de tokens | Login existente de Codex CLI (`auth.json`), solo lectura |
+| ChatGPT Codex | Límites de 5 horas y semanales, uso local/remoto de tokens | Login existente de Codex CLI (`auth.json`), solo lectura, o un helper en otra máquina |
 | Claude Pro / Max | Límites de 5 horas y semanales, uso de tokens | Login existente de Claude Code, solo lectura, o un helper en otra máquina |
 
 La lectura de cuotas usa endpoints no documentados de los proveedores. Pueden cambiar o dejar de funcionar en cualquier momento.
@@ -118,7 +118,7 @@ Las notas de desarrollo y de diseño de tests están en [`docs/dev/`](./docs/dev
 ## Privacidad y datos locales
 
 - Cada proveedor viene **apagado por defecto** y necesita su propio consentimiento explícito. Desactivar un proveedor corta su consulta periódica y borra su cuota en caché.
-- Las credenciales se leen solo de los archivos de login de las CLI oficiales. AIBar nunca renueva tokens, nunca modifica un login y no guarda credenciales propias.
+- Las credenciales de cuota local se leen solo de los archivos de login de las CLI oficiales. Mientras usa cuota remota, AIBar lee únicamente el archivo sanitizado de ese proveedor, nunca su credencial local. AIBar nunca renueva tokens, nunca modifica un login y no guarda credenciales propias.
 - Los datos quedan en `%LOCALAPPDATA%\AIBar`: caché de cuotas, historial, analíticas y la instantánea para YASB. AIBar no tiene backend ni telemetría.
 - Las consultas van directo desde tu PC a OpenAI, Anthropic y sus páginas de estado públicas.
 - AIBar ya no escanea el uso local de OpenCode ni Pi. Los archivos existentes se conservan hasta **Clear AIBar Data**, cuya operación interna sigue borrando las cachés, el historial y las exportaciones locales. Usá **Settings → General → Clear AIBar Data**; no toca tus sesiones de los proveedores.
