@@ -146,7 +146,12 @@
        <Border Style="{StaticResource SettingsCard}" Padding="16,10">
         <CheckBox x:Name="StartWithWindows" Content="Start with Windows" AutomationProperties.Name="Start with Windows" Click="OnToggleStartup"/>
        </Border>
-       <TextBlock Text="LOCAL DATA" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
+       <TextBlock Text="UPDATES" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
+        <Border Style="{StaticResource SettingsCard}" Padding="16,10"><StackPanel>
+         <CheckBox x:Name="CheckForUpdates" Content="Check for new versions" AutomationProperties.Name="Check for new versions" IsChecked="True"/>
+         <TextBlock Text="Anonymous GitHub check. Opens the release page only; never downloads or installs updates." Style="{StaticResource SettingsMeta}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        </StackPanel></Border>
+        <TextBlock Text="LOCAL DATA" Style="{StaticResource SettingsHeading}" Margin="0,16,0,8"/>
        <Border Style="{StaticResource SettingsCard}" Padding="16,10"><StackPanel>
         <Button x:Name="ClearData" Content="Clear AIBar Data" AutomationProperties.Name="Clear AIBar Data" Click="OnClearData" HorizontalAlignment="Left"/>
         <TextBlock x:Name="GeneralStatus" Style="{StaticResource SettingsMeta}" Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>

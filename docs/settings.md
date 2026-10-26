@@ -20,6 +20,8 @@ Selected pivots have an accent underline and semibold text. Controls have named 
 
 **Start with Windows** loads the current Windows registration. Clicking it toggles the native registration and displays the actual readback result, not an assumed success.
 
+**Check for new versions** is on by default. Save to apply this toggle. AIBar makes an anonymous, bounded request to `https://api.github.com/repos/MarsSall/aibar/releases/latest` shortly after startup and about once a day. Off means no update request. Network errors and invalid responses are silent. A newer version shows a native notice, like the startup offers, with **Open download page** and **Close**. The button opens only this repository's GitHub release page in your browser; AIBar never downloads or runs an update. Closing the notice does not disable checks; it may appear again next launch if you are still outdated.
+
 **Clear AIBar Data** asks: “Clear AIBar Data? This removes AIBar's local data and turns off Codex quota access. Your provider logins are not touched.” Choose **Clear** or **Cancel** (the safe default). Cancel does nothing; Clear drains the existing runtime work and removes AIBar-owned data. The result appears inline and Settings reloads its controls.
 
 ## Appearance
@@ -85,6 +87,8 @@ Save applies only changed sources to their respective runtimes before granting c
 
 ## Persistence and clearing
 
+`%LOCALAPPDATA%\AIBar\settings.json` also stores `checkForUpdates` (boolean). An absent field means **on**, including legacy files. Provider consent/source saves preserve this value, and saving the toggle preserves the provider fields through the same serialized, atomic writer.
+
 `%LOCALAPPDATA%\AIBar\settings.json` stores independent `codexSource` and `claudeSource` values: `automatic`, `this-pc` or `other-machine`. When `codexSource` is absent, it migrates from the saved general `dataSource`, or defaults to Automatic. When `claudeSource` is absent, it also migrates from `dataSource`; an existing Claude choice wins. A Claude-only legacy choice never selects Codex's source. Present invalid provider values default to Automatic rather than falling back to the general value.
 
 Migration happens on load, in memory. Consent and cache-provenance saves preserve absent source fields: `claudeSource` or `codexSource` is written only if it was already present or that provider's source is explicitly saved. Default Automatic is not materialized by a consent save. Existing source values, consent decisions and Claude cache provenance are preserved regardless of save order, even if an unrelated consent field is malformed.
@@ -107,7 +111,7 @@ Saving multiple sections is **not a cross-file transaction**. A later persistenc
 
 ## Integration contract
 
-`SettingsWindowHost(AppearanceSettings, QuotaAlertObserver, SettingsProviderCommands?, Action? previewNotification, DockSettings? dock, SettingsGlyphFont? font)` is the UI-thread entry point. The optional parameters preserve existing call sites. Alert saves still run on the observer's serialized queue.
+`SettingsWindowHost(AppearanceSettings, QuotaAlertObserver, SettingsProviderCommands?, Action? previewNotification, DockSettings? dock, SettingsGlyphFont? font, ConsentSettings? updateSettings)` is the UI-thread entry point. The optional parameters preserve existing call sites. Alert saves still run on the observer's serialized queue.
 
 `App.xaml.cs` constructs `SettingsProviderCommands` from the existing `NativeSettingsCommands`, `BetaRuntime` and `ClaudeQuotaRuntime`, and passes the tray's notification entry point for preview. Codex uses `EnablePrivateIntegrationAsync` / `DisablePrivateIntegrationAsync`; Claude uses `GrantConsentAsync` / `RevokeConsentAsync` and `SetSourceAsync`. The tray's former provider/alert entry points are removed; the underlying runtime operations remain available to Settings.
 

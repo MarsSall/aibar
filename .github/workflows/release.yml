@@ -1,0 +1,138 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and create draft release
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Validate tag against project version
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [xml]$project = Get-Content -LiteralPath 'src/AIBar.Desktop/AIBar.Desktop.csproj' -Raw
+          $version = [string]($project.Project.PropertyGroup.Version | Select-Object -First 1)
+          if ($version -cnotmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$' -or
+              $env:GITHUB_REF_NAME -cne "v$version") {
+              throw 'Tag must equal v followed by the project Version.'
+          }
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+          "RELEASE_DIRECTORY=$env:RUNNER_TEMP\aibar-release" >> $env:GITHUB_ENV
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore AIBar.sln --nologo
+
+      - name: Build
+        run: dotnet build AIBar.sln --no-restore --configuration Debug --nologo
+
+      - name: Test
+        run: >-
+          dotnet test AIBar.sln --no-build --no-restore --configuration Debug
+          --logger "console;verbosity=normal"
+          --logger "trx;LogFileName=AIBar.Tests.trx"
+          --results-directory "$env:RUNNER_TEMP\aibar-test-results"
+
+      - name: Package portable release
+        run: |
+          ./scripts/Publish-Deterministic.ps1 -Release -ExpectedSourceCommit $env:GITHUB_SHA -OutputDirectory $env:RELEASE_DIRECTORY
+
+      - name: Ensure Inno Setup 6.7.3 and build installer
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Test-PinnedCompiler([string]$path) {
+              if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $false }
+              $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($path)
+              return ("$($info.FileMajorPart).$($info.FileMinorPart).$($info.FileBuildPart)" -eq '6.7.3')
+          }
+          $candidates = @(
+              (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
+              (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+              (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe')
+          )
+          $onPath = Get-Command ISCC.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -ne $onPath) { $candidates += $onPath.Source }
+          $compiler = $candidates | Where-Object { Test-PinnedCompiler $_ } | Select-Object -First 1
+          if (-not $compiler) {
+              $installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+              # SHA-256 independently matched against winget-pkgs JRSoftware.InnoSetup 6.7.3.
+              $expectedHash = '9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732'
+              Invoke-WebRequest -Uri 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $installer -TimeoutSec 120
+              $actualHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+              if ($actualHash -cne $expectedHash) { throw 'Inno Setup installer SHA-256 mismatch.' }
+              $destination = Join-Path $env:RUNNER_TEMP 'Inno Setup 6.7.3'
+              $process = Start-Process -FilePath $installer -ArgumentList @('/CURRENTUSER', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=`"$destination`"") -Wait -PassThru
+              if ($process.ExitCode -ne 0) { throw "Inno Setup installation failed: $($process.ExitCode)" }
+              $compiler = Join-Path $destination 'ISCC.exe'
+          }
+          if (-not (Test-PinnedCompiler $compiler)) { throw 'Expected Inno Setup compiler 6.7.3.' }
+          ./scripts/Build-Installer.ps1 -ReleaseDirectory $env:RELEASE_DIRECTORY -IsccPath $compiler
+
+      - name: Reject existing releases including drafts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The authenticated paginated list includes drafts, unlike tag-based lookups.
+          $response = gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" --paginate --slurp
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot check existing releases; refusing to create a draft.' }
+          $pages = ($response -join "`n") | ConvertFrom-Json -NoEnumerate -ErrorAction Stop
+          if ($null -eq $pages) { throw 'Invalid release list; refusing to create a draft.' }
+          foreach ($page in $pages) {
+              foreach ($release in $page) {
+                  if ($release.tag_name -ceq $env:GITHUB_REF_NAME) {
+                      throw "Release already exists for tag $env:GITHUB_REF_NAME (including drafts); refusing to create another."
+                  }
+              }
+          }
+
+      - name: Create draft release with four assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:RELEASE_VERSION
+          $assets = @(
+              (Join-Path $env:RELEASE_DIRECTORY "AIBar-$version-win-x64-setup.exe"),
+              (Join-Path $env:RELEASE_DIRECTORY "AIBar-$version-win-x64.zip"),
+              (Join-Path $env:RELEASE_DIRECTORY 'release-manifest.json'),
+              (Join-Path $env:RELEASE_DIRECTORY 'SHA256SUMS.txt')
+          )
+          foreach ($asset in $assets) {
+              if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) { throw "Missing asset: $asset" }
+          }
+          $notes = (Get-Content -LiteralPath 'packaging/release-notes.md' -Raw).Replace('{{VERSION}}', $version).Replace('{{SOURCE_COMMIT}}', $env:GITHUB_SHA)
+          $notesPath = Join-Path $env:RUNNER_TEMP 'aibar-release-notes.md'
+          [IO.File]::WriteAllText($notesPath, $notes, [Text.UTF8Encoding]::new($false))
+          $arguments = @('--draft', '--verify-tag', '--title', "AIBar $version", '--notes-file', $notesPath)
+          if ($version.Contains('-')) { $arguments += '--prerelease' }
+          # The preceding authenticated guard rejects existing published releases and drafts.
+          gh release create $env:GITHUB_REF_NAME @assets @arguments
+          if ($LASTEXITCODE -ne 0) { throw 'Draft creation failed; an existing release is never overwritten.' }

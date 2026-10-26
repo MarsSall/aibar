@@ -31,7 +31,21 @@ AIBar es una app chica y local para la bandeja de Windows, pensada para quienes 
 
 Todo corre en tu máquina. AIBar lee en modo solo lectura los logins oficiales que ya tenés en las CLI, nunca renueva ni reescribe tokens y guarda el historial en archivos SQLite locales.
 
-> **Estado: beta privada.** La versión actual es `0.1.0-beta.4`, un ZIP para Windows x64, autocontenido y sin firmar. Todavía no hay instalador, actualizador ni release público. Ver [distribución de la beta privada](./docs/private-beta.md) (en inglés).
+## Instalación
+
+Windows 10 u 11, x64.
+
+1. Descargá `AIBar-<versión>-win-x64-setup.exe` del [último release](https://github.com/MarsSall/aibar/releases/latest).
+2. AIBar todavía no está firmado, así que Windows SmartScreen puede mostrar **Windows protegió tu PC**. Tocá **Más información** y después **Ejecutar de todas formas**.
+3. El instalador no pide permisos de administrador. Instala en `%LOCALAPPDATA%\Programs\AIBar` y agrega un acceso en el menú Inicio.
+
+¿Preferís no usar instalador? Descargá `AIBar-<versión>-win-x64.zip`, descomprimilo en una carpeta que vayas a conservar y abrí `AIBar.Desktop.exe`.
+
+Para verificar una descarga, compará `(Get-FileHash .\<archivo>).Hash` en PowerShell con su línea en el `SHA256SUMS.txt` del release (mayúsculas y minúsculas no importan).
+
+**Actualizaciones.** AIBar te avisa cuando hay un release más nuevo y abre su página de descarga; nunca descarga ni instala nada por su cuenta. Ejecutá el instalador nuevo encima del anterior: tu configuración e historial se conservan.
+
+**Desinstalar** desde Configuración de Windows → Aplicaciones o el menú Inicio. El desinstalador pregunta si querés borrar también tus datos de AIBar; se conservan salvo que marques la casilla.
 
 ## Stack
 
@@ -76,7 +90,7 @@ AIBar arranca en la bandeja. Activá Codex y Claude desde **Settings… → Prov
 | `dotnet test AIBar.sln` | Correr la suite de tests de .NET |
 | `dotnet run --project src/AIBar.Desktop` | Correr la app desde el código fuente |
 | `python -m unittest discover -s tools/claude-remote-usage/tests` | Testear los helpers remotos de Linux |
-| `pwsh -File scripts/Publish-Deterministic.ps1 -PrivateBeta ...` | Generar el ZIP de la beta privada ([detalles](./docs/private-beta.md)) |
+| `pwsh -File scripts/Publish-Deterministic.ps1 -Release ...` | Generar el ZIP del release; después `scripts/Build-Installer.ps1` para el instalador ([detalles](./docs/release.md), en inglés) |
 
 ## Funcionalidades
 
@@ -111,7 +125,7 @@ La lectura de cuotas usa endpoints no documentados de los proveedores. Pueden ca
 | `tests/` | Suites de xUnit y harnesses de procesos |
 | `tools/` | Supervisor de empaquetado y helpers remotos para Linux |
 | `yasb/` | Lector del CustomWidget de YASB, ejemplos y tests de Pester |
-| `scripts/` | Publicación determinística de la beta privada |
+| `scripts/` | Empaquetado determinístico del release y armado del instalador |
 
 Las notas de desarrollo y de diseño de tests están en [`docs/dev/`](./docs/dev/README.md).
 
@@ -120,12 +134,12 @@ Las notas de desarrollo y de diseño de tests están en [`docs/dev/`](./docs/dev
 - Cada proveedor viene **apagado por defecto** y necesita su propio consentimiento explícito. Desactivar un proveedor corta su consulta periódica y borra su cuota en caché.
 - Las credenciales de cuota local se leen solo de los archivos de login de las CLI oficiales. Mientras usa cuota remota, AIBar lee únicamente el archivo sanitizado de ese proveedor, nunca su credencial local. AIBar nunca renueva tokens, nunca modifica un login y no guarda credenciales propias.
 - Los datos quedan en `%LOCALAPPDATA%\AIBar`: caché de cuotas, historial, analíticas y la instantánea para YASB. AIBar no tiene backend ni telemetría.
-- Las consultas van directo desde tu PC a OpenAI, Anthropic y sus páginas de estado públicas.
+- Las consultas van directo desde tu PC a OpenAI, Anthropic y sus páginas de estado públicas. La única otra consulta de red es una comprobación anónima de la última versión de AIBar en GitHub, activada por defecto y desactivable en **Settings → General → Check for new versions**. El aviso solo abre la página del release; AIBar nunca descarga ni ejecuta actualizaciones.
 - AIBar ya no escanea el uso local de OpenCode ni Pi. Los archivos existentes se conservan hasta **Clear AIBar Data**, cuya operación interna sigue borrando las cachés, el historial y las exportaciones locales. Usá **Settings → General → Clear AIBar Data**; no toca tus sesiones de los proveedores.
 
 ## Roadmap
 
-La firma de código, un instalador, la actualización automática y un release público están planeados. Hoy no están disponibles.
+Están planeados la firma de código gratuita para proyectos open source (SignPath Foundation) y un paquete de winget. La instalación automática de actualizaciones no está planeada: AIBar solo avisa.
 
 ## Contribuir
 

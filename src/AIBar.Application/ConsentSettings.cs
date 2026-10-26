@@ -17,6 +17,16 @@ public sealed class ConsentSettings(string path)
     public async ValueTask<bool> LoadClaudeAsync(CancellationToken cancellationToken) =>
         await ReadAsync<StoredConsent>(cancellationToken).ConfigureAwait(false) is { Schema: Schema, PrivateClaudeConsent: true };
 
+    public async ValueTask<bool> LoadUpdateCheckAsync(CancellationToken cancellationToken)
+    {
+        using var document = await ReadAsync<JsonDocument>(cancellationToken).ConfigureAwait(false);
+        return !(document?.RootElement is { ValueKind: JsonValueKind.Object } root &&
+            root.TryGetProperty("schema", out var schema) && schema.ValueKind == JsonValueKind.Number && schema.TryGetInt32(out var version) && version == Schema &&
+            root.TryGetProperty("checkForUpdates", out var value) && value.ValueKind == JsonValueKind.False);
+    }
+    public ValueTask SaveUpdateCheckAsync(bool enabled, CancellationToken cancellationToken) =>
+        SaveDecisionAsync(null, null, cancellationToken, checkForUpdates: enabled);
+
     // Compatibility entry points now refer exclusively to Codex; dataSource is migration-only.
     public ValueTask<DataSource> LoadDataSourceAsync(CancellationToken cancellationToken) => LoadCodexSourceAsync(cancellationToken);
     public ValueTask SaveDataSourceAsync(DataSource source, CancellationToken cancellationToken) => SaveCodexSourceAsync(source, cancellationToken);
@@ -95,7 +105,7 @@ public sealed class ConsentSettings(string path)
     }
 
     private async ValueTask SaveDecisionAsync(bool? codex, bool? claude, CancellationToken cancellationToken,
-        ClaudeQuotaSource? source = null, ClaudeQuotaSource? cacheSource = null, ClaudeQuotaSource? codexSource = null)
+        ClaudeQuotaSource? source = null, ClaudeQuotaSource? cacheSource = null, ClaudeQuotaSource? codexSource = null, bool? checkForUpdates = null)
     {
         var gate = SaveGates.GetOrAdd(Path.GetFullPath(_path), _ => new(1, 1));
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -113,7 +123,7 @@ public sealed class ConsentSettings(string path)
                     value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.GetBoolean() : null;
                 JsonElement? Field(string name) => root.TryGetProperty(name, out var value) ? value.Clone() : null;
                 previous = new(Schema, Decision("privateCodexConsent") ?? false, Decision("privateClaudeConsent"),
-                    Field("claudeSource"), Field("claudeCacheSource"), Field("codexSource"), Field("dataSource"));
+                    Field("claudeSource"), Field("claudeCacheSource"), Field("codexSource"), Field("dataSource"), Decision("checkForUpdates"));
             }
             // Defaults and legacy migration are load-time decisions, not disclosed source choices.
             // Consent and cache-provenance saves must not materialize absent provider fields.
@@ -128,7 +138,7 @@ public sealed class ConsentSettings(string path)
             var migrationValue = (source is not null || codexSource is not null) &&
                 sourceValue is not null && codexValue is not null ? null : previous?.DataSource;
             var settings = new StoredConsent(Schema, codex ?? previous?.PrivateCodexConsent ?? false,
-                claude ?? previous?.PrivateClaudeConsent, sourceValue, cacheValue, codexValue, migrationValue);
+                claude ?? previous?.PrivateClaudeConsent, sourceValue, cacheValue, codexValue, migrationValue, checkForUpdates ?? previous?.CheckForUpdates);
             var directory = Path.GetDirectoryName(_path) ?? throw new InvalidOperationException("Consent settings require a directory.");
             Directory.CreateDirectory(directory);
             var temporary = Path.Combine(directory, $".{Path.GetFileName(_path)}.{Guid.NewGuid():N}.tmp");
@@ -154,7 +164,8 @@ public sealed class ConsentSettings(string path)
         [property: JsonPropertyName("claudeSource"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? ClaudeSource = null,
         [property: JsonPropertyName("claudeCacheSource"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? ClaudeCacheSource = null,
         [property: JsonPropertyName("codexSource"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? CodexSource = null,
-        [property: JsonPropertyName("dataSource"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? DataSource = null);
+        [property: JsonPropertyName("dataSource"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? DataSource = null,
+        [property: JsonPropertyName("checkForUpdates"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? CheckForUpdates = null);
 
     private sealed record StoredSource(
         [property: JsonPropertyName("schema")] int Schema,
