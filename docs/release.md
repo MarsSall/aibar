@@ -45,4 +45,20 @@ The version is read from `release-manifest.json`, not hardcoded. The installer p
 
 Inno Setup is a build tool, not an AIBar runtime dependency. Neither packaging command runs the generated installer or uninstaller. Actual install, upgrade while running, shortcut/startup behavior and both data-retention choices still require manual acceptance on Windows; do not test destructive uninstall options against data you need.
 
-A later task will run packaging on version tags in CI and publish the installer, portable ZIP and hashes to GitHub Releases. These commands currently produce local artifacts only.
+## Publishing a release
+
+1. Bump `<Version>` in `src/AIBar.Desktop/AIBar.Desktop.csproj` to the intended version (for example, `0.1.0` or `0.1.0-beta.5`). Merge the reviewed change to `main` and check out the merged commit locally.
+2. Tag that commit with the exact project version, prefixed by `v`, then push only that tag:
+
+   ```bash
+   git tag vX.Y.Z && git push origin vX.Y.Z
+   ```
+
+   Replace `X.Y.Z` with the full version, including any prerelease suffix. A mismatched tag fails before building.
+3. Wait for the **Release** workflow. It runs only on pushed `v*` tags, builds and tests the solution on Windows, runs the two packaging scripts, and creates a **draft** titled `AIBar <version>`. Versions containing `-` are marked prerelease. Drafts and prereleases are excluded from the app's latest-release update notice.
+4. Review the draft notes and all four assets: `AIBar-<version>-win-x64-setup.exe`, `AIBar-<version>-win-x64.zip`, `release-manifest.json`, and `SHA256SUMS.txt`. Confirm the source commit and hashes, and manually test installation/portable startup and uninstall behavior on Windows before publishing.
+5. Publish the reviewed draft by hand in GitHub Releases. The workflow never publishes automatically. Before creating a draft, an authenticated guard lists every page of releases, including drafts, and fails if any release has the same tag. API or JSON parsing errors also stop creation (fail closed). A rerun against an existing draft therefore fails; inspect it rather than expecting assets to be replaced. The workflow never edits, deletes, or overwrites an existing release.
+
+The workflow uses only the automatic `GITHUB_TOKEN`, with `contents: write` restricted to the draft-creating job and read-only permission at workflow level. The token is exposed only in the step-level environments of the existing-release guard and draft creation steps. Official checkout and .NET setup actions are pinned to full commit SHAs; checkout does not persist credentials. Inno Setup is build-time only: the runner must use exactly **6.7.3**, or download the official installer and verify pinned SHA-256 `9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732` before a silent per-user installation. That hash was checked against the winget-pkgs manifest for `JRSoftware.InnoSetup` 6.7.3. No paid signing service or new runtime dependency is introduced.
+
+Release notes come from `packaging/release-notes.md`, with version and source commit filled in by CI. They include English/Spanish download guidance, unsigned-build SmartScreen instructions, and PowerShell checksum verification. Build outputs, compiler downloads and rendered notes stay in runner temporary storage, outside the clean source checkout required by release packaging.
