@@ -26,6 +26,7 @@ param(
     [int]$CancelAfterMilliseconds = 0,
     [string]$KnownDescendantIdentityPath,
     [switch]$PrivateBeta,
+    [switch]$Release,
     [string]$GlyphFontDirectory,
     # Synthetic offline packaging tests only; requires explicit test mode AND local inputs.
     [string]$TestGlyphFontSha256,
@@ -39,10 +40,14 @@ param(
     [int]$SmokeStartupMilliseconds = 1000
 )
 $ErrorActionPreference = "Stop"
+if ($Release -and ($PrivateBeta -or $CapabilityPlan -or $GraphProjection -or $PSBoundParameters.ContainsKey('PrepareOnly') -or
+    $PSBoundParameters.ContainsKey('BetaBaselineCommit') -or $PSBoundParameters.ContainsKey('BetaParentCommit'))) {
+    throw "RELEASE_OPTIONS_CONFLICT"
+}
 if (($PSBoundParameters.ContainsKey('ExpectedSourceCommit') -or $PSBoundParameters.ContainsKey('PrepareOnly') -or
      $PSBoundParameters.ContainsKey('GlyphFontDirectory') -or $PSBoundParameters.ContainsKey('TestGlyphFontSha256') -or
      $PSBoundParameters.ContainsKey('TestGlyphFontLength') -or $PSBoundParameters.ContainsKey('TestGlyphLicenseSha256')) -and
-    (-not $PrivateBeta -or $CapabilityPlan -or $GraphProjection)) {
+    ((-not $PrivateBeta -and -not $Release) -or $CapabilityPlan -or $GraphProjection)) {
     throw "BETA_OPTIONS_REQUIRE_PRIVATE_BETA"
 }
 $glyphTestPins = $PSBoundParameters.ContainsKey('TestGlyphFontSha256') -or $PSBoundParameters.ContainsKey('TestGlyphFontLength') -or $PSBoundParameters.ContainsKey('TestGlyphLicenseSha256')
@@ -268,27 +273,34 @@ function Copy-PrivateBetaGlyphFont([string]$Publish) {
         if (($null -ne $asset.length -and (Get-Item -LiteralPath $destination).Length -ne $asset.length) -or (Sha $destination) -cne $asset.sha256) { throw "BETA_GLYPH_SOURCE_MISMATCH: $($asset.name)" }
     }
 }
-function Invoke-PrivateBeta {
+function Invoke-Distribution {
+    $errorPrefix = if ($Release) { "RELEASE" } else { "BETA" }
     $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
     $canonical = (& git -C $projectRoot rev-parse --show-toplevel).Trim()
-    if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($canonical) -cne $projectRoot) { throw "BETA_REPOSITORY_MISMATCH" }
+    if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($canonical) -cne $projectRoot) { throw "${errorPrefix}_REPOSITORY_MISMATCH" }
     $status = ((& git -C $projectRoot status --porcelain) -join "`n").Trim()
-    if ($LASTEXITCODE -ne 0) { throw "BETA_REPOSITORY_INVALID" }
-    if (-not [string]::IsNullOrWhiteSpace($status)) { throw "BETA_SOURCE_UNCOMMITTED" }
-    $source = (& git -C $projectRoot rev-parse HEAD).Trim(); $parent = (& git -C $projectRoot rev-parse "$source^").Trim()
-    if ($LASTEXITCODE -ne 0) { throw "BETA_SOURCE_MISSING" }
-    $baseline = if ([string]::IsNullOrWhiteSpace($BetaBaselineCommit)) { "c4e35c01d5ed9cff30b136802a39196a3b2ed91d" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaBaselineCommit }
-    $requiredParent = if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { "816c28b6747a6e9aa62c5c23c216cd4feb7a55fd" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaParentCommit }
-    # Explicit source pinning admits reviewed later commits without weakening legacy defaults.
-    if (-not [string]::IsNullOrWhiteSpace($ExpectedSourceCommit)) {
-        if ($ExpectedSourceCommit -cnotmatch '^(?:[0-9a-f]{40}|[0-9a-f]{64})$' -or $source -cne $ExpectedSourceCommit) { throw "BETA_SOURCE_MISMATCH" }
-    } elseif ($parent -cne $requiredParent) { throw "BETA_PARENT_MISMATCH" }
-    if ($PrepareOnly -and [string]::IsNullOrWhiteSpace($ExpectedSourceCommit)) { throw "BETA_PREPARATION_REQUIRES_SOURCE_PIN" }
-    & git -C $projectRoot merge-base --is-ancestor $baseline $source
-    if ($LASTEXITCODE -ne 0) { throw "BETA_BASELINE_MISMATCH" }
+    if ($LASTEXITCODE -ne 0) { throw "${errorPrefix}_REPOSITORY_INVALID" }
+    if (-not [string]::IsNullOrWhiteSpace($status)) { throw "${errorPrefix}_SOURCE_UNCOMMITTED" }
+    $source = (& git -C $projectRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "${errorPrefix}_SOURCE_MISSING" }
+    if ($Release) {
+        if ($ExpectedSourceCommit -cnotmatch '^(?:[0-9a-f]{40}|[0-9a-f]{64})$' -or $source -cne $ExpectedSourceCommit) { throw "RELEASE_SOURCE_MISMATCH" }
+    } else {
+        $parent = (& git -C $projectRoot rev-parse "$source^").Trim()
+        if ($LASTEXITCODE -ne 0) { throw "BETA_SOURCE_MISSING" }
+        $baseline = if ([string]::IsNullOrWhiteSpace($BetaBaselineCommit)) { "c4e35c01d5ed9cff30b136802a39196a3b2ed91d" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaBaselineCommit }
+        $requiredParent = if ([string]::IsNullOrWhiteSpace($BetaParentCommit)) { "816c28b6747a6e9aa62c5c23c216cd4feb7a55fd" } else { if ($env:AIBAR_PRIVATE_BETA_TEST_MODE -ne "1") { throw "BETA_TEST_OVERRIDE_DENIED" }; $BetaParentCommit }
+        # Explicit source pinning admits reviewed later commits without weakening legacy defaults.
+        if (-not [string]::IsNullOrWhiteSpace($ExpectedSourceCommit)) {
+            if ($ExpectedSourceCommit -cnotmatch '^(?:[0-9a-f]{40}|[0-9a-f]{64})$' -or $source -cne $ExpectedSourceCommit) { throw "BETA_SOURCE_MISMATCH" }
+        } elseif ($parent -cne $requiredParent) { throw "BETA_PARENT_MISMATCH" }
+        if ($PrepareOnly -and [string]::IsNullOrWhiteSpace($ExpectedSourceCommit)) { throw "BETA_PREPARATION_REQUIRES_SOURCE_PIN" }
+        & git -C $projectRoot merge-base --is-ancestor $baseline $source
+        if ($LASTEXITCODE -ne 0) { throw "BETA_BASELINE_MISMATCH" }
+    }
     [xml]$projectXml = Get-Content -LiteralPath (Join-Path $projectRoot "src\AIBar.Desktop\AIBar.Desktop.csproj") -Raw
     $version = [string]($projectXml.Project.PropertyGroup.Version | Select-Object -First 1)
-    if ([string]::IsNullOrWhiteSpace($version)) { throw "BETA_VERSION_MISSING" }
+    if ([string]::IsNullOrWhiteSpace($version)) { throw "${errorPrefix}_VERSION_MISSING" }
     $outputRoot = Assert-FreshLeaf $OutputDirectory $projectRoot
     $isolation = Get-IsolationRoots $projectRoot $outputRoot
     $created = $false
@@ -301,23 +313,40 @@ function Invoke-PrivateBeta {
             Assert-IsolationReady $isolation $IsolationMarker $projectRoot
             $publishArguments += "/p:DirectoryBuildPropsPath=$(Write-IsolationProps $isolation)"
         }
-        Invoke-OwnedProcess $PublishCommand $publishArguments "BETA_PUBLISH_FAILED"
+        Invoke-OwnedProcess $PublishCommand $publishArguments "${errorPrefix}_PUBLISH_FAILED"
         Copy-PrivateBetaYasbAssets $projectRoot $publish
+        if ($Release) {
+            # Reuse the integration assets without carrying the legacy distribution label.
+            $yasbReadme = Join-Path $publish "yasb/README.txt"
+            $readmeText = [IO.File]::ReadAllText($yasbReadme).Replace('private beta', 'public release')
+            [IO.File]::WriteAllText($yasbReadme, $readmeText, [Text.UTF8Encoding]::new($false))
+        }
         Copy-PrivateBetaGlyphFont $publish
-        $notice = "AIBar $version is an unsigned private beta for Windows x64. It is manually distributed and has no updater or installer.`nBaseline ancestor: $baseline`nSource commit: $source`n"
-        [IO.File]::WriteAllText((Join-Path $publish "PRIVATE-BETA.txt"), $notice, [Text.UTF8Encoding]::new($false))
+        if (-not $Release) {
+            $notice = "AIBar $version is an unsigned private beta for Windows x64. It is manually distributed and has no updater or installer.`nBaseline ancestor: $baseline`nSource commit: $source`n"
+            [IO.File]::WriteAllText((Join-Path $publish "PRIVATE-BETA.txt"), $notice, [Text.UTF8Encoding]::new($false))
+        }
         $files = @{}; Get-ChildItem -LiteralPath $publish -Recurse -File | ForEach-Object { $relative = $_.FullName.Substring($publish.Length).TrimStart('\','/') -replace '\\','/'; if ($relative.StartsWith('/') -or $relative.Split('/') -contains '..' -or $files.ContainsKey($relative)) { throw "BETA_INVENTORY_INVALID" }; $files[$relative] = [ordered]@{ path=$relative; length=$_.Length; sha256=(Sha $_.FullName) } }
         $paths = [string[]]$files.Keys; [Array]::Sort($paths, [StringComparer]::Ordinal); $inventory = @($paths | ForEach-Object { [pscustomobject]$files[$_] })
         Add-Type -AssemblyName System.IO.Compression; Add-Type -AssemblyName System.IO.Compression.FileSystem
-        $zipPath = Join-Path $outputRoot "AIBar-win-x64-private-beta.zip"; $stream = [IO.File]::Open($zipPath, [IO.FileMode]::CreateNew); $zip = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create, $false)
+        $zipName = if ($Release) { "AIBar-$version-win-x64.zip" } else { "AIBar-win-x64-private-beta.zip" }
+        $zipPath = Join-Path $outputRoot $zipName; $stream = [IO.File]::Open($zipPath, [IO.FileMode]::CreateNew); $zip = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create, $false)
         try { foreach ($relative in $paths) { $entry = $zip.CreateEntry($relative, [IO.Compression.CompressionLevel]::Optimal); $entry.LastWriteTime = [DateTimeOffset]::FromUnixTimeSeconds([long]$SourceDateEpoch); $entry.ExternalAttributes = 0; $input = [IO.File]::OpenRead((Join-Path $publish ($relative -replace '/','\'))); try { $target = $entry.Open(); try { $input.CopyTo($target) } finally { $target.Dispose() } } finally { $input.Dispose() } } } finally { $zip.Dispose(); $stream.Dispose() }
         $startupSmoke = "not-run"
-        if (-not $PrepareOnly) {
+        if (-not $Release -and -not $PrepareOnly) {
             $smoke = Join-Path $outputRoot "smoke"; $process = $null
             try { Expand-Archive -LiteralPath $zipPath -DestinationPath $smoke; $executable = Join-Path $smoke "AIBar.Desktop.exe"; if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "BETA_SMOKE_EXECUTABLE_MISSING" }; $process = Start-Process -FilePath $executable -WorkingDirectory $smoke -PassThru; if ($process.WaitForExit($SmokeStartupMilliseconds)) { throw "BETA_SMOKE_EARLY_EXIT" }; $process.Kill($true); if (-not $process.WaitForExit($ProcessTimeoutSeconds * 1000)) { throw "BETA_SMOKE_TIMEOUT" } } finally { if ($null -ne $process) { if (-not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }; $process.Dispose() }; if (Test-Path -LiteralPath $smoke) { Remove-Item -LiteralPath $smoke -Recurse -Force } }
             $startupSmoke = "passed"
         }
         $zipSha = Sha $zipPath
+        if ($Release) {
+            $manifestPath = Join-Path $outputRoot "release-manifest.json"
+            Write-CanonicalJson $manifestPath ([ordered]@{ schemaVersion="aibar-release-1"; target="win-x64"; selfContained=$true; unsigned=$true; sourceCommit=$source; version=$version; inventory=$inventory; zipSha256=$zipSha })
+            $checksums = "$zipSha  $zipName`n$(Sha $manifestPath)  release-manifest.json`n"
+            [IO.File]::WriteAllText((Join-Path $outputRoot "SHA256SUMS.txt"), $checksums, [Text.UTF8Encoding]::new($false))
+            # Keep the published tree as input to the installer build.
+            return
+        }
         [ordered]@{ schemaVersion="aibar-private-beta-1"; target="win-x64"; selfContained=$true; unsigned=$true; baselineCommit=$baseline; parentCommit=$parent; sourceCommit=$source; version=$version; startupSmoke=$startupSmoke; inventory=$inventory; zipSha256=$zipSha } | ConvertTo-Json -Compress -Depth 8 | Set-Content -LiteralPath (Join-Path $outputRoot "private-beta-manifest.json") -NoNewline
         $instructions = "AIBar private beta $version is unsigned. Extract the ZIP, verify `$((Get-FileHash .\AIBar-win-x64-private-beta.zip -Algorithm SHA256).Hash) equals $zipSha, then launch AIBar.Desktop.exe from the extracted directory. Replace an older beta by exiting it and replacing its extracted directory manually; no updater or uninstall is provided. Baseline ancestor: $baseline. Parent commit: $parent. Source commit: $source."
         if ($PrepareOnly) {
@@ -328,7 +357,7 @@ function Invoke-PrivateBeta {
         [IO.File]::WriteAllText((Join-Path $outputRoot "private-beta-instructions.txt"), $instructions + "`n", [Text.UTF8Encoding]::new($false))
     } catch { if ($created -and (Test-Path -LiteralPath $outputRoot)) { Remove-Item -LiteralPath $outputRoot -Recurse -Force }; throw }
 }
-if ($PrivateBeta) { Invoke-PrivateBeta; exit 0 }
+if ($PrivateBeta -or $Release) { Invoke-Distribution; exit 0 }
 try {
     if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { throw "OutputDirectory is required." }
     try { $epoch = [long]::Parse($SourceDateEpoch, [Globalization.CultureInfo]::InvariantCulture) } catch { throw "SourceDateEpoch must be an integer." }
