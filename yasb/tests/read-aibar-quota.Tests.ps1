@@ -113,7 +113,7 @@ Describe 'AIBar YASB reader' {
             @{ Name = 'nullable-reset.json'; Label = '5h: 12% | 7d: 40% | current'; Tooltip = "Codex`n5h  12% $dot reset: --`nWeekly  40% $dot resets in 1d 22h`ncurrent $dot age: 2h"; ClassName = 'aibar-quota state-current' },
             @{ Name = 'reset-equal.json'; Label = '5h: 12% | current'; Tooltip = "Codex`n5h  12% $dot reset: due`ncurrent $dot age: 0m"; ClassName = 'aibar-quota state-current' }
         )
-        $compact = @('40%', '12%', '40% | stale | refresh failed', '40% | stale | authentication failed', 'unavailable', 'disabled', '40%', '40%', '12%')
+        $compact = @('40% 7d', '12% 5hr', '40% 7d | stale | refresh failed', '40% 7d | stale | authentication failed', 'unavailable', 'disabled', '40% 7d', '40% 7d', '12% 5hr')
         $index = 0
         foreach ($case in $cases) {
             $result = Read-Fixture $case.Name
@@ -126,7 +126,7 @@ Describe 'AIBar YASB reader' {
 
         # S6 regression: the limit omitted from compactText still has usage and reset in the tooltip.
         $twoWindow = Read-Fixture 'current.json'
-        Assert-Compact $twoWindow '40%'
+        Assert-Compact $twoWindow '40% 7d'
         $twoWindow.tooltip | Should -BeExactly "Codex`n5h  12.5% $dot resets in 1h 0m`nWeekly  40% $dot resets in 1d 22h`ncurrent $dot age: 2h"
 
         $five = [ordered]@{ percentageUsed = 12.5; resetAt = '2026-07-12T13:00:00Z' }
@@ -146,7 +146,7 @@ Describe 'AIBar YASB reader' {
             @{ Name = 'zero-window current fails closed'; Five = $null; Weekly = $null; State = 'current'; Warning = $null; Source = $source; Label = 'unavailable'; Tooltip = "Codex`nunavailable $dot age: --"; ClassName = 'aibar-quota state-unavailable warning-unavailable' },
             @{ Name = 'malformed-present sibling fails closed'; Five = [ordered]@{ percentageUsed = -1; resetAt = $null }; Weekly = $weekly35; State = 'current'; Warning = $null; Source = $source; Label = 'unavailable'; Tooltip = "Codex`nunavailable $dot age: --"; ClassName = 'aibar-quota state-unavailable warning-unavailable' }
         )
-        $compact = @('35%', '35%', '25%', '12.5%', '35% | stale | refresh failed', '35% | stale | service unavailable', '12.5% | stale | authentication failed', 'refreshing', 'unavailable', 'unavailable', 'unavailable')
+        $compact = @('35% 7d', '35% 7d', '25% 7d', '12.5% 5hr', '35% 7d | stale | refresh failed', '35% 7d | stale | service unavailable', '12.5% 5hr | stale | authentication failed', 'refreshing', 'unavailable', 'unavailable', 'unavailable')
         $index = 0
         foreach ($case in $nullableCases) {
             $document = [ordered]@{
@@ -188,7 +188,9 @@ Describe 'AIBar YASB reader' {
                         if ($weeklyHero) { $document.weekly = $document.fiveHour; $document.fiveHour = [ordered]@{ percentageUsed = 0; resetAt = $null } }
                         $result = Read-Document $document
                         Assert-SafeFields $result
-                        Assert-Compact $result (([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%')
+                        # At 0% both windows tie and the 5h window keeps priority, so the label names it.
+                        $label = if ($weeklyHero -and $value -gt 0) { ' 7d' } else { ' 5hr' }
+                        Assert-Compact $result (([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%' + $label)
                         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32($stage[2]))
                         $result.progressColor | Should -BeExactly $color
                         $formatted = ([double]$value).ToString('0.#', [Globalization.CultureInfo]::InvariantCulture)
@@ -384,9 +386,9 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
 
     It 'names Claude in the alternate label and tooltip while the compact text matches Codex' {
         $cases = @(
-            @('current.json', '40%'), @('partial.json', '40%'), @('nullable-reset.json', '40%'),
-            @('refreshing.json', '12%'), @('stale-refresh.json', '40% | stale | refresh failed'),
-            @('stale-auth.json', '40% | stale | authentication failed'),
+            @('current.json', '40% 7d'), @('partial.json', '40% 7d'), @('nullable-reset.json', '40% 7d'),
+            @('refreshing.json', '12% 5hr'), @('stale-refresh.json', '40% 7d | stale | refresh failed'),
+            @('stale-auth.json', '40% 7d | stale | authentication failed'),
             @('unavailable.json', 'unavailable'), @('disabled.json', 'disabled')
         )
         foreach ($case in $cases) {
@@ -427,7 +429,8 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
                     # S14 replaces weekly-first: zero competing usage preserves all original target ramp assertions.
                     if ($weekly) { $document.weekly = $window; $document.fiveHour = [ordered]@{ percentageUsed = 0; resetAt = $null } }
                     $result = Read-ClaudeDocument $document
-                    Assert-Compact $result (([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%')
+                    $label = if ($weekly -and $value -gt 0) { ' 7d' } else { ' 5hr' }
+                    Assert-Compact $result (([double]$value).ToString('R', [Globalization.CultureInfo]::InvariantCulture) + '%' + $label)
                     $glyphs = @(0xF0766, 0xF0A9E, 0xF0A9F, 0xF0AA0, 0xF0AA1, 0xF0AA2, 0xF0AA3, 0xF0AA4, 0xF0AA5)
                     $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32($glyphs[[int][math]::Min(8, [math]::Floor($value / 12.5))]))
                     $result.progressColor | Should -BeExactly $(if ($value -lt 50) { '#3DDC84' } elseif ($value -lt 75) { '#FFC531' } elseif ($value -lt 90) { '#FF8A3D' } else { '#FF4D5E' })
@@ -439,7 +442,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
     It 'uses Claude five-hour usage when it is higher and retains both window details' {
         $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 92; resetAt = '2026-07-12T13:00:00Z' }; weekly = [ordered]@{ percentageUsed = 40; resetAt = '2026-07-14T10:00:00Z' } }
         $result = Read-ClaudeDocument $document
-        Assert-Compact $result '92%'
+        Assert-Compact $result '92% 5hr'
         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA4))
         $result.progressColor | Should -BeExactly '#FF4D5E'
         $result.label | Should -BeExactly 'Claude 5h: 92% | 7d: 40% | current'
@@ -447,7 +450,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         # Cached/stale data uses the same selection without losing its explicit warning.
         $document.state = 'stale'; $document.warning = 'refresh-failed'
         $result = Read-ClaudeDocument $document
-        Assert-Compact $result '92% | stale | refresh failed'
+        Assert-Compact $result '92% 5hr | stale | refresh failed'
         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA4))
         $result.progressColor | Should -BeExactly '#FF4D5E'
     }
@@ -455,7 +458,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
     It 'uses Claude weekly usage when it is higher even if five-hour resets sooner' {
         $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 40; resetAt = '2026-07-12T13:00:00Z' }; weekly = [ordered]@{ percentageUsed = 78; resetAt = '2026-07-14T10:00:00Z' } }
         $result = Read-ClaudeDocument $document
-        Assert-Compact $result '78%'
+        Assert-Compact $result '78% 7d'
         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA3))
         $result.progressColor | Should -BeExactly '#FF8A3D'
         $result.label | Should -BeExactly 'Claude 5h: 40% | 7d: 78% | current'
@@ -474,7 +477,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         )) {
             $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = [ordered]@{ percentageUsed = 50; resetAt = $resets[0] }; weekly = [ordered]@{ percentageUsed = 50; resetAt = $resets[1] } }
             $result = Read-ClaudeDocument $document
-            Assert-Compact $result '50%'
+            Assert-Compact $result $(if ($resets[2] -eq 'weekly') { '50% 7d' } else { '50% 5hr' })
             $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA1))
             $result.progressColor | Should -BeExactly '#FFC531'
             $selected = & $readerModule {
@@ -491,7 +494,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
         $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $null; weekly = [ordered]@{ percentageUsed = 62.5; resetAt = '2026-07-14T10:00:00Z' } }
         $result = Read-Document $document
         Assert-SafeFields $result
-        Assert-Compact $result '62.5%'
+        Assert-Compact $result '62.5% 7d'
         $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA2))
         $result.progressColor | Should -BeExactly '#FFC531'
         $result.label | Should -BeExactly '7d: 62.5% | current'
@@ -505,7 +508,7 @@ Describe 'Claude opt-in YASB contract (S4-S5)' {
                 $document = [ordered]@{ schemaVersion = 1; generatedAt = '2026-07-12T12:00:00Z'; state = 'current'; warning = $null; sourceRetrievedAt = '2026-07-12T10:00:00Z'; fiveHour = $window; weekly = $null }
                 if ($weeklyOnly) { $document.fiveHour = $null; $document.weekly = $window }
                 $result = Read-ClaudeDocument $document
-                Assert-Compact $result ("$used%")
+                Assert-Compact $result $(if ($weeklyOnly) { "$used% 7d" } else { "$used% 5hr" })
                 $result.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32($(if ($used -eq 0) { 0xF0766 } else { 0xF0AA5 })))
                 $result.progressColor | Should -BeExactly $(if ($used -eq 0) { '#3DDC84' } else { '#FF4D5E' })
                 $result.label | Should -BeExactly $(if ($weeklyOnly) { "Claude 7d: $used% | current" } else { "Claude 5h: $used% | current" })
@@ -604,10 +607,10 @@ Describe 'Settings YASB colors' {
         foreach ($provider in @('', 'Claude')) {
             $result = Read-WithAppearance '{"schema":1,"barColors":"brand","yasbColors":"brand"}' $provider
             $result.progressColor | Should -BeExactly $(if ($provider -ceq 'Claude') { '#E0876A' } else { '#2FBF98' })
-            $result.compactText | Should -BeExactly '40%'
+            $result.compactText | Should -BeExactly '40% 7d'
             (@($result.PSObject.Properties.Name) -join ',') | Should -BeExactly 'label,compactText,progressGlyph,progressColor,tooltip,className'
             $higherFive = Read-WithAppearance '{"schema":1,"barColors":"brand","yasbColors":"brand"}' $provider 92
-            $higherFive.compactText | Should -BeExactly '92%'
+            $higherFive.compactText | Should -BeExactly '92% 5hr'
             $higherFive.progressGlyph | Should -BeExactly ([char]::ConvertFromUtf32(0xF0AA4))
             $higherFive.progressColor | Should -BeExactly $result.progressColor
             (@($higherFive.PSObject.Properties.Name) -join ',') | Should -BeExactly 'label,compactText,progressGlyph,progressColor,tooltip,className'
@@ -618,7 +621,7 @@ Describe 'Settings YASB colors' {
             $result = Read-WithAppearance $json
             Assert-SafeFields $result
             $result.progressColor | Should -BeExactly '#3DDC84'
-            $result.compactText | Should -BeExactly '40%'
+            $result.compactText | Should -BeExactly '40% 7d'
         }
     }
     It 'keeps unavailable gray in brand mode and reads settings without modifying bytes' {
