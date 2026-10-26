@@ -221,6 +221,9 @@ public sealed class PanelDetailsWindowTests
         WithPanel(panel =>
         {
             panel.OpenDetails(true);
+            // Windows may refuse to activate a background test process (CI runners, SSH sessions); the foreground
+            // must still read as this process, otherwise the real probe sees another app and dismisses the pair.
+            panel.ActivationLeftApp = () => false;
             panel.Activate();
             panel.CheckDetailsActivation();
             Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
