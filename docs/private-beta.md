@@ -1,5 +1,7 @@
 # AIBar private beta distribution
 
+> **Superseded.** Public releases use [release packaging](./release.md) (`-Release`, installer and the tag-triggered workflow). This page documents the legacy `-PrivateBeta` mode, which the script still supports.
+
 AIBar `0.1.0-beta.4` is an **unsigned**, **self-contained**, **Windows x64** ZIP for manual private-beta testing. It has no installer, signing, updater, uninstall flow, package-manager delivery, store distribution, or public release.
 
 ## Package contents

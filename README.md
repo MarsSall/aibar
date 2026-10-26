@@ -31,7 +31,21 @@ AIBar is a small local Windows tray app for people who live inside ChatGPT Codex
 
 Everything runs on your machine. AIBar reads the existing official CLI logins read-only, never refreshes or rewrites tokens, and keeps its history in local SQLite files.
 
-> **Status: private beta.** The current build is `0.1.0-beta.4`, an unsigned, self-contained Windows x64 ZIP. There is no installer, updater or public release yet. See [private beta distribution](./docs/private-beta.md).
+## Install
+
+Windows 10 or 11, x64.
+
+1. Download `AIBar-<version>-win-x64-setup.exe` from the [latest release](https://github.com/MarsSall/aibar/releases/latest).
+2. AIBar is not code-signed yet, so Windows SmartScreen may show **Windows protected your PC**. Select **More info**, then **Run anyway**.
+3. The installer needs no administrator rights. It installs to `%LOCALAPPDATA%\Programs\AIBar` and adds a Start menu shortcut.
+
+Prefer no installer? Download `AIBar-<version>-win-x64.zip`, extract it to a folder you keep, and run `AIBar.Desktop.exe`.
+
+To check a download, compare `(Get-FileHash .\<file>).Hash` in PowerShell with its line in the release's `SHA256SUMS.txt` (case does not matter).
+
+**Updates.** AIBar tells you when a newer release exists and opens its download page; it never downloads or installs anything by itself. Run the new installer over the old one: your settings and history stay.
+
+**Uninstall** from Windows Settings → Apps or the Start menu. The uninstaller asks whether to delete your AIBar data too; it is kept unless you tick the box.
 
 ## Stack
 
@@ -76,7 +90,7 @@ AIBar starts in the tray. Open **Settings… → Providers** to enable Codex and
 | `dotnet test AIBar.sln` | Run the .NET test suite |
 | `dotnet run --project src/AIBar.Desktop` | Run the tray app from source |
 | `python -m unittest discover -s tools/claude-remote-usage/tests` | Test the Linux remote-usage helpers |
-| `pwsh -File scripts/Publish-Deterministic.ps1 -PrivateBeta ...` | Build the private-beta ZIP ([details](./docs/private-beta.md)) |
+| `pwsh -File scripts/Publish-Deterministic.ps1 -Release ...` | Build the release ZIP; then `scripts/Build-Installer.ps1` for the installer ([details](./docs/release.md)) |
 
 ## Features
 
@@ -111,7 +125,7 @@ Quota retrieval uses undocumented provider endpoints. They may change or stop wo
 | `tests/` | xUnit suites and process harnesses |
 | `tools/` | Packaging supervisor and the Linux remote-usage helpers |
 | `yasb/` | YASB CustomWidget reader, examples and Pester tests |
-| `scripts/` | Deterministic private-beta publishing |
+| `scripts/` | Deterministic release packaging and the installer build |
 
 Developer and test-design notes live in [`docs/dev/`](./docs/dev/README.md).
 
@@ -125,7 +139,7 @@ Developer and test-design notes live in [`docs/dev/`](./docs/dev/README.md).
 
 ## Roadmap
 
-Code signing, an installer, auto-update and a public release are planned, not current capabilities.
+Free code signing for open-source projects (SignPath Foundation) and a winget package are planned. Automatic installation of updates is not planned: AIBar only notifies.
 
 ## Contributing
 
